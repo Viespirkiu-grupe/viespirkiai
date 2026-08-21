@@ -109,6 +109,25 @@ export type Procurement = Readonly<{
     bvpzKodai: readonly string[] | null;
     esFinansavimas: boolean | null;
     lots: readonly Lot[];
+    participation: ProcurementParticipation | null;
+}>;
+
+// Distinct-tiekejoKodas participation facts from public.v_dalyviai_v2, merged
+// onto a Lot/Procurement by the Procurement Reader's own batch query (the
+// consolidated successor to LT-COM-01/02/03's former per-indicator
+// collect.sql). null means no ATN-1 participation was observed at all for
+// this lot/procurement; a non-null object with totalBids/totalSuppliers: 0 is
+// a real, rarer case — a participant row exists but every tiekejoKodas in it
+// is NULL (~1.5% of procurements; see LT-COM-03/README.md's real-data run).
+export type LotParticipation = Readonly<{
+    totalBids: number;
+    validBids: number;
+    reportedAt: string | null;
+}>;
+
+export type ProcurementParticipation = Readonly<{
+    totalSuppliers: number;
+    reportedAt: string | null;
 }>;
 
 export type Lot = Readonly<{
@@ -122,6 +141,7 @@ export type Lot = Readonly<{
     dalyviuSkaicius: number | null;
     kainuSkaicius: number | null;
     atmestuSkaicius: number | null;
+    participation: LotParticipation | null;
 }>;
 
 // The Subject a Risk Indicator's isEligible/assessRisk decide about (v2 §3.4).
@@ -135,19 +155,20 @@ export type ProcurementSubject = Readonly<{
     procurement: Procurement;
 }>;
 
-// procurement is nullable: v_pirkimo_dalis can produce a lot whose
-// pirkimoNumeris has no matching v_pirkimas row (an orphan lot — the same
-// case today's "unmatched procurement" fixture covers). Requiring a non-null
-// parent here would make such lots unreachable as Subjects, silently
-// dropping them from risk_signals instead of producing the insufficient_data
-// row they produce today.
+// procurement is always non-null: the Procurement Reader only ever builds a
+// LotSubject from a Lot already nested inside its parent Procurement.lots. An
+// orphan lot — a v_pirkimo_dalis_v2 row whose pirkimoNumeris has no matching
+// v_pirkimas_v2 row — never reaches this far; the Reader logs its count and
+// drops it before any Subject is built (architecture-v2.md §1.2's
+// ProcurementReader note: "can't happen by business invariant... it is not a
+// Subject").
 export type LotSubject = Readonly<{
     subjectType: "lot";
     subjectKey: string;
     procurementSource: string | null;
     procurementId: string;
     lot: Lot;
-    procurement: Procurement | null;
+    procurement: Procurement;
 }>;
 
 // "contract"/"supplier" subjects (see SubjectType above) have no Subject

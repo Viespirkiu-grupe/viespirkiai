@@ -12,24 +12,30 @@ report(s) into a single subject. `totalSuppliers` counts every distinct supplier
 
 | File             | Question it answers                                                                     |
 |-------------------|-------------------------------------------------------------------------------------------|
-| `collect.sql`     | What is true about each procurement — the distinct-supplier count, method, when reported  |
 | `parameters.ts`   | What it compares against, and since when                                                  |
 | `definition.ts`   | Identity, lifecycle, public wording — pure metadata, no behaviour                          |
 | `decision.ts`     | What the facts mean — the state, the threshold that decided it, the evidence — plus the `AProcurementIndicatorDecision` wiring, with `static decide()` as its judgement method (replaces `rules.ts`) |
 | `test/`           | How we know it works                                                                      |
 
-Inside `test/`, `fixtures.ts` states both the source rows and the fact row `collect.sql` must produce from them;
-`decision.test.ts` decides those fact rows with no database, and `collect.it.ts` proves the statement really produces
-them against a real PostgreSQL. Everything else — identity fields, parameter resolution, `not_applicable` when no entry
-applies — belongs to `ARiskIndicatorDecision`/`AProcurementIndicatorDecision` and is tested once in `test/risk/procurementLotDecision.test.ts`.
+There is no `collect.sql` here (v2 architecture): the cross-lot distinct-supplier count (`totalSuppliers`/
+`reportedAt`) comes from `modules/risk/procurementReader.ts`'s consolidated procurement-grain participation query
+and arrives already merged onto `Subject.procurement.participation` before `decision.ts` ever runs.
+
+Inside `test/`, `fixtures.ts` states the expected `Subject.procurement.participation` shape for each scenario;
+`decision.test.ts` decides those fixtures with no database. The participation query's own correctness (cross-lot
+union, cutoff filtering) is tested once in `test/risk/procurementReader.it.ts`. Everything else — identity fields,
+parameter resolution, `not_applicable` when no entry applies — belongs to
+`ARiskIndicatorDecision`/`AProcurementIndicatorDecision` and is tested once in
+`test/risk/procurementLotDecision.test.ts`.
 
 ## How this differs from LT-COM-01 and LT-COM-02
 
-All three read `public.v_dalyviai` and share the `insufficient_data` reasoning (unmatched procurement, an empty
-report), but they differ in grain and in what they measure:
+All three are judged from participation counts the Procurement Reader merges onto `Lot`/`Procurement` via two
+consolidated queries (not three independent `collect.sql` statements) and share the `insufficient_data` reasoning
+(no participation observed, an empty report), but they differ in grain and in what they measure:
 
 - **LT-COM-01** ("single valid bid") and **LT-COM-02** ("low number of bidders") both judge one **lot** at a time —
-  a multi-lot procurement produces one fact row (and one decision) per lot.
+  a multi-lot procurement produces one `Subject.lot.participation` (and one decision) per lot.
 - **LT-COM-03** judges the **whole procurement** — every lot's participants are unioned into one distinct-supplier
   count before the threshold is applied. A supplier that bid on two lots of the same procurement is counted once, not
   twice (`test/fixtures.ts`'s `sameSupplierAcrossTwoLots`), and a procurement where lot 1 drew one supplier and lot 2

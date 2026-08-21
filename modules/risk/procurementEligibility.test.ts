@@ -17,6 +17,7 @@ function procurement(overrides: Partial<Procurement> = {}): Procurement {
         bvpzKodai: null,
         esFinansavimas: null,
         lots: [],
+        participation: null,
         ...overrides,
     };
 }
@@ -33,6 +34,7 @@ function lot(overrides: Partial<Lot> = {}): Lot {
         dalyviuSkaicius: 1,
         kainuSkaicius: 1,
         atmestuSkaicius: 0,
+        participation: null,
         ...overrides,
     };
 }
@@ -55,22 +57,11 @@ describe("procurementEligibility", () => {
             decision: { state: "not_applicable" },
         });
     });
-
-    it("is insufficient_data when there is no procurement at all", () => {
-        expect(procurementEligibility(null)).toEqual({
-            eligible: false,
-            decision: { state: "insufficient_data", missingData: ["procurementSource"] },
-        });
-    });
 });
 
 describe("lotEligibility", () => {
     it("delegates entirely to its parent procurement's gate", () => {
         expect(lotEligibility(lot(), procurement())).toEqual({ eligible: true });
-        expect(lotEligibility(lot(), null)).toEqual({
-            eligible: false,
-            decision: { state: "insufficient_data", missingData: ["procurementSource"] },
-        });
         expect(lotEligibility(lot(), procurement({ saltinis: "cvpp", pirkimoBudas: null }))).toEqual({
             eligible: false,
             decision: { state: "not_applicable" },

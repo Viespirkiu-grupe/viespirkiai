@@ -97,7 +97,7 @@ describe("Risk Signals Writer", () => {
     it("appends the observations of one indicator to the run's snapshot", async () => {
         const runId = await openRun();
         const stats = await withTransaction((client) =>
-            writeObservations(client, INDICATOR_ID, runId, [
+            writeObservations(client, runId, [
                 observation({ subjectKey: "cvpis:1" }),
                 observation({ subjectKey: "cvpis:2" }),
             ]),
@@ -112,7 +112,7 @@ describe("Risk Signals Writer", () => {
 
     it("writes nothing for an indicator that produced no observations", async () => {
         const runId = await openRun();
-        const stats = await withTransaction((client) => writeObservations(client, INDICATOR_ID, runId, []));
+        const stats = await withTransaction((client) => writeObservations(client, runId, []));
         expect(stats).toEqual({ inserted: 0 });
         expect(await signalsOfRun(runId)).toHaveLength(0);
     });
@@ -121,12 +121,12 @@ describe("Risk Signals Writer", () => {
     // compared, so each run's snapshot stands alone.
     it("keeps each run's rows separate, leaving the previous snapshot untouched", async () => {
         const runId1 = await openRun();
-        await withTransaction((client) => writeObservations(client, INDICATOR_ID, runId1, [observation()]));
+        await withTransaction((client) => writeObservations(client, runId1, [observation()]));
         const first = await signalsOfRun(runId1);
 
         const runId2 = await openRun();
         await withTransaction((client) =>
-            writeObservations(client, INDICATOR_ID, runId2, [observation({ state: "not_triggered" })]),
+            writeObservations(client, runId2, [observation({ state: "not_triggered" })]),
         );
 
         expect(await signalsOfRun(runId1)).toEqual(first);
@@ -138,18 +138,18 @@ describe("Risk Signals Writer", () => {
         const runId = await openRun();
         await expect(
             withTransaction((client) =>
-                writeObservations(client, INDICATOR_ID, runId, [observation(), observation()]),
+                writeObservations(client, runId, [observation(), observation()]),
             ),
         ).rejects.toThrow(/risk_signals_run_subject_idx|duplicate key/);
     });
 
     it("contains a failing indicator: its rows are absent, others' remain", async () => {
         const runId = await openRun();
-        await withTransaction((client) => writeObservations(client, INDICATOR_ID, runId, [observation()]));
+        await withTransaction((client) => writeObservations(client, runId, [observation()]));
 
         await expect(
             withTransaction(async (client) => {
-                await writeObservations(client, "LT-WRITE-TEST-02", runId, [
+                await writeObservations(client, runId, [
                     observation({ indicatorId: "LT-WRITE-TEST-02" }),
                 ]);
                 throw new Error("indicator failed after writing");
@@ -178,9 +178,9 @@ describe("risk.v_latest_run", () => {
 describe("retention", () => {
     it("deletes the signals of a superseded run past the window", async () => {
         const old = await openRun("2026-01-01T00:00:00Z");
-        await withTransaction((client) => writeObservations(client, INDICATOR_ID, old, [observation()]));
+        await withTransaction((client) => writeObservations(client, old, [observation()]));
         const current = await openRun();
-        await withTransaction((client) => writeObservations(client, INDICATOR_ID, current, [observation()]));
+        await withTransaction((client) => writeObservations(client, current, [observation()]));
 
         const stats = await withTransaction(deleteExpiredSnapshots);
 
@@ -194,7 +194,7 @@ describe("retention", () => {
     // serving stale ones.
     it("never deletes the run the site is showing, however old it is", async () => {
         const onlyRun = await openRun("2026-01-01T00:00:00Z");
-        await withTransaction((client) => writeObservations(client, INDICATOR_ID, onlyRun, [observation()]));
+        await withTransaction((client) => writeObservations(client, onlyRun, [observation()]));
 
         const stats = await withTransaction(deleteExpiredSnapshots);
 
@@ -204,7 +204,7 @@ describe("retention", () => {
 
     it("keeps the run rows themselves, as the provenance of past signals", async () => {
         const old = await openRun("2026-01-01T00:00:00Z");
-        await withTransaction((client) => writeObservations(client, INDICATOR_ID, old, [observation()]));
+        await withTransaction((client) => writeObservations(client, old, [observation()]));
         await openRun();
 
         await withTransaction(deleteExpiredSnapshots);

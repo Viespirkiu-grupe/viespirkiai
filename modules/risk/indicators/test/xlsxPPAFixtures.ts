@@ -41,7 +41,7 @@ export async function insertAtaskaita(params: {
     return rows[0].id;
 }
 
-export async function insertDalyvis(params: { ataskaitaId: number; kodas: string }): Promise<void> {
+export async function insertDalyvis(params: { ataskaitaId: number; kodas: string | null }): Promise<void> {
     await riskDb.query(`INSERT INTO public."xlsxPPAdalyviai" ("ataskaitaId", "kodas") VALUES ($1, $2)`, [
         params.ataskaitaId,
         params.kodas,

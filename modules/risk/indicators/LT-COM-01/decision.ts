@@ -3,53 +3,44 @@ import { ALotIndicatorDecision } from "../../procurementLotDecision.ts";
 import { ltCom01Definition } from "./definition.ts";
 import type { LtCom01Parameters } from "./parameters.ts";
 
-// LT-COM-01 — Single valid bid: one supplemental fact row (from collect.sql)
-// plus the parameter values in force for it, in; one Decision, out. See
-// docs/indicators-story/risk-service-architecture-v2.md §3.4. Replaces
+// LT-COM-01 — Single valid bid: judges a lot from the participation counts
+// the Procurement Reader already merged onto Subject.lot.participation. See
+// docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4. Replaces
 // rules.ts.
 
-// What collect.sql returns per lot.
-export type LtCom01Facts = Readonly<{
-    pirkimoNumeris: string;
-    daliesNumeris: string;
-    method: string | null;
-    totalBids: number;
-    validBids: number;
-    reportedAt: string | null;
-}>;
-
-export class LtCom01Decision extends ALotIndicatorDecision<LtCom01Facts, typeof ltCom01Definition> {
+export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definition> {
     protected readonly missingDataWhenAbsent = ["tiekejoKodas"];
 
     constructor() {
-        super(ltCom01Definition, import.meta.url, "./collect.sql");
+        super(ltCom01Definition);
     }
 
-    protected factKey(row: LtCom01Facts): string {
-        return `${row.pirkimoNumeris}:${row.daliesNumeris}`;
+    protected hasRequiredData(subject: Subject): boolean {
+        return subject.subjectType === "lot" && subject.lot.participation !== null;
     }
 
-    protected subjectKey(subject: Subject): string {
-        return subject.subjectType === "lot" ? `${subject.lot.pirkimoNumeris}:${subject.lot.daliesNumeris}` : "";
+    protected decide(subject: Subject, parameters: LtCom01Parameters): Decision {
+        return LtCom01Decision.decide(subject, parameters);
     }
 
-    protected methodOf(row: LtCom01Facts): string | null {
-        return row.method;
-    }
-
-    protected decide(_subject: Subject, facts: LtCom01Facts, parameters: LtCom01Parameters): Decision {
-        return LtCom01Decision.decide(facts, parameters);
-    }
-
-    static decide(facts: LtCom01Facts, parameters: LtCom01Parameters): Decision {
+    static decide(subject: Subject, parameters: LtCom01Parameters): Decision {
+        if (subject.subjectType !== "lot") {
+            throw new Error("LT-COM-01: expected a lot subject");
+        }
+        const { lot, procurement } = subject;
+        // hasRequiredData already proved this is non-null.
+        const participation = lot.participation!;
         const evidence = {
-            pirkimoBudas: facts.method,
-            ataskaitosData: facts.reportedAt,
+            pirkimoBudas: procurement.pirkimoBudas,
+            ataskaitosData: participation.reportedAt,
             source: "ATN-1 ataskaita",
         };
 
-        // totalBids === 0: treated as an incomplete report, not zero participation.
-        if (facts.totalBids === 0) {
+        // totalBids === 0: a real, rarer case distinct from "no participation
+        // observed" (hasRequiredData's null check) — a participant row
+        // exists but every tiekejoKodas in it is NULL. Treated as an
+        // incomplete report, not zero participation.
+        if (participation.totalBids === 0) {
             return {
                 state: "insufficient_data",
                 evidence,
@@ -58,8 +49,8 @@ export class LtCom01Decision extends ALotIndicatorDecision<LtCom01Facts, typeof 
         }
 
         return {
-            state: facts.validBids <= parameters.maximumValidBids ? "triggered" : "not_triggered",
-            rawValue: { totalBids: facts.totalBids, validBids: facts.validBids },
+            state: participation.validBids <= parameters.maximumValidBids ? "triggered" : "not_triggered",
+            rawValue: { totalBids: participation.totalBids, validBids: participation.validBids },
             threshold: { maximumValidBids: parameters.maximumValidBids },
             evidence,
         };

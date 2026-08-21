@@ -11,16 +11,22 @@ report, the same grain as [`LT-COM-01`](../LT-COM-01/README.md) and the natural 
 
 | File                    | Question it answers                                                              |
 |-------------------------|------------------------------------------------------------------------------------|
-| `collect.sql`           | What is true about each lot — the participant count, method, when reported        |
 | `parameters.ts`         | What it compares against, and since when                                          |
 | `definition.ts`         | Identity, lifecycle, public wording — pure metadata, no behaviour                 |
 | `decision.ts`           | What the facts mean — the state, the threshold that decided it, the evidence — plus the `ALotIndicatorDecision` wiring, with `static decide()` as its judgement method (replaces `rules.ts`) |
 | `test/`                 | How we know it works                                                              |
 
-Inside `test/`, `fixtures.ts` states both the source rows and the fact row `collect.sql` must produce from them;
-`decision.test.ts` decides those fact rows with no database, and `collect.it.ts` proves the statement really produces
-them against a real PostgreSQL. Everything else — identity fields, parameter resolution, `not_applicable` when no entry
-applies — belongs to `ARiskIndicatorDecision`/`ALotIndicatorDecision` and is tested once in `test/risk/procurementLotDecision.test.ts`.
+There is no `collect.sql` here (v2 architecture — see below): participation counts (`totalBids`/`reportedAt`) come
+from `modules/risk/procurementReader.ts`'s consolidated lot-grain participation query, shared by every lot-grain
+indicator (LT-COM-01's `validBids` comes from the same query), and arrive already merged onto
+`Subject.lot.participation` before `decision.ts` ever runs.
+
+Inside `test/`, `fixtures.ts` states the expected `Subject.lot.participation` shape for each scenario;
+`decision.test.ts` decides those fixtures with no database. The participation query's own correctness (dedup,
+cutoff filtering, `daliesNumeris` handling) is tested once, for every lot-grain indicator, in
+`test/risk/procurementReader.it.ts`. Everything else — identity fields, parameter resolution, `not_applicable` when
+no entry applies — belongs to `ARiskIndicatorDecision`/`ALotIndicatorDecision` and is tested once in
+`test/risk/procurementLotDecision.test.ts`.
 
 ## How this differs from LT-COM-01
 

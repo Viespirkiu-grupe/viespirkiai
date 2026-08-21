@@ -14,16 +14,13 @@ export type EligibilityGate =
  * Eligible when pirkimoBudas is present and saltinis is 'cvpis' (§3.3's
  * decision table). cvpp rows never carry pirkimoBudas (v_pirkimas.sql), so
  * they are the documented not-eligible case: not_applicable, not a data gap.
- * A missing Procurement (the orphan-lot case — see contracts.ts's
- * LotSubject) IS a data gap, so it reports insufficient_data instead.
+ *
+ * Takes a non-null Procurement: the Procurement Reader drops orphan lots
+ * before any Subject is built (types.ts's LotSubject comment), and a
+ * ProcurementSubject's own procurement was never nullable, so both callers
+ * (procurementLotDecision.ts) always have one to pass.
  */
-export function procurementEligibility(procurement: Procurement | null): EligibilityGate {
-    if (procurement === null) {
-        return {
-            eligible: false,
-            decision: { state: "insufficient_data", missingData: ["procurementSource"] },
-        };
-    }
+export function procurementEligibility(procurement: Procurement): EligibilityGate {
     if (procurement.saltinis === "cvpis" && procurement.pirkimoBudas !== null) {
         return { eligible: true };
     }
@@ -37,6 +34,6 @@ export function procurementEligibility(procurement: Procurement | null): Eligibi
  * risk-service-architecture-v2.md §5's answered open question #1 ("you will
  * extend DRD on demand").
  */
-export function lotEligibility(_lot: Lot, procurement: Procurement | null): EligibilityGate {
+export function lotEligibility(_lot: Lot, procurement: Procurement): EligibilityGate {
     return procurementEligibility(procurement);
 }

@@ -3,52 +3,45 @@ import { AProcurementIndicatorDecision } from "../../procurementLotDecision.ts";
 import { ltCom03Definition } from "./definition.ts";
 import type { LtCom03Parameters } from "./parameters.ts";
 
-// LT-COM-03 — Only one supplier invited or consulted: one supplemental fact
-// row (from collect.sql) plus the parameter values in force for it, in; one
-// Decision, out. See
-// docs/indicators-story/risk-service-architecture-v2.md §3.4. Replaces
+// LT-COM-03 — Only one supplier invited or consulted: judges a whole
+// procurement from the cross-lot participation counts the Procurement Reader
+// already merged onto Subject.procurement.participation. See
+// docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4. Replaces
 // rules.ts.
 
-// What collect.sql returns per procurement.
-export type LtCom03Facts = Readonly<{
-    pirkimoNumeris: string;
-    method: string | null;
-    totalSuppliers: number;
-    reportedAt: string | null;
-}>;
-
-export class LtCom03Decision extends AProcurementIndicatorDecision<LtCom03Facts, typeof ltCom03Definition> {
+export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom03Definition> {
     protected readonly missingDataWhenAbsent = ["tiekejoKodas"];
 
     constructor() {
-        super(ltCom03Definition, import.meta.url, "./collect.sql");
+        super(ltCom03Definition);
     }
 
-    protected factKey(row: LtCom03Facts): string {
-        return row.pirkimoNumeris;
+    protected hasRequiredData(subject: Subject): boolean {
+        return subject.subjectType === "procurement" && subject.procurement.participation !== null;
     }
 
-    protected subjectKey(subject: Subject): string {
-        return subject.subjectType === "procurement" ? subject.procurement.pirkimoNumeris : "";
+    protected decide(subject: Subject, parameters: LtCom03Parameters): Decision {
+        return LtCom03Decision.decide(subject, parameters);
     }
 
-    protected methodOf(row: LtCom03Facts): string | null {
-        return row.method;
-    }
-
-    protected decide(_subject: Subject, facts: LtCom03Facts, parameters: LtCom03Parameters): Decision {
-        return LtCom03Decision.decide(facts, parameters);
-    }
-
-    static decide(facts: LtCom03Facts, parameters: LtCom03Parameters): Decision {
+    static decide(subject: Subject, parameters: LtCom03Parameters): Decision {
+        if (subject.subjectType !== "procurement") {
+            throw new Error("LT-COM-03: expected a procurement subject");
+        }
+        const { procurement } = subject;
+        // hasRequiredData already proved this is non-null.
+        const participation = procurement.participation!;
         const evidence = {
-            pirkimoBudas: facts.method,
-            ataskaitosData: facts.reportedAt,
+            pirkimoBudas: procurement.pirkimoBudas,
+            ataskaitosData: participation.reportedAt,
             source: "ATN-1 ataskaita",
         };
 
-        // totalSuppliers === 0: treated as an incomplete report, not zero suppliers.
-        if (facts.totalSuppliers === 0) {
+        // totalSuppliers === 0: a real, rarer case distinct from "no
+        // participation observed" (hasRequiredData's null check) — a
+        // participant row exists but every tiekejoKodas in it is NULL.
+        // Treated as an incomplete report, not zero suppliers.
+        if (participation.totalSuppliers === 0) {
             return {
                 state: "insufficient_data",
                 evidence,
@@ -57,8 +50,8 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<LtCom03Facts,
         }
 
         return {
-            state: facts.totalSuppliers < parameters.minimumSuppliers ? "triggered" : "not_triggered",
-            rawValue: { totalSuppliers: facts.totalSuppliers },
+            state: participation.totalSuppliers < parameters.minimumSuppliers ? "triggered" : "not_triggered",
+            rawValue: { totalSuppliers: participation.totalSuppliers },
             threshold: { minimumSuppliers: parameters.minimumSuppliers },
             evidence,
         };

@@ -20,7 +20,6 @@ export type WriteStats = Readonly<{ inserted: number }>;
  */
 export async function writeObservations(
     client: PoolClient,
-    indicatorId: string,
     runId: number,
     observations: readonly RiskSignal[],
 ): Promise<WriteStats> {
@@ -36,18 +35,18 @@ export async function writeObservations(
             state, raw_value, threshold, evidence, missing_data,
             data_as_of
         )
-        SELECT $3, "subjectType", "subjectKey", "procurementSource", "procurementId",
-               $2, "indicatorVersion", "appliedParameters",
+        SELECT $2, "subjectType", "subjectKey", "procurementSource", "procurementId",
+               "indicatorId", "indicatorVersion", "appliedParameters",
                "state", "rawValue", "threshold", "evidence", "missingData",
                "dataAsOf"::timestamptz
         FROM jsonb_to_recordset($1::jsonb) AS t(
             "subjectType" text, "subjectKey" text, "procurementSource" text, "procurementId" text,
-            "indicatorVersion" integer, "appliedParameters" jsonb,
+            "indicatorId" text, "indicatorVersion" integer, "appliedParameters" jsonb,
             "state" text, "rawValue" jsonb, "threshold" jsonb, "evidence" jsonb, "missingData" jsonb,
             "dataAsOf" text
         )
         `,
-        [JSON.stringify(observations), indicatorId, runId],
+        [JSON.stringify(observations), runId],
     );
 
     return { inserted: rowCount ?? 0 };

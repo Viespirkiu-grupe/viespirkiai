@@ -14,27 +14,21 @@ type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 // and the cheapest subclass to assert the shared behaviour of the base class
 // on. Always eligible; assessRisk() replays the canned observations in
 // order, one per subject evaluate() is asked to decide. Overrides
-// assessRisk() directly rather than going through the bulk-facts abstract
-// members (factKey/subjectKey/methodOf/decide), which this test has no use
-// for — they're stubbed to satisfy the abstract contract only.
-class TestDecision extends ARiskIndicatorDecision<never, TestDefinition> {
+// assessRisk() directly rather than going through hasRequiredData/decide,
+// which this test has no use for — they're stubbed to satisfy the abstract
+// contract only.
+class TestDecision extends ARiskIndicatorDecision<TestDefinition> {
     private readonly observations: readonly RiskSignal[];
     private cursor = 0;
 
     constructor(definition: TestDefinition, observations: readonly RiskSignal[] = []) {
-        super(definition, import.meta.url, "./fixtures/collect.sql");
+        super(definition);
         this.observations = observations;
     }
 
     protected readonly missingDataWhenAbsent: readonly string[] = [];
-    protected factKey(): string {
-        return "";
-    }
-    protected subjectKey(): string {
-        return "";
-    }
-    protected methodOf(): string | null {
-        return null;
+    protected hasRequiredData(): boolean {
+        return true;
     }
     protected decide(): Decision {
         throw new Error("not used: assessRisk() is overridden directly");
@@ -118,6 +112,7 @@ function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
         bvpzKodai: null,
         esFinansavimas: null,
         lots: [],
+        participation: null,
         ...overrides,
     };
 }
@@ -136,7 +131,6 @@ function subjects(count: number): readonly Subject[] {
 }
 
 const RUN = { runId: 1, dataAsOf: "2026-08-01", subjects: null } as const;
-const NO_DATA = { query: async () => [] };
 
 describe("ARiskIndicatorDecision", () => {
     it("rejects a definition with empty public wording", () => {
@@ -294,24 +288,24 @@ describe("ARiskIndicatorDecision", () => {
         expect(indicator.parametersAsOf("2026-03-01")).toEqual([indicator.parameters[0]]);
     });
 
-    it("validates the rows assessRisk() returned against the output contract", async () => {
+    it("validates the rows assessRisk() returned against the output contract", () => {
         const indicator = makeIndicator({}, [observation()]);
-        await expect(indicator.evaluate(RUN, subjects(1), NO_DATA)).resolves.toEqual([observation()]);
+        expect(indicator.evaluate(RUN, subjects(1))).toEqual([observation()]);
     });
 
-    it("rejects an observation carrying another indicator's identity", async () => {
+    it("rejects an observation carrying another indicator's identity", () => {
         const indicator = makeIndicator({}, [observation({ indicatorVersion: 2 })]);
-        await expect(indicator.evaluate(RUN, subjects(1), NO_DATA)).rejects.toThrow(/observation carries indicator identity/);
+        expect(() => indicator.evaluate(RUN, subjects(1))).toThrow(/observation carries indicator identity/);
     });
 
-    it("rejects an observation whose subjectType differs from the declared one", async () => {
+    it("rejects an observation whose subjectType differs from the declared one", () => {
         const indicator = makeIndicator({}, [observation({ subjectType: "lot" })]);
-        await expect(indicator.evaluate(RUN, subjects(1), NO_DATA)).rejects.toThrow(/does not match the indicator's declared/);
+        expect(() => indicator.evaluate(RUN, subjects(1))).toThrow(/does not match the indicator's declared/);
     });
 
-    it("rejects two observations about the same subject", async () => {
+    it("rejects two observations about the same subject", () => {
         const indicator = makeIndicator({}, [observation(), observation()]);
-        await expect(indicator.evaluate(RUN, subjects(2), NO_DATA)).rejects.toThrow(/duplicate observation for subject/);
+        expect(() => indicator.evaluate(RUN, subjects(2))).toThrow(/duplicate observation for subject/);
     });
 });
 

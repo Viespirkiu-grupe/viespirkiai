@@ -8,15 +8,12 @@ import type { EvaluationContext } from "./evaluationContext.ts";
 // docs/indicators-story/risk-service-architecture-v2.md §3.2 ("Procurement
 // Risk Decision Service" / "Procurement Lot Risk Decision Service"). Each
 // implements isEligible with its own Eligibility Decision (§3.3) — the
-// shared Procurement/Lot Eligibility Decision, then the bulk-facts
-// insufficient_data check — so a subject-type-agnostic base class never has
-// to branch on subjectType itself.
+// shared Procurement/Lot Eligibility Decision, then hasRequiredData() — so a
+// subject-type-agnostic base class never has to branch on subjectType
+// itself.
 
 /** For indicators whose subjectType is 'procurement'. */
-export abstract class AProcurementIndicatorDecision<F, D extends RiskIndicatorDefinition> extends ARiskIndicatorDecision<
-    F,
-    D
-> {
+export abstract class AProcurementIndicatorDecision<D extends RiskIndicatorDefinition> extends ARiskIndicatorDecision<D> {
     isEligible(subject: Subject, context: EvaluationContext): EligibilityOutcome {
         if (subject.subjectType !== "procurement") {
             throw new Error(`${this.id}: expected a procurement subject, got ${subject.subjectType}`);
@@ -27,7 +24,7 @@ export abstract class AProcurementIndicatorDecision<F, D extends RiskIndicatorDe
             return { eligible: false, signal: this.signalFor(subject, context, gate.decision, null) };
         }
 
-        if (this.factsFor(subject) === undefined) {
+        if (!this.hasRequiredData(subject)) {
             const decision: Decision = {
                 state: "insufficient_data",
                 missingData: [...this.missingDataWhenAbsent],
@@ -40,7 +37,7 @@ export abstract class AProcurementIndicatorDecision<F, D extends RiskIndicatorDe
 }
 
 /** For indicators whose subjectType is 'lot'. */
-export abstract class ALotIndicatorDecision<F, D extends RiskIndicatorDefinition> extends ARiskIndicatorDecision<F, D> {
+export abstract class ALotIndicatorDecision<D extends RiskIndicatorDefinition> extends ARiskIndicatorDecision<D> {
     isEligible(subject: Subject, context: EvaluationContext): EligibilityOutcome {
         if (subject.subjectType !== "lot") {
             throw new Error(`${this.id}: expected a lot subject, got ${subject.subjectType}`);
@@ -51,7 +48,7 @@ export abstract class ALotIndicatorDecision<F, D extends RiskIndicatorDefinition
             return { eligible: false, signal: this.signalFor(subject, context, gate.decision, null) };
         }
 
-        if (this.factsFor(subject) === undefined) {
+        if (!this.hasRequiredData(subject)) {
             const decision: Decision = {
                 state: "insufficient_data",
                 missingData: [...this.missingDataWhenAbsent],

@@ -1,8 +1,6 @@
 import { riskSignalContract, zodContract } from "./contracts.ts";
 import { EvaluationContext, type EvaluationRun } from "./evaluationContext.ts";
 import { describeScope, scopeAdmits, scopeKey, scopesAreDisjoint } from "./parameterScope.ts";
-import type { RiskDataSource } from "./riskDataSource.ts";
-import { loadPackagedSql } from "./sqlLoader.ts";
 import type {
     Decision,
     EligibilityOutcome,
@@ -41,45 +39,38 @@ export interface RiskIndicatorDecision {
  * extends (directly, or via a subject-type specialization such as
  * AProcurementIndicatorDecision/ALotIndicatorDecision in
  * procurementLotDecision.ts): `class LtCom01Decision extends
- * ALotIndicatorDecision<LtCom01Facts, LtCom01Definition>`.
+ * ALotIndicatorDecision<typeof ltCom01Definition>`.
  *
- * `F` is the bulk fact row one indicator's collect.sql returns; `D` is the
- * indicator's own RiskIndicatorDefinition shape, so `this.definition` and
- * the parameter-timeline helpers below are typed to that indicator's own
- * parameter type, not `unknown`.
+ * `D` is the indicator's own RiskIndicatorDefinition shape, so
+ * `this.definition` and the parameter-timeline helpers below are typed to
+ * that indicator's own parameter type, not `unknown`.
  *
  * Validates the definition it's constructed with, resolves its own effective
- * parameters, prefetches its bulk facts once per evaluate() call, decides
- * every subject of its own subjectType, and validates what it produced.
+ * parameters, and decides every subject of its own subjectType. No bulk
+ * per-indicator SQL prefetch: the Procurement Reader (procurementReader.ts)
+ * already loaded everything an indicator needs onto Subject.procurement/
+ * Subject.lot, so evaluate() is synchronous.
  * `isEligible`/`assessRisk` are abstract on purpose: the eligibility gate
  * differs by subject type (procurement vs lot), so it belongs to a
  * subject-type-specific subclass, not this generic one — see
  * procurementLotDecision.ts. See
  * docs/indicators-story/risk-service-architecture-v2.md §3.4.
  */
-export abstract class ARiskIndicatorDecision<F = unknown, D extends RiskIndicatorDefinition = RiskIndicatorDefinition>
+export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition = RiskIndicatorDefinition>
     implements RiskIndicatorDecision
 {
     readonly definition: D;
-    private readonly definitionUrl: string;
-    private readonly sqlFile: string;
     private readonly parameterContract: RuntimeContract<ParametersOf<D>>;
     readonly outputContract: RuntimeContract<RiskSignal>;
-    private factsByKey = new Map<string, F>();
 
     /**
-     * `definitionUrl` resolves `sqlFile` against the indicator's own
-     * directory — pass `import.meta.url` from `decision.ts`.
-     *
      * Throws on an id outside the catalogue namespace, missing public
      * wording, parameter values that violate the indicator's own contract,
      * or a gapped/overlapping parameter timeline. See
      * docs/indicators-story/risk-service-architecture.md §4.3.
      */
-    protected constructor(definition: D, definitionUrl: string, sqlFile: string) {
+    protected constructor(definition: D) {
         this.definition = definition;
-        this.definitionUrl = definitionUrl;
-        this.sqlFile = sqlFile;
         this.parameterContract = zodContract(definition.parameterSchema as never) as RuntimeContract<ParametersOf<D>>;
         this.outputContract = definition.outputContract ?? riskSignalContract;
 
@@ -172,63 +163,59 @@ export abstract class ARiskIndicatorDecision<F = unknown, D extends RiskIndicato
     }
 
     /**
-     * One bulk prefetch per evaluate() call, before the subject loop below —
-     * not one query per subject. Groups rows under factKey() so isEligible/
-     * assessRisk can look a subject's facts up in O(1) via factsFor().
+     * The pirkimoBudas that scopes a subject: a lot deliberately carries no
+     * pirkimoBudas of its own (types.ts's Lot comment) — its method is
+     * always its parent procurement's. Concrete because it needs no
+     * per-indicator override now that Subject.procurement is always
+     * populated by the time this runs.
      */
-    private async prepare(context: EvaluationContext, data: RiskDataSource): Promise<void> {
-        const sql = loadPackagedSql(this.definitionUrl, this.sqlFile);
-        const rows = await data.query<F>(sql, [context.dataAsOf, context.subjects]);
-        this.factsByKey = new Map(rows.map((row) => [this.factKey(row), row]));
+    protected methodOf(subject: Subject): string | null {
+        return subject.procurement.pirkimoBudas;
     }
 
-    /** The bulk fact row prepare() collected for a subject, if any. */
-    protected factsFor(subject: Subject): F | undefined {
-        return this.factsByKey.get(this.subjectKey(subject));
+    /** The objectType that scopes a subject — same derivation as methodOf. */
+    protected objectTypeOf(subject: Subject): string | null {
+        return subject.procurement.pirkimoObjektoTipas;
     }
 
-    // Groups a bulk-query row under the key subjectKey() below also
-    // produces.
-    protected abstract factKey(row: F): string;
-    protected abstract subjectKey(subject: Subject): string;
-    // Feeds both the decision's evidence and parameterEntryFor's scope
-    // resolution (SubjectFacts.method).
-    protected abstract methodOf(row: F): string | null;
-    // isEligible's insufficient_data reason when no bulk-query row exists
-    // for a subject that passed the eligibility gate.
+    // Whether this subject carries the data this indicator needs to judge
+    // (e.g. Subject.lot.participation !== null) — the replacement for the
+    // old "did the bulk query return a row for this subject?" check, now
+    // that there's no bulk query.
+    protected abstract hasRequiredData(subject: Subject): boolean;
+    // isEligible's insufficient_data reason when hasRequiredData is false.
     protected abstract readonly missingDataWhenAbsent: readonly string[];
-    protected abstract decide(subject: Subject, facts: F, parameters: ParametersOf<D>): Decision;
+    protected abstract decide(subject: Subject, parameters: ParametersOf<D>): Decision;
 
     /**
      * Business + data eligibility gate for one subject (architecture-v2.md
      * §3.3/§3.4). Abstract here: the gate differs by subject type
      * (procurement vs lot), so a subject-type-specific subclass —
      * AProcurementIndicatorDecision or ALotIndicatorDecision
-     * (procurementLotDecision.ts) — implements it, typically by calling
-     * `this.factsFor(subject)` after checking the shared Procurement/Lot
-     * Eligibility Decision. Synchronous: reads only from whatever prepare()
-     * cached, never the database directly. Public because
+     * (procurementLotDecision.ts) — implements it, typically by calling the
+     * shared Procurement/Lot Eligibility Decision, then hasRequiredData().
+     * Synchronous: reads only Subject.procurement/Subject.lot, which the
+     * Procurement Reader already populated. Public because
      * RiskIndicatorDecision declares it.
      */
     abstract isEligible(subject: Subject, context: EvaluationContext): EligibilityOutcome;
 
     /**
      * Risk assessment for one subject isEligible() already found eligible.
-     * Never called otherwise. Subject-type-agnostic — it only needs the bulk
-     * fact row isEligible already proved exists — so it's concrete here
-     * rather than duplicated per subject type.
+     * Never called otherwise. Subject-type-agnostic — it only needs
+     * hasRequiredData() to already hold — so it's concrete here rather than
+     * duplicated per subject type.
      */
     assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
-        // isEligible already proved this key is present.
-        const facts = this.factsFor(subject)!;
         const scopeFacts: SubjectFacts = {
             subjectKey: subject.subjectKey,
             procurementSource: subject.procurementSource,
             procurementId: subject.procurementId,
-            method: this.methodOf(facts),
+            method: this.methodOf(subject),
+            objectType: this.objectTypeOf(subject),
         };
         const entry = this.parameterEntryFor(context.dataAsOf, scopeFacts);
-        const decision: Decision = entry === null ? { state: "not_applicable" } : this.decide(subject, facts, entry.values);
+        const decision: Decision = entry === null ? { state: "not_applicable" } : this.decide(subject, entry.values);
         const appliedParameters = entry === null ? null : (entry.values as Readonly<Record<string, unknown>>);
 
         return this.signalFor(subject, context, decision, appliedParameters);
@@ -264,17 +251,12 @@ export abstract class ARiskIndicatorDecision<F = unknown, D extends RiskIndicato
 
     /**
      * Resolves this indicator's effective parameters for the run's cutoff,
-     * prefetches once via prepare(), decides every subject of this
-     * indicator's own subjectType (isEligible, then assessRisk when
-     * eligible), and validates the batch via validateObservations().
+     * decides every subject of this indicator's own subjectType (isEligible,
+     * then assessRisk when eligible), and validates the batch via
+     * validateObservations().
      */
-    async evaluate(
-        run: EvaluationRun,
-        subjects: readonly Subject[],
-        data: RiskDataSource,
-    ): Promise<readonly RiskSignal[]> {
+    evaluate(run: EvaluationRun, subjects: readonly Subject[]): readonly RiskSignal[] {
         const context = new EvaluationContext(run, this.parametersAsOf(run.dataAsOf) as readonly ParameterEntry<unknown>[]);
-        await this.prepare(context, data);
 
         const mine = subjects.filter((subject) => subject.subjectType === this.subjectType);
         const signals = mine.map((subject) => {
