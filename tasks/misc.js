@@ -25,6 +25,7 @@ import { processSuggestionQueue } from "../modules/searchSuggestion/processSugge
 import { deleteDeadIndexes } from "../quickwit/deleteDeadIndexes.js";
 import { processDomenaiAdpQueue } from "../modules/domenai/processAdpQueue.js";
 import { processJuridiniaiIndexQueue } from "../modules/juridiniai/quickwitProcessIndexQueue.js";
+import { processMcpToolCallsIndexQueue } from "../modules/mcp/quickwitProcessIndexQueue.js";
 import { processJuridiniaiRefreshQueue } from "../modules/juridiniai/processRefreshQueue.js";
 import { atnaujintiJarCsv } from "../modules/juridiniai/updateJarCsv.js";
 import { atnaujintiJarPapildomusDuomenis } from "../modules/juridiniai/importJarPapildomiDuomenys.js";
@@ -247,5 +248,18 @@ export default [
         errorCooldown: 30,
         wakeOn: [WORK_SIGNALS.JURIDINIAI_INDEX_READY],
         job: processJuridiniaiIndexQueue,
+    },
+    {
+        // mcpToolCalls -> quickwit (iš mcpToolCallsQuickwitIndexQueue)
+        name: "mcpToolCallsQuickwitProcessIndexQueue",
+        mode: "asap",
+        // MCP logas nėra skubus – žemesnis prioritetas nei duomenų srautai.
+        priority: 8,
+        // Kaip ir juridiniuose: TaskRunner workeriai nėra shard'inti.
+        concurrency: 1,
+        cooldown: 60,
+        errorCooldown: 60,
+        wakeOn: [WORK_SIGNALS.MCP_TOOL_CALLS_INDEX_READY],
+        job: processMcpToolCallsIndexQueue,
     },
 ];
