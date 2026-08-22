@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { postgres } from '@/postgres/postgres.js';
 import { readETarSidecar } from '@/modules/eTar/eTarSidecar.js';
+import { rewriteETarLegalActLinks } from '@/src/lib/teisesAktoHtml.ts';
 
 // Oficialaus teisės akto teksto HTML, skirtas įdėti į <iframe> akto puslapyje.
 //
@@ -50,7 +51,7 @@ function wrap(html: string, scheme: string): string {
     --bg: #ffffff; --fg: #0c0a09; --line: #d6d3d1; --mark: #fff3a3;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #16181d; --fg: #e7e9ee; --line: #343a44; --mark: #4a4320; }
+    :root { --bg: #0c0a09; --fg: #fafaf9; --line: #292524; --mark: #4a4320; }
   }
   :root[data-scheme="light"] {
     color-scheme: light;
@@ -108,7 +109,7 @@ export const GET: APIRoute = async ({ params, url }) => {
   if (!html) return new Response('Teksto nėra', { status: 404 });
 
   const scheme = url.searchParams.get('scheme') ?? '';
-  return new Response(wrap(stripForcedBlack(html), scheme), {
+  return new Response(wrap(rewriteETarLegalActLinks(stripForcedBlack(html)), scheme), {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Content-Security-Policy':

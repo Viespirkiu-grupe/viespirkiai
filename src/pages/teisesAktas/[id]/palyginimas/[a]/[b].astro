@@ -1,0 +1,21 @@
+---
+// Abi redakcijos pasirinktos: /teisesAktas/:id/palyginimas/:a/:b.
+import TaPalyginimas from '../../../../../components/teisesAktai/TaPalyginimas.astro';
+import { loadPalyginimas, palyginimoKelias } from '../../../../../lib/redakcijuPalyginimas.ts';
+
+const { id, a, b } = Astro.params;
+if (!id || !a || !b) return Astro.redirect('/404');
+
+const data = await loadPalyginimas(id, a, b);
+if (!data) return Astro.redirect('/404');
+if (!data.a && !data.klaida) return Astro.redirect(palyginimoKelias(id), 302);
+// `b` netinka (nėra tokios, be teksto arba ne naujesnė už `a`) — paliekam
+// pasirinktą `a` ir leidžiam rinktis iš naujo.
+if (data.a && !data.b && !data.klaida) {
+  return Astro.redirect(palyginimoKelias(id, data.a.editionToken), 302);
+}
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+
+<TaPalyginimas id={id} data={data} />

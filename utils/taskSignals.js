@@ -15,6 +15,7 @@ export const WORK_SIGNALS = Object.freeze({
     DOMENAI_ADP_READY: `${PREFIX}.domenai.adp.ready`,
     JURIDINIAI_REFRESH_READY: `${PREFIX}.juridiniai.refresh.ready`,
     JURIDINIAI_INDEX_READY: `${PREFIX}.juridiniai.index.ready`,
+    MCP_TOOL_CALLS_INDEX_READY: `${PREFIX}.mcp-tool-calls.index.ready`,
     SUTARTYS_CHANGED: `${PREFIX}.sutartys.changed`,
     VIESIEJI_PIRKIMAI_CHANGED: `${PREFIX}.viesieji-pirkimai.changed`,
     TED_NOTICES_READY: `${PREFIX}.ted.notices.ready`,

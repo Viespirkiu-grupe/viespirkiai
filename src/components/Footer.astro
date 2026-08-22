@@ -32,6 +32,7 @@ const rodytiIspejima = showFooterDisclaimer(Astro.url.pathname);
   <FooterColumn title="Nustatymai">
     <button type="button" id="fontToggle">Pakeisti šriftą</button>
     <button type="button" id="rodytiReklamas" hidden>Rodyti reklamas</button>
+    <button type="button" id="rodytiDiSantraukas" hidden>Rodyti AI santraukas</button>
   </FooterColumn>
 
   {rodytiIspejima && (
@@ -73,6 +74,16 @@ const rodytiIspejima = showFooterDisclaimer(Astro.url.pathname);
     rodytiReklamas.hidden = false;
     rodytiReklamas.addEventListener('click', () => {
       document.cookie = 'reklamosPaslepta=;path=/;max-age=0;samesite=lax';
+      location.reload();
+    });
+  }
+
+  // „Rodyti AI santraukas" – matoma tik jei anksčiau paspausta „Neberodyti".
+  const rodytiDiSantraukas = document.getElementById('rodytiDiSantraukas');
+  if (rodytiDiSantraukas && /(?:^|;\s*)showAi=false(?:;|$)/.test(document.cookie)) {
+    rodytiDiSantraukas.hidden = false;
+    rodytiDiSantraukas.addEventListener('click', () => {
+      document.cookie = 'showAi=;path=/;max-age=0;samesite=lax';
       location.reload();
     });
   }

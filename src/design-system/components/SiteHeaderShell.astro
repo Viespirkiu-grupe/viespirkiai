@@ -110,12 +110,18 @@ const mobileGroups = [...primaryMenu, ...secondaryMenu];
             <span class="navbar-mobile-group-title">{item.label}</span>
             <ul>
               {item.children.map((c) => (
-                <>
-                  <li><a href={c.href} class={isActive(c.href)} aria-current={isActive(c.href) === 'active' ? 'page' : undefined}>{c.label}</a></li>
-                  {c.children?.map((sc) => (
-                    <li class="navbar-mobile-subitem"><a href={sc.href} class={isActive(sc.href)} aria-current={isActive(sc.href) === 'active' ? 'page' : undefined}>{sc.label}</a></li>
-                  ))}
-                </>
+                <li>
+                  <a href={c.href} class={isActive(c.href)} aria-current={isActive(c.href) === 'active' ? 'page' : undefined}>{c.label}</a>
+                  {c.children && (
+                    <ul class="navbar-mobile-subnav">
+                      {c.children.map((sc) => (
+                        <li class="navbar-mobile-subitem">
+                          <a href={sc.href} class={isActive(sc.href)} aria-current={isActive(sc.href) === 'active' ? 'page' : undefined}>{sc.label}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
               ))}
             </ul>
           </li>
@@ -148,12 +154,16 @@ const mobileGroups = [...primaryMenu, ...secondaryMenu];
     padding: 0;
   }
 
-  .navbar-mobile-group ul a {
+  .navbar-mobile-group > ul > li > a {
     padding-left: 16px;
   }
 
+  .navbar-mobile-group .navbar-mobile-subnav {
+    margin: 0;
+  }
+
   .navbar-mobile-subitem a {
-    padding-left: 28px;
+    padding-left: 32px;
     font-size: var(--text-sm);
     color: var(--gray);
   }

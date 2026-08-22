@@ -38,6 +38,13 @@ const TABLES = {
     sourceValue: `e."eilutesId"::text`,
     signal: WORK_SIGNALS.JURIDINIAI_INDEX_READY,
   },
+  mcpToolCalls: {
+    queue: "mcpToolCallsQuickwitIndexQueue",
+    queueId: "mcpToolCallId",
+    source: "mcpToolCalls",
+    sourceId: "id",
+    signal: WORK_SIGNALS.MCP_TOOL_CALLS_INDEX_READY,
+  },
 };
 
 const HELP = `Perkelia pasirinktų Quickwit indeksų gyvas eilutes į indeksavimo eilę.

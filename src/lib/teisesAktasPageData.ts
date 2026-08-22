@@ -32,6 +32,11 @@ export function teisesAktoKelias(legalActId: string, key?: string | null): strin
     + (segmentas ? `/${encodeURIComponent(segmentas)}` : '');
 }
 
+/** To paties akto teksto skaitytuvas per visą langą. */
+export function teisesAktoTekstoKelias(legalActId: string, key?: string | null): string {
+  return `${teisesAktoKelias(legalActId, key)}/tekstas`;
+}
+
 export interface TeisesAktasDocument {
   documentId: number;
   variantas: string;
@@ -105,6 +110,12 @@ export interface Redakcija {
   changes: any[];
   /** Ar turim patį tekstą — jei ne, lieka tik nuoroda į e-TAR. */
   hasText: boolean;
+  /**
+   * Ar tekstas tikrai perskaitomas (`contentPresence = provided`). `hasText`
+   * sako tik tiek, kad dokumento eilutė yra: e-TAR dalies suvestinių turinio
+   * neatiduoda, ir tokios redakcijos palyginti nėra su kuo.
+   */
+  turiTeksta: boolean;
   /** e-TAR adresas (kai savo teksto neturim). */
   sourceUrl: string | null;
   isCurrent: boolean;
@@ -172,6 +183,7 @@ export function buildRedakcijos(
       to: null,
       changes: [],
       hasText: true,
+      turiTeksta: original.turinioBusena === 'provided',
       sourceUrl: original.sourceUrl ?? null,
       isCurrent: original.documentId === currentDocumentId,
     });
@@ -192,6 +204,7 @@ export function buildRedakcijos(
       to: edition.effectiveTo ?? null,
       changes: edition.changes ?? [],
       hasText: Boolean(doc),
+      turiTeksta: doc?.turinioBusena === 'provided',
       sourceUrl: doc?.sourceUrl ?? edition.url ?? null,
       isCurrent: doc != null && doc.documentId === currentDocumentId,
     });
@@ -210,6 +223,7 @@ export function buildRedakcijos(
       to: null,
       changes: [],
       hasText: true,
+      turiTeksta: doc.turinioBusena === 'provided',
       sourceUrl: doc.sourceUrl ?? null,
       isCurrent: doc.documentId === currentDocumentId,
     });

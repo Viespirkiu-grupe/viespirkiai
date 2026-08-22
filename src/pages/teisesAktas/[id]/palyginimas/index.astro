@@ -1,0 +1,15 @@
+---
+// Palyginimo pradžia: /teisesAktas/:id/palyginimas — dar nieko nepasirinkta.
+import TaPalyginimas from '../../../../components/teisesAktai/TaPalyginimas.astro';
+import { loadPalyginimas } from '../../../../lib/redakcijuPalyginimas.ts';
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect('/404');
+
+const data = await loadPalyginimas(id);
+if (!data) return Astro.redirect('/404');
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+
+<TaPalyginimas id={id} data={data} />

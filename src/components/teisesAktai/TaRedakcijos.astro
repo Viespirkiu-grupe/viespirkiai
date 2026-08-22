@@ -8,16 +8,20 @@
 //
 // Sąrašas yra <details>, tad vienodai gerai atrodo ir su 2, ir su 200
 // redakcijų: uždarytas rodo tik dabartinę, atidarytas — slenkamą sąrašą.
-import { teisesAktoKelias, type Redakcija } from '../../lib/teisesAktasPageData.ts';
+import { teisesAktoKelias, teisesAktoTekstoKelias, type Redakcija } from '../../lib/teisesAktasPageData.ts';
+import { palyginimoKelias } from '../../lib/redakcijuPalyginimas.ts';
 
 interface Props {
   redakcijos: Redakcija[];
   legalActId: string;
+  skaitytuvas?: boolean;
 }
 
-const { redakcijos, legalActId } = Astro.props;
+const { redakcijos, legalActId, skaitytuvas = false } = Astro.props;
 
-const href = (r: Redakcija) => teisesAktoKelias(legalActId, r.key);
+const href = (r: Redakcija) => skaitytuvas
+  ? teisesAktoTekstoKelias(legalActId, r.key)
+  : teisesAktoKelias(legalActId, r.key);
 
 /** „2026-06-23 → 2026-07-08" arba „nuo 2026-07-09"; originalas — be datų. */
 function laikotarpis(r: Redakcija): string {
@@ -38,6 +42,11 @@ function zenklas(r: Redakcija): { text: string; kind: string } | null {
 
 const current = redakcijos.find(r => r.isCurrent) ?? redakcijos[0];
 const others = redakcijos.length - 1;
+
+// Palyginti galima tik datuotas redakcijas, kurių tekstas tikrai perskaitomas –
+// tas pačias, kurias siūlo palyginimo puslapis. Kitaip nuoroda vestų į puslapį,
+// kuriame paaiškėtų, kad lyginti nėra ko.
+const galimaPalyginti = redakcijos.filter(r => r.turiTeksta && r.from).length >= 2;
 ---
 
 {redakcijos.length > 0 && (
@@ -54,12 +63,26 @@ const others = redakcijos.length - 1;
       </summary>
 
       <ul class="ta-red-list">
+        {galimaPalyginti && (
+          <li class="ta-red-item is-compare">
+            <a href={palyginimoKelias(legalActId)} class="ta-red-link"></a>
+            <div class="ta-red-row">
+              <span class="ta-red-when">Palyginti dvi redakcijas</span>
+              <span class="ta-red-arrow">→</span>
+            </div>
+          </li>
+        )}
         {redakcijos.map((r) => (
           <li class:list={['ta-red-item', r.isCurrent && 'is-current', r.hasText && 'is-clickable']}>
             {/* Spaudžiama visa eilutė, ne data joje — nuoroda uždengia įrašą,
                 o jo viduje esančios nuorodos į kitus aktus lieka virš jos. */}
             {r.hasText && (
-              <a href={href(r)} class="ta-red-link" aria-label={`Rodyti redakciją ${laikotarpis(r)}`}></a>
+              <a
+                href={href(r)}
+                class="ta-red-link"
+                data-ta-skaitytuvas={skaitytuvas ? '' : undefined}
+                aria-label={`Rodyti redakciją ${laikotarpis(r)}`}
+              ></a>
             )}
             <div class="ta-red-row">
               <span class:list={['ta-red-when', !r.hasText && 'is-muted']}>{laikotarpis(r)}</span>
@@ -181,14 +204,23 @@ const others = redakcijos.length - 1;
     box-shadow: var(--shadow-md);
     animation: ta-red-drop var(--transition);
   }
-  @keyframes ta-red-drop {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: none; }
-  }
   @media (prefers-reduced-motion: reduce) {
     .ta-red-list { animation: none; }
   }
 
+  /* Palyginimas – pirmas įrašas, dar prieš aktualią suvestinę: tai veiksmas su
+     visu sąrašu, tad stovi jo priekyje ir atskirtas linija. */
+  .ta-red-item.is-compare {
+    border-bottom: var(--border);
+    cursor: pointer;
+  }
+  .ta-red-item.is-compare:hover { background: var(--color-muted-bg); }
+  .ta-red-item.is-compare + .ta-red-item { border-top: 0; }
+  .ta-red-arrow { margin-left: auto; color: var(--gray); }
+  @keyframes ta-red-drop {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+  }
   .ta-red-item {
     position: relative;
     padding: 6px 12px;

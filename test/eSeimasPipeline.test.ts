@@ -108,6 +108,33 @@ describe("runPipeline", () => {
         expect(result.documents.failed).toBe(20);
     });
 
+    it("daugiau nei 1000 klaidų neužkemša pick lango", async () => {
+        // Ankstesnis 1000 elementų `exclude` limitas leisdavo 1001-am lūžusiam
+        // elementui vėl atsistoti SQL lango priekyje. Jį atmetus atmintyje
+        // porcija atrodydavo tuščia ir pipeline'as paskelbdavo klaidingą pabaigą.
+        const items = Array.from({ length: 1125 }, (_, i) => `item-${i}`);
+        const source = makeSource(items, { limitWindow: 50 });
+        const nulūžę = new Set(items.slice(0, 1105));
+
+        const result = await runPipeline({
+            documents: {
+                label: "dokumentai",
+                batchSize: 50,
+                key: (item: string) => item,
+                pick: source.pick,
+                work: async (item: string) => {
+                    if (nulūžę.has(item)) throw new Error("nepavyko");
+                    source.finish(item);
+                },
+                onError: () => {},
+            },
+        }, { concurrency: 8 });
+
+        expect([...source.pending].filter(item => !nulūžę.has(item))).toEqual([]);
+        expect(result.documents.done).toBeGreaterThanOrEqual(20);
+        expect(result.documents.failed).toBe(1105);
+    });
+
     it("laikina pick klaida darbo nenutraukia", async () => {
         const source = makeSource(Array.from({ length: 30 }, (_, i) => `item-${i}`));
         let calls = 0;

@@ -1,0 +1,76 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import TeisesAktoTekstoPanel from './TeisesAktoTekstoPanel.astro';
+import type { loadTeisesAktasPage } from '../../lib/teisesAktasPageData.ts';
+import { teisesAktoKelias } from '../../lib/teisesAktasPageData.ts';
+import { beTeksto, beTekstoZinute } from '../../lib/teisesAktaiLabels.ts';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import config from '../../lib/config.ts';
+
+interface Props {
+  id: string;
+  data: NonNullable<Awaited<ReturnType<typeof loadTeisesAktasPage>>>;
+}
+
+const { id, data } = Astro.props;
+const { act, current, tekstas, turiHtml, turinys, redakcijos } = data;
+const urlScheme = Astro.url.searchParams.get('scheme');
+const colorScheme = urlScheme === 'dark' || urlScheme === 'light'
+  ? urlScheme
+  : getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const title = current?.title || act.title || id;
+const currentKey = current?.editionToken ?? current?.variantas;
+const aktoHref = teisesAktoKelias(id, currentKey);
+const etarUrl = current?.sourceUrl || `https://www.e-tar.lt/portal/lt/legalAct/${id}`;
+const tekstoBase = turiHtml && current?.md5
+  ? `/teisesAktai/tekstas/html/${encodeURIComponent(current.md5)}?theme=3`
+  : null;
+const tekstoSrc = tekstoBase
+  && tekstoBase + (colorScheme === 'dark' || colorScheme === 'light' ? `&scheme=${colorScheme}` : '');
+const tusciasTekstas = beTeksto(current?.turinioBusena)
+  ? (current!.contentMessage || beTekstoZinute(current!.turinioBusena))
+  : 'Tekstas dar nenuskaitytas.';
+---
+
+<Layout
+  pageTitle={title}
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+  hideFooter={true}
+>
+  <main class="ta-reader-main px-0">
+    <TeisesAktoTekstoPanel
+      legalActId={id}
+      tekstoBase={tekstoBase}
+      tekstoSrc={tekstoSrc}
+      tekstas={tekstas}
+      turinys={turinys}
+      redakcijos={redakcijos}
+      tusciasTekstas={tusciasTekstas}
+      etarUrl={etarUrl}
+      aktoHref={aktoHref}
+      pilnas={true}
+    />
+  </main>
+</Layout>
+
+<script>
+  import {
+    initTeisesAktoSkaitytuvoNuorodas,
+    initTeisesAktoTekstoTema,
+    initTeisesAktoTurinioSekimas,
+  } from '../../scripts/teisesAktoTekstoTema.ts';
+  initTeisesAktoTekstoTema();
+  initTeisesAktoTurinioSekimas();
+  initTeisesAktoSkaitytuvoNuorodas();
+</script>
+
+<style>
+  .ta-reader-main {
+    height: calc(100dvh - var(--site-header-offset, 49px));
+    min-height: 0;
+    overflow: hidden;
+  }
+</style>
