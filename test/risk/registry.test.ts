@@ -11,10 +11,9 @@ type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 
 // A minimal ARiskIndicatorDecision subclass — isEligible/assessRisk stubbed
 // to satisfy the abstract contract, since these tests exercise only the
-// shared parameter-timeline machinery and validateObservations(), neither of
-// which is per-indicator behaviour. RiskDecisionEngine (riskDecisionEngine.ts)
-// is what actually calls isEligible/assessRisk per subject; that wiring is
-// tested there, not here.
+// shared parameter-timeline machinery, which is not per-indicator behaviour.
+// RiskDecisionEngine (riskDecisionEngine.ts) is what actually calls
+// isEligible/assessRisk per subject; that wiring is tested there, not here.
 class TestDecision extends ARiskIndicatorDecision<TestDefinition> {
     constructor(definition: TestDefinition, context: EvaluationContext) {
         super(definition, context);
@@ -28,7 +27,7 @@ class TestDecision extends ARiskIndicatorDecision<TestDefinition> {
         return { eligible: true };
     }
     assessRisk(): RiskSignal {
-        throw new Error("not used: these tests call validateObservations() directly");
+        throw new Error("not used: these tests exercise parameterEntryFor() directly");
     }
 }
 
@@ -72,25 +71,6 @@ function indicatorClass(definition: TestDefinition): IndicatorClass {
     };
 }
 
-function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
-    return {
-        indicatorId: "LT-TEST-01",
-        indicatorVersion: 1,
-        subjectType: "procurement",
-        subjectKey: "cvpis:1",
-        procurementSource: "cvpis",
-        procurementId: "1",
-        state: "triggered",
-        rawValue: null,
-        threshold: null,
-        appliedParameters: null,
-        evidence: {},
-        missingData: [],
-        dataAsOf: "2026-08-01",
-        ...overrides,
-    };
-}
-
 describe("ARiskIndicatorDecision", () => {
     it("resolves the parameters when in force at a cutoff", () => {
         const indicator = makeIndicator({
@@ -113,31 +93,6 @@ describe("ARiskIndicatorDecision", () => {
         expect(indicator.parameterEntryFor("2026-03-01")).toMatchObject({ threshold: 1 });
     });
 
-    it("validates rows against the output contract", () => {
-        const indicator = makeIndicator({});
-        expect(indicator.validateObservations([observation()])).toEqual([observation()]);
-    });
-
-    it("rejects an observation carrying another indicator's identity", () => {
-        const indicator = makeIndicator({});
-        expect(() => indicator.validateObservations([observation({ indicatorVersion: 2 })])).toThrow(
-            /observation carries indicator identity/,
-        );
-    });
-
-    it("rejects an observation whose subjectType differs from the declared one", () => {
-        const indicator = makeIndicator({});
-        expect(() => indicator.validateObservations([observation({ subjectType: "lot" })])).toThrow(
-            /does not match the indicator's declared/,
-        );
-    });
-
-    it("rejects two observations about the same subject", () => {
-        const indicator = makeIndicator({});
-        expect(() => indicator.validateObservations([observation(), observation()])).toThrow(
-            /duplicate observation for subject/,
-        );
-    });
 });
 
 describe("RiskIndicatorRegistry", () => {

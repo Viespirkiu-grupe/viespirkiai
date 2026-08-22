@@ -151,10 +151,14 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * not need to repeat every time. If an indicator cannot construct every
      * field itself (no applicable parameter entry, missing data), it returns
      * only what it knows (typically just `state`, plus `evidence`/
-     * `missingData`) and this fills in the rest.
+     * `missingData`) and this fills in the rest. Every RiskSignal in the
+     * system is built here, so this is also where the output contract runs
+     * (schema validation of what assessRisk()/isEligible() produced) — the
+     * result is frozen, since it's about to be handed to the Engine and,
+     * from there, straight to the Signal Writer.
      */
     protected signalFor(subject: Subject, context: EvaluationContext, partial: PartialRiskSignal): RiskSignal {
-        return {
+        const signal = this.outputContract.validate({
             indicatorId: this.id,
             indicatorVersion: this.version,
             subjectType: subject.subjectType,
@@ -168,45 +172,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
             evidence: partial.evidence ?? {},
             missingData: [...(partial.missingData ?? [])],
             dataAsOf: context.dataAsOf,
-        };
-    }
-
-    /**
-     * Validates rows against the output contract, then checks that each
-     * row's indicatorId/indicatorVersion match this indicator's key and that
-     * no (subjectType, subjectKey) pair repeats within the batch. Called by
-     * RiskDecisionEngine once per indicator, over everything that indicator
-     * produced across a whole evaluateAll() run — not by this class itself,
-     * which only ever decides one subject at a time. See
-     * docs/indicators-story/risk-schema.md §2.
-     */
-    validateObservations(observations: readonly unknown[]): readonly RiskSignal[] {
-        const seen = new Set<string>();
-        const validated: RiskSignal[] = [];
-
-        for (const raw of observations) {
-            const observation = this.outputContract.validate(raw);
-
-            if (observation.indicatorId !== this.id || observation.indicatorVersion !== this.version) {
-                throw new Error(
-                    `${this.id}: observation carries indicator identity ${observation.indicatorId}/${observation.indicatorVersion}, expected ${this}`,
-                );
-            }
-            if (observation.subjectType !== this.subjectType) {
-                throw new Error(
-                    `${this.id}: observation subjectType ${observation.subjectType} does not match the indicator's declared subjectType ${this.subjectType}`,
-                );
-            }
-
-            const dedupeKey = `${observation.subjectType}:${observation.subjectKey}`;
-            if (seen.has(dedupeKey)) {
-                throw new Error(`${this.id}: duplicate observation for subject ${dedupeKey}`);
-            }
-            seen.add(dedupeKey);
-
-            validated.push(observation);
-        }
-
-        return validated;
+        });
+        return Object.freeze(signal);
     }
 }

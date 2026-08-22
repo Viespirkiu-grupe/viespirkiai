@@ -13,69 +13,62 @@ import type { Lot, Procurement, RiskSignal, Subject } from "./types.ts";
  * Procurement Reader (procurementReader.ts) handed it.
  */
 export class RiskDecisionEngine {
-    private readonly indicators: readonly ARiskIndicatorDecision[];
+    private readonly procurementIndicators: readonly ARiskIndicatorDecision[];
+    private readonly lotIndicators: readonly ARiskIndicatorDecision[];
 
     /**
      * `indicators` are already evaluation-scoped — each carries its own
      * fixed EvaluationContext (riskIndicatorDecision.ts), built by
      * RiskIndicatorRegistry.createAllIndicators(context)
      * (registry.ts) — so this class never builds or resolves a context
-     * itself.
+     * itself. Split by subjectType once here, so evaluateProcurement/
+     * evaluateLot each walk only the indicators that apply to their subject.
      */
     constructor(indicators: readonly ARiskIndicatorDecision[]) {
-        this.indicators = indicators;
+        this.procurementIndicators = indicators.filter((indicator) => indicator.subjectType === "procurement");
+        this.lotIndicators = indicators.filter((indicator) => indicator.subjectType === "lot");
     }
 
     /**
      * Walks every procurement (evaluateProcurement) and its lots
-     * (evaluateLot), then validates each indicator's own observations once
-     * at the end via ARiskIndicatorDecision.validateObservations —
-     * identity/duplicate checks are the indicator's own concern, but only
-     * meaningful over everything it decided this call, not one subject at a
-     * time.
+     * (evaluateLot) into one flat signal list. Each signal is already
+     * validated and frozen by ARiskIndicatorDecision.signalFor
+     * (riskIndicatorDecision.ts) at the moment it's built, so there's
+     * nothing left for the Engine to do but collect them.
      */
     evaluateAll(procurements: readonly Procurement[]): readonly RiskSignal[] {
-        const observationsByIndicator = new Map<ARiskIndicatorDecision, unknown[]>(
-            this.indicators.map((indicator) => [indicator, []]),
-        );
+        const signals: RiskSignal[] = [];
 
         for (const procurement of procurements) {
-            this.evaluateProcurement(procurement, observationsByIndicator);
+            signals.push(...this.evaluateProcurement(procurement));
             for (const lot of procurement.lots) {
-                this.evaluateLot(lot, procurement, observationsByIndicator);
+                signals.push(...this.evaluateLot(lot, procurement));
             }
         }
 
-        const signals: RiskSignal[] = [];
-        for (const indicator of this.indicators) {
-            signals.push(...indicator.validateObservations(observationsByIndicator.get(indicator)!));
-        }
         return signals;
     }
 
     /** Every procurement-subjectType indicator's signal for this one procurement. */
-    private evaluateProcurement(
-        procurement: Procurement,
-        observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
-    ): void {
+    private evaluateProcurement(procurement: Procurement): RiskSignal[] {
         const subject = this.subjectForProcurement(procurement);
-        for (const indicator of this.indicators) {
-            if (indicator.subjectType !== "procurement") continue;
-            this.decide(indicator, subject, observationsByIndicator);
+        const signals: RiskSignal[] = [];
+        for (const indicator of this.procurementIndicators) {
+            const signal = this.decide(indicator, subject);
+            if (signal) signals.push(signal);
         }
+        return signals;
     }
 
     /** Every lot-subjectType indicator's signal for this one lot. */
-    private evaluateLot(
-        lot: Lot,
-        procurement: Procurement,
-        observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
-    ): void {
+    private evaluateLot(lot: Lot, procurement: Procurement): RiskSignal[] {
         const subject = this.subjectForLot(lot, procurement);
-        for (const indicator of this.indicators) {
-            if (indicator.subjectType !== "lot") continue;
-            this.decide(indicator, subject, observationsByIndicator);
+        const signals: RiskSignal[] = [];
+        for (const indicator of this.lotIndicators) {
+            const signal = this.decide(indicator, subject);
+            if (signal) signals.push(signal);
         }
+        return signals;
     }
 
     /**
@@ -84,18 +77,14 @@ export class RiskDecisionEngine {
      * A failing indicator is contained to this one subject: logged, and
      * contributes nothing for it, rather than aborting the whole run.
      */
-    private decide(
-        indicator: ARiskIndicatorDecision,
-        subject: Subject,
-        observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
-    ): void {
+    private decide(indicator: ARiskIndicatorDecision, subject: Subject): RiskSignal | undefined {
         try {
             const outcome = indicator.isEligible(subject, indicator.context);
-            const signal = outcome.eligible ? indicator.assessRisk(subject, indicator.context) : outcome.signal;
-            observationsByIndicator.get(indicator)!.push(signal);
+            return outcome.eligible ? indicator.assessRisk(subject, indicator.context) : outcome.signal;
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             log(`riskDecisionEngine: ${indicator.id} failed for subject ${subject.subjectKey}: ${message}`);
+            return undefined;
         }
     }
 

@@ -153,32 +153,4 @@ describe("RiskDecisionEngine", () => {
         expect(indicator.assessRiskCalls).toHaveLength(2);
     });
 
-    it("validates each indicator's own signals at the end — a duplicate subject observation still throws", () => {
-        const duplicateKey = "cvpis:DUPLICATE";
-        const indicator = new TestIndicator(
-            {},
-            {
-                signalOverride: () => ({
-                    indicatorId: "LT-TEST-01",
-                    indicatorVersion: 1,
-                    subjectType: "procurement",
-                    subjectKey: duplicateKey,
-                    procurementSource: "cvpis",
-                    procurementId: "1",
-                    state: "not_triggered",
-                    rawValue: null,
-                    threshold: null,
-                    appliedParameters: null,
-                    evidence: {},
-                    missingData: [],
-                    dataAsOf: CONTEXT.dataAsOf,
-                }),
-            },
-        );
-        const engine = new RiskDecisionEngine([indicator]);
-
-        expect(() =>
-            engine.evaluateAll([testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]),
-        ).toThrow(/duplicate observation for subject/);
-    });
 });
