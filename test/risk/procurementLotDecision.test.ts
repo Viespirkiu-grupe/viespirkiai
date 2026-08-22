@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PartialRiskSignal, ParameterEntry, Procurement, ProcurementSubject, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
+import type { PartialRiskSignal, BaseParameters, Procurement, ProcurementSubject, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
 import { AProcurementIndicatorDecision } from "../../modules/risk/procurementLotDecision.ts";
 import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 
@@ -19,7 +19,9 @@ import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 // two-step per-subject protocol the Engine itself uses (isEligible, then
 // assessRisk if eligible), against one subject at a time.
 
-type TestParameters = Readonly<{ threshold: number }>;
+interface TestParameters extends BaseParameters {
+    readonly threshold: number;
+}
 type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 
 // A minimal AProcurementIndicatorDecision subclass — hasRequiredData/assessRisk
@@ -59,7 +61,7 @@ class TestProcurementDecision extends AProcurementIndicatorDecision<TestDefiniti
     }
 }
 
-const OPEN_ENDED: ParameterEntry<TestParameters> = {
+const OPEN_ENDED: TestParameters = {
     validFrom: "2026-01-01",
     validTo: null,
     threshold: 10,
@@ -108,7 +110,7 @@ const RUN = Object.freeze({ runId: 7, dataAsOf: "2026-08-01", subjects: null }) 
 
 function makeIndicator(
     options: {
-        parameters?: readonly ParameterEntry<TestParameters>[];
+        parameters?: TestParameters;
         judge?: (subject: Subject, parameters: TestParameters) => PartialRiskSignal;
         hasRequiredData?: (subject: Subject) => boolean;
     } = {},
@@ -121,7 +123,7 @@ function makeIndicator(
             references: [],
             sourceRelations: [],
             requiredInputs: [],
-            parameters: options.parameters ?? [OPEN_ENDED],
+            parameters: options.parameters ?? OPEN_ENDED,
             standard: { name: "test", url: "https://example.com" },
             public: {
                 titleLt: "Testinis rodiklis",
@@ -188,12 +190,9 @@ describe("AProcurementIndicatorDecision", () => {
         expect(observation.missingData).toEqual([]);
     });
 
-    it("applies the entry in force at the run's cutoff", () => {
+    it("applies the parameters only within their validFrom/validTo window", () => {
         const indicator = makeIndicator({
-            parameters: [
-                { ...OPEN_ENDED, validTo: "2026-06-01", threshold: 10 },
-                { validFrom: "2026-06-01", validTo: null, threshold: 1, source: "test" },
-            ],
+            parameters: { ...OPEN_ENDED, validTo: "2026-06-01" },
         });
 
         const before = decideSubject(indicator, subject(), { ...RUN, dataAsOf: "2026-03-01" });
@@ -201,17 +200,17 @@ describe("AProcurementIndicatorDecision", () => {
         expect(before.appliedParameters).toEqual({ threshold: 10 });
 
         const after = decideSubject(indicator, subject(), { ...RUN, dataAsOf: "2026-08-01" });
-        expect(after.state).toBe("not_triggered");
-        expect(after.appliedParameters).toEqual({ threshold: 1 });
+        expect(after.state).toBe("not_applicable");
+        expect(after.appliedParameters).toBeNull();
     });
 
     // The rule that most wants a single home: a subject no reviewed threshold
     // covers can never be published as triggered.
-    it("reports not_applicable without calling judge() when no entry covers the cutoff", () => {
+    it("reports not_applicable without calling judge() when the cutoff is outside the parameters' window", () => {
         const indicator = makeIndicator({
-            parameters: [OPEN_ENDED],
+            parameters: OPEN_ENDED,
             judge: () => {
-                throw new Error("judge() must not be called without an applicable parameter entry");
+                throw new Error("judge() must not be called without applicable parameters");
             },
         });
 

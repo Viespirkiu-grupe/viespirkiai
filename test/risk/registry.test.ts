@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { EligibilityOutcome, ParameterEntry, RiskIndicatorDefinition, RiskSignal } from "../../modules/risk/types.ts";
+import type { EligibilityOutcome, BaseParameters, RiskIndicatorDefinition, RiskSignal } from "../../modules/risk/types.ts";
 import { ARiskIndicatorDecision } from "../../modules/risk/riskIndicatorDecision.ts";
 import { RiskIndicatorRegistry, type IndicatorClass } from "../../modules/risk/registry.ts";
 import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 
-type TestParameters = Readonly<{ threshold: number }>;
+interface TestParameters extends BaseParameters {
+    readonly threshold: number;
+}
 type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 
 // A minimal ARiskIndicatorDecision subclass — isEligible/assessRisk stubbed
@@ -35,7 +37,7 @@ const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjec
 function testDefinition(overrides: {
     id?: string;
     version?: number;
-    parameters?: readonly ParameterEntry<TestParameters>[];
+    parameters?: TestParameters;
     public?: { titleLt: string; descriptionLt: string; formulaLt: string; limitationLt: string };
 }): TestDefinition {
     return {
@@ -45,7 +47,7 @@ function testDefinition(overrides: {
         references: [],
         sourceRelations: [],
         requiredInputs: [],
-        parameters: overrides.parameters ?? [{ validFrom: "2026-01-01", validTo: null, threshold: 1, source: "test" }],
+        parameters: overrides.parameters ?? { validFrom: "2026-01-01", validTo: null, threshold: 1, source: "test" },
         standard: { name: "test", url: "https://example.com" },
         public: overrides.public ?? {
             titleLt: "Testinis rodiklis",
@@ -90,28 +92,25 @@ function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
 }
 
 describe("ARiskIndicatorDecision", () => {
-    it("resolves the entry in force at a cutoff", () => {
+    it("resolves the parameters when in force at a cutoff", () => {
         const indicator = makeIndicator({
-            parameters: [{ validFrom: "2026-01-01", validTo: null, threshold: 2, source: "t" }],
+            parameters: { validFrom: "2026-01-01", validTo: null, threshold: 2, source: "t" },
         });
 
         expect(indicator.parameterEntryFor("2026-08-01")).toMatchObject({ threshold: 2 });
     });
 
-    it("resolves no entry at a cutoff outside the timeline", () => {
+    it("resolves null at a cutoff outside the parameters' window", () => {
         const indicator = makeIndicator({});
         expect(indicator.parameterEntryFor("2020-01-01")).toBeNull();
     });
 
-    it("resolves the effective entry of a contiguous timeline at a cutoff", () => {
+    it("resolves null at a cutoff past validTo", () => {
         const indicator = makeIndicator({
-            parameters: [
-                { validFrom: "2026-01-01", validTo: "2026-07-01", threshold: 1, source: "t" },
-                { validFrom: "2026-07-01", validTo: null, threshold: 2, source: "t" },
-            ],
+            parameters: { validFrom: "2026-01-01", validTo: "2026-07-01", threshold: 1, source: "t" },
         });
-        expect(indicator.parametersAsOf("2026-08-01")).toEqual([indicator.parameters[1]]);
-        expect(indicator.parametersAsOf("2026-03-01")).toEqual([indicator.parameters[0]]);
+        expect(indicator.parameterEntryFor("2026-08-01")).toBeNull();
+        expect(indicator.parameterEntryFor("2026-03-01")).toMatchObject({ threshold: 1 });
     });
 
     it("validates rows against the output contract", () => {
@@ -165,19 +164,19 @@ describe("RiskIndicatorRegistry", () => {
         const inForce = indicatorClass(
             testDefinition({
                 id: "LT-TEST-01",
-                parameters: [{ validFrom: "2026-01-01", validTo: null, threshold: 1, source: "t" }],
+                parameters: { validFrom: "2026-01-01", validTo: null, threshold: 1, source: "t" },
             }),
         );
         const notYetStarted = indicatorClass(
             testDefinition({
                 id: "LT-TEST-02",
-                parameters: [{ validFrom: "2099-01-01", validTo: null, threshold: 1, source: "t" }],
+                parameters: { validFrom: "2099-01-01", validTo: null, threshold: 1, source: "t" },
             }),
         );
         const alreadyEnded = indicatorClass(
             testDefinition({
                 id: "LT-TEST-03",
-                parameters: [{ validFrom: "2020-01-01", validTo: "2020-06-01", threshold: 1, source: "t" }],
+                parameters: { validFrom: "2020-01-01", validTo: "2020-06-01", threshold: 1, source: "t" },
             }),
         );
         const registry = new RiskIndicatorRegistry([inForce, notYetStarted, alreadyEnded]);

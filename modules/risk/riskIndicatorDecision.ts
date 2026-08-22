@@ -3,7 +3,6 @@ import type { EvaluationContext } from "./evaluationContext.ts";
 import type {
     EligibilityOutcome,
     PartialRiskSignal,
-    ParameterEntry,
     ParametersOf,
     RiskIndicatorDefinition,
     RiskSignal,
@@ -85,8 +84,8 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
         return this.definition.requiredInputs;
     }
 
-    get parameters(): readonly ParameterEntry<ParametersOf<D>>[] {
-        return this.definition.parameters as readonly ParameterEntry<ParametersOf<D>>[];
+    get parameters(): ParametersOf<D> {
+        return this.definition.parameters as ParametersOf<D>;
     }
 
     get standard() {
@@ -102,20 +101,16 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
         return `${this.id}/${this.version}`;
     }
 
-    /** The parameter entries in force at a cutoff. */
-    parametersAsOf(dataAsOf: string): readonly ParameterEntry<ParametersOf<D>>[] {
-        return this.parameters.filter(
-            (entry) => entry.validFrom <= dataAsOf && (entry.validTo === null || entry.validTo > dataAsOf),
-        );
-    }
-
     /**
-     * The one entry that decides a subject at a cutoff: in force by date.
-     * `null` means no parameter entry covers this subject. See
+     * The definition's parameters, if they are in force at a cutoff — `null`
+     * if `dataAsOf` falls outside [validFrom, validTo). See
      * docs/indicators-story/risk-service-architecture-v2.md §3.4.
      */
-    parameterEntryFor(dataAsOf: string): ParameterEntry<ParametersOf<D>> | null {
-        return this.parametersAsOf(dataAsOf)[0] ?? null;
+    parameterEntryFor(dataAsOf: string): ParametersOf<D> | null {
+        const parameters = this.parameters;
+        return parameters.validFrom <= dataAsOf && (parameters.validTo === null || parameters.validTo > dataAsOf)
+            ? parameters
+            : null;
     }
 
     // Whether this subject carries the data this indicator needs to judge

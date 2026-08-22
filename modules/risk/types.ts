@@ -44,13 +44,12 @@ export type RiskSignal = Readonly<{
     dataAsOf: string;
 }>;
 
-export type ParameterEntry<P> = Readonly<{
+export type BaseParameters = Readonly<{
     validFrom: string;
     validTo: string | null;
     source: string;
     note?: string;
-}> &
-    P;
+}>;
 
 // What a Risk Indicator's assessRisk() (or isEligible()) returns — the
 // indicator-specific fields only; ARiskIndicatorDecision.signalFor() fills in
@@ -171,20 +170,20 @@ export type RiskIndicatorPublicText = Readonly<{
 // The metadata of one indicator version. definition.ts exports one of these
 // per indicator; decision.ts constructs an ARiskIndicatorDecision<F, D>
 // around it.
-export interface RiskIndicatorDefinition<P = unknown> {
+export interface RiskIndicatorDefinition<P extends BaseParameters = BaseParameters> {
     readonly key: RiskIndicatorKey;
     readonly subjectType: SubjectType;
     readonly stage: IndicatorStage;
     readonly references: readonly string[];
     readonly sourceRelations: readonly string[];
     readonly requiredInputs: readonly string[];
-    readonly parameters: readonly ParameterEntry<P>[];
+    readonly parameters: P;
     readonly outputContract?: RuntimeContract<RiskSignal>;
     readonly standard: RiskIndicatorStandard;
     readonly public: RiskIndicatorPublicText;
 }
 
 // Extracts a RiskIndicatorDefinition's own parameter type, so
-// ARiskIndicatorDecision<F, D> can type parametersAsOf/parameterEntryFor/
+// ARiskIndicatorDecision<F, D> can type parameters/parameterEntryFor/
 // decide against D's own P instead of unknown.
 export type ParametersOf<D> = D extends RiskIndicatorDefinition<infer P> ? P : unknown;

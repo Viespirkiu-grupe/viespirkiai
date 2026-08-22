@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EligibilityOutcome, Lot, Procurement, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
+import type { BaseParameters, EligibilityOutcome, Lot, Procurement, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
 import { ARiskIndicatorDecision } from "../../modules/risk/riskIndicatorDecision.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
 import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
@@ -11,7 +11,7 @@ import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 // ever decides one subject at a time (isEligible/assessRisk) — these tests
 // exist to prove the Engine, not the indicator base class, owns the loop.
 
-type TestDefinition = RiskIndicatorDefinition<{}>;
+type TestDefinition = RiskIndicatorDefinition<BaseParameters>;
 
 function definition(overrides: Partial<TestDefinition> = {}): TestDefinition {
     return {
@@ -21,7 +21,7 @@ function definition(overrides: Partial<TestDefinition> = {}): TestDefinition {
         references: [],
         sourceRelations: [],
         requiredInputs: [],
-        parameters: [{ validFrom: "2026-01-01", validTo: null, source: "test" }],
+        parameters: { validFrom: "2026-01-01", validTo: null, source: "test" },
         standard: { name: "test", url: "https://example.com" },
         public: { titleLt: "Testinis rodiklis", descriptionLt: "desc", formulaLt: "formula", limitationLt: "limitation" },
         ...overrides,

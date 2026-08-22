@@ -33,12 +33,12 @@ describe("riskCatalogue", () => {
         }
     });
 
-    it("carries the public wording and parameter history each entry is rendered from", () => {
+    it("carries the public wording and parameters each entry is rendered from", () => {
         for (const entry of riskCatalogue) {
             expect(entry.public.titleLt).not.toBe("");
             expect(entry.public.limitationLt).not.toBe("");
             expect(entry.standard.url).toMatch(/^https:\/\//);
-            expect(entry.parameters.length).toBeGreaterThan(0);
+            expect(entry.parameters.validFrom).not.toBe("");
         }
     });
 });
