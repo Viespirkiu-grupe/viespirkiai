@@ -9,10 +9,11 @@ import { ltCom02Definition } from "./definition.ts";
 // docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4.
 
 export class LtCom02Decision extends ALotIndicatorDecision<typeof ltCom02Definition> {
+    static readonly definition = ltCom02Definition;
     protected readonly missingDataWhenAbsent = ["tiekejoKodas"];
 
-    constructor() {
-        super(ltCom02Definition);
+    constructor(context: EvaluationContext) {
+        super(ltCom02Definition, context);
     }
 
     protected hasRequiredData(subject: Subject): boolean {
@@ -59,5 +60,3 @@ export class LtCom02Decision extends ALotIndicatorDecision<typeof ltCom02Definit
         });
     }
 }
-
-export const ltCom02v1 = new LtCom02Decision();

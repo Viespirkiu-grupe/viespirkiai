@@ -1,5 +1,4 @@
 import { log } from "../../utils/log.js";
-import { EvaluationContext, type EvaluationRun } from "./evaluationContext.ts";
 import type { ARiskIndicatorDecision } from "./riskIndicatorDecision.ts";
 import type { Lot, Procurement, RiskSignal, Subject } from "./types.ts";
 
@@ -16,37 +15,34 @@ import type { Lot, Procurement, RiskSignal, Subject } from "./types.ts";
 export class RiskDecisionEngine {
     private readonly indicators: readonly ARiskIndicatorDecision[];
 
+    /**
+     * `indicators` are already evaluation-scoped — each carries its own
+     * fixed EvaluationContext (riskIndicatorDecision.ts), built by
+     * RiskIndicatorRegistry.createAllIndicators(context)
+     * (registry.ts) — so this class never builds or resolves a context
+     * itself.
+     */
     constructor(indicators: readonly ARiskIndicatorDecision[]) {
         this.indicators = indicators;
     }
 
     /**
-     * `run` carries the cutoff an EvaluationContext needs to resolve each
-     * indicator's effective parameters against — the run's cutoff, not any
-     * one subject's.
-     *
-     * Builds one EvaluationContext per indicator up front — dataAsOf-effective
-     * parameters depend only on the indicator and the run, never on which
-     * subject is being decided, so this is done once per call, not once per
-     * subject. Then walks every procurement (evaluateProcurement) and its
-     * lots (evaluateLot), and validates each indicator's own observations
-     * once at the end via ARiskIndicatorDecision.validateObservations —
+     * Walks every procurement (evaluateProcurement) and its lots
+     * (evaluateLot), then validates each indicator's own observations once
+     * at the end via ARiskIndicatorDecision.validateObservations —
      * identity/duplicate checks are the indicator's own concern, but only
      * meaningful over everything it decided this call, not one subject at a
      * time.
      */
-    evaluateAll(run: EvaluationRun, procurements: readonly Procurement[]): readonly RiskSignal[] {
-        const contexts = new Map<ARiskIndicatorDecision, EvaluationContext>(
-            this.indicators.map((indicator) => [indicator, new EvaluationContext(run, indicator.parametersAsOf(run.dataAsOf))]),
-        );
+    evaluateAll(procurements: readonly Procurement[]): readonly RiskSignal[] {
         const observationsByIndicator = new Map<ARiskIndicatorDecision, unknown[]>(
             this.indicators.map((indicator) => [indicator, []]),
         );
 
         for (const procurement of procurements) {
-            this.evaluateProcurement(procurement, contexts, observationsByIndicator);
+            this.evaluateProcurement(procurement, observationsByIndicator);
             for (const lot of procurement.lots) {
-                this.evaluateLot(lot, procurement, contexts, observationsByIndicator);
+                this.evaluateLot(lot, procurement, observationsByIndicator);
             }
         }
 
@@ -60,13 +56,12 @@ export class RiskDecisionEngine {
     /** Every procurement-subjectType indicator's signal for this one procurement. */
     private evaluateProcurement(
         procurement: Procurement,
-        contexts: ReadonlyMap<ARiskIndicatorDecision, EvaluationContext>,
         observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
     ): void {
         const subject = this.subjectForProcurement(procurement);
         for (const indicator of this.indicators) {
             if (indicator.subjectType !== "procurement") continue;
-            this.decide(indicator, subject, contexts.get(indicator)!, observationsByIndicator);
+            this.decide(indicator, subject, observationsByIndicator);
         }
     }
 
@@ -74,13 +69,12 @@ export class RiskDecisionEngine {
     private evaluateLot(
         lot: Lot,
         procurement: Procurement,
-        contexts: ReadonlyMap<ARiskIndicatorDecision, EvaluationContext>,
         observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
     ): void {
         const subject = this.subjectForLot(lot, procurement);
         for (const indicator of this.indicators) {
             if (indicator.subjectType !== "lot") continue;
-            this.decide(indicator, subject, contexts.get(indicator)!, observationsByIndicator);
+            this.decide(indicator, subject, observationsByIndicator);
         }
     }
 
@@ -93,12 +87,11 @@ export class RiskDecisionEngine {
     private decide(
         indicator: ARiskIndicatorDecision,
         subject: Subject,
-        context: EvaluationContext,
         observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
     ): void {
         try {
-            const outcome = indicator.isEligible(subject, context);
-            const signal = outcome.eligible ? indicator.assessRisk(subject, context) : outcome.signal;
+            const outcome = indicator.isEligible(subject, indicator.context);
+            const signal = outcome.eligible ? indicator.assessRisk(subject, indicator.context) : outcome.signal;
             observationsByIndicator.get(indicator)!.push(signal);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);

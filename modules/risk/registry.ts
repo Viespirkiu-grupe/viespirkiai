@@ -1,64 +1,62 @@
-import type { RiskIndicatorKey } from "./types.ts";
+import type { RiskIndicatorDefinition, RiskIndicatorKey } from "./types.ts";
 import type { ARiskIndicatorDecision } from "./riskIndicatorDecision.ts";
+import type { EvaluationContext } from "./evaluationContext.ts";
 
 function keyString(key: RiskIndicatorKey): string {
     return `${key.id}/${key.version}`;
 }
 
 /**
- * The in-process catalogue of deployed Risk Indicator versions, keyed by
+ * A concrete indicator's decision.ts class — constructible from just an
+ * EvaluationContext, with its RiskIndicatorDefinition exposed statically so
+ * the registry can catalogue it without evaluating anything.
+ */
+export type IndicatorClass = (new (context: EvaluationContext) => ARiskIndicatorDecision) & {
+    readonly definition: RiskIndicatorDefinition;
+};
+
+/**
+ * The in-process catalogue of deployed Risk Indicator definitions, keyed by
  * (id, version). See docs/indicators-story/risk-service-architecture-v2.md §3.5.
  *
- * The constructor throws on a duplicate key or on more than one active
- * version of the same indicator id.
+ * Holds definitions, not decisions: an ARiskIndicatorDecision is
+ * evaluation-scoped (it carries a fixed EvaluationContext), so this registry
+ * only ever hands one out via createAllIndicators(context) — never keeps one
+ * around itself. The constructor throws on a duplicate key.
  */
 export class RiskIndicatorRegistry {
-    private readonly byKey = new Map<string, ARiskIndicatorDecision>();
-    private readonly activeById = new Map<string, ARiskIndicatorDecision>();
+    private readonly byKey = new Map<string, IndicatorClass>();
 
-    constructor(indicators: readonly ARiskIndicatorDecision[]) {
-        for (const indicator of indicators) {
-            this.add(indicator);
+    constructor(indicatorClasses: readonly IndicatorClass[]) {
+        for (const cls of indicatorClasses) {
+            this.add(cls);
         }
     }
 
-    require(key: RiskIndicatorKey): ARiskIndicatorDecision {
-        const indicator = this.byKey.get(keyString(key));
-        if (!indicator) {
+    require(key: RiskIndicatorKey): RiskIndicatorDefinition {
+        const cls = this.byKey.get(keyString(key));
+        if (!cls) {
             throw new Error(`Unknown Risk Indicator: ${keyString(key)}`);
         }
-        return indicator;
+        return cls.definition;
     }
 
-    all(): readonly ARiskIndicatorDecision[] {
-        return [...this.byKey.values()];
+    all(): readonly RiskIndicatorDefinition[] {
+        return [...this.byKey.values()].map((cls) => cls.definition);
     }
 
-    /** The one `active`-lifecycle version of each indicator. */
-    active(): readonly ARiskIndicatorDecision[] {
-        return [...this.activeById.values()];
+    /** One ARiskIndicatorDecision per registered definition carrying a parameter entry in force at context.dataAsOf. */
+    createAllIndicators(context: EvaluationContext): readonly ARiskIndicatorDecision[] {
+        return [...this.byKey.values()]
+            .map((cls) => new cls(context))
+            .filter((indicator) => indicator.parameterEntryFor(context.dataAsOf) !== null);
     }
 
-    /** Indicators whose lifecycle is 'active' or 'shadow'; see ARiskIndicatorDecision.isEvaluable in riskIndicatorDecision.ts. */
-    evaluable(): readonly ARiskIndicatorDecision[] {
-        return this.all().filter((indicator) => indicator.isEvaluable);
-    }
-
-    private add(indicator: ARiskIndicatorDecision): void {
-        const ks = keyString(indicator.key);
+    private add(cls: IndicatorClass): void {
+        const ks = keyString(cls.definition.key);
         if (this.byKey.has(ks)) {
             throw new Error(`Duplicate Risk Indicator key: ${ks}`);
         }
-        this.byKey.set(ks, indicator);
-
-        if (!indicator.isActive) return;
-
-        const existingActive = this.activeById.get(indicator.id);
-        if (existingActive) {
-            throw new Error(
-                `Risk Indicator ${indicator.id} has more than one active version: ${existingActive.version} and ${indicator.version}`,
-            );
-        }
-        this.activeById.set(indicator.id, indicator);
+        this.byKey.set(ks, cls);
     }
 }

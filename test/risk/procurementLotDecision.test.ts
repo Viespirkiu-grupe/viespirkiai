@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PartialRiskSignal, ParameterEntry, Procurement, ProcurementSubject, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
 import { AProcurementIndicatorDecision } from "../../modules/risk/procurementLotDecision.ts";
-import { EvaluationContext, type EvaluationRun } from "../../modules/risk/evaluationContext.ts";
+import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 
 // The shared half of every decision (ARiskIndicatorDecision,
 // riskIndicatorDecision.ts) plus the procurement-subject eligibility gate
@@ -35,11 +35,12 @@ class TestProcurementDecision extends AProcurementIndicatorDecision<TestDefiniti
 
     constructor(
         definition: TestDefinition,
+        context: EvaluationContext,
         judgeFn: (subject: Subject, parameters: TestParameters) => PartialRiskSignal,
         hasRequiredDataFn: (subject: Subject) => boolean = (subject) =>
             subject.subjectType === "procurement" && subject.procurement.numatomaVerteEUR !== null,
     ) {
-        super(definition);
+        super(definition, context);
         this.judgeFn = judgeFn;
         this.hasRequiredDataFn = hasRequiredDataFn;
     }
@@ -99,6 +100,12 @@ function subject(
     };
 }
 
+const RUN = Object.freeze({ runId: 7, dataAsOf: "2026-08-01", subjects: null }) as Readonly<{
+    runId: number;
+    dataAsOf: string;
+    subjects: readonly string[] | null;
+}>;
+
 function makeIndicator(
     options: {
         parameters?: readonly ParameterEntry<TestParameters>[];
@@ -109,7 +116,6 @@ function makeIndicator(
     return new TestProcurementDecision(
         {
             key: { id: "LT-TEST-01", version: 3 },
-            lifecycle: "active",
             subjectType: "procurement",
             stage: "tender",
             references: [],
@@ -124,6 +130,7 @@ function makeIndicator(
                 limitationLt: "limitation",
             },
         },
+        new EvaluationContext(RUN),
         options.judge ??
             ((judgedSubject, parameters) => {
                 const measured = judgedSubject.subjectType === "procurement" ? judgedSubject.procurement.numatomaVerteEUR! : 0;
@@ -137,14 +144,15 @@ function makeIndicator(
     );
 }
 
-const RUN: EvaluationRun = { runId: 7, dataAsOf: "2026-08-01", subjects: null };
-
 // The per-subject protocol RiskDecisionEngine itself uses
 // (riskDecisionEngine.ts's private decide()) — isEligible, then assessRisk
 // only if eligible — replayed here against one subject, with a context built
-// the same way the Engine builds one per indicator.
-function decideSubject(indicator: TestProcurementDecision, subject: ProcurementSubject, run: EvaluationRun = RUN): RiskSignal {
-    const context = new EvaluationContext(run, indicator.parametersAsOf(run.dataAsOf));
+// the same way the Engine passes one per indicator (indicator.context).
+// Independent of makeIndicator()'s own fixed construction-time context: a
+// concrete assessRisk() reads whichever context it is called with, not
+// necessarily `this.context`, which is all these tests exercise.
+function decideSubject(indicator: TestProcurementDecision, subject: ProcurementSubject, run: typeof RUN = RUN): RiskSignal {
+    const context = new EvaluationContext(run);
     const outcome = indicator.isEligible(subject, context);
     return outcome.eligible ? indicator.assessRisk(subject, context) : outcome.signal;
 }

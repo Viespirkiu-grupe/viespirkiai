@@ -5,7 +5,7 @@ import { PostgresRiskDataSource } from "../../modules/risk/riskDataSource.ts";
 import { riskIndicatorRegistry } from "../../modules/risk/deployedIndicators.ts";
 import { ProcurementReader } from "../../modules/risk/procurementReader.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
-import type { EvaluationRun } from "../../modules/risk/evaluationContext.ts";
+import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 import type { RiskSignal } from "../../modules/risk/types.ts";
 import { SignalWriter } from "./signalWriter.ts";
 
@@ -78,8 +78,9 @@ async function closeStaleRunningRuns(): Promise<void> {
 }
 
 /**
- * Executes every active/shadow Risk Indicator against every page the
- * Procurement Reader loads (risk-service-architecture-v2.md §1.2): opens one
+ * Executes every Risk Indicator whose parameter timeline is in force as of
+ * `dataAsOf` against every page the Procurement Reader loads
+ * (risk-service-architecture-v2.md §1.2): opens one
  * run, loops pages until nextCursor is null, evaluates each page's
  * Procurements through the RiskDecisionEngine (one flat signal list per
  * page, spanning every indicator), writes that page's signals in one
@@ -102,7 +103,6 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
     // the Signal Writer touches `riskDb`.
     const canonicalFacts = new PostgresRiskDataSource(postgres);
     const reader = new ProcurementReader(canonicalFacts, subjects, dataAsOf);
-    const engine = new RiskDecisionEngine(riskIndicatorRegistry.evaluable());
     const writer = new SignalWriter(riskDb);
 
     const openedRun = await writer.updateEvaluationRun({
@@ -111,7 +111,8 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
         codeCommit: options.codeCommit,
         statistics: {},
     });
-    const evaluationRun: EvaluationRun = { runId: openedRun.runId, dataAsOf, subjects };
+    const evaluationContext = new EvaluationContext({ runId: openedRun.runId, dataAsOf, subjects });
+    const engine = new RiskDecisionEngine(riskIndicatorRegistry.createAllIndicators(evaluationContext));
 
     const statistics: Record<string, IndicatorStats> = {};
     let anyFailed = false;
@@ -119,7 +120,7 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
 
     do {
         const page = await reader.loadProcurements(cursor, pageSize);
-        const signals = engine.evaluateAll(evaluationRun, page.items);
+        const signals = engine.evaluateAll(page.items);
 
         let inserted = true;
         if (signals.length > 0) {

@@ -12,7 +12,7 @@ not their bid was later rejected**, and regardless of which lot they bid on.
 
 | File            | Question it answers                                                                  |
 |-----------------|------------------------------------------------------------------------------------------|
-| `definition.ts` | Identity, lifecycle, public wording, and the parameter timeline — what it compares against, and since when |
+| `definition.ts` | Identity, public wording, and the parameter timeline — what it compares against, and since when |
 | `decision.ts`   | The `AProcurementIndicatorDecision` subclass whose `assessRisk()` judges the subject     |
 | `test/`         | How we know it works                                                                    |
 
@@ -49,7 +49,7 @@ negotiated procedures, restricted competitions, and low-value survey ("apklausa"
 competitions, which by design admit any interested supplier. Narrowing to those methods is deferred until the
 `pirkimoBudas` vocabulary those procedures actually produce is confirmed against ingested data; low-value "apklausa"
 procurements are statutorily exempt from the procedure-completion report this indicator's data depends on, so they
-are unreachable through `v_dalyviai` regardless of scoping. `lifecycle: 'shadow'` until this is resolved.
+are unreachable through `v_dalyviai` regardless of scoping.
 
 ## Threshold
 

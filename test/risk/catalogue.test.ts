@@ -10,9 +10,9 @@ import {
 // boundary: every deployed version is described, and nothing beyond the
 // published fields travels to the web layer.
 describe("riskCatalogue", () => {
-    it("describes every deployed indicator version, whatever its lifecycle", () => {
+    it("describes every deployed indicator version, whatever its parameter timeline", () => {
         expect(riskCatalogue.map((entry) => `${entry.id}/${entry.version}`)).toEqual(
-            riskIndicatorRegistry.all().map((indicator) => indicator.toString()),
+            riskIndicatorRegistry.all().map((definition) => `${definition.key.id}/${definition.key.version}`),
         );
     });
 

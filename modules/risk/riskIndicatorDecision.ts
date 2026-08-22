@@ -45,24 +45,12 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
 {
     readonly definition: D;
     readonly outputContract: RuntimeContract<RiskSignal>;
+    readonly context: EvaluationContext;
 
-    /**
-     * Throws on an id outside the catalogue namespace, missing public
-     * wording, or a gapped/overlapping parameter timeline. See
-     * docs/indicators-story/risk-service-architecture-v2.md §3.4.
-     */
-    protected constructor(definition: D) {
+    protected constructor(definition: D, context: EvaluationContext) {
         this.definition = definition;
+        this.context = context;
         this.outputContract = definition.outputContract ?? riskSignalContract;
-
-        // @Todo: eliminate - this assert is not needed
-        this.assertIdentity();
-
-        // @Todo: eliminate - this assert is not needed
-        this.assertPublicWording();
-
-        // @Todo: no assert is needed, simply have isActive() method that is checked before calling indicator
-        this.assertParameterTimeline();
     }
 
     get key() {
@@ -125,9 +113,6 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * The one entry that decides a subject at a cutoff: in force by date.
      * `null` means no parameter entry covers this subject. See
      * docs/indicators-story/risk-service-architecture-v2.md §3.4.
-     *
-     * assertParameterTimeline (below) rejects gapped/overlapping entries, so
-     * at most one entry can be in force at any cutoff.
      */
     parameterEntryFor(dataAsOf: string): ParameterEntry<ParametersOf<D>> | null {
         return this.parametersAsOf(dataAsOf)[0] ?? null;
@@ -228,52 +213,5 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
         }
 
         return validated;
-    }
-
-    private assertIdentity(): void {
-        if (!this.id.startsWith("LT-")) {
-            throw new Error(`Risk Indicator id must start with 'LT-': ${this.id}`);
-        }
-    }
-
-    private assertPublicWording(): void {
-        if (!this.public.titleLt || !this.public.limitationLt) {
-            throw new Error(`Risk Indicator ${this.id}: public.titleLt and public.limitationLt must be non-empty`);
-        }
-    }
-
-    // See docs/indicators-story/risk-service-architecture-v2.md §3.4.
-    private assertParameterTimeline(): void {
-        const entries = [...this.parameters].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
-
-        for (const entry of entries) {
-            if (entry.validTo !== null && entry.validTo < entry.validFrom) {
-                throw new Error(
-                    `Risk Indicator ${this.id}: parameter entry validTo (${entry.validTo}) is earlier than validFrom (${entry.validFrom})`,
-                );
-            }
-        }
-
-        this.assertContiguous(entries);
-    }
-
-    // One global timeline, since a parameter entry no longer carries a scope
-    // to narrow which subjects it applies to.
-    private assertContiguous(sortedEntries: readonly ParameterEntry<ParametersOf<D>>[]): void {
-        for (let i = 0; i < sortedEntries.length - 1; i++) {
-            const current = sortedEntries[i];
-            const next = sortedEntries[i + 1];
-
-            if (current.validTo === null) {
-                throw new Error(
-                    `Risk Indicator ${this.id}: parameter entry starting ${current.validFrom} is open-ended but is followed by another entry starting ${next.validFrom}`,
-                );
-            }
-            if (current.validTo !== next.validFrom) {
-                throw new Error(
-                    `Risk Indicator ${this.id}: parameter entries have a gap or overlap between ${current.validTo} and ${next.validFrom}`,
-                );
-            }
-        }
     }
 }

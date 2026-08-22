@@ -2,16 +2,12 @@ import type { RiskIndicatorDefinition } from "../../types.ts";
 
 // LT-COM-02 — Low number of bidders (Mažas dalyvių skaičius).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-//
-// lifecycle: 'shadow' pending review.
-
 export type LtCom02Parameters = Readonly<{
     minimumBidders: number;
 }>;
 
 export const ltCom02Definition: RiskIndicatorDefinition<LtCom02Parameters> = {
     key: { id: "LT-COM-02", version: 1 },
-    lifecycle: "shadow",
     subjectType: "lot",
     stage: "award",
     references: ["OCP-R019", "OLAF-CN01", "OLAF-CN02", "OLAF-CA02", "VPT-I12"],

@@ -4,8 +4,6 @@
 // and riskDataSource.ts. See
 // docs/indicators-story/risk-service-architecture-v2.md §3.4.
 
-// @Todo: eliminate IndicatorLifecycle
-export type IndicatorLifecycle = "draft" | "shadow" | "active" | "retired";
 export type IndicatorStage = "planning" | "tender" | "award" | "contract";
 export type SubjectType = "procurement" | "lot" | "contract" | "supplier";
 
@@ -46,12 +44,6 @@ export type RiskSignal = Readonly<{
     dataAsOf: string;
 }>;
 
-// One effective-dated entry of a parameter timeline: the indicator's own
-// parameter fields (`P`), plus the effective-dating and provenance every
-// entry carries. `validTo: null` means still in force.
-//
-// `source` and `note` are published verbatim with the entry
-// (deployedIndicators.ts). `note` is optional.
 export type ParameterEntry<P> = Readonly<{
     validFrom: string;
     validTo: string | null;
@@ -181,7 +173,6 @@ export type RiskIndicatorPublicText = Readonly<{
 // around it.
 export interface RiskIndicatorDefinition<P = unknown> {
     readonly key: RiskIndicatorKey;
-    readonly lifecycle: IndicatorLifecycle;
     readonly subjectType: SubjectType;
     readonly stage: IndicatorStage;
     readonly references: readonly string[];

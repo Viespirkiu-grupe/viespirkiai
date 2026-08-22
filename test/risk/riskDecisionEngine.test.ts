@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EligibilityOutcome, Lot, Procurement, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
 import { ARiskIndicatorDecision } from "../../modules/risk/riskIndicatorDecision.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
-import type { EvaluationContext, EvaluationRun } from "../../modules/risk/evaluationContext.ts";
+import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 
 // Pure, no DB — RiskDecisionEngine is the only place that batches over
 // Procurements/lots and every registered indicator
@@ -16,7 +16,6 @@ type TestDefinition = RiskIndicatorDefinition<{}>;
 function definition(overrides: Partial<TestDefinition> = {}): TestDefinition {
     return {
         key: { id: "LT-TEST-01", version: 1 },
-        lifecycle: "active",
         subjectType: "procurement",
         stage: "tender",
         references: [],
@@ -28,6 +27,8 @@ function definition(overrides: Partial<TestDefinition> = {}): TestDefinition {
         ...overrides,
     };
 }
+
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
 
 // Always eligible; assessRisk() records every subject it was called with (so
 // tests can assert which subjects the Engine routed to it), and either
@@ -41,7 +42,7 @@ class TestIndicator extends ARiskIndicatorDecision<TestDefinition> {
         overrides: Partial<TestDefinition> = {},
         options: { shouldThrow?: boolean; signalOverride?: (subject: Subject) => RiskSignal } = {},
     ) {
-        super(definition(overrides));
+        super(definition(overrides), CONTEXT);
         this.shouldThrow = options.shouldThrow ?? false;
         this.signalOverride = options.signalOverride;
     }
@@ -98,8 +99,6 @@ function testLot(pirkimoNumeris: string, daliesNumeris: string): Lot {
     };
 }
 
-const RUN: EvaluationRun = { runId: 1, dataAsOf: "2026-08-01", subjects: null };
-
 describe("RiskDecisionEngine", () => {
     it("builds one ProcurementSubject and one LotSubject per lot, each carrying its non-null parent", () => {
         const procurement = testProcurement({ pirkimoNumeris: "10", lots: [testLot("10", "1"), testLot("10", "2")] });
@@ -107,7 +106,7 @@ describe("RiskDecisionEngine", () => {
         const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
         const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator]);
 
-        engine.evaluateAll(RUN, [procurement]);
+        engine.evaluateAll([procurement]);
 
         expect(procurementIndicator.assessRiskCalls).toHaveLength(1);
         expect(procurementIndicator.assessRiskCalls[0]).toMatchObject({ subjectType: "procurement", subjectKey: "cvpis:10" });
@@ -126,7 +125,7 @@ describe("RiskDecisionEngine", () => {
         const healthy = new TestIndicator();
         const engine = new RiskDecisionEngine([failing, healthy]);
 
-        const signals = engine.evaluateAll(RUN, [testProcurement()]);
+        const signals = engine.evaluateAll([testProcurement()]);
 
         expect(signals.find((s) => s.indicatorId === "LT-TEST-FAIL")).toBeUndefined();
         const healthySignal = signals.find((s) => s.indicatorId === "LT-TEST-01");
@@ -139,7 +138,7 @@ describe("RiskDecisionEngine", () => {
         const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
         const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator]);
 
-        engine.evaluateAll(RUN, [procurement]);
+        engine.evaluateAll([procurement]);
 
         expect(procurementIndicator.assessRiskCalls.every((s) => s.subjectType === "procurement")).toBe(true);
         expect(lotIndicator.assessRiskCalls.every((s) => s.subjectType === "lot")).toBe(true);
@@ -149,7 +148,7 @@ describe("RiskDecisionEngine", () => {
         const indicator = new TestIndicator();
         const engine = new RiskDecisionEngine([indicator]);
 
-        engine.evaluateAll(RUN, [testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]);
+        engine.evaluateAll([testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]);
 
         expect(indicator.assessRiskCalls).toHaveLength(2);
     });
@@ -172,14 +171,14 @@ describe("RiskDecisionEngine", () => {
                     appliedParameters: null,
                     evidence: {},
                     missingData: [],
-                    dataAsOf: RUN.dataAsOf,
+                    dataAsOf: CONTEXT.dataAsOf,
                 }),
             },
         );
         const engine = new RiskDecisionEngine([indicator]);
 
         expect(() =>
-            engine.evaluateAll(RUN, [testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]),
+            engine.evaluateAll([testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]),
         ).toThrow(/duplicate observation for subject/);
     });
 });

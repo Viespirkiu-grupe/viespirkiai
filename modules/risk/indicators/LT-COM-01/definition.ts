@@ -2,16 +2,12 @@ import type { RiskIndicatorDefinition } from "../../types.ts";
 
 // LT-COM-01 — Single valid bid (Vienintelis tinkamas pasiūlymas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-//
-// lifecycle: 'shadow' pending review.
-
 export type LtCom01Parameters = Readonly<{
     maximumValidBids: number;
 }>;
 
 export const ltCom01Definition: RiskIndicatorDefinition<LtCom01Parameters> = {
     key: { id: "LT-COM-01", version: 1 },
-    lifecycle: "shadow",
     subjectType: "lot",
     stage: "award",
     references: ["OCP-R018", "OLAF-CA02", "OT-I01", "STT-I03", "VPT-I01"],

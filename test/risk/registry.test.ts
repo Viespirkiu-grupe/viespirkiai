@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { EligibilityOutcome, ParameterEntry, RiskIndicatorDefinition, RiskSignal } from "../../modules/risk/types.ts";
 import { ARiskIndicatorDecision } from "../../modules/risk/riskIndicatorDecision.ts";
-import { RiskIndicatorRegistry } from "../../modules/risk/registry.ts";
+import { RiskIndicatorRegistry, type IndicatorClass } from "../../modules/risk/registry.ts";
+import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 
 type TestParameters = Readonly<{ threshold: number }>;
 type TestDefinition = RiskIndicatorDefinition<TestParameters>;
@@ -13,8 +14,8 @@ type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 // is what actually calls isEligible/assessRisk per subject; that wiring is
 // tested there, not here.
 class TestDecision extends ARiskIndicatorDecision<TestDefinition> {
-    constructor(definition: TestDefinition) {
-        super(definition);
+    constructor(definition: TestDefinition, context: EvaluationContext) {
+        super(definition, context);
     }
 
     protected readonly missingDataWhenAbsent: readonly string[] = [];
@@ -29,16 +30,16 @@ class TestDecision extends ARiskIndicatorDecision<TestDefinition> {
     }
 }
 
-function makeIndicator(overrides: {
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+
+function testDefinition(overrides: {
     id?: string;
     version?: number;
-    lifecycle?: "draft" | "shadow" | "active" | "retired";
     parameters?: readonly ParameterEntry<TestParameters>[];
     public?: { titleLt: string; descriptionLt: string; formulaLt: string; limitationLt: string };
-}): TestDecision {
-    return new TestDecision({
+}): TestDefinition {
+    return {
         key: { id: (overrides.id ?? "LT-TEST-01") as `LT-${string}`, version: overrides.version ?? 1 },
-        lifecycle: overrides.lifecycle ?? "active",
         subjectType: "procurement",
         stage: "tender",
         references: [],
@@ -52,7 +53,21 @@ function makeIndicator(overrides: {
             formulaLt: "formula",
             limitationLt: "limitation",
         },
-    });
+    };
+}
+
+function makeIndicator(overrides: Parameters<typeof testDefinition>[0] = {}): TestDecision {
+    return new TestDecision(testDefinition(overrides), CONTEXT);
+}
+
+/** Wraps a definition as an IndicatorClass — the shape RiskIndicatorRegistry holds (registry.ts). */
+function indicatorClass(definition: TestDefinition): IndicatorClass {
+    return class extends TestDecision {
+        static readonly definition = definition;
+        constructor(context: EvaluationContext) {
+            super(definition, context);
+        }
+    };
 }
 
 function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
@@ -75,37 +90,6 @@ function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
 }
 
 describe("ARiskIndicatorDecision", () => {
-    it("rejects a definition with empty public wording", () => {
-        expect(() =>
-            makeIndicator({
-                id: "LT-TEST-05",
-                public: { titleLt: "", descriptionLt: "d", formulaLt: "f", limitationLt: "l" },
-            }),
-        ).toThrow(/titleLt and public.limitationLt must be non-empty/);
-    });
-
-    it("rejects a parameter timeline with a gap", () => {
-        expect(() =>
-            makeIndicator({
-                parameters: [
-                    { validFrom: "2026-01-01", validTo: "2026-06-01", threshold: 1, source: "t" },
-                    { validFrom: "2026-07-01", validTo: null, threshold: 2, source: "t" },
-                ],
-            }),
-        ).toThrow(/gap or overlap/);
-    });
-
-    it("rejects a parameter timeline with an overlap", () => {
-        expect(() =>
-            makeIndicator({
-                parameters: [
-                    { validFrom: "2026-01-01", validTo: "2026-07-01", threshold: 1, source: "t" },
-                    { validFrom: "2026-06-01", validTo: null, threshold: 2, source: "t" },
-                ],
-            }),
-        ).toThrow(/gap or overlap/);
-    });
-
     it("resolves the entry in force at a cutoff", () => {
         const indicator = makeIndicator({
             parameters: [{ validFrom: "2026-01-01", validTo: null, threshold: 2, source: "t" }],
@@ -117,14 +101,6 @@ describe("ARiskIndicatorDecision", () => {
     it("resolves no entry at a cutoff outside the timeline", () => {
         const indicator = makeIndicator({});
         expect(indicator.parameterEntryFor("2020-01-01")).toBeNull();
-    });
-
-    it("rejects validTo earlier than validFrom", () => {
-        expect(() =>
-            makeIndicator({
-                parameters: [{ validFrom: "2026-07-01", validTo: "2026-01-01", threshold: 1, source: "t" }],
-            }),
-        ).toThrow(/earlier than validFrom/);
     });
 
     it("resolves the effective entry of a contiguous timeline at a cutoff", () => {
@@ -167,37 +143,48 @@ describe("ARiskIndicatorDecision", () => {
 
 describe("RiskIndicatorRegistry", () => {
     it("rejects duplicate (id, version) keys", () => {
-        const a = makeIndicator({});
-        const b = makeIndicator({});
+        const a = indicatorClass(testDefinition({}));
+        const b = indicatorClass(testDefinition({}));
         expect(() => new RiskIndicatorRegistry([a, b])).toThrow(/Duplicate Risk Indicator key/);
     });
 
-    it("rejects two active versions of the same indicator", () => {
-        const v1 = makeIndicator({ version: 1, lifecycle: "active" });
-        const v2 = makeIndicator({ version: 2, lifecycle: "active" });
-        expect(() => new RiskIndicatorRegistry([v1, v2])).toThrow(/more than one active version/);
-    });
-
-    it("allows one active and one retired version of the same indicator", () => {
-        const v1 = makeIndicator({ version: 1, lifecycle: "retired" });
-        const v2 = makeIndicator({ version: 2, lifecycle: "active" });
-        const registry = new RiskIndicatorRegistry([v1, v2]);
-        expect(registry.active().map((indicator) => indicator.key)).toEqual([{ id: "LT-TEST-01", version: 2 }]);
-    });
-
     it("requires a known key and rejects an unknown one", () => {
-        const indicator = makeIndicator({});
-        const registry = new RiskIndicatorRegistry([indicator]);
-        expect(registry.require({ id: "LT-TEST-01", version: 1 })).toBe(indicator);
+        const definition = testDefinition({});
+        const registry = new RiskIndicatorRegistry([indicatorClass(definition)]);
+        expect(registry.require({ id: "LT-TEST-01", version: 1 })).toBe(definition);
         expect(() => registry.require({ id: "LT-TEST-01", version: 2 })).toThrow(/Unknown Risk Indicator/);
     });
 
-    it("evaluable() includes active and shadow but not draft or retired", () => {
-        const active = makeIndicator({ id: "LT-TEST-01", lifecycle: "active" });
-        const shadow = makeIndicator({ id: "LT-TEST-02", lifecycle: "shadow" });
-        const draft = makeIndicator({ id: "LT-TEST-03", lifecycle: "draft" });
-        const retired = makeIndicator({ id: "LT-TEST-04", lifecycle: "retired" });
-        const registry = new RiskIndicatorRegistry([active, shadow, draft, retired]);
-        expect(registry.evaluable().map((indicator) => indicator.id)).toEqual(["LT-TEST-01", "LT-TEST-02"]);
+    it("all() lists every registered definition", () => {
+        const definition = testDefinition({});
+        const registry = new RiskIndicatorRegistry([indicatorClass(definition)]);
+        expect(registry.all()).toEqual([definition]);
+    });
+
+    it("createAllIndicators(context) builds one indicator per definition carrying a parameter entry in force at that cutoff", () => {
+        const inForce = indicatorClass(
+            testDefinition({
+                id: "LT-TEST-01",
+                parameters: [{ validFrom: "2026-01-01", validTo: null, threshold: 1, source: "t" }],
+            }),
+        );
+        const notYetStarted = indicatorClass(
+            testDefinition({
+                id: "LT-TEST-02",
+                parameters: [{ validFrom: "2099-01-01", validTo: null, threshold: 1, source: "t" }],
+            }),
+        );
+        const alreadyEnded = indicatorClass(
+            testDefinition({
+                id: "LT-TEST-03",
+                parameters: [{ validFrom: "2020-01-01", validTo: "2020-06-01", threshold: 1, source: "t" }],
+            }),
+        );
+        const registry = new RiskIndicatorRegistry([inForce, notYetStarted, alreadyEnded]);
+
+        const indicators = registry.createAllIndicators(CONTEXT);
+
+        expect(indicators.map((indicator) => indicator.id)).toEqual(["LT-TEST-01"]);
+        expect(indicators[0].context).toBe(CONTEXT);
     });
 });

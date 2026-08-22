@@ -3,16 +3,12 @@ import type { RiskIndicatorDefinition } from "../../types.ts";
 // LT-COM-03 — Only one supplier invited or consulted (Konsultuotas ar
 // kviestas tik vienas tiekėjas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-//
-// lifecycle: 'shadow' pending review.
-
 export type LtCom03Parameters = Readonly<{
     minimumSuppliers: number;
 }>;
 
 export const ltCom03Definition: RiskIndicatorDefinition<LtCom03Parameters> = {
     key: { id: "LT-COM-03", version: 1 },
-    lifecycle: "shadow",
     subjectType: "procurement",
     stage: "award",
     references: ["STT-I02"],

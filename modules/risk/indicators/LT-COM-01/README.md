@@ -10,7 +10,7 @@ valid when its `atmetimoPriezastis` is null.
 
 | File            | Question it answers                                                          |
 |-----------------|--------------------------------------------------------------------------------|
-| `definition.ts` | Identity, lifecycle, public wording, and the parameter timeline — what it compares against, and since when |
+| `definition.ts` | Identity, public wording, and the parameter timeline — what it compares against, and since when |
 | `decision.ts`   | The `ALotIndicatorDecision` subclass whose `assessRisk()` judges the subject |
 | `test/`         | How we know it works                                                        |
 
@@ -27,7 +27,7 @@ decides those fixtures with no database. The participation query itself is teste
 
 The parameter timeline applies to every `pirkimoBudas`. Narrowing to competitive procedures only — see
 [`modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js`](../../../viesiejiPirkimai/viesiejiPirkimaiEnums.js)'s
-`PIRKIMO_BUDAS` map — is a possible future refinement; `lifecycle: 'shadow'` until that is resolved.
+`PIRKIMO_BUDAS` map — is a possible future refinement, not yet applied.
 
 ## Threshold
 

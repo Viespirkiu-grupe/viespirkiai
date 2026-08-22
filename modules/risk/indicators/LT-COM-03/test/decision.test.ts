@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ltCom03v1 } from "../decision.ts";
+import { LtCom03Decision } from "../decision.ts";
 import type { LotSubject, Procurement, ProcurementParticipation, ProcurementSubject } from "../../../types.ts";
-import { EvaluationContext, type EvaluationRun } from "../../../evaluationContext.ts";
+import { EvaluationContext } from "../../../evaluationContext.ts";
 import { RiskDecisionEngine } from "../../../riskDecisionEngine.ts";
 import { emptyReport, fiveSuppliers, oneSupplier, REPORTED_AT, twoSuppliers } from "./fixtures.ts";
 
@@ -19,8 +19,8 @@ import { emptyReport, fiveSuppliers, oneSupplier, REPORTED_AT, twoSuppliers } fr
 // goes through RiskDecisionEngine itself, since that is genuinely how a
 // ProcurementSubject reaches assessRisk in production.
 
-const RUN: EvaluationRun = { runId: 1, dataAsOf: "2026-08-01", subjects: null };
-const CONTEXT = new EvaluationContext(RUN, ltCom03v1.parametersAsOf(RUN.dataAsOf));
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+const ltCom03v1 = new LtCom03Decision(CONTEXT);
 
 function testProcurement(participation: ProcurementParticipation | null, overrides: Partial<Procurement> = {}): Procurement {
     return {
@@ -135,7 +135,7 @@ describe("LtCom03Decision end to end (through RiskDecisionEngine, no database)",
 
     it("assembles a complete signal from a Procurement carrying merged cross-lot participation", () => {
         const procurement = testProcurement(oneSupplier);
-        const [signal] = engine.evaluateAll(RUN, [procurement]);
+        const [signal] = engine.evaluateAll([procurement]);
         expect(signal).toMatchObject({
             indicatorId: "LT-COM-03",
             subjectType: "procurement",
@@ -146,7 +146,7 @@ describe("LtCom03Decision end to end (through RiskDecisionEngine, no database)",
 
     it("reports insufficient_data when no participation was observed for the procurement", () => {
         const procurement = testProcurement(null);
-        const [signal] = engine.evaluateAll(RUN, [procurement]);
+        const [signal] = engine.evaluateAll([procurement]);
         expect(signal.state).toBe("insufficient_data");
         expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });

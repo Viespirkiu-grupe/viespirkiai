@@ -255,7 +255,6 @@ classDiagram
         <<interface>>
         +string id
         +number version
-        +IndicatorLifecycle lifecycle
         +SubjectType subjectType
         +IndicatorStage stage
         +string[] references
@@ -371,7 +370,7 @@ Each deployed indicator version is one directory under `modules/risk/indicators/
 
 | File            | Holds                                                                                                                                                                                   |
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `definition.ts` | The `RiskIndicatorDefinition` object — identity, lifecycle, references, standard, public wording. Pure data; no imports of `ARiskIndicatorDecision`. Used in GUI and found in registry. |
+| `definition.ts` | The `RiskIndicatorDefinition` object — identity, references, standard, public wording, and the effective-dated parameter timeline. Pure data; no imports of `ARiskIndicatorDecision`. Used in GUI and found in registry. |
 | `decision.ts`   | The `ARiskIndicatorDecision` subclass that exposes `isEligible` and `assessRisk`                                                                                                        |
 | `test/`         | Unit tests against risk indicator class                                                                                                                                                 |
 

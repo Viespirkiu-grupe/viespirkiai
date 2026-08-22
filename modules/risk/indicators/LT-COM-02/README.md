@@ -10,7 +10,7 @@ distinct participant recorded for the lot, **whether or not their bid was later 
 
 | File            | Question it answers                                                          |
 |-----------------|--------------------------------------------------------------------------------|
-| `definition.ts` | Identity, lifecycle, public wording, and the parameter timeline — what it compares against, and since when |
+| `definition.ts` | Identity, public wording, and the parameter timeline — what it compares against, and since when |
 | `decision.ts`   | The `ALotIndicatorDecision` subclass whose `assessRisk()` judges the subject |
 | `test/`         | How we know it works                                                        |
 
@@ -39,7 +39,7 @@ distinct risks (OCP-R018 vs. OCP-R019).
 ## Scope
 
 As with LT-COM-01, the parameter timeline applies to every `pirkimoBudas`; narrowing is the same open question noted
-in [`LT-COM-01/README.md`](../LT-COM-01/README.md). `lifecycle: 'shadow'` until that is resolved.
+in [`LT-COM-01/README.md`](../LT-COM-01/README.md), not yet applied.
 
 ## Threshold
 
