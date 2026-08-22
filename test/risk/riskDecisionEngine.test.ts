@@ -55,11 +55,11 @@ class TestIndicator extends ARiskIndicatorDecision<TestDefinition> {
         return { eligible: true };
     }
 
-    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
+    assessRisk(subject: Subject): RiskSignal {
         this.assessRiskCalls.push(subject);
         if (this.shouldThrow) throw new Error("boom");
         if (this.signalOverride) return this.signalOverride(subject);
-        return this.signalFor(subject, context, { state: "not_triggered" });
+        return this.signalFor(subject, { state: "not_triggered" });
     }
 }
 

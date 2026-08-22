@@ -79,8 +79,8 @@ export class RiskDecisionEngine {
      */
     private decide(indicator: ARiskIndicatorDecision, subject: Subject): RiskSignal | undefined {
         try {
-            const outcome = indicator.isEligible(subject, indicator.context);
-            return outcome.eligible ? indicator.assessRisk(subject, indicator.context) : outcome.signal;
+            const outcome = indicator.isEligible(subject);
+            return outcome.eligible ? indicator.assessRisk(subject) : outcome.signal;
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             log(`riskDecisionEngine: ${indicator.id} failed for subject ${subject.subjectKey}: ${message}`);

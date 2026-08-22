@@ -70,7 +70,7 @@ function lotSubject(participation: LotParticipation, procurementOverrides: Parti
 }
 
 function assessRiskFor(participation: LotParticipation) {
-    return ltCom01v1.assessRisk(lotSubject(participation), CONTEXT);
+    return ltCom01v1.assessRisk(lotSubject(participation));
 }
 
 describe("LtCom01Decision.assessRisk", () => {

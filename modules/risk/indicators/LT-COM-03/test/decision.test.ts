@@ -54,7 +54,7 @@ function procurementSubject(participation: ProcurementParticipation, overrides: 
 }
 
 function assessRiskFor(participation: ProcurementParticipation) {
-    return ltCom03v1.assessRisk(procurementSubject(participation), CONTEXT);
+    return ltCom03v1.assessRisk(procurementSubject(participation));
 }
 
 describe("LtCom03Decision.assessRisk", () => {

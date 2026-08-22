@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PartialRiskSignal, BaseParameters, Procurement, ProcurementSubject, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
+import type { PartialRiskSignal, BaseParameters, Procurement, ProcurementSubject, RiskIndicatorDefinition, RiskSignal } from "../../modules/risk/types.ts";
 import { AProcurementIndicatorDecision } from "../../modules/risk/procurementLotDecision.ts";
 import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
 
@@ -32,32 +32,32 @@ type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 // which this test mirrors.
 class TestProcurementDecision extends AProcurementIndicatorDecision<TestDefinition> {
     protected readonly missingDataWhenAbsent = ["numatomaVerteEUR"];
-    private readonly judgeFn: (subject: Subject, parameters: TestParameters) => PartialRiskSignal;
-    private readonly hasRequiredDataFn: (subject: Subject) => boolean;
+    private readonly judgeFn: (subject: ProcurementSubject, parameters: TestParameters) => PartialRiskSignal;
+    private readonly hasRequiredDataFn: (subject: ProcurementSubject) => boolean;
 
     constructor(
         definition: TestDefinition,
         context: EvaluationContext,
-        judgeFn: (subject: Subject, parameters: TestParameters) => PartialRiskSignal,
-        hasRequiredDataFn: (subject: Subject) => boolean = (subject) =>
-            subject.subjectType === "procurement" && subject.procurement.numatomaVerteEUR !== null,
+        judgeFn: (subject: ProcurementSubject, parameters: TestParameters) => PartialRiskSignal,
+        hasRequiredDataFn: (subject: ProcurementSubject) => boolean = (subject) =>
+            subject.procurement.numatomaVerteEUR !== null,
     ) {
         super(definition, context);
         this.judgeFn = judgeFn;
         this.hasRequiredDataFn = hasRequiredDataFn;
     }
 
-    protected hasRequiredData(subject: Subject): boolean {
+    protected hasRequiredData(subject: ProcurementSubject): boolean {
         return this.hasRequiredDataFn(subject);
     }
 
-    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
-        const entry = this.parameterEntryFor(context.dataAsOf);
+    assessRisk(subject: ProcurementSubject): RiskSignal {
+        const entry = this.parameterEntryFor(this.context.dataAsOf);
         if (entry === null) {
-            return this.signalFor(subject, context, { state: "not_applicable" });
+            return this.signalFor(subject, { state: "not_applicable" });
         }
         const partial = this.judgeFn(subject, entry);
-        return this.signalFor(subject, context, { ...partial, appliedParameters: { threshold: entry.threshold } });
+        return this.signalFor(subject, { ...partial, appliedParameters: { threshold: entry.threshold } });
     }
 }
 
@@ -111,8 +111,9 @@ const RUN = Object.freeze({ runId: 7, dataAsOf: "2026-08-01", subjects: null }) 
 function makeIndicator(
     options: {
         parameters?: TestParameters;
-        judge?: (subject: Subject, parameters: TestParameters) => PartialRiskSignal;
-        hasRequiredData?: (subject: Subject) => boolean;
+        judge?: (subject: ProcurementSubject, parameters: TestParameters) => PartialRiskSignal;
+        hasRequiredData?: (subject: ProcurementSubject) => boolean;
+        run?: typeof RUN;
     } = {},
 ): TestProcurementDecision {
     return new TestProcurementDecision(
@@ -132,10 +133,10 @@ function makeIndicator(
                 limitationLt: "limitation",
             },
         },
-        new EvaluationContext(RUN),
+        new EvaluationContext(options.run ?? RUN),
         options.judge ??
             ((judgedSubject, parameters) => {
-                const measured = judgedSubject.subjectType === "procurement" ? judgedSubject.procurement.numatomaVerteEUR! : 0;
+                const measured = judgedSubject.procurement.numatomaVerteEUR!;
                 return {
                     state: measured < parameters.threshold ? "triggered" : "not_triggered",
                     rawValue: { measured },
@@ -148,15 +149,14 @@ function makeIndicator(
 
 // The per-subject protocol RiskDecisionEngine itself uses
 // (riskDecisionEngine.ts's private decide()) — isEligible, then assessRisk
-// only if eligible — replayed here against one subject, with a context built
-// the same way the Engine passes one per indicator (indicator.context).
-// Independent of makeIndicator()'s own fixed construction-time context: a
-// concrete assessRisk() reads whichever context it is called with, not
-// necessarily `this.context`, which is all these tests exercise.
-function decideSubject(indicator: TestProcurementDecision, subject: ProcurementSubject, run: typeof RUN = RUN): RiskSignal {
-    const context = new EvaluationContext(run);
-    const outcome = indicator.isEligible(subject, context);
-    return outcome.eligible ? indicator.assessRisk(subject, context) : outcome.signal;
+// only if eligible — replayed here against one subject. The indicator's
+// context is fixed at construction (indicator.context, per
+// ARiskIndicatorDecision), so tests that need a different dataAsOf build a
+// fresh indicator via makeIndicator({ run }) rather than passing a context
+// here.
+function decideSubject(indicator: TestProcurementDecision, subject: ProcurementSubject): RiskSignal {
+    const outcome = indicator.isEligible(subject);
+    return outcome.eligible ? indicator.assessRisk(subject) : outcome.signal;
 }
 
 describe("AProcurementIndicatorDecision", () => {
@@ -189,15 +189,23 @@ describe("AProcurementIndicatorDecision", () => {
     });
 
     it("applies the parameters only within their validFrom/validTo window", () => {
-        const indicator = makeIndicator({
-            parameters: { ...OPEN_ENDED, validTo: "2026-06-01" },
-        });
-
-        const before = decideSubject(indicator, subject(), { ...RUN, dataAsOf: "2026-03-01" });
+        const before = decideSubject(
+            makeIndicator({
+                parameters: { ...OPEN_ENDED, validTo: "2026-06-01" },
+                run: { ...RUN, dataAsOf: "2026-03-01" },
+            }),
+            subject(),
+        );
         expect(before.state).toBe("triggered");
         expect(before.appliedParameters).toEqual({ threshold: 10 });
 
-        const after = decideSubject(indicator, subject(), { ...RUN, dataAsOf: "2026-08-01" });
+        const after = decideSubject(
+            makeIndicator({
+                parameters: { ...OPEN_ENDED, validTo: "2026-06-01" },
+                run: { ...RUN, dataAsOf: "2026-08-01" },
+            }),
+            subject(),
+        );
         expect(after.state).toBe("not_applicable");
         expect(after.appliedParameters).toBeNull();
     });
@@ -210,16 +218,17 @@ describe("AProcurementIndicatorDecision", () => {
             judge: () => {
                 throw new Error("judge() must not be called without applicable parameters");
             },
+            run: { ...RUN, dataAsOf: "2020-01-01" },
         });
 
-        const observation = decideSubject(indicator, subject(), { ...RUN, dataAsOf: "2020-01-01" });
+        const observation = decideSubject(indicator, subject());
         expect(observation.state).toBe("not_applicable");
         expect(observation.appliedParameters).toBeNull();
         expect(observation.rawValue).toBeNull();
     });
 
     it("reports not_applicable at a cutoff before the timeline starts", () => {
-        const observation = decideSubject(makeIndicator(), subject(), { ...RUN, dataAsOf: "2025-01-01" });
+        const observation = decideSubject(makeIndicator({ run: { ...RUN, dataAsOf: "2025-01-01" } }), subject());
         expect(observation.state).toBe("not_applicable");
     });
 

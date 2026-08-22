@@ -17,9 +17,9 @@ import type {
 // subject, is it eligible, and if so, what does it decide? A public
 // interface — implemented by ARiskIndicatorDecision below, but not part of
 // it — so isEligible/assessRisk are public methods, not protected.
-export interface RiskIndicatorDecision {
-    isEligible(subject: Subject, context: EvaluationContext): EligibilityOutcome;
-    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal;
+export interface RiskIndicatorDecision<S extends Subject = Subject> {
+    isEligible(subject: S): EligibilityOutcome;
+    assessRisk(subject: S): RiskSignal;
 }
 
 /**
@@ -33,13 +33,22 @@ export interface RiskIndicatorDecision {
  * `this.definition` and the parameter-timeline helpers below are typed to
  * that indicator's own parameter type, not `unknown`.
  *
+ * `S` is the indicator's own Subject variant (ProcurementSubject/LotSubject)
+ * — fixed by the subject-type specialization it extends
+ * (AProcurementIndicatorDecision/ALotIndicatorDecision in
+ * procurementLotDecision.ts) — so isEligible/assessRisk/hasRequiredData are
+ * typed to that indicator's own subject shape, never `Subject` needing a
+ * cast.
+ *
  * A Risk Indicator decides exactly one subject at a time — batching over the
  * whole subject universe belongs to RiskDecisionEngine
  * (riskDecisionEngine.ts), not here. See
  * docs/indicators-story/risk-service-architecture-v2.md §3.4.
  */
-export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition = RiskIndicatorDefinition>
-    implements RiskIndicatorDecision
+export abstract class ARiskIndicatorDecision<
+    D extends RiskIndicatorDefinition = RiskIndicatorDefinition,
+    S extends Subject = Subject,
+> implements RiskIndicatorDecision<S>
 {
     readonly definition: D;
     readonly context: EvaluationContext;
@@ -114,7 +123,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
     // (e.g. Subject.lot.participation !== null) — the replacement for the
     // old "did the bulk query return a row for this subject?" check, now
     // that there's no bulk query.
-    protected abstract hasRequiredData(subject: Subject): boolean;
+    protected abstract hasRequiredData(subject: S): boolean;
     // isEligible's insufficient_data reason when hasRequiredData is false.
     protected abstract readonly missingDataWhenAbsent: readonly string[];
 
@@ -129,7 +138,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * Procurement Reader already populated. Public because
      * RiskIndicatorDecision declares it.
      */
-    abstract isEligible(subject: Subject, context: EvaluationContext): EligibilityOutcome;
+    abstract isEligible(subject: S): EligibilityOutcome;
 
     /**
      * Risk assessment for one subject isEligible() already found eligible.
@@ -140,7 +149,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * calls parameterEntryFor() then signalFor() (both below) rather than
      * assembling a RiskSignal by hand.
      */
-    abstract assessRisk(subject: Subject, context: EvaluationContext): RiskSignal;
+    abstract assessRisk(subject: S): RiskSignal;
 
     /**
      * Assembles a full RiskSignal around a PartialRiskSignal — the fields an
@@ -154,7 +163,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * result is frozen, since it's about to be handed to the Engine and,
      * from there, straight to the Signal Writer.
      */
-    protected signalFor(subject: Subject, context: EvaluationContext, partial: PartialRiskSignal): RiskSignal {
+    protected signalFor(subject: S, partial: PartialRiskSignal): RiskSignal {
         const signal = riskSignalContract.validate({
             indicatorId: this.id,
             indicatorVersion: this.version,
@@ -167,7 +176,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
             threshold: partial.threshold ?? null,
             appliedParameters: partial.appliedParameters ?? null,
             missingData: [...(partial.missingData ?? [])],
-            dataAsOf: context.dataAsOf,
+            dataAsOf: this.context.dataAsOf,
         });
         return Object.freeze(signal);
     }

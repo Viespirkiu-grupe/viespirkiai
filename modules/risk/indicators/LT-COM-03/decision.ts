@@ -1,4 +1,4 @@
-import type { ProcurementSubject, RiskSignal, Subject } from "../../types.ts";
+import type { ProcurementSubject, RiskSignal } from "../../types.ts";
 import { AProcurementIndicatorDecision } from "../../procurementLotDecision.ts";
 import type { EvaluationContext } from "../../evaluationContext.ts";
 import { ltCom03Definition } from "./definition.ts";
@@ -16,16 +16,12 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
         super(ltCom03Definition, context);
     }
 
-    protected hasRequiredData(subject: Subject): boolean {
-        return subject.subjectType === "procurement" && subject.procurement.participation !== null;
+    protected hasRequiredData(subject: ProcurementSubject): boolean {
+        return subject.procurement.participation !== null;
     }
 
-    // RiskDecisionEngine only ever calls a procurement-subjectType indicator
-    // (procurementIndicators) with a ProcurementSubject (evaluateProcurement,
-    // riskDecisionEngine.ts) — subjects are already routed by subjectType
-    // before this runs.
-    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
-        const { procurement } = subject as ProcurementSubject;
+    assessRisk(subject: ProcurementSubject): RiskSignal {
+        const { procurement } = subject;
         // hasRequiredData already proved this is non-null.
         const participation = procurement.participation!;
 
@@ -34,14 +30,14 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
         // participant row exists but every tiekejoKodas in it is NULL.
         // Treated as an incomplete report, not zero suppliers.
         if (participation.totalSuppliers === 0) {
-            return this.signalFor(subject, context, {
+            return this.signalFor(subject, {
                 state: "insufficient_data",
                 missingData: ["tiekejoKodas"],
             });
         }
 
         const minimumSuppliers = this.definition.parameters.minimumSuppliers;
-        return this.signalFor(subject, context, {
+        return this.signalFor(subject, {
             state: participation.totalSuppliers < minimumSuppliers ? "triggered" : "not_triggered",
             rawValue: { totalSuppliers: participation.totalSuppliers },
             threshold: { minimumSuppliers },

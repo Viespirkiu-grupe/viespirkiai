@@ -1,4 +1,4 @@
-import type { LotSubject, RiskSignal, Subject } from "../../types.ts";
+import type { LotSubject, RiskSignal } from "../../types.ts";
 import { ALotIndicatorDecision } from "../../procurementLotDecision.ts";
 import type { EvaluationContext } from "../../evaluationContext.ts";
 import { ltCom01Definition } from "./definition.ts";
@@ -15,15 +15,12 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
         super(ltCom01Definition, context);
     }
 
-    protected hasRequiredData(subject: Subject): boolean {
-        return subject.subjectType === "lot" && subject.lot.participation !== null;
+    protected hasRequiredData(subject: LotSubject): boolean {
+        return subject.lot.participation !== null;
     }
 
-    // RiskDecisionEngine only ever calls a lot-subjectType indicator
-    // (lotIndicators) with a LotSubject (evaluateLot, riskDecisionEngine.ts)
-    // — subjects are already routed by subjectType before this runs.
-    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
-        const { lot } = subject as LotSubject;
+    assessRisk(subject: LotSubject): RiskSignal {
+        const { lot } = subject;
         // hasRequiredData already proved this is non-null.
         const participation = lot.participation!;
 
@@ -32,14 +29,14 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
         // exists but every tiekejoKodas in it is NULL. Treated as an
         // incomplete report, not zero participation.
         if (participation.totalBids === 0) {
-            return this.signalFor(subject, context, {
+            return this.signalFor(subject, {
                 state: "insufficient_data",
                 missingData: ["tiekejoKodas"],
             });
         }
 
         const maximumValidBids = this.definition.parameters.maximumValidBids;
-        return this.signalFor(subject, context, {
+        return this.signalFor(subject, {
             state: participation.validBids <= maximumValidBids ? "triggered" : "not_triggered",
             rawValue: { totalBids: participation.totalBids, validBids: participation.validBids },
             threshold: { maximumValidBids },
