@@ -33,11 +33,6 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
             source: "ATN-1 ataskaita",
         };
 
-        const entry = this.parameterEntryFor(context.dataAsOf);
-        if (entry === null) {
-            return this.signalFor(subject, context, { state: "not_applicable" });
-        }
-
         // totalSuppliers === 0: a real, rarer case distinct from "no
         // participation observed" (hasRequiredData's null check) — a
         // participant row exists but every tiekejoKodas in it is NULL.
@@ -50,7 +45,7 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
             });
         }
 
-        const { minimumSuppliers } = entry;
+        const minimumSuppliers = this.definition.parameters.minimumSuppliers;
         return this.signalFor(subject, context, {
             state: participation.totalSuppliers < minimumSuppliers ? "triggered" : "not_triggered",
             rawValue: { totalSuppliers: participation.totalSuppliers },

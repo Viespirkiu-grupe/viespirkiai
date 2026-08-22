@@ -33,11 +33,6 @@ export class LtCom02Decision extends ALotIndicatorDecision<typeof ltCom02Definit
             source: "ATN-1 ataskaita",
         };
 
-        const entry = this.parameterEntryFor(context.dataAsOf);
-        if (entry === null) {
-            return this.signalFor(subject, context, { state: "not_applicable" });
-        }
-
         // totalBids === 0: a real, rarer case distinct from "no participation
         // observed" (hasRequiredData's null check) — a participant row
         // exists but every tiekejoKodas in it is NULL. Treated as an
@@ -50,7 +45,7 @@ export class LtCom02Decision extends ALotIndicatorDecision<typeof ltCom02Definit
             });
         }
 
-        const { minimumBidders } = entry;
+        const minimumBidders = this.definition.parameters.minimumBidders;
         return this.signalFor(subject, context, {
             state: participation.totalBids < minimumBidders ? "triggered" : "not_triggered",
             rawValue: { totalBids: participation.totalBids },
