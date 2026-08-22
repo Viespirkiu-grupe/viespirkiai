@@ -262,7 +262,6 @@ classDiagram
         +string[] sourceRelations
         +string[] requiredInputs
         +ParameterEntry~P~[] parameters
-        +ZodType~P~ parameterSchema
         +RiskIndicatorStandard standard
         +RiskIndicatorPublicText public
     }
@@ -302,11 +301,11 @@ classDiagram
         <<interface>>
         +string validFrom
         +string validTo
-        +ParameterScope scope
-        +object values
         +string source
         +string note
     }
+    note for ParameterEntry "P's own fields (the indicator's parameter values)
+    are intersected directly onto the entry, not nested under a values key."
     class SubjectType {
         <<enumeration>>
         procurement, lot,

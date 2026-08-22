@@ -1,6 +1,5 @@
-import { riskSignalContract, zodContract } from "./contracts.ts";
+import { riskSignalContract } from "./contracts.ts";
 import type { EvaluationContext } from "./evaluationContext.ts";
-import { describeScope, scopeAdmits, scopeKey, scopesAreDisjoint } from "./parameterScope.ts";
 import type {
     EligibilityOutcome,
     PartialRiskSignal,
@@ -10,20 +9,11 @@ import type {
     RiskSignal,
     RuntimeContract,
     Subject,
-    SubjectFacts,
 } from "./types.ts";
 
 // The behaviour half of a Risk Indicator version — the counterpart to the
 // pure-data RiskIndicatorDefinition (types.ts). See
 // docs/indicators-story/risk-service-architecture-v2.md §3.4.
-
-// Half-open validity ranges [validFrom, validTo), where a null validTo is
-// "still in force".
-function overlapInTime(a: ParameterEntry<unknown>, b: ParameterEntry<unknown>): boolean {
-    const aEndsAfterBStarts = a.validTo === null || a.validTo > b.validFrom;
-    const bEndsAfterAStarts = b.validTo === null || b.validTo > a.validFrom;
-    return aEndsAfterBStarts && bEndsAfterAStarts;
-}
 
 // The minimal contract every Risk Indicator decision must satisfy: given a
 // subject, is it eligible, and if so, what does it decide? A public
@@ -54,22 +44,24 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
     implements RiskIndicatorDecision
 {
     readonly definition: D;
-    private readonly parameterContract: RuntimeContract<ParametersOf<D>>;
     readonly outputContract: RuntimeContract<RiskSignal>;
 
     /**
      * Throws on an id outside the catalogue namespace, missing public
-     * wording, parameter values that violate the indicator's own contract,
-     * or a gapped/overlapping parameter timeline. See
+     * wording, or a gapped/overlapping parameter timeline. See
      * docs/indicators-story/risk-service-architecture-v2.md §3.4.
      */
     protected constructor(definition: D) {
         this.definition = definition;
-        this.parameterContract = zodContract(definition.parameterSchema as never) as RuntimeContract<ParametersOf<D>>;
         this.outputContract = definition.outputContract ?? riskSignalContract;
 
+        // @Todo: eliminate - this assert is not needed
         this.assertIdentity();
+
+        // @Todo: eliminate - this assert is not needed
         this.assertPublicWording();
+
+        // @Todo: no assert is needed, simply have isActive() method that is checked before calling indicator
         this.assertParameterTimeline();
     }
 
@@ -83,10 +75,6 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
 
     get version(): number {
         return this.definition.key.version;
-    }
-
-    get lifecycle() {
-        return this.definition.lifecycle;
     }
 
     get subjectType() {
@@ -121,22 +109,12 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
         return this.definition.public;
     }
 
-    get isActive(): boolean {
-        return this.lifecycle === "active";
-    }
-
-    // True when lifecycle is 'active' or 'shadow'. See
-    // docs/indicators-story/risk-service-architecture-v2.md §3.4.
-    get isEvaluable(): boolean {
-        return this.lifecycle === "active" || this.lifecycle === "shadow";
-    }
-
     /** Catalogue identity as one string, e.g. `LT-COM-01/1`. */
     toString(): string {
         return `${this.id}/${this.version}`;
     }
 
-    /** The parameter entries in force at a cutoff, across all scopes. */
+    /** The parameter entries in force at a cutoff. */
     parametersAsOf(dataAsOf: string): readonly ParameterEntry<ParametersOf<D>>[] {
         return this.parameters.filter(
             (entry) => entry.validFrom <= dataAsOf && (entry.validTo === null || entry.validTo > dataAsOf),
@@ -144,32 +122,15 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
     }
 
     /**
-     * The one entry that decides a subject at a cutoff: in force by date, and
-     * scoped to admit these facts. `null` means no parameter entry covers
-     * this subject. See
+     * The one entry that decides a subject at a cutoff: in force by date.
+     * `null` means no parameter entry covers this subject. See
      * docs/indicators-story/risk-service-architecture-v2.md §3.4.
      *
-     * assertParameterTimeline (below) rejects concurrently valid entries with
-     * overlapping scopes, so at most one entry can match.
+     * assertParameterTimeline (below) rejects gapped/overlapping entries, so
+     * at most one entry can be in force at any cutoff.
      */
-    parameterEntryFor(dataAsOf: string, facts: SubjectFacts): ParameterEntry<ParametersOf<D>> | null {
-        return this.parametersAsOf(dataAsOf).find((entry) => scopeAdmits(entry.scope, facts)) ?? null;
-    }
-
-    /**
-     * The pirkimoBudas that scopes a subject: a lot deliberately carries no
-     * pirkimoBudas of its own (types.ts's Lot comment) — its method is
-     * always its parent procurement's. Concrete because it needs no
-     * per-indicator override now that Subject.procurement is always
-     * populated by the time this runs.
-     */
-    protected methodOf(subject: Subject): string | null {
-        return subject.procurement.pirkimoBudas;
-    }
-
-    /** The objectType that scopes a subject — same derivation as methodOf. */
-    protected objectTypeOf(subject: Subject): string | null {
-        return subject.procurement.pirkimoObjektoTipas;
+    parameterEntryFor(dataAsOf: string): ParameterEntry<ParametersOf<D>> | null {
+        return this.parametersAsOf(dataAsOf)[0] ?? null;
     }
 
     // Whether this subject carries the data this indicator needs to judge
@@ -199,33 +160,10 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * successful isEligible()). Abstract: judging a subject — what it means,
      * which parameter entry applies, what counts as triggered — is each
      * indicator's own job. A concrete indicator's assessRisk() typically
-     * calls resolveParameters() then signalFor() (both below) rather than
+     * calls parameterEntryFor() then signalFor() (both below) rather than
      * assembling a RiskSignal by hand.
      */
     abstract assessRisk(subject: Subject, context: EvaluationContext): RiskSignal;
-
-    /**
-     * Resolves the one parameter entry that applies to this subject at the
-     * run's cutoff, or `null` when none does (the subject is not_applicable
-     * — see signalFor's caller). Wraps parameterEntryFor with the scope
-     * facts every indicator derives the same way (methodOf/objectTypeOf), so
-     * a concrete assessRisk() need not rebuild SubjectFacts itself.
-     */
-    protected resolveParameters(
-        subject: Subject,
-        context: EvaluationContext,
-    ): Readonly<{ values: ParametersOf<D>; appliedParameters: Readonly<Record<string, unknown>> }> | null {
-        const scopeFacts: SubjectFacts = {
-            subjectKey: subject.subjectKey,
-            procurementSource: subject.procurementSource,
-            procurementId: subject.procurementId,
-            method: this.methodOf(subject),
-            objectType: this.objectTypeOf(subject),
-        };
-        const entry = this.parameterEntryFor(context.dataAsOf, scopeFacts);
-        if (entry === null) return null;
-        return { values: entry.values, appliedParameters: entry.values as Readonly<Record<string, unknown>> };
-    }
 
     /**
      * Assembles a full RiskSignal around a PartialRiskSignal — the fields an
@@ -309,7 +247,6 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
         const entries = [...this.parameters].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
 
         for (const entry of entries) {
-            this.parameterContract.validate(entry.values);
             if (entry.validTo !== null && entry.validTo < entry.validFrom) {
                 throw new Error(
                     `Risk Indicator ${this.id}: parameter entry validTo (${entry.validTo}) is earlier than validFrom (${entry.validFrom})`,
@@ -317,48 +254,24 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
             }
         }
 
-        this.assertContiguousWithinScope(entries);
-        this.assertDisjointWhereConcurrent(entries);
+        this.assertContiguous(entries);
     }
 
-    private assertContiguousWithinScope(sortedEntries: readonly ParameterEntry<ParametersOf<D>>[]): void {
-        const byScope = new Map<string, ParameterEntry<ParametersOf<D>>[]>();
-        for (const entry of sortedEntries) {
-            const key = scopeKey(entry.scope);
-            byScope.set(key, [...(byScope.get(key) ?? []), entry]);
-        }
+    // One global timeline, since a parameter entry no longer carries a scope
+    // to narrow which subjects it applies to.
+    private assertContiguous(sortedEntries: readonly ParameterEntry<ParametersOf<D>>[]): void {
+        for (let i = 0; i < sortedEntries.length - 1; i++) {
+            const current = sortedEntries[i];
+            const next = sortedEntries[i + 1];
 
-        for (const group of byScope.values()) {
-            for (let i = 0; i < group.length - 1; i++) {
-                const current = group[i];
-                const next = group[i + 1];
-                const scope = describeScope(current.scope);
-
-                if (current.validTo === null) {
-                    throw new Error(
-                        `Risk Indicator ${this.id}: parameter entry starting ${current.validFrom} (${scope}) is open-ended but is followed by another entry starting ${next.validFrom}`,
-                    );
-                }
-                if (current.validTo !== next.validFrom) {
-                    throw new Error(
-                        `Risk Indicator ${this.id}: parameter entries for ${scope} have a gap or overlap between ${current.validTo} and ${next.validFrom}`,
-                    );
-                }
-            }
-        }
-    }
-
-    private assertDisjointWhereConcurrent(sortedEntries: readonly ParameterEntry<ParametersOf<D>>[]): void {
-        for (let i = 0; i < sortedEntries.length; i++) {
-            for (let j = i + 1; j < sortedEntries.length; j++) {
-                const a = sortedEntries[i];
-                const b = sortedEntries[j];
-                if (scopeKey(a.scope) === scopeKey(b.scope)) continue; // handled as one timeline
-                if (!overlapInTime(a, b)) continue;
-                if (scopesAreDisjoint(a.scope, b.scope)) continue;
-
+            if (current.validTo === null) {
                 throw new Error(
-                    `Risk Indicator ${this.id}: parameter entries starting ${a.validFrom} (${describeScope(a.scope)}) and ${b.validFrom} (${describeScope(b.scope)}) are valid at the same time with overlapping scopes, so a subject could match both`,
+                    `Risk Indicator ${this.id}: parameter entry starting ${current.validFrom} is open-ended but is followed by another entry starting ${next.validFrom}`,
+                );
+            }
+            if (current.validTo !== next.validFrom) {
+                throw new Error(
+                    `Risk Indicator ${this.id}: parameter entries have a gap or overlap between ${current.validTo} and ${next.validFrom}`,
                 );
             }
         }

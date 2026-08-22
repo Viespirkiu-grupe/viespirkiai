@@ -25,16 +25,7 @@ describe("riskCatalogue", () => {
     });
 
     it("keeps the collection internals out of the entries", () => {
-        const internals = [
-            "sourceRelations",
-            "requiredInputs",
-            "sqlFile",
-            "parameterSchema",
-            "parameterContract",
-            "outputContract",
-            "decide",
-            "key",
-        ];
+        const internals = ["sourceRelations", "requiredInputs", "sqlFile", "outputContract", "decide", "key"];
         for (const entry of riskCatalogue) {
             for (const field of internals) {
                 expect(entry).not.toHaveProperty(field);

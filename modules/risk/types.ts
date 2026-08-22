@@ -1,11 +1,10 @@
-import type { z } from "zod";
-
 // Every pure type in the Procurement Risk Service — no runtime behaviour.
 // Runtime schemas/validators live in contracts.ts; behaviour lives in
 // riskIndicatorDecision.ts, procurementLotDecision.ts, evaluationContext.ts,
 // and riskDataSource.ts. See
 // docs/indicators-story/risk-service-architecture-v2.md §3.4.
 
+// @Todo: eliminate IndicatorLifecycle
 export type IndicatorLifecycle = "draft" | "shadow" | "active" | "retired";
 export type IndicatorStage = "planning" | "tender" | "award" | "contract";
 export type SubjectType = "procurement" | "lot" | "contract" | "supplier";
@@ -47,39 +46,19 @@ export type RiskSignal = Readonly<{
     dataAsOf: string;
 }>;
 
-// Which subjects an entry's values apply to; see parameterScope.ts and
-// docs/indicators-story/risk-service-architecture-v2.md §3.4.
-export type ParameterScope = Readonly<{
-    methods?: readonly string[];
-    objectTypes?: readonly string[];
-}>;
-
-// One effective-dated entry of a parameter timeline. `validTo: null` means
-// still in force.
+// One effective-dated entry of a parameter timeline: the indicator's own
+// parameter fields (`P`), plus the effective-dating and provenance every
+// entry carries. `validTo: null` means still in force.
 //
 // `source` and `note` are published verbatim with the entry
 // (deployedIndicators.ts). `note` is optional.
 export type ParameterEntry<P> = Readonly<{
     validFrom: string;
     validTo: string | null;
-    scope: ParameterScope;
-    values: P;
     source: string;
     note?: string;
-}>;
-
-// The scope-matching facts an indicator derives for one subject, used to
-// pick the applicable parameter entry. See
-// docs/indicators-story/risk-service-architecture-v2.md §3.4.
-export type SubjectFacts = Readonly<{
-    subjectKey: string;
-    procurementSource: string | null;
-    procurementId: string | null;
-    // Read by scopeAdmits (parameterScope.ts) when a parameter entry
-    // narrows this dimension.
-    method?: string | null;
-    objectType?: string | null;
-}>;
+}> &
+    P;
 
 // What a Risk Indicator's assessRisk() (or isEligible()) returns — the
 // indicator-specific fields only; ARiskIndicatorDecision.signalFor() fills in
@@ -209,10 +188,6 @@ export interface RiskIndicatorDefinition<P = unknown> {
     readonly sourceRelations: readonly string[];
     readonly requiredInputs: readonly string[];
     readonly parameters: readonly ParameterEntry<P>[];
-    // The shape and value constraints one entry's `values` must satisfy;
-    // zodContract() wraps it into a parameterContract in
-    // riskIndicatorDecision.ts.
-    readonly parameterSchema: z.ZodType<P>;
     readonly outputContract?: RuntimeContract<RiskSignal>;
     readonly standard: RiskIndicatorStandard;
     readonly public: RiskIndicatorPublicText;

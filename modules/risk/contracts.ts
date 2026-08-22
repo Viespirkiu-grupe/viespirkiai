@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { RiskSignal, RuntimeContract, SubjectFacts } from "./types.ts";
+import type { RiskSignal, RuntimeContract } from "./types.ts";
 
 // Runtime validation for the Procurement Risk Service: zod schemas and the
 // RuntimeContract wrapper around them. Types live in types.ts. See
@@ -30,13 +30,3 @@ export const riskSignalSchema: z.ZodType<RiskSignal> = z.object({
 });
 
 export const riskSignalContract: RuntimeContract<RiskSignal> = zodContract(riskSignalSchema);
-
-export const subjectFactsSchema = z.looseObject({
-    subjectKey: z.string().min(1),
-    procurementSource: z.string().nullable(),
-    procurementId: z.string().nullable(),
-    method: z.string().nullish(),
-    objectType: z.string().nullish(),
-});
-
-export const subjectFactsContract: RuntimeContract<SubjectFacts> = zodContract(subjectFactsSchema);

@@ -1,11 +1,14 @@
 import type { RiskIndicatorDefinition } from "../../types.ts";
-import { ltCom02Parameters, ltCom02ParametersSchema, type LtCom02Parameters } from "./parameters.ts";
 
 // LT-COM-02 — Low number of bidders (Mažas dalyvių skaičius).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
 //
-// lifecycle: 'shadow'; scope is unscoped pending review — see parameters.ts
-// and README.md.
+// lifecycle: 'shadow' pending review.
+
+export type LtCom02Parameters = Readonly<{
+    minimumBidders: number;
+}>;
+
 export const ltCom02Definition: RiskIndicatorDefinition<LtCom02Parameters> = {
     key: { id: "LT-COM-02", version: 1 },
     lifecycle: "shadow",
@@ -14,8 +17,17 @@ export const ltCom02Definition: RiskIndicatorDefinition<LtCom02Parameters> = {
     references: ["OCP-R019", "OLAF-CN01", "OLAF-CN02", "OLAF-CA02", "VPT-I12"],
     sourceRelations: ["public.v_pirkimo_dalis_v2", "public.v_dalyviai_v2"],
     requiredInputs: ["tiekejoKodas"],
-    parameters: ltCom02Parameters,
-    parameterSchema: ltCom02ParametersSchema,
+    parameters: [
+        {
+            validFrom: "2026-01-01",
+            validTo: null,
+            minimumBidders: 3,
+            source:
+                "OLAF fraud indicators for public procurement (OLAF-CN02, framework agreement with fewer than three " +
+                "tenderers), cross-referenced against OCP-R019, OLAF-CA02, VPT-I12 in the catalogue: fewer than three " +
+                "participating suppliers is the common low-competition threshold in the source literature.",
+        },
+    ],
     standard: {
         name: "OCP Red Flags in Public Procurement 2024",
         url: "https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf",

@@ -32,8 +32,8 @@ export class LtCom02Decision extends ALotIndicatorDecision<typeof ltCom02Definit
             source: "ATN-1 ataskaita",
         };
 
-        const resolved = this.resolveParameters(subject, context);
-        if (resolved === null) {
+        const entry = this.parameterEntryFor(context.dataAsOf);
+        if (entry === null) {
             return this.signalFor(subject, context, { state: "not_applicable" });
         }
 
@@ -49,13 +49,13 @@ export class LtCom02Decision extends ALotIndicatorDecision<typeof ltCom02Definit
             });
         }
 
-        const { minimumBidders } = resolved.values;
+        const { minimumBidders } = entry;
         return this.signalFor(subject, context, {
             state: participation.totalBids < minimumBidders ? "triggered" : "not_triggered",
             rawValue: { totalBids: participation.totalBids },
             threshold: { minimumBidders },
             evidence,
-            appliedParameters: resolved.appliedParameters,
+            appliedParameters: { minimumBidders },
         });
     }
 }

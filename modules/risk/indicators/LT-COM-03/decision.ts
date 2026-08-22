@@ -32,8 +32,8 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
             source: "ATN-1 ataskaita",
         };
 
-        const resolved = this.resolveParameters(subject, context);
-        if (resolved === null) {
+        const entry = this.parameterEntryFor(context.dataAsOf);
+        if (entry === null) {
             return this.signalFor(subject, context, { state: "not_applicable" });
         }
 
@@ -49,13 +49,13 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
             });
         }
 
-        const { minimumSuppliers } = resolved.values;
+        const { minimumSuppliers } = entry;
         return this.signalFor(subject, context, {
             state: participation.totalSuppliers < minimumSuppliers ? "triggered" : "not_triggered",
             rawValue: { totalSuppliers: participation.totalSuppliers },
             threshold: { minimumSuppliers },
             evidence,
-            appliedParameters: resolved.appliedParameters,
+            appliedParameters: { minimumSuppliers },
         });
     }
 }

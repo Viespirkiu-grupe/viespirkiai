@@ -1,12 +1,15 @@
 import type { RiskIndicatorDefinition } from "../../types.ts";
-import { ltCom03Parameters, ltCom03ParametersSchema, type LtCom03Parameters } from "./parameters.ts";
 
 // LT-COM-03 — Only one supplier invited or consulted (Konsultuotas ar
 // kviestas tik vienas tiekėjas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
 //
-// lifecycle: 'shadow'; scope is unscoped pending review — see parameters.ts
-// and README.md.
+// lifecycle: 'shadow' pending review.
+
+export type LtCom03Parameters = Readonly<{
+    minimumSuppliers: number;
+}>;
+
 export const ltCom03Definition: RiskIndicatorDefinition<LtCom03Parameters> = {
     key: { id: "LT-COM-03", version: 1 },
     lifecycle: "shadow",
@@ -15,8 +18,17 @@ export const ltCom03Definition: RiskIndicatorDefinition<LtCom03Parameters> = {
     references: ["STT-I02"],
     sourceRelations: ["public.v_pirkimas_v2", "public.v_dalyviai_v2"],
     requiredInputs: ["tiekejoKodas"],
-    parameters: ltCom03Parameters,
-    parameterSchema: ltCom03ParametersSchema,
+    parameters: [
+        {
+            validFrom: "2026-01-01",
+            validTo: null,
+            minimumSuppliers: 2,
+            source:
+                "STT corruption-risk analyses (STT-I02, only one supplier consulted or invited): the catalogue's own " +
+                "framing names exactly one supplier as the flagged case, so the threshold is the smallest integer that " +
+                "excludes it — a procurement with fewer than two distinct suppliers recorded across every lot.",
+        },
+    ],
     standard: {
         name: "STT korupcijos rizikos analizės (STT-I02 — konsultuotas ar kviestas tik vienas tiekėjas)",
         url: "https://www.stt.lt/korupcijos-prevencija/korupcijos-rizikos-analizes/7470",

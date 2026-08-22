@@ -31,8 +31,8 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
             source: "ATN-1 ataskaita",
         };
 
-        const resolved = this.resolveParameters(subject, context);
-        if (resolved === null) {
+        const entry = this.parameterEntryFor(context.dataAsOf);
+        if (entry === null) {
             return this.signalFor(subject, context, { state: "not_applicable" });
         }
 
@@ -48,13 +48,13 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
             });
         }
 
-        const { maximumValidBids } = resolved.values;
+        const { maximumValidBids } = entry;
         return this.signalFor(subject, context, {
             state: participation.validBids <= maximumValidBids ? "triggered" : "not_triggered",
             rawValue: { totalBids: participation.totalBids, validBids: participation.validBids },
             threshold: { maximumValidBids },
             evidence,
-            appliedParameters: resolved.appliedParameters,
+            appliedParameters: { maximumValidBids },
         });
     }
 }
