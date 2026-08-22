@@ -39,7 +39,6 @@ export type RiskSignal = Readonly<{
     rawValue: Readonly<Record<string, unknown>> | null;
     threshold: Readonly<Record<string, unknown>> | null;
     appliedParameters: Readonly<Record<string, unknown>> | null;
-    evidence: Readonly<Record<string, unknown>>;
     missingData: readonly string[];
     dataAsOf: string;
 }>;
@@ -60,7 +59,6 @@ export type PartialRiskSignal = Readonly<{
     rawValue?: Readonly<Record<string, unknown>> | null;
     threshold?: Readonly<Record<string, unknown>> | null;
     appliedParameters?: Readonly<Record<string, unknown>> | null;
-    evidence?: Readonly<Record<string, unknown>>;
     missingData?: readonly string[];
 }>;
 

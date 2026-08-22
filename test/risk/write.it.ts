@@ -25,7 +25,6 @@ function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
         rawValue: { a: 1 },
         threshold: { a: 1 },
         appliedParameters: { a: 1 },
-        evidence: { a: 1 },
         missingData: [],
         dataAsOf: "2026-08-12T00:00:00.000Z",
         ...overrides,

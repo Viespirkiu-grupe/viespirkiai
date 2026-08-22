@@ -111,7 +111,7 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
         codeCommit: options.codeCommit,
         statistics: {},
     });
-    const evaluationContext = new EvaluationContext({ runId: openedRun.runId, dataAsOf, subjects });
+    const evaluationContext = new EvaluationContext({ runId: openedRun.runId, dataAsOf });
     const engine = new RiskDecisionEngine(riskIndicatorRegistry.createAllIndicators(evaluationContext));
 
     const statistics: Record<string, IndicatorStats> = {};

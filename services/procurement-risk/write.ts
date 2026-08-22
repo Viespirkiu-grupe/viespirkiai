@@ -32,17 +32,17 @@ export async function writeObservations(
         INSERT INTO risk.risk_signals (
             run_id, subject_type, subject_key, procurement_source, procurement_id,
             indicator_id, indicator_version, applied_parameters,
-            state, raw_value, threshold, evidence, missing_data,
+            state, raw_value, threshold, missing_data,
             data_as_of
         )
         SELECT $2, "subjectType", "subjectKey", "procurementSource", "procurementId",
                "indicatorId", "indicatorVersion", "appliedParameters",
-               "state", "rawValue", "threshold", "evidence", "missingData",
+               "state", "rawValue", "threshold", "missingData",
                "dataAsOf"::timestamptz
         FROM jsonb_to_recordset($1::jsonb) AS t(
             "subjectType" text, "subjectKey" text, "procurementSource" text, "procurementId" text,
             "indicatorId" text, "indicatorVersion" integer, "appliedParameters" jsonb,
-            "state" text, "rawValue" jsonb, "threshold" jsonb, "evidence" jsonb, "missingData" jsonb,
+            "state" text, "rawValue" jsonb, "threshold" jsonb, "missingData" jsonb,
             "dataAsOf" text
         )
         `,

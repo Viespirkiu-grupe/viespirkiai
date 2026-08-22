@@ -8,5 +8,5 @@
       "@design-system/*": ["./src/design-system/*"]
     }
   },
-  "include": ["src/**/*", "test/**/*", "modules/**/*"]
+  "include": ["src/**/*", "test/**/*", "modules/**/*", "services/**/*"]
 }

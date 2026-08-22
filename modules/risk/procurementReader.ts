@@ -1,6 +1,7 @@
 import { log } from "../../utils/log.js";
 import type { Lot, LotParticipation, Procurement, ProcurementParticipation } from "./types.ts";
 import type { RiskDataSource } from "./riskDataSource.ts";
+import { PUBLIC_VIEWS_CTE } from "./procurementPublicViews.ts";
 
 // The Procurement Reader (docs/indicators-story/risk-service-architecture-v2.md
 // §1.2): loads the subject universe page by page, so a run's working set stays
@@ -8,10 +9,13 @@ import type { RiskDataSource } from "./riskDataSource.ts";
 // — that is procurementEligibility.ts's job, downstream of this, matching the
 // DRD diagram's separation of Input Data from Decision.
 
-// Queries the risk service's own _v2 views (modules/mcp/analyst/views/
+// Reads the risk service's own _v2 views (modules/mcp/analyst/views/
 // v_pirkimas_v2.sql, v_pirkimo_dalis_v2.sql, v_dalyviai_v2.sql) rather than
 // the shared analyst views — isolates the Procurement Reader from drift in
 // the shared views' column shape (see v_pirkimas_v2.sql's header comment).
+// Every query below carries PUBLIC_VIEWS_CTE — that module's header explains
+// why these are inlined as a WITH prefix rather than queried as persisted
+// views.
 
 // DISTINCT ON (saltinis, "pirkimoNumeris") guards against a duplicate notice
 // on the cvpp side: cvppViesiejiPirkimai is keyed by skelbimoKodas, not
@@ -23,11 +27,12 @@ import type { RiskDataSource } from "./riskDataSource.ts";
 // otherwise risk skipping or repeating a row across a page boundary if a
 // duplicate ever appears.
 const PROCUREMENT_SQL = `
+    ${PUBLIC_VIEWS_CTE}
     SELECT DISTINCT ON (saltinis, "pirkimoNumeris")
            saltinis, "pirkimoNumeris", pavadinimas, "jarKodas", "pirkimoBudas", statusas,
            "pirkimoObjektoTipas", "numatomaVerteEUR", "paskelbimoData", "pasiulymuPateikimoTerminas",
            "bvpzKodai", "esFinansavimas"
-    FROM public.v_pirkimas_v2
+    FROM v_pirkimas_v2
     WHERE ($1::text[] IS NULL OR "pirkimoNumeris" = ANY ($1::text[]))
       AND ($2::text IS NULL OR (saltinis, "pirkimoNumeris") > ($2::text, $3::text))
     ORDER BY saltinis, "pirkimoNumeris", "paskelbimoData" DESC NULLS LAST
@@ -38,15 +43,17 @@ const PROCUREMENT_SQL = `
 // scope, used once (not per page) to tell an orphan lot from a real one —
 // see loadLotUniverse() below.
 const PROCUREMENT_IDS_SQL = `
+    ${PUBLIC_VIEWS_CTE}
     SELECT DISTINCT "pirkimoNumeris"
-    FROM public.v_pirkimas_v2
+    FROM v_pirkimas_v2
     WHERE ($1::text[] IS NULL OR "pirkimoNumeris" = ANY ($1::text[]))
 `;
 
 const LOT_SQL = `
+    ${PUBLIC_VIEWS_CTE}
     SELECT "subjektoRaktas", saltinis, "pirkimoNumeris", "daliesNumeris", "daliesPavadinimas",
            deklaruota, stebeta, "dalyviuSkaicius", "kainuSkaicius", "atmestuSkaicius"
-    FROM public.v_pirkimo_dalis_v2
+    FROM v_pirkimo_dalis_v2
     WHERE ($1::text[] IS NULL OR "pirkimoNumeris" = ANY ($1::text[]))
 `;
 
@@ -55,6 +62,7 @@ const LOT_SQL = `
 // (pirkimoNumeris, daliesNumeris) with at least one participant recorded in
 // v_dalyviai_v2 at or before the cutoff.
 const LOT_PARTICIPATION_SQL = `
+    ${PUBLIC_VIEWS_CTE}
     SELECT d."pirkimoNumeris"                                                            AS "pirkimoNumeris",
            COALESCE(d."daliesNumeris", '0')                                              AS "daliesNumeris",
            count(DISTINCT d."tiekejoKodas")::int                                         AS "totalBids",
@@ -62,7 +70,7 @@ const LOT_PARTICIPATION_SQL = `
                                                                                           AS "validBids",
            to_char(max(d."ataskaitosData") AT TIME ZONE 'UTC',
                    'YYYY-MM-DD"T"HH24:MI:SS"Z"')                                          AS "reportedAt"
-    FROM public.v_dalyviai_v2 d
+    FROM v_dalyviai_v2 d
     WHERE d."ataskaitosData" <= $1::timestamptz
       AND ($2::text[] IS NULL OR d."pirkimoNumeris" = ANY ($2::text[]))
     GROUP BY d."pirkimoNumeris", COALESCE(d."daliesNumeris", '0')
@@ -73,11 +81,12 @@ const LOT_PARTICIPATION_SQL = `
 // "method" column here — a lot's (and a procurement's) method is
 // Procurement.pirkimoBudas, never derived from the ATN-1 report itself.
 const PROCUREMENT_PARTICIPATION_SQL = `
+    ${PUBLIC_VIEWS_CTE}
     SELECT d."pirkimoNumeris"                                                            AS "pirkimoNumeris",
            count(DISTINCT d."tiekejoKodas")::int                                         AS "totalSuppliers",
            to_char(max(d."ataskaitosData") AT TIME ZONE 'UTC',
                    'YYYY-MM-DD"T"HH24:MI:SS"Z"')                                          AS "reportedAt"
-    FROM public.v_dalyviai_v2 d
+    FROM v_dalyviai_v2 d
     WHERE d."ataskaitosData" <= $1::timestamptz
       AND ($2::text[] IS NULL OR d."pirkimoNumeris" = ANY ($2::text[]))
     GROUP BY d."pirkimoNumeris"

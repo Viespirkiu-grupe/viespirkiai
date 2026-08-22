@@ -19,8 +19,9 @@ export const oneOfTwoRejected: LotParticipation = { totalBids: 2, validBids: 1, 
 // Two bidders, neither rejected — not_triggered.
 export const twoValidBidders: LotParticipation = { totalBids: 2, validBids: 2, reportedAt: REPORTED_AT };
 
-// A participation row real ingestion cannot produce on its own (every
-// tiekejoKodas would have to be NULL) — a decision-only case pinning what
-// assessRisk() does with it regardless: treated as an incomplete report, not
-// zero participation.
+// A real, rarer case — every recorded tiekejoKodas is null-coded, rather
+// than no participation being observed at all — produced by the real query
+// too (test/risk/procurementReader.it.ts's "nullCoded" scenario), not just
+// a decision-only fixture. Treated as an incomplete report, not zero
+// participation.
 export const emptyReport: LotParticipation = { totalBids: 0, validBids: 0, reportedAt: REPORTED_AT };

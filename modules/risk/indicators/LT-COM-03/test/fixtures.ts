@@ -22,8 +22,9 @@ export const twoSuppliers: ProcurementParticipation = { totalSuppliers: 2, repor
 // boundary.
 export const fiveSuppliers: ProcurementParticipation = { totalSuppliers: 5, reportedAt: REPORTED_AT };
 
-// A participation row real ingestion cannot produce on its own (every
-// tiekejoKodas would have to be NULL) — a decision-only case pinning what
-// assessRisk() does with it regardless: treated as an incomplete report, not
-// zero suppliers.
+// A real, rarer case — every recorded tiekejoKodas is null-coded, rather
+// than no participation being observed at all — produced by the real query
+// too (test/risk/procurementReader.it.ts's "nullCoded" scenario), not just
+// a decision-only fixture. Treated as an incomplete report, not zero
+// suppliers.
 export const emptyReport: ProcurementParticipation = { totalSuppliers: 0, reportedAt: REPORTED_AT };

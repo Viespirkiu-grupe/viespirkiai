@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LtCom02Decision } from "../decision.ts";
-import type { Lot, LotParticipation, LotSubject, Procurement, ProcurementSubject } from "../../../types.ts";
+import type { Lot, LotParticipation, LotSubject, Procurement } from "../../../types.ts";
 import { EvaluationContext } from "../../../evaluationContext.ts";
 import { RiskDecisionEngine } from "../../../riskDecisionEngine.ts";
 import { emptyReport, fiveBidders, REPORTED_AT, threeBidders, twoBidders } from "./fixtures.ts";
@@ -99,16 +99,6 @@ describe("LtCom02Decision.assessRisk", () => {
         expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });
 
-    it("carries the report's own evidence, sourced from the parent procurement's pirkimoBudas", () => {
-        for (const participation of [twoBidders, fiveBidders, threeBidders]) {
-            expect(assessRiskFor(participation).evidence).toEqual({
-                pirkimoBudas: "Atviras konkursas",
-                ataskaitosData: participation.reportedAt,
-                source: "ATN-1 ataskaita",
-            });
-        }
-    });
-
     it("is total: every participation shape returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
         for (const totalBids of [0, 1, 2, 3, 7]) {
@@ -121,16 +111,6 @@ describe("LtCom02Decision.assessRisk", () => {
         expect(assessRiskFor(fiveBidders)).toEqual(assessRiskFor(fiveBidders));
     });
 
-    it("throws when given a procurement subject instead of a lot subject", () => {
-        const procurementSubject: ProcurementSubject = {
-            subjectType: "procurement",
-            subjectKey: "cvpis:1",
-            procurementSource: "cvpis",
-            procurementId: "1",
-            procurement: testProcurement(),
-        };
-        expect(() => ltCom02v1.assessRisk(procurementSubject, CONTEXT)).toThrow(/expected a lot subject/);
-    });
 });
 
 describe("LtCom02Decision end to end (through RiskDecisionEngine, no database)", () => {

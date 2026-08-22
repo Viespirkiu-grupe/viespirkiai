@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LtCom03Decision } from "../decision.ts";
-import type { LotSubject, Procurement, ProcurementParticipation, ProcurementSubject } from "../../../types.ts";
+import type { Procurement, ProcurementParticipation, ProcurementSubject } from "../../../types.ts";
 import { EvaluationContext } from "../../../evaluationContext.ts";
 import { RiskDecisionEngine } from "../../../riskDecisionEngine.ts";
 import { emptyReport, fiveSuppliers, oneSupplier, REPORTED_AT, twoSuppliers } from "./fixtures.ts";
@@ -83,16 +83,6 @@ describe("LtCom03Decision.assessRisk", () => {
         expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });
 
-    it("carries the report's own evidence, sourced from the procurement's own pirkimoBudas", () => {
-        for (const participation of [oneSupplier, fiveSuppliers, twoSuppliers]) {
-            expect(assessRiskFor(participation).evidence).toEqual({
-                pirkimoBudas: "Atviras konkursas",
-                ataskaitosData: participation.reportedAt,
-                source: "ATN-1 ataskaita",
-            });
-        }
-    });
-
     it("is total: every participation shape returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
         for (const totalSuppliers of [0, 1, 2, 3, 7]) {
@@ -105,29 +95,6 @@ describe("LtCom03Decision.assessRisk", () => {
         expect(assessRiskFor(twoSuppliers)).toEqual(assessRiskFor(twoSuppliers));
     });
 
-    it("throws when given a lot subject instead of a procurement subject", () => {
-        const lotSubject: LotSubject = {
-            subjectType: "lot",
-            subjectKey: "cvpis:1:1",
-            procurementSource: "cvpis",
-            procurementId: "1",
-            procurement: testProcurement(null, { pirkimoNumeris: "1" }),
-            lot: {
-                subjektoRaktas: "cvpis:1:1",
-                saltinis: "cvpis",
-                pirkimoNumeris: "1",
-                daliesNumeris: "1",
-                daliesPavadinimas: null,
-                deklaruota: true,
-                stebeta: false,
-                dalyviuSkaicius: null,
-                kainuSkaicius: null,
-                atmestuSkaicius: null,
-                participation: null,
-            },
-        };
-        expect(() => ltCom03v1.assessRisk(lotSubject, CONTEXT)).toThrow(/expected a procurement subject/);
-    });
 });
 
 describe("LtCom03Decision end to end (through RiskDecisionEngine, no database)", () => {

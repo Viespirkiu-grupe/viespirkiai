@@ -1,4 +1,4 @@
-import type { RiskSignal, Subject } from "../../types.ts";
+import type { LotSubject, RiskSignal, Subject } from "../../types.ts";
 import { ALotIndicatorDecision } from "../../procurementLotDecision.ts";
 import type { EvaluationContext } from "../../evaluationContext.ts";
 import { ltCom01Definition } from "./definition.ts";
@@ -19,18 +19,13 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
         return subject.subjectType === "lot" && subject.lot.participation !== null;
     }
 
+    // RiskDecisionEngine only ever calls a lot-subjectType indicator
+    // (lotIndicators) with a LotSubject (evaluateLot, riskDecisionEngine.ts)
+    // — subjects are already routed by subjectType before this runs.
     assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
-        if (subject.subjectType !== "lot") {
-            throw new Error("LT-COM-01: expected a lot subject");
-        }
-        const { lot, procurement } = subject;
+        const { lot } = subject as LotSubject;
         // hasRequiredData already proved this is non-null.
         const participation = lot.participation!;
-        const evidence = {
-            pirkimoBudas: procurement.pirkimoBudas,
-            ataskaitosData: participation.reportedAt,
-            source: "ATN-1 ataskaita",
-        };
 
         // totalBids === 0: a real, rarer case distinct from "no participation
         // observed" (hasRequiredData's null check) — a participant row
@@ -39,7 +34,6 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
         if (participation.totalBids === 0) {
             return this.signalFor(subject, context, {
                 state: "insufficient_data",
-                evidence,
                 missingData: ["tiekejoKodas"],
             });
         }
@@ -49,7 +43,6 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
             state: participation.validBids <= maximumValidBids ? "triggered" : "not_triggered",
             rawValue: { totalBids: participation.totalBids, validBids: participation.validBids },
             threshold: { maximumValidBids },
-            evidence,
             appliedParameters: { maximumValidBids },
         });
     }

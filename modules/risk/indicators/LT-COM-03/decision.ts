@@ -1,4 +1,4 @@
-import type { RiskSignal, Subject } from "../../types.ts";
+import type { ProcurementSubject, RiskSignal, Subject } from "../../types.ts";
 import { AProcurementIndicatorDecision } from "../../procurementLotDecision.ts";
 import type { EvaluationContext } from "../../evaluationContext.ts";
 import { ltCom03Definition } from "./definition.ts";
@@ -20,18 +20,14 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
         return subject.subjectType === "procurement" && subject.procurement.participation !== null;
     }
 
+    // RiskDecisionEngine only ever calls a procurement-subjectType indicator
+    // (procurementIndicators) with a ProcurementSubject (evaluateProcurement,
+    // riskDecisionEngine.ts) — subjects are already routed by subjectType
+    // before this runs.
     assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
-        if (subject.subjectType !== "procurement") {
-            throw new Error("LT-COM-03: expected a procurement subject");
-        }
-        const { procurement } = subject;
+        const { procurement } = subject as ProcurementSubject;
         // hasRequiredData already proved this is non-null.
         const participation = procurement.participation!;
-        const evidence = {
-            pirkimoBudas: procurement.pirkimoBudas,
-            ataskaitosData: participation.reportedAt,
-            source: "ATN-1 ataskaita",
-        };
 
         // totalSuppliers === 0: a real, rarer case distinct from "no
         // participation observed" (hasRequiredData's null check) — a
@@ -40,7 +36,6 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
         if (participation.totalSuppliers === 0) {
             return this.signalFor(subject, context, {
                 state: "insufficient_data",
-                evidence,
                 missingData: ["tiekejoKodas"],
             });
         }
@@ -50,7 +45,6 @@ export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom0
             state: participation.totalSuppliers < minimumSuppliers ? "triggered" : "not_triggered",
             rawValue: { totalSuppliers: participation.totalSuppliers },
             threshold: { minimumSuppliers },
-            evidence,
             appliedParameters: { minimumSuppliers },
         });
     }

@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS risk.risk_signals (
     state              text NOT NULL,
     raw_value          jsonb,
     threshold          jsonb,
-    evidence           jsonb,
     missing_data       jsonb,
     error_info         jsonb,
     duration_ms        integer,
@@ -74,9 +73,6 @@ CREATE INDEX IF NOT EXISTS risk_signals_run_procurement_idx
 -- Methodology page and list filters: subjects one indicator triggered.
 CREATE INDEX IF NOT EXISTS risk_signals_run_triggered_idx
     ON risk.risk_signals (run_id, indicator_id) WHERE state = 'triggered';
-
-CREATE INDEX IF NOT EXISTS risk_signals_evidence_gin
-    ON risk.risk_signals USING gin (evidence jsonb_path_ops);
 
 -- 3. The run the site shows -----------------------------------------------
 

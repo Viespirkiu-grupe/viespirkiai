@@ -174,7 +174,6 @@ describe("AProcurementIndicatorDecision", () => {
             rawValue: { measured: 4 },
             threshold: { threshold: 10 },
             appliedParameters: { threshold: 10 },
-            evidence: {},
             missingData: [],
             dataAsOf: "2026-08-01",
         });
@@ -186,7 +185,6 @@ describe("AProcurementIndicatorDecision", () => {
 
         expect(observation.rawValue).toBeNull();
         expect(observation.threshold).toBeNull();
-        expect(observation.evidence).toEqual({});
         expect(observation.missingData).toEqual([]);
     });
 

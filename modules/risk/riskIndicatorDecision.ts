@@ -147,8 +147,8 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * indicator's assessRisk() (or isEligible()'s ineligible branch) does
      * not need to repeat every time. If an indicator cannot construct every
      * field itself (no applicable parameter entry, missing data), it returns
-     * only what it knows (typically just `state`, plus `evidence`/
-     * `missingData`) and this fills in the rest. Every RiskSignal in the
+     * only what it knows (typically just `state`, plus `missingData`) and
+     * this fills in the rest. Every RiskSignal in the
      * system is built here, so this is also where the output contract runs
      * (schema validation of what assessRisk()/isEligible() produced) — the
      * result is frozen, since it's about to be handed to the Engine and,
@@ -166,7 +166,6 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
             rawValue: partial.rawValue ?? null,
             threshold: partial.threshold ?? null,
             appliedParameters: partial.appliedParameters ?? null,
-            evidence: partial.evidence ?? {},
             missingData: [...(partial.missingData ?? [])],
             dataAsOf: context.dataAsOf,
         });

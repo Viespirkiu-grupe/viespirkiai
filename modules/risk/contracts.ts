@@ -24,7 +24,6 @@ export const riskSignalSchema: z.ZodType<RiskSignal> = z.object({
     rawValue: z.record(z.string(), z.unknown()).nullable(),
     threshold: z.record(z.string(), z.unknown()).nullable(),
     appliedParameters: z.record(z.string(), z.unknown()).nullable(),
-    evidence: z.record(z.string(), z.unknown()),
     missingData: z.array(z.string()),
     dataAsOf: z.string(),
 });
