@@ -1,0 +1,154 @@
+---
+interface Props {
+  tekstas: string;
+  modelis?: string | null;
+  link?: string | null;
+}
+const { tekstas, modelis, link } = Astro.props;
+// Modelis rašo pastraipas tuščiomis eilutėmis; laužom į <p>, kad skaitytųsi.
+const pastraipos = String(tekstas)
+  .split(/\n\s*\n|\n/)
+  .map((p) => p.trim())
+  .filter(Boolean);
+// Dekoratyvinis kairysis „bortelis" – vietoj blockquote linijos „AI AI AI".
+// Netelpantys „AI" paslepiami JS, kad nei vienas nebūtų nukirstas per vidurį.
+const railCount = 80;
+---
+
+<section class="ai" aria-label="AI santrauka">
+  <div class="ai__eyebrow">
+    <span class="ai__label">AI santrauka</span>
+    <button type="button" class="ai__hide">Neberodyti</button>
+  </div>
+
+  <div class="ai__row">
+    <div class="ai__railcol">
+      <div class="ai__rail" aria-hidden="true">{Array.from({ length: railCount }, () => <span>AI</span>)}</div>
+    </div>
+    <div class="ai__body">
+      {pastraipos.map((p) => <p class="ai__tekstas text-justify">{p}</p>)}
+      {modelis && (
+        <p class="ai__modelis">~ {link ? <a href={link} class="link" rel="noopener nofollow">{modelis}</a> : modelis}</p>
+      )}
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Plokščias blokas kaip ir reklamos: caption kairėje, „Neberodyti" dešinėje. */
+  .ai {
+    margin-bottom: 20px;
+  }
+
+  .ai__eyebrow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 8px;
+  }
+
+  .ai__label {
+    font-size: var(--text-xs);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray);
+  }
+
+  .ai__hide {
+    appearance: none;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    text-decoration: none;
+    transition: color var(--transition);
+  }
+  .ai__hide:hover {
+    color: var(--black);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .ai__row {
+    display: grid;
+    grid-template-columns: 1.6em 1fr;
+    gap: 12px;
+  }
+
+  /* Bortelio stulpelis aukščio nediktuoja – „AI" juosta pozicionuota
+     absoliučiai, tad jos ilgį riboja teksto aukštis. */
+  .ai__railcol { position: relative; }
+
+  /* Vertikalus „AI" stulpelis vietoj citatos kraštinės. */
+  .ai__rail {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0.45em;
+    /* Inline ašis vertikali, tad text-align centruoja „AI" juostą pagal aukštį. */
+    text-align: center;
+    writing-mode: vertical-rl;
+    white-space: nowrap;
+    overflow: hidden;
+    font-size: var(--text-xs);
+    letter-spacing: 0.08em;
+    line-height: 1;
+    color: var(--gray);
+    opacity: 0.7;
+    user-select: none;
+  }
+  .ai__rail span {
+    display: inline-block;
+    /* Simetriški tarpai – kad centravimas nenusislinktų per paskutinį tarpą. */
+    margin-inline: 0.3em;
+  }
+
+  .ai__body { min-width: 0; }
+
+  .ai__tekstas {
+    margin: 0 0 10px;
+  }
+  .ai__tekstas:last-child { margin-bottom: 0; }
+
+  .ai__modelis {
+    margin: 10px 0 0;
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
+</style>
+
+<script>
+  // „Neberodyti" — įrašo showAi=false cookie ir pašalina bloką; kitą kartą
+  // SSR jo nebekuria (grąžinti galima poraštėje „Rodyti AI santraukas").
+  document.querySelectorAll('.ai__hide').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.cookie = 'showAi=false;path=/;max-age=34560000;samesite=lax';
+      btn.closest('.ai')?.remove();
+    });
+  });
+
+  // Paslepiam „AI", kurie netilptų visi – kad bortelis nesibaigtų puse raidės.
+  const rails = document.querySelectorAll<HTMLElement>('.ai__rail');
+  const fitRail = (rail: HTMLElement) => {
+    const items = Array.from(rail.children) as HTMLElement[];
+    items.forEach((item) => { item.style.display = ''; });
+    const limit = rail.clientHeight;
+    let telpa = items.length;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].offsetTop + items[i].offsetHeight > limit + 0.5) { telpa = i; break; }
+    }
+    // Netelpančius išimam iš srauto (display:none), kad likusieji centruotųsi.
+    items.forEach((item, i) => { item.style.display = i < telpa ? '' : 'none'; });
+  };
+  const fitAll = () => rails.forEach(fitRail);
+  fitAll();
+  if (rails.length && 'ResizeObserver' in window) {
+    const observer = new ResizeObserver(fitAll);
+    rails.forEach((rail) => observer.observe(rail));
+  }
+</script>

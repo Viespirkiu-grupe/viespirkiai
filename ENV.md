@@ -51,6 +51,9 @@ _(taskrunneris juos irgi naudoja)_
 | `ENABLE_BOT_CHALLENGE` | `false` | Įjungia lengvą JavaScript patikrą maršrutams `/`, `/viesiejiPirkimai`, `/dokumentai` ir `/juridiniai`. Pirma užklausa nustato sesijos slapuką `bot=no` ir perkrauna puslapį; JavaScript nevykdantys scraperiai iki paieškos neprieina. Nuorodų peržiūros crawleriai (Facebook, Slack, Signal, Telegram, Mastodon…) patikros negauna – jiems visada, nepriklausomai nuo šio kintamojo, grąžinamas pigus tik iš URL parametrų sudarytas OG dokumentas be DB užklausų. Paieškos crawleriai (Googlebot, Applebot) gauna tikrą puslapį. |
 | `GIT_COMMIT` | _(iš `.git` arba `build-info.json`)_ | Paleistos versijos commit'o hash'as – footer'yje rodomas trumpasis hash'as su nuoroda į GitHub. **Paprastai nustatinėti nereikia:** `npm run build` (taip pat ir Docker build'as) hash'ą nuskaito iš `.git` ir įrašo į `build-info.json`, kuris įkepamas į image'ą. Kintamasis reikalingas tik ten, kur `.git` nepasiekiamas (build iš archyvo), arba norint reikšmę perrašyti. Alternatyvūs pavadinimai: `GIT_SHA`, `SOURCE_COMMIT`. |
 
+Eksperimentinis pirkimo aprašo CLI naudoja `OPENROUTER_API_KEY` tiesiai iš
+aplinkos arba `.env`. Paleidimas: `npm run pirkimas:aprasas -- 9330950`.
+
 ### DB prisijungimas
 
 Naudoja bendrą pool'ą (`postgres/postgres.js`) — reikalingas ir frontend'ui, ir

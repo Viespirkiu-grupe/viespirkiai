@@ -133,3 +133,19 @@ export function getCvpisUrl(pirkimas: Pirkimas) {
   const action = map[pirkimas.type as string];
   return action ? `https://viesiejipirkimai.lt/epps/${action.startsWith('view') ? 'pmc' : 'cft'}/${action}.do?resourceId=${pirkimas.pirkimoId}` : null;
 }
+
+// Naujausia sėkminga AI santrauka (naujausiai sukurta iš visų modelio variantų).
+export async function loadPirkimoAiSantrauka(pirkimoId: string): Promise<{ aprasymas: string; sukurta: any; modelis: string; link: string | null } | null> {
+  const { rows } = await postgres.query(
+    `SELECT a."aprasymas", a."sukurta",
+            CASE WHEN v.modelis LIKE '%/%' THEN v.modelis ELSE v.tiekejas || '/' || v.modelis END AS modelis,
+            v.link
+       FROM public."viesiejiPirkimaiAprasymai" a
+       JOIN public."aiModelVariants" v ON v.id = a."modelioVariantasId"
+      WHERE a."pirkimoId" = $1 AND a.success = true AND a."aprasymas" IS NOT NULL
+      ORDER BY a."sukurta" DESC
+      LIMIT 1`,
+    [pirkimoId],
+  );
+  return rows[0] ?? null;
+}

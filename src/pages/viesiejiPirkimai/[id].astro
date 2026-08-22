@@ -14,8 +14,9 @@ import PirkimasDokumentai from '../../components/viesiejiPirkimai/PirkimasDokume
 import PirkimasSkelbimai from '../../components/viesiejiPirkimai/PirkimasSkelbimai.astro';
 import PirkimasTedNuorodos from '../../components/viesiejiPirkimai/PirkimasTedNuorodos.astro';
 import PirkimasDalyviai from '../../components/viesiejiPirkimai/PirkimasDalyviai.astro';
+import PirkimasAiSantrauka from '../../components/viesiejiPirkimai/PirkimasAiSantrauka.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
-import { loadPirkimas, buildTimelineItems, buildTedKorteles, getCvpisUrl } from '../../lib/viesiejiPirkimai.js';
+import { loadPirkimas, loadPirkimoAiSantrauka, buildTimelineItems, buildTedKorteles, getCvpisUrl } from '../../lib/viesiejiPirkimai.js';
 
 const raw = Astro.params.id!;
 const isPng = raw.endsWith('.png');
@@ -53,6 +54,12 @@ const pageDescription = `${pirkimas.pirkimoBudas || ''}\nPaskelbta: ${String(pir
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
+
+// AI santrauka; jei vartotojas paspaudė „Neberodyti", cookie `showAi=false`
+// ir SSR jos visai nekrauna.
+const aiSantrauka = Astro.cookies.get('showAi')?.value === 'false'
+  ? null
+  : await loadPirkimoAiSantrauka(id);
 ---
 
 <Layout
@@ -82,8 +89,12 @@ const font = getFont(Astro.cookies);
       <div class="text-muted mb-4 text-sm">
           Duomenys atnaujinti <DateValue value={pirkimas.turinioNuskaitymoData} mode="datetime" />
       </div>
+      {aiSantrauka && <PirkimasAiSantrauka tekstas={aiSantrauka.aprasymas} modelis={aiSantrauka.modelis} link={aiSantrauka.link} />}
       {pirkimas.informacija && pirkimas.informacija !== pirkimas.pavadinimas && (
-        <div class="text-justify">{pirkimas.informacija}</div>
+        <section>
+          <div class="aprasymo-antraste">Oficialus aprašymas</div>
+          <div class="text-justify">{pirkimas.informacija}</div>
+        </section>
       )}
     </div>
 
@@ -121,6 +132,16 @@ const font = getFont(Astro.cookies);
   /* Documents block fills two of the three columns; cards inside flow into
      as many sub-columns as fit (see PirkimasDokumentai listClass). */
   .dok-span-2 { grid-column: span 2; }
+
+  /* Ta pati caption forma kaip AI santraukoje, kad blokai poruotųsi. */
+  .aprasymo-antraste {
+    font-size: var(--text-xs);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray);
+    margin-bottom: 8px;
+  }
+
   @media (max-width: 640px) {
     .dok-span-2 { grid-column: auto; }
   }
