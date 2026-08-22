@@ -178,7 +178,6 @@ export interface RiskIndicatorDefinition<P extends BaseParameters = BaseParamete
     readonly sourceRelations: readonly string[];
     readonly requiredInputs: readonly string[];
     readonly parameters: P;
-    readonly outputContract?: RuntimeContract<RiskSignal>;
     readonly standard: RiskIndicatorStandard;
     readonly public: RiskIndicatorPublicText;
 }

@@ -6,7 +6,6 @@ import type {
     ParametersOf,
     RiskIndicatorDefinition,
     RiskSignal,
-    RuntimeContract,
     Subject,
 } from "./types.ts";
 
@@ -43,13 +42,11 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
     implements RiskIndicatorDecision
 {
     readonly definition: D;
-    readonly outputContract: RuntimeContract<RiskSignal>;
     readonly context: EvaluationContext;
 
     protected constructor(definition: D, context: EvaluationContext) {
         this.definition = definition;
         this.context = context;
-        this.outputContract = definition.outputContract ?? riskSignalContract;
     }
 
     get key() {
@@ -158,7 +155,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * from there, straight to the Signal Writer.
      */
     protected signalFor(subject: Subject, context: EvaluationContext, partial: PartialRiskSignal): RiskSignal {
-        const signal = this.outputContract.validate({
+        const signal = riskSignalContract.validate({
             indicatorId: this.id,
             indicatorVersion: this.version,
             subjectType: subject.subjectType,
