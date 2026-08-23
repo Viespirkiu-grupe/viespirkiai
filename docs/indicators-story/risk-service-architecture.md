@@ -20,16 +20,22 @@ flowchart LR
         ASSESS --> SIGA
     end
 
-    WRITER["Signal Writer<br/>(persists risk signals)"]
-    STORE[("risk.risk_signals")]
+    COLLECT["Decision Collector<br/>(one ProcurementRiskDecisions per procurement"]
+    WRITER["Decision Writer<br/>(upserts by procurement, updates the run)"]
+    STORE[("risk.risk_procurement_decisions")]
+    RUNS[("risk.risk_evaluation_runs")]
+
     CRON -->|" run trigger "| READER
-    READER -->|" Procurement + Lots "| ELIG
-    SIGE --> WRITER
-    SIGA --> WRITER
-    WRITER -->|" risk_signals rows "| STORE
+    READER -->|" Procurement + Lots + Bids "| ELIG
+    SIGE --> COLLECT
+    SIGA --> COLLECT
+    COLLECT -->|" ProcurementRiskDecisions "| WRITER
+    WRITER -->|" INSERT … ON CONFLICT DO UPDATE "| STORE
+    WRITER -->|" run row + statistics "| RUNS
+    STORE -.->|" run_id "| RUNS
 ```
 
-### 1.2 Procurement Reader and Signal Writer Components Class Diagram
+### 1.2 Procurement Reader and Decision Writer Components Class Diagram
 
 ```mermaid
 classDiagram
@@ -72,39 +78,36 @@ classDiagram
         -procurementIndicators: ARiskIndicatorDecision[]
         -lotIndicators: ARiskIndicatorDecision[]
         -bidIndicators: ARiskIndicatorDecision[]
-        +evaluateAll(procurements: Procurement[]) RiskSignal[]
-        -evaluateProcurement(procurement: Procurement) RiskSignal[]
+        +evaluateAll(procurements: Procurement[]) ProcurementRiskDecisions[]
+        -evaluateProcurement(procurement: Procurement) ProcurementRiskDecisions
         -evaluateLot(lot: Lot, procurement: Procurement) RiskSignal[]
         -evaluateBid(bid: Bid, lot: Lot, procurement: Procurement) RiskSignal[]
     }
+    note for RiskDecisionEngine "The signals of a procurement, of its lots and of its bids are collected
+    into that procurement's single ProcurementRiskDecisions — the grain stays on the signal
+    (subjectType, subjectKey), not on the row."
 
-    class SignalWriter {
+    class DecisionWriter {
         -evaluationRun: EvaluationRun | null
-        +writeRiskSignals(signals: RiskSignal[]) Promise~number~
+        +writeDecisions(decisions: ProcurementRiskDecisions[]) Promise~number~
         +updateEvaluationRun(update: Partial~EvaluationRun~) Promise~EvaluationRun~
     }
-    note for SignalWriter "updateEvaluationRun upserts: the first call inserts the run row, later calls
-    update it — accumulating per-indicator stats across pages. No crash recovery, no retry."
+    note for DecisionWriter "writeDecisions upserts on (procurement_source, procurement_id): one
+    statement per page, INSERT … ON CONFLICT DO UPDATE. updateEvaluationRun upserts the run row —
+    the first call inserts it, later calls accumulate per-indicator stats across pages.
+    No crash recovery, no retry."
 
     RunJob ..> RunJobOptions: options
     RunJob --> RunResult: returns
     RunJob ..> ProcurementReader: loop — loads next page (subjects filter, cursor) until nextCursor is null
     ProcurementReader --> Page: returns
     RunJob ..> RiskDecisionEngine: evaluates one page of procurements
-    RunJob ..> SignalWriter: writes the page's signals, then checkpoints statistics
+    RunJob ..> DecisionWriter: writes the page's decisions, then checkpoints statistics
 ```
 
 ## 2. Procurement Risk Decision Service
 
-The service's data contract: what a run reads (§2.1, §2.2) and what it writes (§2.3, §2.4). Every type below is
-declared in `modules/risk/types.ts`; `RiskSignal` is additionally validated at runtime by `riskSignalSchema` in
-`modules/risk/contracts.ts`.
-
 ### 2.1 Input Data Object Model
-
-The Procurement Reader loads one object graph per page, rooted at `Procurement`. A Risk Indicator reads only this
-graph, never the database. Its three grains are the three implemented subject types — `Procurement`, `Lot`, `Bid`;
-`contract` and `supplier` are admitted by the schema but have no object yet.
 
 ```mermaid
 classDiagram
@@ -199,25 +202,30 @@ entity, two names — to be reconciled.
 
 ### 2.3 Output Data Object Model
 
-A run produces one `EvaluationRun` and one `RiskSignal` per (subject, indicator) pair it evaluated. Nothing else.
+A run produces one `EvaluationRun`, and one `ProcurementRiskDecisions` per procurement it evaluated. Every
+`RiskSignal` the run produced — for the procurement, its lots and its bids — lives inside that procurement's
+decisions object. Nothing else.
 
 ```mermaid
 classDiagram
     class ProcurementRiskDecisions {
-        +procurementId: string | null
-        +procurementSource: string | null
+        +procurementSource: string
+        +procurementId: string
+        +runId: number
+        +signals: RiskSignal[]
+        +dataAsOf: string
         +createdAt: Date
         +updatedAt: Date
     }
-    note for ProcurementRiskDecisions "Created by Procurement Risk Decision Service"
-    
+    note for ProcurementRiskDecisions "Created by the Decision Collector, persisted by the Decision Writer.
+    Natural key: (procurementSource, procurementId) — one row per procurement, refreshed in place.
+    runId, dataAsOf and updatedAt always describe the run that last refreshed it."
+
     class RiskSignal {
         +indicatorId: string
         +indicatorVersion: number
         +subjectType: SubjectType
         +subjectKey: string
-        +(DEPRECATED) procurementSource: string | null 
-        +(DEPRECATED) procurementId: string | null
         +state: IndicatorState
         +rawValue: Record~string, unknown~ | null
         +threshold: Record~string, unknown~ | null
@@ -225,7 +233,8 @@ classDiagram
         +missingData: string[]
         +dataAsOf: string
     }
-    note for RiskSignal "Created by RiskIndicatorDecision"
+    note for RiskSignal "Created by RiskIndicatorDecision. Stored as an element of
+    risk_procurement_decisions.signals (jsonb), never as its own row."
 
     class IndicatorState {
         <<enumeration>>
@@ -242,12 +251,13 @@ classDiagram
         +codeCommit: string
         +statistics: Record~string, IndicatorStats~
     }
-    note for EvaluationRun "Created by Procurement Reader, updated by Procurement Writer"
+    note for EvaluationRun "Opened and updated by the Decision Writer; the provenance every
+    decisions row points at."
 
     class IndicatorStats {
         +rows: number
         +triggered: number
-        +inserted: number
+        +written: number
     }
 
     class RunStatus {
@@ -260,62 +270,64 @@ classDiagram
 
     EvaluationRun "1" --> "1" RunStatus: status
     EvaluationRun "1" *-- "0..*" IndicatorStats: statistics, keyed by indicatorId
-    EvaluationRun "1" *-- "0..*" ProcurementRiskDecisions: decisions
-    ProcurementRiskDecisions "1" *-- "0..*" RiskSignal: riskSignals
+    EvaluationRun "1" <-- "0..*" ProcurementRiskDecisions: runId, the last run that refreshed the row
+    ProcurementRiskDecisions "1" *-- "0..*" RiskSignal: signals, stored as jsonb
     RiskSignal "1" --> "1" IndicatorState: state
 ```
 
+`RiskSignal` no longer carries `procurementSource` / `procurementId`: the row it lives in already answers that.
+
 ### 2.4 Output Data Object Model Persistence
 
-`RiskSignal` → `risk.risk_signals`, one row per signal:
+`ProcurementRiskDecisions` → `risk.risk_procurement_decisions`, **one row per procurement** (not per run):
 
-| Field               | Column               | Type          | Note                                                        |
-|---------------------|----------------------|---------------|-------------------------------------------------------------|
-| —                   | `run_id`             | `bigint`      | Supplied by the Signal Writer, not by the indicator          |
-| `subjectType`       | `subject_type`       | `text`        | CHECK: `procurement`, `lot`, `bid`, `contract`, `supplier`   |
-| `subjectKey`        | `subject_key`        | `text`        |                                                              |
-| `procurementSource` | `procurement_source` | `text`        | Denormalised, so a lot/bid row filters by procurement        |
-| `procurementId`     | `procurement_id`     | `text`        | Same                                                         |
-| `indicatorId`       | `indicator_id`       | `text`        |                                                              |
-| `indicatorVersion`  | `indicator_version`  | `integer`     | `NOT NULL` — an indicator's identity is (id, version)        |
-| `appliedParameters` | `applied_parameters` | `jsonb`       | The parameter entry in force at `dataAsOf`                   |
-| `state`             | `state`              | `text`        | CHECK: `IndicatorState` plus `calculation_error`             |
-| `rawValue`          | `raw_value`          | `jsonb`       | What was measured                                            |
-| `threshold`         | `threshold`          | `jsonb`       | What it was measured against                                 |
-| `missingData`       | `missing_data`       | `jsonb`       | Field names, when `state = insufficient_data`                |
-| `dataAsOf`          | `data_as_of`         | `timestamptz` | Copied from the run, so a row explains itself without a join |
+| Field               | Column               | Type          | Note                                                                   |
+|---------------------|----------------------|---------------|------------------------------------------------------------------------|
+| —                   | `id`                 | `bigint`      | Identity PK                                                            |
+| `procurementSource` | `procurement_source` | `text`        | Natural key, part 1                                                    |
+| `procurementId`     | `procurement_id`     | `text`        | Natural key, part 2                                                    |
+| `runId`             | `run_id`             | `bigint`      | FK → `risk.risk_evaluation_runs(id)`; **overwritten** on every refresh  |
+| `signals`           | `signals`            | `jsonb`       | Array of `RiskSignal` — procurement, lot and bid grains together        |
+| `dataAsOf`          | `data_as_of`         | `timestamptz` | Cutoff of the run that last wrote the row                              |
+| `createdAt`         | `created_at`         | `timestamptz` | `DEFAULT now()`, never updated — first time this procurement was scored |
+| `updatedAt`         | `updated_at`         | `timestamptz` | `now()` on every upsert — the "assessed at" the GUI shows              |
 
-`EvaluationRun` → `risk.evaluation_runs`, one row per run:
+| Constraint / Index                                            | Purpose                                                    |
+|---------------------------------------------------------------|-------------------------------------------------------------|
+| `UNIQUE (procurement_source, procurement_id)`                 | The upsert conflict target; one row per procurement         |
+| `GIN (signals jsonb_path_ops)`                                | List filters: which procurements a given indicator triggered |
+| `INDEX (run_id)`                                              | "What did run N touch"; FK maintenance                      |
+| `INDEX (updated_at DESC)`                                     | Freshness listings                                           |
+
+`EvaluationRun` → `risk.risk_evaluation_runs`, one row per run:
 
 | Field        | Column        | Type          | Note                                                      |
 |--------------|---------------|---------------|-----------------------------------------------------------|
-| `runId`      | `id`          | `bigint`      | The FK every signal carries                               |
+| `runId`      | `id`          | `bigint`      | The FK every decisions row carries                        |
 | `dataAsOf`   | `data_as_of`  | `timestamptz` |                                                           |
 | `codeCommit` | `code_commit` | `text`        |                                                           |
 | `status`     | `status`      | `text`        | CHECK: the four `RunStatus` values                        |
-| `statistics` | `statistics`  | `jsonb`       | Per-indicator `rows` / `triggered` / `inserted`           |
+| `statistics` | `statistics`  | `jsonb`       | Per-indicator `rows` / `triggered` / `written`            |
 | —            | `started_at`  | `timestamptz` | `DEFAULT now()`                                           |
 | —            | `finished_at` | `timestamptz` | Stamped when status becomes terminal                      |
 | —            | `error`       | `text`        | Set only by the stale-run sweep at the next process start |
 
-`state`'s CHECK admits a fifth value, `calculation_error`, that no run writes: the engine contains a failing
-indicator by logging it and contributing no signal. The columns `error_info` and `duration_ms` belong to that same
-unused path.
+Invariants:
 
-Three invariants:
+| # | Invariant                                                                                                                                                              |
+|---|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | **One row per procurement, refreshed in place.** There is no per-run snapshot; the table is the current state. `risk_rw` needs `INSERT` **and** `UPDATE`.                 |
+| 2 | **`signals` is replaced whole, never merged element-wise.** A refresh re-evaluates every deployed indicator for that procurement, so the array is always internally consistent. |
+| 3 | **A refresh is scoped.** A run over a subset of procurements updates only those rows; every other row keeps its older `run_id` / `updated_at`. Indicators can grow and be re-run without reprocessing the whole register. |
+| 4 | **At most one open run** — partial unique index on `status = 'running'` in `risk.risk_evaluation_runs`.                                                                    |
+| 5 | **`updated_at` is the published freshness.** The GUI shows it per procurement; there is no global "as of" for the site any more.                                          |
 
-- **A run is an immutable snapshot.** `risk.risk_signals` is insert-only — `risk_rw` holds no UPDATE or DELETE — so
-  there is no current-state row to maintain. A superseded snapshot is deleted whole by the retention job.
-- **One result per subject and indicator, per run** — unique index `(run_id, subject_type, subject_key, indicator_id)`.
-- **At most one open run** — partial unique index on `status = 'running'`.
+Read path:
 
-Two views are the only read path, so the site, the retention job and the service cannot disagree about which
-snapshot is live:
-
-| View                           | Answers                                                                                    |
-|--------------------------------|--------------------------------------------------------------------------------------------|
-| `risk.v_latest_run`            | Which run the site shows — the most recently started `succeeded` or `partial` run           |
-| `risk.v_procurement_summaries` | Per procurement, within that run: counts by state and the list of `triggered` indicator ids |
+| View                           | Answers                                                                                             |
+|--------------------------------|------------------------------------------------------------------------------------------------------|
+| `risk.v_latest_run`            | Provenance only: the most recently started `succeeded` / `partial` run. No longer a read filter        |
+| `risk.v_procurement_summaries` | Per procurement, from its own `signals` jsonb: counts by state, the `triggered` indicator ids, `updated_at` |
 
 ## 3. Risk Decision Services (DRD)
 
@@ -500,8 +512,8 @@ classDiagram
     }
     note for Subject "Each variant wraps the object the Reader already loaded — Procurement, Lot or Bid
     (§2.1) — together with its non-null parents, so a decision never re-fetches what the Reader knows.
-    subjectType, subjectKey, procurementSource and procurementId are derived from the wrapped
-    object's own key, not stored on it."
+    subjectType and subjectKey are derived from the wrapped object's own key, not stored on it; the
+    procurement key belongs to the ProcurementRiskDecisions row, not to the signal (§2.3)."
 
     class EligibilityOutcome {
         <<type>>
@@ -555,7 +567,30 @@ npm run risk:run -- --limit 20         # light run: first 20 distinct ATN-1 proc
 
 `--limit N` and explicit subject ids are mutually exclusive. Requires `riskDb` (see `postgres/riskDb.js`) and the primary Postgres DB configured, as in [Local dev setup](../../CLAUDE.md).
 
-## 5. Open Questions
+Every invocation is a **refresh**, not a snapshot: it rewrites the decisions row of each procurement it touched and
+leaves the rest untouched. Adding an indicator and re-running a subset is therefore a normal operation — the whole
+register is not reprocessed, and each row's `updated_at` says how fresh it is.
+
+## 5. Deprecated
+
+What exists in the code today and is superseded by §1–§2. To be removed by the refactoring; this section goes with it.
+
+| # | Deprecated                                                                        | Where                                                                  | Replacement                                                                              |
+|---|-----------------------------------------------------------------------------------|------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| 1 | Table `risk.risk_signals` — one flattened row per (subject, indicator)            | `migrations/risk/001_risk.sql`, `003_bid_subject.sql`                   | `risk.risk_procurement_decisions`, signals as `jsonb`                                     |
+| 2 | Table name `risk.evaluation_runs`                                                 | `migrations/risk/001_risk.sql`, `002_roles.sql`                         | `risk.risk_evaluation_runs`                                                               |
+| 3 | Snapshot-per-run model: insert-only writes, one live run, `run_id` filter on reads | `services/procurement-risk/write.ts`, `risk.v_procurement_summaries`    | Current-state upsert by procurement; `run_id` is provenance, not a filter                 |
+| 4 | `SignalWriter` / `writeRiskSignals()` / `writeObservations()`                      | `services/procurement-risk/signalWriter.ts`, `write.ts`                 | `DecisionWriter` / `writeDecisions()` — `INSERT … ON CONFLICT DO UPDATE`                  |
+| 5 | `RiskSignal.procurementSource`, `RiskSignal.procurementId`                         | `modules/risk/types.ts`, `modules/risk/contracts.ts`                    | Held once on the decisions row                                                            |
+| 6 | `RiskDecisionEngine.evaluateAll(): RiskSignal[]`                                   | `modules/risk/riskDecisionEngine.ts`                                    | Returns `ProcurementRiskDecisions[]`, signals grouped per procurement                     |
+| 7 | Retention by superseded snapshot (`deleteExpiredSnapshots`, `RETENTION_INTERVAL`)  | `services/procurement-risk/retention.ts`, `retentionJob.ts`             | Nothing to expire — rows are overwritten. Only run rows accumulate                        |
+| 8 | Columns `error_info`, `duration_ms` and state `calculation_error`                  | `migrations/risk/001_risk.sql`                                          | Unused path; a failing indicator is logged and contributes no signal                       |
+| 9 | Grants: `risk_rw` insert-only on signals, DELETE for retention                     | `migrations/risk/002_roles.sql`                                         | `SELECT, INSERT, UPDATE` on both `risk_*` tables                                          |
+| 10 | Indexes `risk_signals_run_subject_idx`, `risk_signals_run_procurement_idx`, `risk_signals_run_triggered_idx` | `migrations/risk/001_risk.sql`                       | Unique natural key + GIN on `signals` (§2.4)                                              |
+| 11 | `IndicatorStats.inserted`                                                          | `services/procurement-risk/signalWriter.ts`, `runJob.ts`                | `written` (inserted or updated)                                                            |
+| 12 | Doc references to `risk-service-architecture-v2.md` / `architecture-v2.md` §-numbers | code comments across `modules/risk/`, `services/procurement-risk/`     | This document                                                                              |
+
+## 6. Open Questions
 
 | # | Question                                                                                                                                                                                                                               |
 |---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
