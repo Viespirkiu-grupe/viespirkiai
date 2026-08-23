@@ -200,19 +200,30 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 
 #### Subject `bid` — Bid / bidder participation (11)
 
-| Code      | Canonical indicator                                     | Canonical category | Reference indicators                                                                                       |
-|-----------|---------------------------------------------------------|--------------------|------------------------------------------------------------------------------------------------------------|
-| LT-AWD-05 | Late bid accepted and won                               | Award              | OCP-R030                                                                                                   |
-| LT-AWD-06 | Winner does not meet award criteria                     | Award              | OCP-R056                                                                                                   |
-| LT-COM-16 | Similar bid documents                                   | Competition        | OCP-R041; OECD-BR-09; OECD-BR-10; OECD-BR-12; OECD-BR-14; OECD-BR-15; OECD-BR-39                           |
-| LT-COM-17 | Bids submitted in suspiciously repeated order           | Competition        | OCP-R034; OECD-BR-18                                                                                       |
-| LT-COM-20 | Unexpected or frequent bid withdrawal                   | Competition        | OECD-BR-04                                                                                                 |
-| LT-COM-21 | Non-genuine, incomplete, or incapable bid               | Competition        | OECD-BR-13; OECD-BR-16; OECD-BR-32; OECD-BR-38; OECD-BR-46                                                 |
-| LT-COM-23 | Bidder statements indicate collusion                    | Competition        | OECD-BR-33; OECD-BR-34; OECD-BR-35; OECD-BR-36; OECD-BR-37; OECD-BR-38; OECD-BR-39; OECD-BR-40; OECD-BR-41 |
-| LT-PRI-02 | Line-item price anomalously high or low                 | Pricing            | OCP-R017                                                                                                   |
-| LT-PRI-09 | Heavily discounted bid                                  | Pricing            | OCP-R058                                                                                                   |
-| LT-PRI-11 | Supplier bid much higher than for a comparable contract | Pricing            | OECD-BR-27                                                                                                 |
-| LT-PRI-12 | Anomalous geographic delivery or transport pricing      | Pricing            | OECD-BR-30; OECD-BR-31                                                                                     |
+| Code      | Canonical indicator                                     | Canonical category | Reference indicators                                                                                       | Note             |
+|-----------|---------------------------------------------------------|--------------------|------------------------------------------------------------------------------------------------------------|------------------|
+| LT-AWD-05 | Late bid accepted and won                               | Award              | OCP-R030                                                                                                   | Cannot implement |
+| LT-AWD-06 | Winner does not meet award criteria                     | Award              | OCP-R056                                                                                                   |                  |
+| LT-COM-16 | Similar bid documents                                   | Competition        | OCP-R041; OECD-BR-09; OECD-BR-10; OECD-BR-12; OECD-BR-14; OECD-BR-15; OECD-BR-39                           |                  |
+| LT-COM-17 | Bids submitted in suspiciously repeated order           | Competition        | OCP-R034; OECD-BR-18                                                                                       |                  |
+| LT-COM-20 | Unexpected or frequent bid withdrawal                   | Competition        | OECD-BR-04                                                                                                 |                  |
+| LT-COM-21 | Non-genuine, incomplete, or incapable bid               | Competition        | OECD-BR-13; OECD-BR-16; OECD-BR-32; OECD-BR-38; OECD-BR-46                                                 |                  |
+| LT-COM-23 | Bidder statements indicate collusion                    | Competition        | OECD-BR-33; OECD-BR-34; OECD-BR-35; OECD-BR-36; OECD-BR-37; OECD-BR-38; OECD-BR-39; OECD-BR-40; OECD-BR-41 |                  |
+| LT-PRI-02 | Line-item price anomalously high or low                 | Pricing            | OCP-R017                                                                                                   |                  |
+| LT-PRI-09 | Heavily discounted bid                                  | Pricing            | OCP-R058                                                                                                   |                  |
+| LT-PRI-11 | Supplier bid much higher than for a comparable contract | Pricing            | OECD-BR-27                                                                                                 |                  |
+| LT-PRI-12 | Anomalous geographic delivery or transport pricing      | Pricing            | OECD-BR-30; OECD-BR-31                                                                                     |                  |
+
+#### Cannot Implement Explanations
+
+**LT-AWD-05** — Late bid accepted and won: not implementable with currently ingested data. The only per-bid data source
+is the PPA procedure report (`v_dalyviai_v2`, backed by `xlsxPPAdalyviai` / `xlsxPPApasiulymuEile` /
+`xlsxPPAatmestiPasiulymai`), and none of its columns carry a bid-level submission timestamp — only `ataskaitosData`
+(report creation date, procurement-grain). The free-text rejection-reason lookup (`xlsxPPAatmetimoPriezastys`, 1,918
+distinct values) contains no lateness-related wording either (checked for `vėlav`, `pavėluot`, `po termino`,
+`pasibaigus terminui`). Without a submission-time signal there is nothing to compare against the tender deadline, so the
+indicator would only ever produce `insufficient_data`. Revisit if a data source carrying bid submission timestamps is
+ever ingested.
 
 ### 4.2 Contract Risk Decision Service (17)
 
