@@ -117,7 +117,7 @@ describe("RiskDecisionEngine", () => {
         const procurement = testProcurement({ pirkimoNumeris: "10", lots: [testLot("10", "1"), testLot("10", "2")] });
         const procurementIndicator = new TestIndicator({ subjectType: "procurement" });
         const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
-        const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator]);
+        const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator], CONTEXT);
 
         engine.evaluateAll([procurement]);
 
@@ -136,9 +136,9 @@ describe("RiskDecisionEngine", () => {
     it("isolates a failing indicator: the other indicator's signals are unaffected", () => {
         const failing = new TestIndicator({ key: { id: "LT-TEST-FAIL", version: 1 } }, { shouldThrow: true });
         const healthy = new TestIndicator();
-        const engine = new RiskDecisionEngine([failing, healthy]);
+        const engine = new RiskDecisionEngine([failing, healthy], CONTEXT);
 
-        const signals = engine.evaluateAll([testProcurement()]);
+        const signals = engine.evaluateAll([testProcurement()]).flatMap((d) => d.signals);
 
         expect(signals.find((s) => s.indicatorId === "LT-TEST-FAIL")).toBeUndefined();
         const healthySignal = signals.find((s) => s.indicatorId === "LT-TEST-01");
@@ -149,7 +149,7 @@ describe("RiskDecisionEngine", () => {
         const procurement = testProcurement({ pirkimoNumeris: "20", lots: [testLot("20", "1")] });
         const procurementIndicator = new TestIndicator({ subjectType: "procurement" });
         const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
-        const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator]);
+        const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator], CONTEXT);
 
         engine.evaluateAll([procurement]);
 
@@ -159,7 +159,7 @@ describe("RiskDecisionEngine", () => {
 
     it("calls assessRisk exactly once per (indicator, subject) pair across the whole run", () => {
         const indicator = new TestIndicator();
-        const engine = new RiskDecisionEngine([indicator]);
+        const engine = new RiskDecisionEngine([indicator], CONTEXT);
 
         engine.evaluateAll([testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]);
 
@@ -170,7 +170,7 @@ describe("RiskDecisionEngine", () => {
         const lot = testLot("30", "1", [testBid("B1"), testBid("B2")]);
         const procurement = testProcurement({ pirkimoNumeris: "30", lots: [lot] });
         const bidIndicator = new TestIndicator({ key: { id: "LT-TEST-03", version: 1 }, subjectType: "bid" });
-        const engine = new RiskDecisionEngine([bidIndicator]);
+        const engine = new RiskDecisionEngine([bidIndicator], CONTEXT);
 
         engine.evaluateAll([procurement]);
 
@@ -191,7 +191,7 @@ describe("RiskDecisionEngine", () => {
         const procurementIndicator = new TestIndicator({ subjectType: "procurement" });
         const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
         const bidIndicator = new TestIndicator({ key: { id: "LT-TEST-03", version: 1 }, subjectType: "bid" });
-        const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator, bidIndicator]);
+        const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator, bidIndicator], CONTEXT);
 
         engine.evaluateAll([procurement]);
 
@@ -205,9 +205,9 @@ describe("RiskDecisionEngine", () => {
         const lot = testLot("50", "1", [testBid("B1")]);
         const procurement = testProcurement({ pirkimoNumeris: "50", lots: [lot] });
         const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
-        const engine = new RiskDecisionEngine([lotIndicator]);
+        const engine = new RiskDecisionEngine([lotIndicator], CONTEXT);
 
-        const signals = engine.evaluateAll([procurement]);
+        const signals = engine.evaluateAll([procurement]).flatMap((d) => d.signals);
 
         expect(signals.every((s) => s.subjectType !== "bid")).toBe(true);
     });

@@ -169,8 +169,6 @@ export abstract class ARiskIndicatorDecision<
             indicatorVersion: this.version,
             subjectType: subject.subjectType,
             subjectKey: subject.subjectKey,
-            procurementSource: subject.procurementSource,
-            procurementId: subject.procurementId,
             state: partial.state,
             rawValue: partial.rawValue ?? null,
             threshold: partial.threshold ?? null,

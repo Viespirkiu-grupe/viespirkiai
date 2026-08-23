@@ -111,11 +111,11 @@ describe("LtOth05Decision.assessRisk", () => {
 });
 
 describe("LtOth05Decision end to end (through RiskDecisionEngine, no database)", () => {
-    const engine = new RiskDecisionEngine([ltOth05v1]);
+    const engine = new RiskDecisionEngine([ltOth05v1], CONTEXT);
 
     it("assembles a complete signal from a Procurement carrying merged procedure-outcome data", () => {
         const procurement = testProcurement(oneLotNoBids);
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal).toMatchObject({
             indicatorId: "LT-OTH-05",
             subjectType: "procurement",
@@ -126,7 +126,7 @@ describe("LtOth05Decision end to end (through RiskDecisionEngine, no database)",
 
     it("reports insufficient_data when no procedure-ending decision was observed for the procurement", () => {
         const procurement = testProcurement(null);
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal.state).toBe("insufficient_data");
         expect(signal.missingData).toEqual(["proceduruPabaiga"]);
     });

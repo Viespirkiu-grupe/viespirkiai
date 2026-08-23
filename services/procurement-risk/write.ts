@@ -1,53 +1,50 @@
 import type { PoolClient } from "pg";
-import type { RiskSignal } from "../../modules/risk/types.ts";
+import type { ProcurementRiskDecisions } from "../../modules/risk/types.ts";
 
-export type WriteStats = Readonly<{ inserted: number }>;
+export type WriteStats = Readonly<{ written: number }>;
 
 /**
- * The Risk Signals Writer (risk-service-architecture.md §6.2): the
- * single place that turns validated observations into rows.
+ * The Decision Writer's raw SQL (risk-service-architecture.md §2.4): the
+ * single place that turns a page's ProcurementRiskDecisions into rows.
  *
- * `risk.risk_signals` is insert-only. One run writes one immutable snapshot,
- * the site reads exactly one run, and superseded snapshots are deleted whole
- * by the retention job — so there is no current-state pointer to maintain, no
- * column comparison and nothing for a later run to modify. The `risk_rw` role
- * holds no UPDATE or DELETE on the table, so that is enforced rather than
- * merely intended.
+ * `risk.risk_procurement_decisions` is current-state, not a snapshot: one row
+ * per procurement, refreshed in place by `INSERT … ON CONFLICT DO UPDATE` on
+ * the natural key (procurement_source, procurement_id). `signals` is replaced
+ * whole — a refresh re-evaluates every deployed indicator for that
+ * procurement, so the array is always internally consistent. `created_at` is
+ * deliberately left out of the `DO UPDATE SET` list, so it only ever fires
+ * once, on first insert; `updated_at` advances on every refresh.
  *
  * Indicator-independent: adding a Risk Indicator writes no SQL of its own.
  * Runs inside the caller's transaction, so a failing indicator contributes no
- * partial rows to the snapshot.
+ * partial rows to the page.
  */
-export async function writeObservations(
+export async function writeDecisions(
     client: PoolClient,
     runId: number,
-    observations: readonly RiskSignal[],
+    decisions: readonly ProcurementRiskDecisions[],
 ): Promise<WriteStats> {
-    if (observations.length === 0) {
-        return { inserted: 0 };
+    if (decisions.length === 0) {
+        return { written: 0 };
     }
 
     const { rowCount } = await client.query(
         `
-        INSERT INTO risk.risk_signals (
-            run_id, subject_type, subject_key, procurement_source, procurement_id,
-            indicator_id, indicator_version, applied_parameters,
-            state, raw_value, threshold, missing_data,
-            data_as_of
+        INSERT INTO risk.risk_procurement_decisions (
+            procurement_source, procurement_id, run_id, signals, data_as_of
         )
-        SELECT $2, "subjectType", "subjectKey", "procurementSource", "procurementId",
-               "indicatorId", "indicatorVersion", "appliedParameters",
-               "state", "rawValue", "threshold", "missingData",
-               "dataAsOf"::timestamptz
+        SELECT "procurementSource", "procurementId", $2, "signals"::jsonb, "dataAsOf"::timestamptz
         FROM jsonb_to_recordset($1::jsonb) AS t(
-            "subjectType" text, "subjectKey" text, "procurementSource" text, "procurementId" text,
-            "indicatorId" text, "indicatorVersion" integer, "appliedParameters" jsonb,
-            "state" text, "rawValue" jsonb, "threshold" jsonb, "missingData" jsonb,
-            "dataAsOf" text
+            "procurementSource" text, "procurementId" text, "signals" jsonb, "dataAsOf" text
         )
+        ON CONFLICT (procurement_source, procurement_id) DO UPDATE SET
+            run_id = excluded.run_id,
+            signals = excluded.signals,
+            data_as_of = excluded.data_as_of,
+            updated_at = now()
         `,
-        [JSON.stringify(observations), runId],
+        [JSON.stringify(decisions), runId],
     );
 
-    return { inserted: rowCount ?? 0 };
+    return { written: rowCount ?? 0 };
 }

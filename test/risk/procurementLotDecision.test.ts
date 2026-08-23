@@ -169,8 +169,6 @@ describe("AProcurementIndicatorDecision", () => {
             indicatorVersion: 3,
             subjectType: "procurement",
             subjectKey: "cvpis:1",
-            procurementSource: "cvpis",
-            procurementId: "1",
             state: "triggered",
             rawValue: { measured: 4 },
             threshold: { threshold: 10 },

@@ -1,30 +1,20 @@
 import type { Pool, PoolClient } from "pg";
-import type { RiskSignal } from "../../modules/risk/types.ts";
-import { writeObservations } from "./write.ts";
-
-export type RunStatus = "running" | "succeeded" | "partial" | "failed";
-
-export type EvaluationRun = Readonly<{
-    runId: number;
-    status: RunStatus;
-    dataAsOf: string;
-    codeCommit: string;
-    statistics: Record<string, unknown>;
-}>;
+import type { EvaluationRun, ProcurementRiskDecisions } from "../../modules/risk/types.ts";
+import { writeDecisions } from "./write.ts";
 
 /**
- * The Signal Writer (docs/indicators-story/risk-service-architecture-v2.md
- * §1.2): wraps write.ts's indicator-independent writeObservations() with the
+ * The Decision Writer (docs/indicators-story/risk-service-architecture.md
+ * §1.2): wraps write.ts's indicator-independent writeDecisions() with the
  * run lifecycle. One instance per run.
  *
  * updateEvaluationRun upserts: the first call (no run open yet) INSERTs the
- * risk.evaluation_runs row; every later call UPDATEs it — accumulating
+ * risk.risk_evaluation_runs row; every later call UPDATEs it — accumulating
  * per-indicator stats across pages as services/procurement-risk/runJob.ts
  * loops the Procurement Reader's pages. No crash recovery, no retry: a
  * process crash mid-run leaves the row 'running', closed as 'failed' by
  * runJob.ts's closeStaleRunningRuns() on the next process start.
  */
-export class SignalWriter {
+export class DecisionWriter {
     private readonly pool: Pool;
     private evaluationRun: EvaluationRun | null = null;
 
@@ -34,19 +24,19 @@ export class SignalWriter {
 
     get runId(): number {
         if (this.evaluationRun === null) {
-            throw new Error("SignalWriter: no run open yet — call updateEvaluationRun first");
+            throw new Error("DecisionWriter: no run open yet — call updateEvaluationRun first");
         }
         return this.evaluationRun.runId;
     }
 
     /** One DB transaction per call. */
-    async writeRiskSignals(signals: readonly RiskSignal[]): Promise<number> {
+    async writeDecisions(decisions: readonly ProcurementRiskDecisions[]): Promise<number> {
         const client: PoolClient = await this.pool.connect();
         try {
             await client.query("BEGIN");
-            const { inserted } = await writeObservations(client, this.runId, signals);
+            const { written } = await writeDecisions(client, this.runId, decisions);
             await client.query("COMMIT");
-            return inserted;
+            return written;
         } catch (err) {
             await client.query("ROLLBACK");
             throw err;
@@ -58,7 +48,7 @@ export class SignalWriter {
     async updateEvaluationRun(update: Partial<Omit<EvaluationRun, "runId">>): Promise<EvaluationRun> {
         if (this.evaluationRun === null) {
             const { rows } = await this.pool.query<{ id: number }>(
-                `INSERT INTO risk.evaluation_runs (data_as_of, code_commit, status, statistics)
+                `INSERT INTO risk.risk_evaluation_runs (data_as_of, code_commit, status, statistics)
                  VALUES ($1, $2, $3, $4) RETURNING id`,
                 [update.dataAsOf, update.codeCommit, update.status ?? "running", JSON.stringify(update.statistics ?? {})],
             );
@@ -74,7 +64,7 @@ export class SignalWriter {
 
         const merged: EvaluationRun = { ...this.evaluationRun, ...update };
         await this.pool.query(
-            `UPDATE risk.evaluation_runs
+            `UPDATE risk.risk_evaluation_runs
              SET status = $2,
                  finished_at = CASE WHEN $2 IN ('succeeded', 'partial', 'failed') THEN now() ELSE finished_at END,
                  statistics = $3

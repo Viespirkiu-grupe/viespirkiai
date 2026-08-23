@@ -1,32 +1,42 @@
-// Integration tests for the Risk Signals Writer (services/procurement-risk/
-// write.ts) and the retention job, against the local risk-dev Postgres.
-// Protects the storage decision docs/indicators-story/risk-service-
-// architecture.md §6.2 depends on: risk_signals is insert-only, one run is one
-// immutable snapshot, the site reads exactly one run, and superseded snapshots
-// are deleted whole.
+// Integration tests for the Decision Writer (services/procurement-risk/
+// write.ts), against the local risk-dev Postgres. Protects the storage
+// decision docs/indicators-story/risk-service-architecture.md §2.4 depends
+// on: risk_procurement_decisions is current-state, one row per procurement,
+// refreshed in place by INSERT ... ON CONFLICT DO UPDATE.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { PoolClient } from "pg";
 import { riskDb } from "../../postgres/riskDb.js";
-import { writeObservations } from "../../services/procurement-risk/write.ts";
-import { deleteExpiredSnapshots } from "../../services/procurement-risk/retention.ts";
-import type { RiskSignal } from "../../modules/risk/types.ts";
+import { writeDecisions } from "../../services/procurement-risk/write.ts";
+import type { ProcurementRiskDecisions, RiskSignal } from "../../modules/risk/types.ts";
 
 const INDICATOR_ID = "LT-WRITE-TEST-01";
 
-function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
+function signal(overrides: Partial<RiskSignal> = {}): RiskSignal {
     return {
         indicatorId: INDICATOR_ID,
         indicatorVersion: 1,
         subjectType: "procurement",
         subjectKey: "cvpis:1",
-        procurementSource: "cvpis",
-        procurementId: "1",
         state: "triggered",
         rawValue: { a: 1 },
         threshold: { a: 1 },
         appliedParameters: { a: 1 },
         missingData: [],
         dataAsOf: "2026-08-12T00:00:00.000Z",
+        ...overrides,
+    };
+}
+
+function decisions(overrides: Partial<ProcurementRiskDecisions> = {}): ProcurementRiskDecisions {
+    const now = new Date();
+    return {
+        procurementSource: "cvpis",
+        procurementId: "1",
+        runId: 0,
+        signals: [signal()],
+        dataAsOf: "2026-08-12T00:00:00.000Z",
+        createdAt: now,
+        updatedAt: now,
         ...overrides,
     };
 }
@@ -46,44 +56,35 @@ async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promi
     }
 }
 
-async function signalsOfRun(runId: number) {
+async function decisionsFor(procurementSource: string, procurementId: string) {
     const { rows } = await riskDb.query(
-        `SELECT * FROM risk.risk_signals WHERE run_id = $1 ORDER BY subject_key`,
-        [runId],
-    );
-    return rows;
-}
-
-async function allTestSignals() {
-    const { rows } = await riskDb.query(
-        `SELECT * FROM risk.risk_signals WHERE indicator_id = $1 ORDER BY run_id, subject_key`,
-        [INDICATOR_ID],
+        `SELECT * FROM risk.risk_procurement_decisions WHERE procurement_source = $1 AND procurement_id = $2`,
+        [procurementSource, procurementId],
     );
     return rows;
 }
 
 // These tests don't exercise the run open/close lifecycle, so runs are
 // inserted pre-closed to avoid colliding with the partial unique index on
-// status = 'running'. `startedAt` lets a run be aged for the retention tests.
-async function openRun(startedAt = "now()"): Promise<number> {
+// status = 'running'.
+async function openRun(): Promise<number> {
     const { rows } = await riskDb.query<{ id: number }>(
-        `INSERT INTO risk.evaluation_runs (data_as_of, code_commit, status, started_at)
-         VALUES (now(), 'test', 'succeeded', ${startedAt === "now()" ? "now()" : "$1::timestamptz"})
+        `INSERT INTO risk.risk_evaluation_runs (data_as_of, code_commit, status)
+         VALUES (now(), 'test', 'succeeded')
          RETURNING id`,
-        startedAt === "now()" ? [] : [startedAt],
     );
     return rows[0].id;
 }
 
-// Clears the whole sandbox schema, not just this file's rows: `v_latest_run`
-// is a property of the runs table as a whole, so a leftover run from a manual
-// `npm run risk:run` would otherwise decide which snapshot these tests see.
-// The DELETE grant on risk.evaluation_runs that makes this possible is
-// test-only — see migrations/risk/test/000_grants.sql; nothing may delete a
-// run in production.
+// Clears the whole sandbox schema, not just this file's rows: v_latest_run
+// is a property of the runs table as a whole, so a leftover run from a
+// manual `npm run risk:run` would otherwise decide which row's provenance
+// these tests see. The DELETE grant this relies on is test-only — see
+// migrations/risk/test/000_grants.sql; nothing may delete a row in
+// production, rows are only ever overwritten.
 async function cleanUp(): Promise<void> {
-    await riskDb.query(`DELETE FROM risk.risk_signals`);
-    await riskDb.query(`DELETE FROM risk.evaluation_runs`);
+    await riskDb.query(`DELETE FROM risk.risk_procurement_decisions`);
+    await riskDb.query(`DELETE FROM risk.risk_evaluation_runs`);
 }
 
 beforeAll(cleanUp);
@@ -92,80 +93,77 @@ afterAll(async () => {
     await riskDb.end();
 });
 
-describe("Risk Signals Writer", () => {
-    it("appends the observations of one indicator to the run's snapshot", async () => {
+describe("Decision Writer", () => {
+    it("inserts one row per procurement", async () => {
         const runId = await openRun();
         const stats = await withTransaction((client) =>
-            writeObservations(client, runId, [
-                observation({ subjectKey: "cvpis:1" }),
-                observation({ subjectKey: "cvpis:2" }),
+            writeDecisions(client, runId, [
+                decisions({ procurementId: "1" }),
+                decisions({ procurementId: "2" }),
             ]),
         );
-        expect(stats).toEqual({ inserted: 2 });
+        expect(stats).toEqual({ written: 2 });
 
-        const rows = await signalsOfRun(runId);
-        expect(rows).toHaveLength(2);
-        expect(rows[0].run_id).toBe(String(runId));
-        expect(rows[0].state).toBe("triggered");
+        expect(await decisionsFor("cvpis", "1")).toHaveLength(1);
+        expect(await decisionsFor("cvpis", "2")).toHaveLength(1);
     });
 
-    it("writes nothing for an indicator that produced no observations", async () => {
+    it("writes nothing for an empty page", async () => {
         const runId = await openRun();
-        const stats = await withTransaction((client) => writeObservations(client, runId, []));
-        expect(stats).toEqual({ inserted: 0 });
-        expect(await signalsOfRun(runId)).toHaveLength(0);
+        const stats = await withTransaction((client) => writeDecisions(client, runId, []));
+        expect(stats).toEqual({ written: 0 });
     });
 
-    // The point of the model: an unchanged result is written again rather than
-    // compared, so each run's snapshot stands alone.
-    it("keeps each run's rows separate, leaving the previous snapshot untouched", async () => {
+    // The point of the model: a later run refreshes the same procurement's row
+    // in place rather than appending a new one.
+    it("refreshes an existing procurement's row in place, keeping created_at and advancing updated_at", async () => {
         const runId1 = await openRun();
-        await withTransaction((client) => writeObservations(client, runId1, [observation()]));
-        const first = await signalsOfRun(runId1);
+        await withTransaction((client) => writeDecisions(client, runId1, [decisions({ signals: [signal({ state: "triggered" })] })]));
+        const [first] = await decisionsFor("cvpis", "1");
 
         const runId2 = await openRun();
         await withTransaction((client) =>
-            writeObservations(client, runId2, [observation({ state: "not_triggered" })]),
+            writeDecisions(client, runId2, [decisions({ signals: [signal({ state: "not_triggered" })] })]),
         );
+        const rows = await decisionsFor("cvpis", "1");
 
-        expect(await signalsOfRun(runId1)).toEqual(first);
-        expect((await signalsOfRun(runId2))[0].state).toBe("not_triggered");
-        expect(await allTestSignals()).toHaveLength(2);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].run_id).toBe(String(runId2));
+        expect(rows[0].signals[0].state).toBe("not_triggered");
+        expect(rows[0].created_at).toEqual(first.created_at);
+        expect(new Date(rows[0].updated_at).getTime()).toBeGreaterThanOrEqual(new Date(first.updated_at).getTime());
     });
 
-    it("rejects two results for the same subject and indicator within one run", async () => {
+    it("holds every signal for a procurement (procurement, lot and bid grains) as one jsonb array", async () => {
+        const runId = await openRun();
+        const mixedSignals = [
+            signal({ subjectType: "procurement", subjectKey: "cvpis:1" }),
+            signal({ subjectType: "lot", subjectKey: "cvpis:1:1" }),
+            signal({ subjectType: "bid", subjectKey: "cvpis:1:1:B1" }),
+        ];
+        await withTransaction((client) => writeDecisions(client, runId, [decisions({ signals: mixedSignals })]));
+
+        const [row] = await decisionsFor("cvpis", "1");
+        expect(row.signals).toHaveLength(3);
+        expect(row.signals.map((s: RiskSignal) => s.subjectType).sort()).toEqual(["bid", "lot", "procurement"]);
+    });
+
+    it("rejects two procurements with the same natural key in one call", async () => {
         const runId = await openRun();
         await expect(
             withTransaction((client) =>
-                writeObservations(client, runId, [observation(), observation()]),
+                writeDecisions(client, runId, [decisions({ procurementId: "1" }), decisions({ procurementId: "1" })]),
             ),
-        ).rejects.toThrow(/risk_signals_run_subject_idx|duplicate key/);
-    });
-
-    it("contains a failing indicator: its rows are absent, others' remain", async () => {
-        const runId = await openRun();
-        await withTransaction((client) => writeObservations(client, runId, [observation()]));
-
-        await expect(
-            withTransaction(async (client) => {
-                await writeObservations(client, runId, [
-                    observation({ indicatorId: "LT-WRITE-TEST-02" }),
-                ]);
-                throw new Error("indicator failed after writing");
-            }),
-        ).rejects.toThrow(/indicator failed/);
-
-        const rows = await signalsOfRun(runId);
-        expect(rows.map((r) => r.indicator_id)).toEqual([INDICATOR_ID]);
+        ).rejects.toThrow(/risk_procurement_decisions_natural_key|duplicate key|ON CONFLICT/);
     });
 });
 
 describe("risk.v_latest_run", () => {
     it("is the newest completed run, ignoring one still running", async () => {
-        const older = await openRun("2026-01-01T00:00:00Z");
+        const older = await openRun();
         const newer = await openRun();
         await riskDb.query(
-            `INSERT INTO risk.evaluation_runs (data_as_of, code_commit, status) VALUES (now(), 'test', 'running')`,
+            `INSERT INTO risk.risk_evaluation_runs (data_as_of, code_commit, status) VALUES (now(), 'test', 'running')`,
         );
 
         const { rows } = await riskDb.query<{ id: string }>(`SELECT id FROM risk.v_latest_run`);
@@ -174,41 +172,29 @@ describe("risk.v_latest_run", () => {
     });
 });
 
-describe("retention", () => {
-    it("deletes the signals of a superseded run past the window", async () => {
-        const old = await openRun("2026-01-01T00:00:00Z");
-        await withTransaction((client) => writeObservations(client, old, [observation()]));
-        const current = await openRun();
-        await withTransaction((client) => writeObservations(client, current, [observation()]));
+describe("risk.v_procurement_summaries", () => {
+    it("computes per-procurement counts from that row's own signals", async () => {
+        const runId = await openRun();
+        await withTransaction((client) =>
+            writeDecisions(client, runId, [
+                decisions({
+                    procurementId: "1",
+                    signals: [
+                        signal({ state: "triggered", indicatorId: "LT-WRITE-TEST-01" }),
+                        signal({ state: "not_triggered", indicatorId: "LT-WRITE-TEST-02" }),
+                        signal({ state: "insufficient_data", indicatorId: "LT-WRITE-TEST-03" }),
+                    ],
+                }),
+            ]),
+        );
 
-        const stats = await withTransaction(deleteExpiredSnapshots);
-
-        expect(stats).toEqual({ runsCleared: 1, signalsDeleted: 1 });
-        expect(await signalsOfRun(old)).toHaveLength(0);
-        expect(await signalsOfRun(current)).toHaveLength(1);
-    });
-
-    // The safety belt: after a long outage the newest successful run is itself
-    // past the window, and emptying the public pages would be worse than
-    // serving stale ones.
-    it("never deletes the run the site is showing, however old it is", async () => {
-        const onlyRun = await openRun("2026-01-01T00:00:00Z");
-        await withTransaction((client) => writeObservations(client, onlyRun, [observation()]));
-
-        const stats = await withTransaction(deleteExpiredSnapshots);
-
-        expect(stats).toEqual({ runsCleared: 0, signalsDeleted: 0 });
-        expect(await signalsOfRun(onlyRun)).toHaveLength(1);
-    });
-
-    it("keeps the run rows themselves, as the provenance of past signals", async () => {
-        const old = await openRun("2026-01-01T00:00:00Z");
-        await withTransaction((client) => writeObservations(client, old, [observation()]));
-        await openRun();
-
-        await withTransaction(deleteExpiredSnapshots);
-
-        const { rows } = await riskDb.query(`SELECT id FROM risk.evaluation_runs WHERE id = $1`, [old]);
+        const { rows } = await riskDb.query(
+            `SELECT * FROM risk.v_procurement_summaries WHERE procurement_source = 'cvpis' AND procurement_id = '1'`,
+        );
         expect(rows).toHaveLength(1);
+        expect(Number(rows[0].triggered_count)).toBe(1);
+        expect(Number(rows[0].insufficient_data_count)).toBe(1);
+        expect(Number(rows[0].evaluated_count)).toBe(3);
+        expect(rows[0].triggered_indicators).toEqual(["LT-WRITE-TEST-01"]);
     });
 });

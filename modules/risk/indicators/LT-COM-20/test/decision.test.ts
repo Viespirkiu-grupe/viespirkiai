@@ -115,11 +115,11 @@ describe("LtCom20Decision.assessRisk", () => {
 });
 
 describe("LtCom20Decision end to end (through RiskDecisionEngine, no database)", () => {
-    const engine = new RiskDecisionEngine([ltCom20v1]);
+    const engine = new RiskDecisionEngine([ltCom20v1], CONTEXT);
 
     it("assembles a complete signal from a Procurement carrying a lot with a withdrawn bid", () => {
         const procurement = testProcurement({ lots: [testLot([withdrawnBid])] });
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal).toMatchObject({
             indicatorId: "LT-COM-20",
             subjectType: "bid",
@@ -130,27 +130,27 @@ describe("LtCom20Decision end to end (through RiskDecisionEngine, no database)",
 
     it("reports insufficient_data when the bid carries no ranking and no rejection outcome", () => {
         const procurement = testProcurement({ lots: [testLot([noOutcomeBid])] });
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal.state).toBe("insufficient_data");
         expect(signal.missingData).toEqual(["eileNumeris", "atmetimoStatusas"]);
     });
 
     it("reports the shared eligibility gate's signal for a non-cvpis procurement, without needing bid data", () => {
         const procurement = testProcurement({ saltinis: "cvpp", pirkimoBudas: null, lots: [testLot([withdrawnBid])] });
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal.state).toBe("not_applicable");
     });
 
     it("emits one signal per bid when a lot has several bidders", () => {
         const procurement = testProcurement({ lots: [testLot([withdrawnBid, rankedBid, rejectedForCauseBid])] });
-        const signals = engine.evaluateAll([procurement]);
+        const signals = engine.evaluateAll([procurement])[0].signals;
         expect(signals).toHaveLength(3);
         expect(signals.map((s) => s.state).sort()).toEqual(["not_triggered", "not_triggered", "triggered"]);
     });
 
     it("never evaluates a lot with no observed bids", () => {
         const procurement = testProcurement({ lots: [testLot([])] });
-        const signals = engine.evaluateAll([procurement]);
+        const signals = engine.evaluateAll([procurement])[0].signals;
         expect(signals).toHaveLength(0);
     });
 });

@@ -5,7 +5,7 @@
 GRANT ALL ON SCHEMA public TO risk_rw;
 
 -- Also local-only: lets test suites DELETE their own fixture rows between
--- runs. Production risk_rw already holds DELETE on risk.risk_signals
--- (risk-service-architecture.md §1.2); risk.evaluation_runs has no production
--- DELETE grant, so that part of this grant is test-only.
-GRANT DELETE ON risk.risk_signals, risk.evaluation_runs TO risk_rw;
+-- runs. Under the upsert model risk_rw holds no production DELETE at all —
+-- rows are overwritten, never removed — so both grants below are entirely
+-- test-only.
+GRANT DELETE ON risk.risk_procurement_decisions, risk.risk_evaluation_runs TO risk_rw;

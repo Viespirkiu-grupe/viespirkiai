@@ -99,11 +99,11 @@ describe("LtCom03Decision.assessRisk", () => {
 });
 
 describe("LtCom03Decision end to end (through RiskDecisionEngine, no database)", () => {
-    const engine = new RiskDecisionEngine([ltCom03v1]);
+    const engine = new RiskDecisionEngine([ltCom03v1], CONTEXT);
 
     it("assembles a complete signal from a Procurement carrying merged cross-lot participation", () => {
         const procurement = testProcurement(oneSupplier);
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal).toMatchObject({
             indicatorId: "LT-COM-03",
             subjectType: "procurement",
@@ -114,7 +114,7 @@ describe("LtCom03Decision end to end (through RiskDecisionEngine, no database)",
 
     it("reports insufficient_data when no participation was observed for the procurement", () => {
         const procurement = testProcurement(null);
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal.state).toBe("insufficient_data");
         expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });

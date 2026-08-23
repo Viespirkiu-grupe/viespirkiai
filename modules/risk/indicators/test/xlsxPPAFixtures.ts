@@ -63,12 +63,13 @@ export async function insertPasiulymas(params: {
     ataskaitaId: number;
     daliesNumeris: string | null;
     dalyvioKodas: string;
+    eileNumeris?: number;
     kaina?: string;
 }): Promise<void> {
     await riskDb.query(
-        `INSERT INTO public."xlsxPPApasiulymuEile" ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "kaina")
-         VALUES ($1, $2, $3, $4)`,
-        [params.ataskaitaId, params.daliesNumeris, params.dalyvioKodas, params.kaina ?? "1000"],
+        `INSERT INTO public."xlsxPPApasiulymuEile" ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "eileNumeris", "kaina")
+         VALUES ($1, $2, $3, $4, $5)`,
+        [params.ataskaitaId, params.daliesNumeris, params.dalyvioKodas, params.eileNumeris ?? null, params.kaina ?? "1000"],
     );
 }
 

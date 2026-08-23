@@ -323,7 +323,7 @@ describe("ProcurementReader bid-grain rows (Lot.bids)", () => {
             sukurtaAt: "2026-05-04T09:30:00Z",
         });
         await insertDalyvis({ ataskaitaId, kodas: "B1" });
-        await insertPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B1", kaina: "5000" });
+        await insertPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B1", eileNumeris: 1, kaina: "5000" });
         await insertDalyvis({ ataskaitaId, kodas: "B2" });
         await insertAtmestasPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B2", statusas: WITHDRAWN_STATUS });
 

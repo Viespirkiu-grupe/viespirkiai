@@ -6,8 +6,8 @@ import { riskIndicatorRegistry } from "../../modules/risk/deployedIndicators.ts"
 import { ProcurementReader } from "../../modules/risk/procurementReader.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
 import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
-import type { RiskSignal } from "../../modules/risk/types.ts";
-import { SignalWriter } from "./signalWriter.ts";
+import type { IndicatorStats, ProcurementRiskDecisions } from "../../modules/risk/types.ts";
+import { DecisionWriter } from "./decisionWriter.ts";
 
 export type RunJobOptions = Readonly<{
     codeCommit: string;
@@ -27,35 +27,38 @@ export type RunResult = Readonly<{
 
 const DEFAULT_PAGE_SIZE = 500;
 
-type IndicatorStats = Readonly<{ rows: number; triggered: number; inserted: number }>;
-
 /**
- * Groups one page's flat signal list by indicatorId and accumulates each
- * indicator's rows/triggered/inserted into the running per-indicator total.
- * RiskDecisionEngine.evaluateAll (riskDecisionEngine.ts) already isolates a
- * failing indicator's own computation per subject — it just contributes no
- * signal for that subject, logged, not surfaced here — so the only failure
- * this job itself still observes is a page's write failing as a whole (see
- * writePage below), which is why `inserted` can differ from `rows`.
+ * Groups one page's ProcurementRiskDecisions by indicatorId (via their own
+ * signals) and accumulates each indicator's rows/triggered/written into the
+ * running per-indicator total. RiskDecisionEngine.evaluateAll
+ * (riskDecisionEngine.ts) already isolates a failing indicator's own
+ * computation per subject — it just contributes no signal for that subject,
+ * logged, not surfaced here — so the only failure this job itself still
+ * observes is a page's write failing as a whole (see the write attempt in
+ * runEvaluation below), which is why `written` can differ from `rows`.
  */
 function mergeIndicatorStats(
     into: Record<string, IndicatorStats>,
-    pageSignals: readonly RiskSignal[],
-    inserted: boolean,
+    pageDecisions: readonly ProcurementRiskDecisions[],
+    written: boolean,
 ): void {
-    const byIndicator = new Map<string, RiskSignal[]>();
-    for (const signal of pageSignals) {
-        const bucket = byIndicator.get(signal.indicatorId) ?? [];
-        bucket.push(signal);
-        byIndicator.set(signal.indicatorId, bucket);
+    const byIndicator = new Map<string, number>();
+    const triggeredByIndicator = new Map<string, number>();
+    for (const decision of pageDecisions) {
+        for (const signal of decision.signals) {
+            byIndicator.set(signal.indicatorId, (byIndicator.get(signal.indicatorId) ?? 0) + 1);
+            if (signal.state === "triggered") {
+                triggeredByIndicator.set(signal.indicatorId, (triggeredByIndicator.get(signal.indicatorId) ?? 0) + 1);
+            }
+        }
     }
 
-    for (const [indicatorId, signals] of byIndicator) {
-        const prev = into[indicatorId] ?? { rows: 0, triggered: 0, inserted: 0 };
+    for (const [indicatorId, rows] of byIndicator) {
+        const prev = into[indicatorId] ?? { rows: 0, triggered: 0, written: 0 };
         into[indicatorId] = {
-            rows: prev.rows + signals.length,
-            triggered: prev.triggered + signals.filter((s) => s.state === "triggered").length,
-            inserted: prev.inserted + (inserted ? signals.length : 0),
+            rows: prev.rows + rows,
+            triggered: prev.triggered + (triggeredByIndicator.get(indicatorId) ?? 0),
+            written: prev.written + (written ? rows : 0),
         };
     }
 }
@@ -68,7 +71,7 @@ function mergeIndicatorStats(
  */
 async function closeStaleRunningRuns(): Promise<void> {
     const { rowCount } = await riskDb.query(
-        `UPDATE risk.evaluation_runs
+        `UPDATE risk.risk_evaluation_runs
          SET status = 'failed', finished_at = now(), error = 'closed at next service start: run left running'
          WHERE status = 'running'`,
     );
@@ -80,17 +83,18 @@ async function closeStaleRunningRuns(): Promise<void> {
 /**
  * Executes every Risk Indicator whose parameter timeline is in force as of
  * `dataAsOf` against every page the Procurement Reader loads
- * (risk-service-architecture-v2.md §1.2): opens one
- * run, loops pages until nextCursor is null, evaluates each page's
- * Procurements through the RiskDecisionEngine (one flat signal list per
- * page, spanning every indicator), writes that page's signals in one
- * transaction, and checkpoints per-indicator statistics after every page.
+ * (risk-service-architecture.md §1.2): opens one run, loops pages until
+ * nextCursor is null, evaluates each page's Procurements through the
+ * RiskDecisionEngine (one ProcurementRiskDecisions per procurement, spanning
+ * every indicator), upserts that page's decisions in one transaction, and
+ * checkpoints per-indicator statistics after every page.
  *
  * Per-indicator computation failures are contained by RiskDecisionEngine
  * itself (logged, that subject's signal just doesn't appear) and never reach
  * this job. What this job still isolates is a page's *write* failing as a
- * whole — the run closes `partial`, not `failed`, so already-written pages
- * for this and other runs stay untouched (risk.risk_signals is insert-only).
+ * whole — the run closes `partial`, not `failed`; every other page's rows,
+ * from this and other runs, stay untouched (a refresh is scoped to the
+ * procurements it actually re-evaluates).
  */
 export async function runEvaluation(options: RunJobOptions): Promise<RunResult> {
     await closeStaleRunningRuns();
@@ -100,10 +104,10 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
     const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
 
     // Calculations read the real database's `public` canonical facts; only
-    // the Signal Writer touches `riskDb`.
+    // the Decision Writer touches `riskDb`.
     const canonicalFacts = new PostgresRiskDataSource(postgres);
     const reader = new ProcurementReader(canonicalFacts, subjects, dataAsOf);
-    const writer = new SignalWriter(riskDb);
+    const writer = new DecisionWriter(riskDb);
 
     const openedRun = await writer.updateEvaluationRun({
         status: "running",
@@ -112,7 +116,7 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
         statistics: {},
     });
     const evaluationContext = new EvaluationContext({ runId: openedRun.runId, dataAsOf });
-    const engine = new RiskDecisionEngine(riskIndicatorRegistry.createAllIndicators(evaluationContext));
+    const engine = new RiskDecisionEngine(riskIndicatorRegistry.createAllIndicators(evaluationContext), evaluationContext);
 
     const statistics: Record<string, IndicatorStats> = {};
     let anyFailed = false;
@@ -120,21 +124,21 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
 
     do {
         const page = await reader.loadProcurements(cursor, pageSize);
-        const signals = engine.evaluateAll(page.items);
+        const decisions = engine.evaluateAll(page.items);
 
-        let inserted = true;
-        if (signals.length > 0) {
+        let written = true;
+        if (decisions.length > 0) {
             try {
-                await writer.writeRiskSignals(signals);
+                await writer.writeDecisions(decisions);
             } catch (err) {
-                inserted = false;
+                written = false;
                 anyFailed = true;
                 const message = err instanceof Error ? err.message : String(err);
-                log(`procurement-risk: failed writing a page's signals: ${message}`);
+                log(`procurement-risk: failed writing a page's decisions: ${message}`);
             }
         }
 
-        mergeIndicatorStats(statistics, signals, inserted);
+        mergeIndicatorStats(statistics, decisions, written);
         await writer.updateEvaluationRun({ statistics });
         cursor = page.nextCursor;
     } while (cursor !== null);

@@ -15,7 +15,6 @@
         "pirkimai:aprasyti": "node scripts/aprasytiPirkimus.js",
         "sutartys:aprasyti": "node scripts/aprasytiSutartis.js",
         "db:schema:dump": "node postgres/dumpSchema.js",
-        "risk:retention": "node services/procurement-risk/retentionJob.ts",
         "risk:run": "node services/procurement-risk/index.ts",
         "regitra:atnaujinti": "node modules/regitra/atnaujintiRegitra.js",
         "sodra:atnaujinti": "node modules/sodra/atnaujintiSodra.js",

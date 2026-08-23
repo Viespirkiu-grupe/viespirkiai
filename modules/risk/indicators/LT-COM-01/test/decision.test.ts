@@ -118,11 +118,11 @@ describe("LtCom01Decision.assessRisk", () => {
 });
 
 describe("LtCom01Decision end to end (through RiskDecisionEngine, no database)", () => {
-    const engine = new RiskDecisionEngine([ltCom01v1]);
+    const engine = new RiskDecisionEngine([ltCom01v1], CONTEXT);
 
     it("assembles a complete signal from a Procurement carrying a merged-participation lot", () => {
         const procurement = testProcurement({ lots: [testLot(singleBidder)] });
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal).toMatchObject({
             indicatorId: "LT-COM-01",
             subjectType: "lot",
@@ -133,14 +133,14 @@ describe("LtCom01Decision end to end (through RiskDecisionEngine, no database)",
 
     it("reports insufficient_data when no participation was observed for the lot", () => {
         const procurement = testProcurement({ lots: [testLot(null)] });
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal.state).toBe("insufficient_data");
         expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });
 
     it("reports the shared eligibility gate's signal for a non-cvpis procurement, without needing participation", () => {
         const procurement = testProcurement({ saltinis: "cvpp", pirkimoBudas: null, lots: [testLot(null)] });
-        const [signal] = engine.evaluateAll([procurement]);
+        const [signal] = engine.evaluateAll([procurement])[0].signals;
         expect(signal.state).toBe("not_applicable");
     });
 });

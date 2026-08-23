@@ -23,24 +23,52 @@ export type RiskIndicatorKey = Readonly<{
     version: number;
 }>;
 
-// v2's RiskSignal (architecture-v2.md §3.4), validated at runtime by
-// contracts.ts's riskSignalSchema. indicatorVersion is required even though
-// the v2 diagram's RiskSignal doesn't list it: risk.risk_signals requires it
-// NOT NULL, and the DB schema/Signal Writer already depend on this exact
-// shape.
+// RiskSignal (risk-service-architecture.md §2.3), validated at runtime by
+// contracts.ts's riskSignalSchema. Stored as an element of
+// risk.risk_procurement_decisions.signals (jsonb), never as its own row —
+// procurementSource/procurementId are held once on that row instead.
 export type RiskSignal = Readonly<{
     indicatorId: string;
     indicatorVersion: number;
     subjectType: SubjectType;
     subjectKey: string;
-    procurementSource: string | null;
-    procurementId: string | null;
     state: IndicatorState;
     rawValue: Readonly<Record<string, unknown>> | null;
     threshold: Readonly<Record<string, unknown>> | null;
     appliedParameters: Readonly<Record<string, unknown>> | null;
     missingData: readonly string[];
     dataAsOf: string;
+}>;
+
+// One procurement's whole risk picture (risk-service-architecture.md §2.3):
+// every RiskSignal the run produced for it, its lots and its bids, collected
+// by RiskDecisionEngine.evaluateAll (riskDecisionEngine.ts) and persisted by
+// the Decision Writer as one row in risk.risk_procurement_decisions, keyed by
+// (procurementSource, procurementId). runId/dataAsOf describe the run that
+// last refreshed the row; createdAt/updatedAt are best-effort placeholders
+// here — the upsert SQL (services/procurement-risk/write.ts) is the actual
+// authority on those two columns (DEFAULT now() on insert, now() on every
+// refresh, created_at otherwise untouched).
+export type ProcurementRiskDecisions = Readonly<{
+    procurementSource: string;
+    procurementId: string;
+    runId: number;
+    signals: readonly RiskSignal[];
+    dataAsOf: string;
+    createdAt: Date;
+    updatedAt: Date;
+}>;
+
+export type RunStatus = "running" | "succeeded" | "partial" | "failed";
+
+export type IndicatorStats = Readonly<{ rows: number; triggered: number; written: number }>;
+
+export type EvaluationRun = Readonly<{
+    runId: number;
+    status: RunStatus;
+    dataAsOf: string;
+    codeCommit: string;
+    statistics: Readonly<Record<string, IndicatorStats>>;
 }>;
 
 export type BaseParameters = Readonly<{

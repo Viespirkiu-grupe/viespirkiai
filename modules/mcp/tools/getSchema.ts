@@ -228,7 +228,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "daliesPavadinimas: dalies pavadinimas iš ATN-1 ataskaitos III.5 skilties (atn1pirkimoDalys); " +
             "NULL, jei ta skiltis nepildyta arba dalies numeris nerastas.\n" +
             "subjektoRaktas formatas 'saltinis:pirkimoNumeris:daliesNumeris' — tai rizikos rodiklių " +
-            "(risk.risk_signals) subjekto raktas; saltinis NULL (rakte — 'unknown') jei pirkimo " +
+            "(risk.risk_procurement_decisions) subjekto raktas; saltinis NULL (rakte — 'unknown') jei pirkimo " +
             "skelbimas dar neįkeltas (ATN-1 ataskaita gali aplenkti skelbimą).",
     },
     v_person_links: {
