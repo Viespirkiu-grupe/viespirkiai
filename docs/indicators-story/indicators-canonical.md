@@ -203,27 +203,63 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 | Code      | Canonical indicator                                     | Canonical category | Reference indicators                                                                                       | Note             |
 |-----------|---------------------------------------------------------|--------------------|------------------------------------------------------------------------------------------------------------|------------------|
 | LT-AWD-05 | Late bid accepted and won                               | Award              | OCP-R030                                                                                                   | Cannot implement |
-| LT-AWD-06 | Winner does not meet award criteria                     | Award              | OCP-R056                                                                                                   |                  |
-| LT-COM-16 | Similar bid documents                                   | Competition        | OCP-R041; OECD-BR-09; OECD-BR-10; OECD-BR-12; OECD-BR-14; OECD-BR-15; OECD-BR-39                           |                  |
-| LT-COM-17 | Bids submitted in suspiciously repeated order           | Competition        | OCP-R034; OECD-BR-18                                                                                       |                  |
-| LT-COM-20 | Unexpected or frequent bid withdrawal                   | Competition        | OECD-BR-04                                                                                                 |                  |
-| LT-COM-21 | Non-genuine, incomplete, or incapable bid               | Competition        | OECD-BR-13; OECD-BR-16; OECD-BR-32; OECD-BR-38; OECD-BR-46                                                 |                  |
-| LT-COM-23 | Bidder statements indicate collusion                    | Competition        | OECD-BR-33; OECD-BR-34; OECD-BR-35; OECD-BR-36; OECD-BR-37; OECD-BR-38; OECD-BR-39; OECD-BR-40; OECD-BR-41 |                  |
-| LT-PRI-02 | Line-item price anomalously high or low                 | Pricing            | OCP-R017                                                                                                   |                  |
-| LT-PRI-09 | Heavily discounted bid                                  | Pricing            | OCP-R058                                                                                                   |                  |
-| LT-PRI-11 | Supplier bid much higher than for a comparable contract | Pricing            | OECD-BR-27                                                                                                 |                  |
-| LT-PRI-12 | Anomalous geographic delivery or transport pricing      | Pricing            | OECD-BR-30; OECD-BR-31                                                                                     |                  |
+| LT-AWD-06 | Winner does not meet award criteria                     | Award              | OCP-R056                                                                                                   | Cannot implement |
+| LT-COM-16 | Similar bid documents                                   | Competition        | OCP-R041; OECD-BR-09; OECD-BR-10; OECD-BR-12; OECD-BR-14; OECD-BR-15; OECD-BR-39                           | Cannot implement |
+| LT-COM-17 | Bids submitted in suspiciously repeated order           | Competition        | OCP-R034; OECD-BR-18                                                                                       | Cannot implement |
+| LT-COM-20 | Unexpected or frequent bid withdrawal                   | Competition        | OECD-BR-04                                                                                                 | Accepted         |
+| LT-COM-21 | Non-genuine, incomplete, or incapable bid               | Competition        | OECD-BR-13; OECD-BR-16; OECD-BR-32; OECD-BR-38; OECD-BR-46                                                 | Accepted         |
+| LT-COM-23 | Bidder statements indicate collusion                    | Competition        | OECD-BR-33; OECD-BR-34; OECD-BR-35; OECD-BR-36; OECD-BR-37; OECD-BR-38; OECD-BR-39; OECD-BR-40; OECD-BR-41 | Cannot implement |
+| LT-PRI-02 | Line-item price anomalously high or low                 | Pricing            | OCP-R017                                                                                                   | Cannot implement |
+| LT-PRI-09 | Heavily discounted bid                                  | Pricing            | OCP-R058                                                                                                   | Accepted         |
+| LT-PRI-11 | Supplier bid much higher than for a comparable contract | Pricing            | OECD-BR-27                                                                                                 | Accepted         |
+| LT-PRI-12 | Anomalous geographic delivery or transport pricing      | Pricing            | OECD-BR-30; OECD-BR-31                                                                                     | Cannot implement |
 
 #### Cannot Implement Explanations
 
 **LT-AWD-05** — Late bid accepted and won: not implementable with currently ingested data. The only per-bid data source
 is the PPA procedure report (`v_dalyviai_v2`, backed by `xlsxPPAdalyviai` / `xlsxPPApasiulymuEile` /
 `xlsxPPAatmestiPasiulymai`), and none of its columns carry a bid-level submission timestamp — only `ataskaitosData`
-(report creation date, procurement-grain). The free-text rejection-reason lookup (`xlsxPPAatmetimoPriezastys`, 1,918
-distinct values) contains no lateness-related wording either (checked for `vėlav`, `pavėluot`, `po termino`,
-`pasibaigus terminui`). Without a submission-time signal there is nothing to compare against the tender deadline, so the
-indicator would only ever produce `insufficient_data`. Revisit if a data source carrying bid submission timestamps is
-ever ingested.
+(report creation date, procurement-grain). Without a submission-time signal there is nothing to compare against the
+tender deadline, so the indicator would only ever produce `insufficient_data`. Revisit if a data source carrying bid
+submission timestamps is ever ingested.
+
+**LT-AWD-06** — Winner does not meet award criteria: not implementable with currently ingested data. The planned
+`v_vertinimo_kriterijai` entity (backed by `xlsxPPAvertinimoKriterijai`) captures the award-criteria *definitions*
+applied to a lot, not a per-bidder compliance verdict against them. No ingested source records whether the winning bid
+actually satisfied each criterion — `v_dalyviai` only carries the resulting rank (`eileNumeris`) and, for rejected bids,
+a free-text rejection reason. Without a compliance-verdict signal the indicator would only ever produce
+`insufficient_data`. Revisit if a source carrying per-criterion compliance assessments is ever ingested.
+
+**LT-COM-16** — Similar bid documents: not implementable with currently ingested data. Every document table in the
+warehouse — `viesiejiPirkimaiFailai`, `cvppFailai`, `vpmSutartysFailai`, and the planned `v_dokumentas` — is keyed to a
+procurement or a contract, never to a bidder; they hold documents the buyer publishes (notices, tender dossiers, signed
+contracts), not the technical or financial proposals individual bidders submit. There is no per-bidder submission to
+compare for textual, formatting, or metadata similarity. Revisit if bidder-submitted proposal documents are ever
+ingested with a bidder attribution.
+
+**LT-COM-17** — Bids submitted in suspiciously repeated order: not implementable with currently ingested data, for the
+same underlying reason as LT-AWD-05. `v_dalyviai."eileNumeris"` (sourced from `xlsxPPApasiulymuEile`, "queue of
+proposals") is the post-evaluation price/score ranking used to infer the winner, not the chronological order in which
+bids were submitted or opened. No source carries a bid submission timestamp or sequence number, so a "repeated
+submission order" pattern cannot be distinguished from a "repeated final ranking" pattern with the data available.
+Revisit alongside LT-AWD-05 if submission-order data is ever ingested.
+
+**LT-COM-23** — Bidder statements indicate collusion: not implementable with currently ingested data. The only
+report-level fields that resemble a collusion signal — `konkurencijaIskreipiantisAsmuo` and `konkurencijosPriemones`
+on `xlsxPPAataskaitos` — record whether the buyer ran pre-tender market consultations and what came of them (606 of
+6,583 reports flag one; sampled `konkurencijosPriemones` values describe market research and consultations, not bidder
+conduct), not statements made by bidders during the procedure. No source captures bidder correspondence, minutes, or
+testimony. Revisit if a source carrying bidder statements or procedural minutes is ever ingested.
+
+**LT-PRI-02** — Line-item price anomalously high or low: not implementable with currently ingested data.
+`v_dalyviai."pasiulymoKaina"` is a single total bid price per (procurement, lot, bidder); no ingested source breaks a
+bid down into its constituent line items or unit prices — no such table exists in the warehouse. Revisit if a
+line-item/unit-price data source is ever ingested.
+
+**LT-PRI-12** — Anomalous geographic delivery or transport pricing: not implementable with currently ingested data. No
+ingested source records a delivery location, distance, or transport-cost component for a bid — `pasiulymoKaina` is one
+undifferentiated total, and `v_company."adresas"` is the supplier's registered address, not a delivery site. Revisit if
+delivery-location or transport-cost data is ever ingested.
 
 ### 4.2 Contract Risk Decision Service (17)
 
