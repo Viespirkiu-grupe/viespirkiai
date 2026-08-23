@@ -18,3 +18,4 @@ export {
     upsertDiscoveredActs,
 } from "./store/queue.js";
 export { saveDocument, saveEditionList } from "./store/documents.js";
+export { formatDiscovery, getActDiscoveries, recordDiscoveries, recordDocumentOutcome } from "./store/discovery.js";

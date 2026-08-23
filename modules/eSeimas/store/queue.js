@@ -1,7 +1,15 @@
 import { postgres } from "../../../postgres/postgres.js";
+import { recordDiscoveries } from "./discovery.js";
 
-/** Aktai, atrasti dienos paieškoje. Grąžina, kiek jų buvo nauji. */
-export async function upsertDiscoveredActs(items) {
+/**
+ * Aktai, atrasti dienos paieškoje. Grąžina, kiek jų buvo nauji.
+ *
+ * @param {Array} items - žali paieškos rezultatai
+ * @param {Object|null} [trace] - kai paduotas, atradimas surašomas į
+ *   "eSeimasActDiscovery" (`--trace`; žr. modules/eSeimas/atradimuSekimas.sql).
+ *   Laukai: `source`, `searchFrom`, `searchTo`, `page`, `pagination`.
+ */
+export async function upsertDiscoveredActs(items, trace = null) {
     const unique = new Map();
     for (const item of items) {
         if (item?.category && item?.id) unique.set(`${item.category}\0${item.id}`, item);
@@ -26,6 +34,13 @@ export async function upsertDiscoveredActs(items) {
          ON CONFLICT DO NOTHING RETURNING "category", "legalActId"`,
         [categories, ids],
     );
+
+    if (trace) {
+        // `queued` — tik pirmą kartą pamatyti aktai; pagal juos atradimo eilutė
+        // pasižymi `isNew`. Sekimo klaidos scrape'o nestabdo (žr. discovery.js).
+        const nauji = new Set(queued.map(row => `${row.category}\0${row.legalActId}`));
+        await recordDiscoveries({ ...trace, items: rows, nauji });
+    }
     return queued.length;
 }
 

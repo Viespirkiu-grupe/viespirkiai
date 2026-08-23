@@ -7,6 +7,8 @@ import { fmtBytes } from "../../utils/units.js";
 import {
     editionExists,
     ensureScrapeDaysForward,
+    formatDiscovery,
+    getActDiscoveries,
     getOldestScrapeDay,
     getScrapeStatus,
     markDayScraped,
@@ -14,12 +16,19 @@ import {
     pickActsToScrape,
     pickDaysToScrape,
     pickEditionsToScrape,
+    recordDocumentOutcome,
     recordEditionFailure,
     recordFailure,
     saveDocument,
     saveEditionList,
     upsertDiscoveredActs,
 } from "./eSeimasStore.js";
+import {
+    assertDayPromiseTable,
+    getDayPromiseStatus,
+    pickDaysWithoutPromise,
+    recordDayPromise,
+} from "./store/dayPromise.js";
 
 // e-Seimas scraper'is virš stateless e-Seimas API adapterio.
 //
@@ -96,7 +105,7 @@ const PASENĘS_TOKENAS = "historical_consolidated_edition_unavailable";
 const yraPasenęsTokenas = (error) =>
     error instanceof ESeimasNotFoundError && error.body?.error === PASENĘS_TOKENAS;
 
-export function createRunner({ api, sidecar, concurrency, force = false }) {
+export function createRunner({ api, sidecar, concurrency, force = false, trace = false }) {
     /** Atsakymas → sidecar → Postgres. Grąžina md5. */
     function store(payload) {
         return saveResponse(sidecar, payload);
@@ -121,7 +130,9 @@ export function createRunner({ api, sidecar, concurrency, force = false }) {
                 const response = await api.searchLegalActs({ from: day, to: day, page });
                 totalPages = response.pagination?.total_pages ?? 1;
                 seen += response.items?.length ?? 0;
-                discovered += await upsertDiscoveredActs(response.items ?? []);
+                discovered += await upsertDiscoveredActs(response.items ?? [], trace && {
+                    source: "day", searchFrom: day, searchTo: day, page, pagination: response.pagination,
+                });
                 page++;
             }
 
@@ -133,18 +144,32 @@ export function createRunner({ api, sidecar, concurrency, force = false }) {
             return { seen, discovered };
         },
 
-        /** 2 etapas: originalus dokumentas. */
-        async scrapeDocument(category, legalActId) {
+        /**
+         * 2 etapas: originalus dokumentas.
+         *
+         * Su `--trace` prie kiekvienos eilutės prikabinamas AKTO ATRADIMAS (iš
+         * kurios dienos paieškos, kurio puslapio ir kelintos eilutės jis atėjo,
+         * kiek rezultatų ta paieška žadėjo) ir rezultatas surašomas atgal į
+         * "eSeimasActDiscovery" — tam, kad matytųsi, iš kur imasi 404 aktai.
+         */
+        async scrapeDocument(category, legalActId, { attempt = 1 } = {}) {
             const started = Date.now();
+            const atradimai = trace ? await getActDiscoveries(category, legalActId, { limit: 1 }) : [];
             const payload = await api.getLegalAct(category, legalActId);
             const fetched = Date.now();
             const { keitimas } = await saveDocument(payload, {
                 category, md5: store(payload), mark: { stage: "document" }, force,
             });
+            if (trace) await recordDocumentOutcome(category, legalActId, "ok", { attempts: attempt });
             logRequest({
                 etapas: "dok ", id: `${category}/${legalActId}`, keitimas,
                 fetchMs: fetched - started, dbMs: Date.now() - fetched,
-                detalė: detalės(simboliai(payload), užklausos(payload)), pavadinimas: payload.title,
+                detalė: detalės(
+                    simboliai(payload), užklausos(payload),
+                    trace ? formatDiscovery(atradimai[0]) : null,
+                    attempt > 1 ? `${attempt} bandymas` : null,
+                ),
+                pavadinimas: payload.title,
             });
         },
 
@@ -249,7 +274,7 @@ export const STAGES = ["days", "documents", "editions", "asr", "historical"];
  * rikiuotės priekyje, užimtų visą `LIMIT` langą ir planuoklis gautų tuščią
  * porciją, nors darbo dar apstu (žr. runPipeline pabaigos sąlygą).
  */
-function stageSpecs(runner, { rescrapeDays }) {
+function stageSpecs(runner, { rescrapeDays, trace = false }) {
     return {
         days: {
             label: "dienos",
@@ -260,15 +285,25 @@ function stageSpecs(runner, { rescrapeDays }) {
             pick: (take, praleisti) =>
                 pickDaysToScrape({ limit: take, rescrapeOlderThanDays: rescrapeDays, exclude: praleisti }),
             work: day => runner.scrapeDay(day),
-            onError: (day, error) => log(`Diena ${day} nepavyko: ${error.message}`),
+            onError: (day, error, bandymai) => log(`Diena ${day} nepavyko po ${bandymai} bandymų: ${error.message}`),
         },
         documents: {
             label: "dokumentai",
             key: act => `${act.category}\0${act.legalActId}`,
             pick: (take, praleisti) => pickActsToScrape("document", { limit: take, exclude: praleisti }),
-            work: act => runner.scrapeDocument(act.category, act.legalActId),
-            onError: async (act, error) => {
-                log(`dokumentas ${act.category}/${act.legalActId} nepavyko: ${error.message}`);
+            work: (act, attempt) => runner.scrapeDocument(act.category, act.legalActId, { attempt }),
+            onError: async (act, error, bandymai) => {
+                // Su `--trace` prie klaidos parodom, iš kurios paieškos aktas
+                // apskritai atsirado — 404 kaltininko ieškom ten, ne čia.
+                const atradimas = trace
+                    ? ` [${formatDiscovery((await getActDiscoveries(act.category, act.legalActId, { limit: 1 }))[0])}]`
+                    : "";
+                log(`dokumentas ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų${atradimas}: ${error.message}`);
+                if (trace) {
+                    await recordDocumentOutcome(act.category, act.legalActId,
+                        error instanceof ESeimasNotFoundError ? "notFound" : "error",
+                        { attempts: bandymai, error });
+                }
                 await recordFailure(act.category, act.legalActId, error);
             },
         },
@@ -277,8 +312,8 @@ function stageSpecs(runner, { rescrapeDays }) {
             key: act => `${act.category}\0${act.legalActId}`,
             pick: (take, praleisti) => pickActsToScrape("editions", { limit: take, exclude: praleisti }),
             work: act => runner.scrapeEditionList(act.category, act.legalActId),
-            onError: async (act, error) => {
-                log(`redakcijų sąrašas ${act.category}/${act.legalActId} nepavyko: ${error.message}`);
+            onError: async (act, error, bandymai) => {
+                log(`redakcijų sąrašas ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų: ${error.message}`);
                 await recordFailure(act.category, act.legalActId, error);
             },
         },
@@ -287,8 +322,8 @@ function stageSpecs(runner, { rescrapeDays }) {
             key: act => `${act.category}\0${act.legalActId}`,
             pick: (take, praleisti) => pickActsToScrape("asr", { limit: take, exclude: praleisti }),
             work: act => runner.scrapeConsolidated(act.category, act.legalActId),
-            onError: async (act, error) => {
-                log(`suvestinė ${act.category}/${act.legalActId} nepavyko: ${error.message}`);
+            onError: async (act, error, bandymai) => {
+                log(`suvestinė ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų: ${error.message}`);
                 await recordFailure(act.category, act.legalActId, error);
             },
         },
@@ -297,8 +332,8 @@ function stageSpecs(runner, { rescrapeDays }) {
             key: edition => `${edition.category}\0${edition.legalActId}\0${edition.editionToken}`,
             pick: (take, praleisti) => pickEditionsToScrape({ limit: take, exclude: praleisti }),
             work: edition => runner.scrapeHistoricalEdition(edition),
-            onError: async (edition, error) => {
-                log(`istorinė redakcija ${edition.category}/${edition.legalActId}/${edition.editionToken} nepavyko: ${error.message}`);
+            onError: async (edition, error, bandymai) => {
+                log(`istorinė redakcija ${edition.category}/${edition.legalActId}/${edition.editionToken} nepavyko po ${bandymai} bandymų: ${error.message}`);
                 await recordEditionFailure(edition.category, edition.legalActId, edition.editionToken, error);
             },
         },
@@ -307,6 +342,20 @@ function stageSpecs(runner, { rescrapeDays }) {
 
 const POLL_MS = 250;
 const PIPELINE_LOG_EVERY = 50;
+/**
+ * Kiek kartų iš viso bandom vieną elementą, kol paskelbiam klaidą.
+ *
+ * Kartojam PLANUOKLIO lygyje, o ne API kliente (ten kartojimo sąmoningai nėra —
+ * žr. modules/eSeimas/eSeimasApi.js): taip pauzė mažesnė nei DB backoff'o
+ * pusvalandis, bet elementas nesikartoja iškart tuo pačiu ryšiu. Ilgesnį poilsį
+ * po visų bandymų toliau skiria DB (`failureCount`/`retryAfter`).
+ *
+ * 404 čia irgi kartojamas: būtent tai ir tikrinam — ar akto tikrai nėra, ar
+ * e-Seimas kartais atsako 404 į tą pačią užklausą.
+ */
+const DEFAULT_ATTEMPTS = 3;
+/** Pauzės tarp bandymų (ms), po vieną kiekvienam pakartojimui. */
+const RETRY_DELAYS_MS = [2_000, 5_000];
 /** Pauzė prieš kartojant nepavykusią `pick` užklausą. */
 const REFILL_RETRY_MS = 5_000;
 /** Po tiek `pick` klaidų iš eilės pasiduodam — su klaida, o ne tyliai „baigta". */
@@ -335,7 +384,7 @@ const REFILL_MAX_ERRORS = 12;
  * „lyg baigęs". Be to, dirbantis darbininkas dar gali atrasti naujo darbo
  * (diena — aktų, redakcijų sąrašas — redakcijų).
  */
-export async function runPipeline(specs, { concurrency, limit = Infinity }) {
+export async function runPipeline(specs, { concurrency, limit = Infinity, attempts = DEFAULT_ATTEMPTS }) {
     const state = Object.entries(specs).map(([name, spec]) => ({
         ...spec, name, buffer: [], inFlight: new Set(), skipped: new Map(),
         done: 0, failed: 0, logged: 0,
@@ -475,18 +524,40 @@ export async function runPipeline(specs, { concurrency, limit = Infinity }) {
         }
     }
 
+    /**
+     * Vienas elementas su pakartojimais. Galutinė klaida praleidžiama toliau
+     * su `bandymai` — kviečiančiam reikia žinoti, kelintas bandymas sudegė
+     * (skaičius keliauja į DB, žr. "eSeimasActDiscovery"."documentAttempts").
+     */
+    async function suBandymais(stage, item) {
+        for (let attempt = 1; ; attempt++) {
+            try {
+                return await stage.work(item, attempt);
+            } catch (error) {
+                if (attempt >= attempts) {
+                    if (error instanceof Error) error.bandymai = attempt;
+                    throw error;
+                }
+                const pauzė = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
+                log(`${stage.label}: ${stage.key(item).replace(/\0/g, "/")} bandymas ${attempt}/${attempts}`
+                    + ` nepavyko (${error.message}) — kartojam po ${Math.round(pauzė / 1000)} s`);
+                await sleep(pauzė);
+            }
+        }
+    }
+
     async function worker() {
         for (;;) {
             const job = await nextJob();
             if (!job) return;
             const { stage, item } = job;
             try {
-                await stage.work(item);
+                await suBandymais(stage, item);
                 stage.done++;
             } catch (error) {
                 stage.failed++;
                 stage.skipped.set(stage.key(item), item);
-                await stage.onError(item, error);
+                await stage.onError(item, error, error?.bandymai ?? attempts);
             } finally {
                 busy--;
                 darboVersija++;
@@ -514,10 +585,10 @@ export async function runPipeline(specs, { concurrency, limit = Infinity }) {
     return Object.fromEntries(state.map(s => [s.name, { done: s.done, failed: s.failed }]));
 }
 
-function runSingleStage(stage, runner, { concurrency, limit, rescrapeDays }) {
-    const spec = stageSpecs(runner, { rescrapeDays })[stage];
+function runSingleStage(stage, runner, { concurrency, limit, rescrapeDays, trace, attempts }) {
+    const spec = stageSpecs(runner, { rescrapeDays, trace })[stage];
     if (!spec) throw new Error(`Nežinomas etapas: ${stage}`);
-    return runPipeline({ [stage]: spec }, { concurrency, limit });
+    return runPipeline({ [stage]: spec }, { concurrency, limit, attempts });
 }
 
 /**
@@ -531,6 +602,10 @@ export async function runStage(stage, options = {}) {
         limit = Infinity,
         rescrapeDays = null,
         force = false,
+        // Atradimų sekimas į "eSeimasActDiscovery" (`--trace`). Numatyta išjungta:
+        // lentelės gali ir nebūti, o įprastam pravažiavimui ji nereikalinga.
+        trace = false,
+        attempts = DEFAULT_ATTEMPTS,
         // Darbininkų tiek, kiek prašyta, bet ore — ne daugiau, nei adapteris
         // pajėgia: viską virš savo eilės jis atmeta su 503, o ne pastato į eilę.
         api = createESeimasApi({ maxInflight: Math.min(concurrency, 6) }),
@@ -538,7 +613,7 @@ export async function runStage(stage, options = {}) {
         closeSidecar = true,
     } = options;
 
-    const runner = createRunner({ api, sidecar, concurrency, force });
+    const runner = createRunner({ api, sidecar, concurrency, force, trace });
 
     try {
         // Dienų lentelė užsėta vieną kartą, tad be šito po pirmo pilno
@@ -550,9 +625,9 @@ export async function runStage(stage, options = {}) {
         }
 
         if (stage === "all") {
-            return await runPipeline(stageSpecs(runner, { rescrapeDays }), { concurrency, limit });
+            return await runPipeline(stageSpecs(runner, { rescrapeDays, trace }), { concurrency, limit, attempts });
         }
-        return { [stage]: await runSingleStage(stage, runner, { concurrency, limit, rescrapeDays }) };
+        return { [stage]: await runSingleStage(stage, runner, { concurrency, limit, rescrapeDays, trace, attempts }) };
     } finally {
         if (closeSidecar) closeSqlite(sidecar);
     }
@@ -582,7 +657,7 @@ function previousDay(date) {
  * @param {number} [opts.maxDays] - kiek dienų daugiausia (pasižvalgymui)
  */
 export async function discoverBackward({
-    from = null, floor = null, maxDays = Infinity, api = createESeimasApi(),
+    from = null, floor = null, maxDays = Infinity, api = createESeimasApi(), trace = false,
 } = {}) {
     let frontier = from ?? previousDay(await getOldestScrapeDay() ?? new Date().toISOString().slice(0, 10));
     let page = 1;
@@ -612,7 +687,9 @@ export async function discoverBackward({
         }
 
         seen += items.length;
-        discovered += await upsertDiscoveredActs(items);
+        discovered += await upsertDiscoveredActs(items, trace && {
+            source: "discover", searchTo: frontier, page, pagination: response.pagination,
+        });
 
         // Ar šiame puslapyje jau matyti senesnė diena?
         const kita = items.map(item => item.adopted_at).find(date => date && date < frontier);
@@ -644,9 +721,69 @@ export async function discoverBackward({
     return { days, seen, discovered, frontier };
 }
 
+/**
+ * DIENŲ PAŽADAI: po vieną užklausą kiekvienai dienai, įsimenant tik tai, kiek
+ * rezultatų ta diena žada (`pagination.total_items`).
+ *
+ * Kodėl atskiras pravažiavimas, o ne šalutinis dienų etapo produktas: dienos
+ * pažadą teisingai pasako TIK `from = to = diena` užklausa. `--discover` sukasi
+ * su „viskas iki datos" riba, tad jos `total_items` yra viso rėžio suma (pvz.
+ * 4020) ir dienai negalioja. Čia imamas tik 1-as puslapis — daugiau puslapių
+ * skaičiui nereikia.
+ *
+ * Rezultatai guli "eSeimasDayPromise" (modules/eSeimas/dienuPazadai.sql).
+ */
+export async function runDayPromises({
+    concurrency = DEFAULT_CONCURRENCY,
+    limit = Infinity,
+    from = null,
+    to = null,
+    refreshDays = null,
+    attempts = DEFAULT_ATTEMPTS,
+    api = createESeimasApi({ maxInflight: Math.min(concurrency, 6) }),
+} = {}) {
+    await assertDayPromiseTable();
+
+    const spec = {
+        label: "dienų pažadai",
+        batchSize: 200,
+        key: day => day,
+        pick: (take, praleisti) =>
+            pickDaysWithoutPromise({ limit: take, from, to, refreshDays, exclude: praleisti }),
+        work: async (day) => {
+            const started = Date.now();
+            const response = await api.searchLegalActs({ from: day, to: day, page: 1 });
+            const queryMs = Date.now() - started;
+            const žadėta = response.pagination?.total_items ?? null;
+            await recordDayPromise(day, {
+                promisedItems: žadėta,
+                totalPages: response.pagination?.total_pages ?? null,
+                pageSize: response.pagination?.page_size ?? null,
+                itemsOnFirstPage: response.items?.length ?? 0,
+                queryMs,
+            });
+            log(`pažadas ${day} ${String(queryMs).padStart(5)}ms — žadėta ${žadėta ?? "?"}`
+                + ` (${response.pagination?.total_pages ?? "?"} psl., 1-ame ${response.items?.length ?? 0} eil.)`);
+        },
+        // Klaidą irgi įrašom: kitaip ta pati diena amžinai grįžtų į eilę, o
+        // dabar matyti, kurios dienos šaltiniui apskritai neatsiveria.
+        onError: async (day, error, bandymai) => {
+            log(`pažadas ${day} nepavyko po ${bandymai} bandymų: ${error.message}`);
+            await recordDayPromise(day, { error });
+        },
+    };
+
+    const result = await runPipeline({ promised: spec }, { concurrency, limit, attempts });
+    const status = await getDayPromiseStatus();
+    log(`Dienų pažadai: pamatuota ${nr(status.pamatuota)} iš ${nr(status.dienuViso)}`
+        + `, žadėta iš viso ${nr(status.zadetaIsViso)} aktų`
+        + (status.suKlaidomis ? `, su klaidomis ${nr(status.suKlaidomis)}` : ""));
+    return { ...result.promised, ...status };
+}
+
 /** Konkreti diena – patogu užpildyti spragą arba persiskaityti iš naujo. */
-export async function scrapeSingleDay(day, { api = createESeimasApi(), sidecar = openESeimasSidecar() } = {}) {
-    const runner = createRunner({ api, sidecar, concurrency: 1 });
+export async function scrapeSingleDay(day, { api = createESeimasApi(), sidecar = openESeimasSidecar(), trace = false } = {}) {
+    const runner = createRunner({ api, sidecar, concurrency: 1, trace });
     try {
         return await runner.scrapeDay(day);
     } finally {
@@ -655,8 +792,8 @@ export async function scrapeSingleDay(day, { api = createESeimasApi(), sidecar =
 }
 
 /** Vienkartinis vieno akto scrape'as – patogu rankiniam patikrinimui. */
-export async function scrapeAct(category, legalActId, { api = createESeimasApi(), sidecar = openESeimasSidecar(), force = false } = {}) {
-    const runner = createRunner({ api, sidecar, concurrency: 1, force });
+export async function scrapeAct(category, legalActId, { api = createESeimasApi(), sidecar = openESeimasSidecar(), force = false, trace = false } = {}) {
+    const runner = createRunner({ api, sidecar, concurrency: 1, force, trace });
     try {
         await runner.scrapeDocument(category, legalActId);
         await runner.scrapeEditionList(category, legalActId);
@@ -731,10 +868,28 @@ e-Seimas scraper (sidecar: <SIDECAR_DIR>/eSeimas.sqlite)
   node modules/eSeimas/eSeimasScrape.js --stage all
   node modules/eSeimas/eSeimasScrape.js --day 2024-03-15
   node modules/eSeimas/eSeimasScrape.js --discover
+  node modules/eSeimas/eSeimasScrape.js --promised [--from D] [--to D] [--limit N]
   node modules/eSeimas/eSeimasScrape.js --category TAD --act <legalActId>
   node modules/eSeimas/eSeimasScrape.js --status [--json]
 
   --concurrency N   lygiagrečių užklausų (numatyta ${DEFAULT_CONCURRENCY})
+  --attempts N      kiek kartų bandyti kiekvieną elementą, kol skelbiam klaidą
+                    (numatyta ${DEFAULT_ATTEMPTS}; pauzės ${RETRY_DELAYS_MS.map(ms => ms / 1000 + " s").join(", ")})
+  --trace           sekti kiekvieno akto ATRADIMĄ lentelėje "eSeimasActDiscovery":
+                    iš kurios paieškos, kurio puslapio ir kelintos eilutės aktas
+                    atėjo, kiek rezultatų ta paieška žadėjo, ir ką vėliau pagal tą
+                    atradimą rado --stage documents (ok / notFound / error).
+                    Lentelę reikia sukurti pačiam:
+                      psql "$PG_URL" -f modules/eSeimas/atradimuSekimas.sql
+                    Jos neradus sekimas tyliai išsijungia.
+  --promised        pereiti per visas žinomas dienas ir kiekvienai padaryti PO VIENĄ
+                    užklausą (from = to = diena, 1 psl.), įrašant, kiek rezultatų
+                    ta diena žada, į "eSeimasDayPromise". Tik tokios užklausos
+                    skaičius ir yra dienos pažadas — --discover riba „viskas iki
+                    datos" grąžina viso rėžio sumą. Lentelę reikia sukurti pačiam:
+                      psql "$PG_URL" -f modules/eSeimas/dienuPazadai.sql
+    --from/--to D   apriboti datų rėžį
+    --refresh-days N  iš naujo matuoti dienas, tikrintas seniau nei prieš N d.
   --force           perrašyti net jei md5 nepasikeitė (po normalizacijos pakeitimų)
   --rescrape-days N iš naujo praeiti dienas, skaitytas seniau nei prieš N d.
                     (aktai registruojami vėliau nei priimami, tad kartą nušluota
@@ -755,7 +910,7 @@ Prieš pirmą paleidimą: psql -f modules/eSeimas/schema.sql
 if (import.meta.url === `file://${process.argv[1]}`) {
     const args = parseArgs(process.argv.slice(2));
 
-    if (args.help || (!args.stage && !args.act && !args.day && !args.status && !args.discover)) {
+    if (args.help || (!args.stage && !args.act && !args.day && !args.status && !args.discover && !args.promised)) {
         console.log(USAGE.trim());
         process.exit(args.help ? 0 : 1);
     }
@@ -775,6 +930,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
             } catch { /* nėra sidecar'o — ne bėda */ }
             console.log(formatStatus(status, sidecarStats));
         }
+    } else if (args.promised) {
+        console.log(JSON.stringify(await runDayPromises({
+            concurrency: numArg(args.concurrency, DEFAULT_CONCURRENCY),
+            limit: numArg(args.limit, Infinity),
+            from: typeof args.from === "string" ? args.from : null,
+            to: typeof args.to === "string" ? args.to : null,
+            refreshDays: args["refresh-days"] ? numArg(args["refresh-days"], null) : null,
+            attempts: Math.max(1, numArg(args.attempts, DEFAULT_ATTEMPTS)),
+        }), null, 2));
     } else if (args.discover) {
         // `--discover` yra savarankiškas režimas, ne etapas. Anksčiau kartu
         // paduotas `--stage` būdavo tyliai ignoruojamas — pasakom aiškiai.
@@ -783,12 +947,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
             from: typeof args.from === "string" ? args.from : null,
             floor: typeof args.floor === "string" ? args.floor : null,
             maxDays: numArg(args.limit, Infinity),
+            trace: Boolean(args.trace),
         }), null, 2));
     } else if (args.day) {
-        console.log(JSON.stringify(await scrapeSingleDay(String(args.day)), null, 2));
+        console.log(JSON.stringify(await scrapeSingleDay(String(args.day), { trace: Boolean(args.trace) }), null, 2));
     } else if (args.act) {
         if (!args.category) throw new Error("Su --act būtinas --category, pvz. TAD");
-        await scrapeAct(String(args.category), String(args.act), { force: Boolean(args.force) });
+        await scrapeAct(String(args.category), String(args.act), {
+            force: Boolean(args.force), trace: Boolean(args.trace),
+        });
         log(`Aktas ${args.category}/${args.act} nuskaitytas`);
     } else {
         const results = await runStage(String(args.stage), {
@@ -796,6 +963,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
             limit: numArg(args.limit, Infinity),
             rescrapeDays: args["rescrape-days"] ? numArg(args["rescrape-days"], null) : null,
             force: Boolean(args.force),
+            trace: Boolean(args.trace),
+            attempts: Math.max(1, numArg(args.attempts, DEFAULT_ATTEMPTS)),
         });
         console.log(JSON.stringify(results, null, 2));
     }
