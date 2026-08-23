@@ -82,6 +82,7 @@ export type Procurement = Readonly<{
     esFinansavimas: boolean | null;
     lots: readonly Lot[];
     participation: ProcurementParticipation | null;
+    procedureOutcome: ProcurementProcedureOutcome | null;
 }>;
 
 // Distinct-tiekejoKodas participation facts from public.v_dalyviai_v2, merged
@@ -97,6 +98,20 @@ export type LotParticipation = Readonly<{
 
 export type ProcurementParticipation = Readonly<{
     totalSuppliers: number;
+    reportedAt: string | null;
+}>;
+
+// Procedure-ending outcomes from public.v_pirkimo_pabaiga_v2, merged onto a
+// Procurement by the Procurement Reader's own batch query. null means no
+// ATN-1 procedure-ending decision was observed for this procurement at all
+// (the procedure hasn't concluded yet, or no report was filed). lotOutcomes
+// is every distinct "proceduruPabaiga" label observed across the
+// procurement's lots — an indicator matches this closed-vocabulary list
+// against known outcome labels in code (types.ts carries no judgement of
+// which labels mean success), the same convention Bid.atmetimoStatusas
+// already uses.
+export type ProcurementProcedureOutcome = Readonly<{
+    lotOutcomes: readonly string[];
     reportedAt: string | null;
 }>;
 

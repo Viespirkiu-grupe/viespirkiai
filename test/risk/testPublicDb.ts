@@ -25,16 +25,19 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
 const TEST_TABLES_SQL = path.join(ROOT, "migrations/risk/test/001_public_test_tables.sql");
 // v_pirkimo_dalis_v2 depends on v_dalyviai_v2, so it must apply after it.
+// v_pirkimo_pabaiga_v2 has no dependency on any other view.
 const VIEW_FILES = [
     path.join(ROOT, "modules/mcp/analyst/views/v_pirkimas_v2.sql"),
     path.join(ROOT, "modules/mcp/analyst/views/v_dalyviai_v2.sql"),
     path.join(ROOT, "modules/mcp/analyst/views/v_pirkimo_dalis_v2.sql"),
+    path.join(ROOT, "modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql"),
 ];
 
 const TEST_TABLES = [
     '"xlsxPPAatmestiPasiulymai"',
     '"xlsxPPAatmestuPasiulymuStatusai"',
     '"xlsxPPApasiulymuEile"',
+    '"xlsxPPAproceduruPabaiga"',
     '"xlsxPPAdalyviai"',
     '"xlsxPPAataskaitos"',
     '"viesiejiPirkimaiDalys"',

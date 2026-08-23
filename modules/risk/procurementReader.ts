@@ -1,5 +1,5 @@
 import { log } from "../../utils/log.js";
-import type { Bid, Lot, LotParticipation, Procurement, ProcurementParticipation } from "./types.ts";
+import type { Bid, Lot, LotParticipation, Procurement, ProcurementParticipation, ProcurementProcedureOutcome } from "./types.ts";
 import type { RiskDataSource } from "./riskDataSource.ts";
 import { PUBLIC_VIEWS_CTE } from "./procurementPublicViews.ts";
 
@@ -127,6 +127,23 @@ const LOT_BIDS_SQL = `
              d."ataskaitosData" DESC
 `;
 
+// Procurement-grain procedure-ending outcomes — every distinct
+// "proceduruPabaiga" label observed across the procurement's lots, shared by
+// every procurement-grain indicator that judges the procedure's outcome
+// (currently LT-OTH-05). array_agg(DISTINCT ...) collapses repeated labels
+// across lots (and across the rare duplicate report) to the set an
+// indicator actually needs to test membership against.
+const PROCEDURE_OUTCOME_SQL = `
+    ${PUBLIC_VIEWS_CTE}
+    SELECT po."pirkimoNumeris"                                                            AS "pirkimoNumeris",
+           array_agg(DISTINCT po."proceduruPabaiga")                                       AS "lotOutcomes",
+           to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt"
+    FROM v_pirkimo_pabaiga_v2 po
+    WHERE po."ataskaitosData" <= $1::timestamptz
+      AND ($2::text[] IS NULL OR po."pirkimoNumeris" = ANY ($2::text[]))
+    GROUP BY po."pirkimoNumeris"
+`;
+
 export type Page<T> = Readonly<{
     items: readonly T[];
     nextCursor: string | null;
@@ -135,6 +152,7 @@ export type Page<T> = Readonly<{
 type LotRow = Omit<Lot, "participation" | "bids">;
 type LotParticipationRow = Readonly<{ pirkimoNumeris: string; daliesNumeris: string }> & LotParticipation;
 type ProcurementParticipationRow = Readonly<{ pirkimoNumeris: string }> & ProcurementParticipation;
+type ProcedureOutcomeRow = Readonly<{ pirkimoNumeris: string }> & ProcurementProcedureOutcome;
 type BidRow = Readonly<{ pirkimoNumeris: string; daliesNumeris: string }> & Bid;
 
 function encodeCursor(saltinis: string, pirkimoNumeris: string): string {
@@ -162,6 +180,7 @@ export class ProcurementReader {
     // ensureLotUniverseLoaded().
     private lotsByNumber: Map<string, Lot[]> | null = null;
     private procurementParticipationByNumber: Map<string, ProcurementParticipation> | null = null;
+    private procedureOutcomeByNumber: Map<string, ProcurementProcedureOutcome> | null = null;
 
     constructor(data: RiskDataSource, subjects: readonly string[] | null, dataAsOf: string) {
         this.data = data;
@@ -173,7 +192,7 @@ export class ProcurementReader {
         await this.ensureLotUniverseLoaded();
 
         const [cursorSaltinis, cursorPirkimoNumeris] = cursor === null ? [null, null] : decodeCursor(cursor);
-        const rows = await this.data.query<Omit<Procurement, "lots" | "participation">>(PROCUREMENT_SQL, [
+        const rows = await this.data.query<Omit<Procurement, "lots" | "participation" | "procedureOutcome">>(PROCUREMENT_SQL, [
             this.subjects,
             cursorSaltinis,
             cursorPirkimoNumeris,
@@ -184,6 +203,7 @@ export class ProcurementReader {
             ...row,
             lots: this.lotsByNumber!.get(row.pirkimoNumeris) ?? [],
             participation: this.procurementParticipationByNumber!.get(row.pirkimoNumeris) ?? null,
+            procedureOutcome: this.procedureOutcomeByNumber!.get(row.pirkimoNumeris) ?? null,
         }));
 
         // last.saltinis is asserted non-null: v_pirkimas_v2's saltinis is
@@ -207,13 +227,15 @@ export class ProcurementReader {
     private async ensureLotUniverseLoaded(): Promise<void> {
         if (this.lotsByNumber !== null) return;
 
-        const [procurementIds, lotRows, lotParticipationRows, procurementParticipationRows, bidRows] = await Promise.all([
-            this.data.query<{ pirkimoNumeris: string }>(PROCUREMENT_IDS_SQL, [this.subjects]),
-            this.data.query<LotRow>(LOT_SQL, [this.subjects]),
-            this.data.query<LotParticipationRow>(LOT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
-            this.data.query<ProcurementParticipationRow>(PROCUREMENT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
-            this.data.query<BidRow>(LOT_BIDS_SQL, [this.dataAsOf, this.subjects]),
-        ]);
+        const [procurementIds, lotRows, lotParticipationRows, procurementParticipationRows, bidRows, procedureOutcomeRows] =
+            await Promise.all([
+                this.data.query<{ pirkimoNumeris: string }>(PROCUREMENT_IDS_SQL, [this.subjects]),
+                this.data.query<LotRow>(LOT_SQL, [this.subjects]),
+                this.data.query<LotParticipationRow>(LOT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
+                this.data.query<ProcurementParticipationRow>(PROCUREMENT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
+                this.data.query<BidRow>(LOT_BIDS_SQL, [this.dataAsOf, this.subjects]),
+                this.data.query<ProcedureOutcomeRow>(PROCEDURE_OUTCOME_SQL, [this.dataAsOf, this.subjects]),
+            ]);
 
         const validIds = new Set(procurementIds.map((row) => row.pirkimoNumeris));
 
@@ -265,6 +287,12 @@ export class ProcurementReader {
             procurementParticipationRows.map((row) => [
                 row.pirkimoNumeris,
                 { totalSuppliers: row.totalSuppliers, reportedAt: row.reportedAt },
+            ]),
+        );
+        this.procedureOutcomeByNumber = new Map(
+            procedureOutcomeRows.map((row) => [
+                row.pirkimoNumeris,
+                { lotOutcomes: row.lotOutcomes, reportedAt: row.reportedAt },
             ]),
         );
     }

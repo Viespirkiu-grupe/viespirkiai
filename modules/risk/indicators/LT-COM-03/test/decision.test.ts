@@ -38,6 +38,7 @@ function testProcurement(participation: ProcurementParticipation | null, overrid
         esFinansavimas: null,
         lots: [],
         participation,
+        procedureOutcome: null,
         ...overrides,
     };
 }

@@ -145,36 +145,36 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 
 #### Subject `procurement` — Procurement (28)
 
-| Code      | Canonical indicator                                   | Canonical category | Reference indicators                                                                                                                                           |
-|-----------|-------------------------------------------------------|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| LT-COM-03 | Only one supplier invited or consulted                | Competition        | STT-I02                                                                                                                                                        |
-| LT-COM-18 | Procurement object has elevated cartel risk           | Competition        | OLAF-CN05                                                                                                                                                      |
-| LT-OTH-01 | No documented market research                         | Other              | STT-I01; OECD-TD-01                                                                                                                                            |
-| LT-OTH-03 | Evaluation/decision period anomalously short or long  | Other              | OCP-R015; OCP-R061; OCP-R062; OLAF-CA08; OT-I05; VPT-I10                                                                                                       |
-| LT-OTH-04 | Award-to-signature period unusually long              | Other              | OCP-R060                                                                                                                                                       |
-| LT-OTH-05 | Procedure unsuccessful or award not contracted        | Other              | OLAF-CA05; OLAF-CA06; OLAF-CA07; VPT-I11                                                                                                                       |
-| LT-OTH-06 | Strategic-policy objective not applied where relevant | Other              | VPT-I02; VPT-I03; VPT-I04; VPT-I05; OECD-GOV-04                                                                                                                |
-| LT-PRI-05 | High estimated value                                  | Pricing            | OLAF-CN06                                                                                                                                                      |
-| LT-PRI-06 | High estimated framework value                        | Pricing            | OLAF-CN04                                                                                                                                                      |
-| LT-PRO-01 | Unjustified non-competitive procedure                 | Procedure design   | OCP-R010; OLAF-CN23; OT-I03; STT-I08; VPT-I15                                                                                                                  |
-| LT-PRO-02 | Direct award contrary to procurement plan             | Procedure design   | OCP-R012                                                                                                                                                       |
-| LT-PRO-04 | Procedure without prior publication                   | Procedure design   | OLAF-CA01; OT-I02                                                                                                                                              |
-| LT-PRO-05 | Accelerated procedure without adequate grounds        | Procedure design   | OLAF-CN22                                                                                                                                                      |
-| LT-PRO-08 | Short submission/advertisement period                 | Procedure design   | OCP-R003; OCP-R014; OLAF-CN29; OT-I04                                                                                                                          |
-| LT-PRO-09 | Unreasonable prequalification requirements            | Procedure design   | OCP-R006; OLAF-CN10; OLAF-CN11; OLAF-CN12; OLAF-CN14; OLAF-CN15; OLAF-CN16; OLAF-CN17; OLAF-CN18; OLAF-CN19; OLAF-CN20; OLAF-CN21; STT-I05; OT-I10; OECD-TD-02 |
-| LT-PRO-10 | Tailored or restrictive technical specifications      | Procedure design   | OCP-R007; OLAF-CN20; STT-I04; OT-I10; OECD-TD-03                                                                                                               |
-| LT-PRO-11 | Unreasonable participation or document fees           | Procedure design   | OCP-R008; OCP-R009                                                                                                                                             |
-| LT-PRO-12 | Excessive tender guarantee                            | Procedure design   | OLAF-CN31                                                                                                                                                      |
-| LT-PRO-13 | Low predefined number of candidates                   | Procedure design   | OLAF-CN24                                                                                                                                                      |
-| LT-PRO-14 | Missing method for reducing candidate numbers         | Procedure design   | OLAF-CN25                                                                                                                                                      |
-| LT-TRA-01 | Planning documents unavailable                        | Transparency       | OCP-R001; VPT-I09; OECD-GOV-01                                                                                                                                 |
-| LT-TRA-02 | Tender insufficiently advertised                      | Transparency       | OCP-R004; OLAF-CN30; OT-I02                                                                                                                                    |
-| LT-TRA-03 | Key tender information/documents unavailable          | Transparency       | OCP-R005; STT-I15                                                                                                                                              |
-| LT-TRA-05 | Bidder questions unanswered                           | Transparency       | OCP-R039                                                                                                                                                       |
-| LT-TRA-06 | Procurement decision or reason not documented         | Transparency       | STT-I15; OLAF-CA06                                                                                                                                             |
-| LT-TRA-07 | Complaint received                                    | Transparency       | OCP-R020; VPT-I13; OECD-GOV-11                                                                                                                                 |
-| LT-TRA-08 | Procurement challenged in court                       | Transparency       | VPT-I14                                                                                                                                                        |
-| LT-TRA-09 | Procurement not conducted electronically              | Transparency       | VPT-I06; OECD-GOV-07                                                                                                                                           |
+| Code      | Canonical indicator                                   | Canonical category | Reference indicators                                                                                                                                           | Note             |
+|-----------|-------------------------------------------------------|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+| LT-COM-03 | Only one supplier invited or consulted                | Competition        | STT-I02                                                                                                                                                        |                  |
+| LT-COM-18 | Procurement object has elevated cartel risk           | Competition        | OLAF-CN05                                                                                                                                                      | Cannot implement |
+| LT-OTH-01 | No documented market research                         | Other              | STT-I01; OECD-TD-01                                                                                                                                            | Cannot implement |
+| LT-OTH-03 | Evaluation/decision period anomalously short or long  | Other              | OCP-R015; OCP-R061; OCP-R062; OLAF-CA08; OT-I05; VPT-I10                                                                                                       |                  |
+| LT-OTH-04 | Award-to-signature period unusually long              | Other              | OCP-R060                                                                                                                                                       |                  |
+| LT-OTH-05 | Procedure unsuccessful or award not contracted        | Other              | OLAF-CA05; OLAF-CA06; OLAF-CA07; VPT-I11                                                                                                                       | Accepted         |
+| LT-OTH-06 | Strategic-policy objective not applied where relevant | Other              | VPT-I02; VPT-I03; VPT-I04; VPT-I05; OECD-GOV-04                                                                                                                |                  |
+| LT-PRI-05 | High estimated value                                  | Pricing            | OLAF-CN06                                                                                                                                                      |                  |
+| LT-PRI-06 | High estimated framework value                        | Pricing            | OLAF-CN04                                                                                                                                                      |                  |
+| LT-PRO-01 | Unjustified non-competitive procedure                 | Procedure design   | OCP-R010; OLAF-CN23; OT-I03; STT-I08; VPT-I15                                                                                                                  |                  |
+| LT-PRO-02 | Direct award contrary to procurement plan             | Procedure design   | OCP-R012                                                                                                                                                       |                  |
+| LT-PRO-04 | Procedure without prior publication                   | Procedure design   | OLAF-CA01; OT-I02                                                                                                                                              |                  |
+| LT-PRO-05 | Accelerated procedure without adequate grounds        | Procedure design   | OLAF-CN22                                                                                                                                                      |                  |
+| LT-PRO-08 | Short submission/advertisement period                 | Procedure design   | OCP-R003; OCP-R014; OLAF-CN29; OT-I04                                                                                                                          |                  |
+| LT-PRO-09 | Unreasonable prequalification requirements            | Procedure design   | OCP-R006; OLAF-CN10; OLAF-CN11; OLAF-CN12; OLAF-CN14; OLAF-CN15; OLAF-CN16; OLAF-CN17; OLAF-CN18; OLAF-CN19; OLAF-CN20; OLAF-CN21; STT-I05; OT-I10; OECD-TD-02 |                  |
+| LT-PRO-10 | Tailored or restrictive technical specifications      | Procedure design   | OCP-R007; OLAF-CN20; STT-I04; OT-I10; OECD-TD-03                                                                                                               |                  |
+| LT-PRO-11 | Unreasonable participation or document fees           | Procedure design   | OCP-R008; OCP-R009                                                                                                                                             |                  |
+| LT-PRO-12 | Excessive tender guarantee                            | Procedure design   | OLAF-CN31                                                                                                                                                      |                  |
+| LT-PRO-13 | Low predefined number of candidates                   | Procedure design   | OLAF-CN24                                                                                                                                                      |                  |
+| LT-PRO-14 | Missing method for reducing candidate numbers         | Procedure design   | OLAF-CN25                                                                                                                                                      |                  |
+| LT-TRA-01 | Planning documents unavailable                        | Transparency       | OCP-R001; VPT-I09; OECD-GOV-01                                                                                                                                 |                  |
+| LT-TRA-02 | Tender insufficiently advertised                      | Transparency       | OCP-R004; OLAF-CN30; OT-I02                                                                                                                                    |                  |
+| LT-TRA-03 | Key tender information/documents unavailable          | Transparency       | OCP-R005; STT-I15                                                                                                                                              |                  |
+| LT-TRA-05 | Bidder questions unanswered                           | Transparency       | OCP-R039                                                                                                                                                       |                  |
+| LT-TRA-06 | Procurement decision or reason not documented         | Transparency       | STT-I15; OLAF-CA06                                                                                                                                             |                  |
+| LT-TRA-07 | Complaint received                                    | Transparency       | OCP-R020; VPT-I13; OECD-GOV-11                                                                                                                                 |                  |
+| LT-TRA-08 | Procurement challenged in court                       | Transparency       | VPT-I14                                                                                                                                                        |                  |
+| LT-TRA-09 | Procurement not conducted electronically              | Transparency       | VPT-I06; OECD-GOV-07                                                                                                                                           |                  |
 
 #### Subject `lot` — Lot (17)
 
@@ -244,12 +244,39 @@ bids were submitted or opened. No source carries a bid submission timestamp or s
 submission order" pattern cannot be distinguished from a "repeated final ranking" pattern with the data available.
 Revisit alongside LT-AWD-05 if submission-order data is ever ingested.
 
+**LT-COM-18** — Procurement object has elevated cartel risk: not implementable with currently ingested data. The
+procurement's CPV codes (`v_pirkimas."bvpzKodai"`, 99.9% populated on the primary `cvpis` source) are available, but
+`OLAF-CN05`'s source booklet (the OLAF-supported *"Red Flags" – a New Automatic Warning System*, p. 9, item I.6)
+names this only as a summary-list title, "Object of public procurement (cartel risk)", with no operational definition,
+threshold, or list of cartel-prone product categories in the booklet itself — the underlying Hungarian methodology
+paper it references is not included and, being built from Hungary's own TED cartel-case history, would not transfer
+to Lithuania regardless. No table in the warehouse records Lithuanian cartel or bid-rigging case history by CPV
+division (`\dt` for `kartel`/`konkurenc`/`cartel`/`competition` finds nothing), so there is no data-grounded way to
+classify which CPV divisions carry elevated cartel risk for the Lithuanian market specifically. Hand-picking sectors
+from general international literature (construction, waste management, catering, etc.) would be an unsourced,
+un-auditable judgment call disguised as a formula, not a reflection of the catalogue concept. Revisit if a Lithuanian
+Competition Council (Konkurencijos taryba) cartel/bid-rigging case dataset, coded to CPV or a comparable sector
+classification, is ever ingested.
+
 **LT-COM-23** — Bidder statements indicate collusion: not implementable with currently ingested data. The only
 report-level fields that resemble a collusion signal — `konkurencijaIskreipiantisAsmuo` and `konkurencijosPriemones`
 on `xlsxPPAataskaitos` — record whether the buyer ran pre-tender market consultations and what came of them (606 of
 6,583 reports flag one; sampled `konkurencijosPriemones` values describe market research and consultations, not bidder
 conduct), not statements made by bidders during the procedure. No source captures bidder correspondence, minutes, or
 testimony. Revisit if a source carrying bidder statements or procedural minutes is ever ingested.
+
+**LT-OTH-01** — No documented market research: not implementable with currently ingested data. No table in the
+warehouse records whether, or how, a buyer researched the market before starting a procurement. The only report-level
+fields that come close — `xlsxPPAataskaitos."konkurencijaIskreipiantisAsmuo"`/`"konkurencijosPriemones"` — record
+whether the buyer identified a competition-distorting economic operator among those who helped prepare the tender
+(5,177 of 6,583 reports carry a non-null flag, 606 true) and what measures were taken about it, not whether market
+research preceded the procurement; `planuojamiPirkimaiDuomenys` (the planning-document entity) carries a price
+estimate and a free-text `aprasymas`, but no market-research field either. The remaining candidates —
+`pirkimoBudoPagrindimas` (procurement-method justification) and `kitaInformacija` — are unstructured free text a
+buyer may or may not use to mention market research, so testing for it would mean pattern-matching prose for an
+unbounded vocabulary rather than reading a structured fact, the kind of fragile-regex approach Phase 1 of the
+implementation plan warns against. Revisit if a structured "preliminary market consultation" field is ever ingested
+(e.g. a future PPA report revision, or a CVP IS notice field mirroring TED's prior-market-consultation indicator).
 
 **LT-PRI-02** — Line-item price anomalously high or low: not implementable with currently ingested data.
 `v_dalyviai."pasiulymoKaina"` is a single total bid price per (procurement, lot, bidder); no ingested source breaks a

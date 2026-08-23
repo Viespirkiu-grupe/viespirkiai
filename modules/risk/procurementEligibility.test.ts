@@ -18,6 +18,7 @@ function procurement(overrides: Partial<Procurement> = {}): Procurement {
         esFinansavimas: null,
         lots: [],
         participation: null,
+        procedureOutcome: null,
         ...overrides,
     };
 }

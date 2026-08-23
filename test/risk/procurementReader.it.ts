@@ -1,7 +1,8 @@
 // Integration test for the Procurement Reader (modules/risk/procurementReader.ts):
 // proves ProcurementReader against the real v_pirkimas_v2/v_pirkimo_dalis_v2/
-// v_dalyviai_v2 views, in the local risk-dev Postgres's test-only `public`
-// schema. See docs/indicators-story/risk-service-architecture-v2.md §1.2.
+// v_dalyviai_v2/v_pirkimo_pabaiga_v2 views, in the local risk-dev Postgres's
+// test-only `public` schema. See
+// docs/indicators-story/risk-service-architecture-v2.md §1.2.
 //
 // Named `.it.ts` to match this repo's integration-test convention
 // (vitest.integration.config.ts); run via `npm run test:integration`, which
@@ -24,6 +25,7 @@ import {
     insertAtmestasPasiulymas,
     insertDalyvis,
     insertPasiulymas,
+    insertProceduruPabaiga,
     WITHDRAWN_STATUS,
 } from "../../modules/risk/indicators/test/xlsxPPAFixtures.ts";
 import { PostgresRiskDataSource } from "../../modules/risk/riskDataSource.ts";
@@ -385,5 +387,116 @@ describe("ProcurementReader bid-grain rows (Lot.bids)", () => {
 
         const [afterCutoff] = await loadAll(reader(["960004"], "2026-10-01T00:00:00.000Z"));
         expect(afterCutoff.lots[0].bids).toHaveLength(1);
+    });
+});
+
+describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
+    it("collects the single lot's outcome label", async () => {
+        await insertViesiejiPirkimai(970001);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970001",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+            sprendimoPriemimoData: "2026-05-10",
+        });
+
+        const [procurement] = await loadAll(reader(["970001"]));
+        expect(procurement.procedureOutcome).toEqual({
+            lotOutcomes: [
+                "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+            ],
+            reportedAt: "2026-05-10",
+        });
+    });
+
+    it("collects every distinct outcome label across a multi-lot procedure, and the latest decision date", async () => {
+        await insertViesiejiPirkimai(970002);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970002",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 2,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: "1",
+            proceduruPabaiga: "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+            sprendimoPriemimoData: "2026-05-10",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: "2",
+            proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras",
+            sprendimoPriemimoData: "2026-05-20",
+        });
+
+        const [procurement] = await loadAll(reader(["970002"]));
+        expect(procurement.procedureOutcome!.lotOutcomes.sort()).toEqual(
+            [
+                "Nutraukus pirkimo ar projekto konkurso procedūras",
+                "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+            ].sort(),
+        );
+        expect(procurement.procedureOutcome!.reportedAt).toBe("2026-05-20");
+    });
+
+    it("is null when no procedure-ending decision was observed at all", async () => {
+        await insertViesiejiPirkimai(970003);
+
+        const [procurement] = await loadAll(reader(["970003"]));
+        expect(procurement.procedureOutcome).toBeNull();
+    });
+
+    it("is still collected when a report has no participant rows — the 'no bids received' case", async () => {
+        // No insertDalyvis call: this is exactly the case v_dalyviai/v_dalyviai_v2
+        // cannot see (their JOIN on xlsxPPAdalyviai drops it), and the reason
+        // v_pirkimo_pabaiga(_v2) reads xlsxPPAataskaitos/xlsxPPAproceduruPabaiga
+        // directly instead.
+        await insertViesiejiPirkimai(970004);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970004",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Per nustatytą terminą tiekėjams nepateikus nė vienos paraiškos, pasiūlymo, projekto konkurso plano ar projekto",
+        });
+
+        const [procurement] = await loadAll(reader(["970004"]));
+        expect(procurement.procedureOutcome!.lotOutcomes).toEqual([
+            "Per nustatytą terminą tiekėjams nepateikus nė vienos paraiškos, pasiūlymo, projekto konkurso plano ar projekto",
+        ]);
+    });
+
+    it("hides an outcome recorded after the cutoff, and shows it at a later one", async () => {
+        await insertViesiejiPirkimai(970005);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970005",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-09-01T00:00:00Z",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus",
+        });
+
+        const [beforeCutoff] = await loadAll(reader(["970005"], DATA_AS_OF));
+        expect(beforeCutoff.procedureOutcome).toBeNull();
+
+        const [afterCutoff] = await loadAll(reader(["970005"], "2026-10-01T00:00:00.000Z"));
+        expect(afterCutoff.procedureOutcome!.lotOutcomes).toEqual([
+            "Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus",
+        ]);
     });
 });

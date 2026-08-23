@@ -132,6 +132,14 @@ CREATE TABLE IF NOT EXISTS public."xlsxPPAatmestiPasiulymai" (
     "statusasId"             integer REFERENCES "xlsxPPAatmestuPasiulymuStatusai" (id)
 );
 
+CREATE TABLE IF NOT EXISTS public."xlsxPPAproceduruPabaiga" (
+    "id"                     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    "ataskaitaId"            bigint NOT NULL REFERENCES "xlsxPPAataskaitos" (id) ON DELETE CASCADE,
+    "daliesNumeris"          text,
+    "proceduruPabaiga"       text,
+    "sprendimoPriemimoData"  date
+);
+
 CREATE TABLE IF NOT EXISTS public."jarAsmenys" (
     "jarKodas"     integer PRIMARY KEY,
     "pavadinimas"  text NOT NULL
