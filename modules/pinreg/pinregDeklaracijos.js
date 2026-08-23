@@ -1,65 +1,132 @@
 import { postgres } from "../../postgres/postgres.js";
-import {
-    WINDOW_COUNT_SQL,
-    splitWindowCount,
-} from "../../utils/windowCount.js";
 
+const TIPAI = {
+    DEKLARUOJANCIO_DARBOVIETE: "darbovietes",
+    SUTUOKTINIO_DARBOVIETE: "sutuoktiniuDarbovietes",
+    KITI_RYSIAI_SU_JA: "rysiaiSuJa",
+};
+
+/** Filtro reikšmė (URL) → `irasoTipas` stulpelio reikšmė. */
+export const TIPU_FILTRAI = {
+    darbovietes: "DEKLARUOJANCIO_DARBOVIETE",
+    sutuoktinio: "SUTUOKTINIO_DARBOVIETE",
+    rysiai: "KITI_RYSIAI_SU_JA",
+};
+
+// Rikiavimo baltasis sąrašas: raktas ateina iš URL, todėl stulpelio vardas
+// niekada nesudaromas iš vartotojo įvesties. Pagal asmenį nerikiuojama sąmoningai
+// – vardai rodomi užcenzūruoti, o abėcėlinė tvarka padėtų juos atspėti.
+const RIKIAVIMAI = {
+    pateikta: '"pateikimoData"',
+    nuo: '"rysioPradzia"',
+    iki: '"rysioPabaiga"',
+    pareigos: '"pareigos"',
+    tipas: '"irasoTipas"',
+};
+
+/**
+ * PINREG įrašai pagal JAR kodą: filtruojama, rikiuojama ir puslapiuojama
+ * duomenų bazėje, kad rezultatas nepriklausytų nuo to, kiek eilučių atsiuntėme
+ * į naršyklę.
+ *
+ * @param {string} jarKodas
+ * @param {{ limit?: number|null, offset?: number, sort?: string, kryptis?: string,
+ *           tipas?: string, pareigos?: string, galiojimas?: string }} [options]
+ */
 export async function gautiPinregDeklaracijasPagalJarKoda(
     jarKodas,
     options = {},
 ) {
     let limit = options.limit ? Number(options.limit) : null;
+    const offset = Number(options.offset) > 0 ? Math.floor(Number(options.offset)) : 0;
+    const sort = RIKIAVIMAI[options.sort] ? options.sort : "pateikta";
+    const kryptis = options.kryptis === "asc" ? "asc" : "desc";
+    const tipas = TIPU_FILTRAI[options.tipas] ? options.tipas : null;
+    const pareigos = (options.pareigos || "").trim();
+    const galiojimas =
+        options.galiojimas === "galiojantys" || options.galiojimas === "pasibaige"
+            ? options.galiojimas
+            : null;
 
-    // Kiekvienam įrašo tipui – viena užklausa; bendras kiekis paimamas lango
-    // funkcija toje pačioje užklausoje (anksčiau buvo atskiras COUNT(*)).
-    // `irasoTipas` rašomas literalu (reikšmės – fiksuotos, ne iš vartotojo), nes
-    // daliniai indeksai (`WHERE "irasoTipas" = '...'`) pritaikomi tik tada, kai
-    // sąlyga matoma planavimo metu.
-    const pagalTipa = (irasoTipas) =>
-        postgres.query(
-            `SELECT *, ${WINDOW_COUNT_SQL} FROM public."pinregJuridiniaiRysiai"
-           WHERE "jarKodas" = $1
-           AND "irasoTipas" = '${irasoTipas}'
-           ORDER BY "pateikimoData" DESC
-           ${limit ? "LIMIT $2" : ""}`,
-            limit ? [jarKodas, limit] : [jarKodas],
+    // Bendros sąlygos (be tipo) – pagal jas skaičiuojami kiekiai kiekvienam tipui,
+    // kad filtro parinktys rodytų, kiek įrašų jose liks.
+    const params = [jarKodas];
+    const salygos = ['"jarKodas" = $1'];
+    if (pareigos) {
+        params.push(`%${pareigos}%`);
+        salygos.push(
+            `(COALESCE("pareigos", '') || ' ' || COALESCE("rysioPobudzioPavadinimas", '')) ILIKE $${params.length}`,
         );
+    }
+    if (galiojimas === "galiojantys") salygos.push('"rysioPabaiga" IS NULL');
+    if (galiojimas === "pasibaige") salygos.push('"rysioPabaiga" IS NOT NULL');
+    const kur = salygos.join(" AND ");
 
-    const [darbovietesQuery, rysiaiQuery, sutuoktiniuQuery] = await Promise.all(
-        [
-            pagalTipa("DEKLARUOJANCIO_DARBOVIETE"),
-            pagalTipa("KITI_RYSIAI_SU_JA"),
-            pagalTipa("SUTUOKTINIO_DARBOVIETE"),
-        ],
-    );
+    const eiluciuParams = [...params];
+    let eiluciuKur = kur;
+    if (tipas) {
+        eiluciuParams.push(TIPU_FILTRAI[tipas]);
+        eiluciuKur += ` AND "irasoTipas" = $${eiluciuParams.length}`;
+    }
+    const limitSql = limit ? ` LIMIT $${eiluciuParams.length + 1}` : "";
+    if (limit) eiluciuParams.push(limit);
+    const offsetSql = offset ? ` OFFSET $${eiluciuParams.length + 1}` : "";
+    if (offset) eiluciuParams.push(offset);
 
-    const { rows: darbovietesRows, viso: darbovietesCount } = splitWindowCount(
-        darbovietesQuery.rows,
-    );
-    const { rows: rysiaiRows, viso: rysiaiCount } = splitWindowCount(
-        rysiaiQuery.rows,
-    );
-    const { rows: sutuoktiniuRows, viso: sutuoktiniuCount } = splitWindowCount(
-        sutuoktiniuQuery.rows,
-    );
+    const [irasaiQuery, kiekiaiQuery] = await Promise.all([
+        postgres.query(
+            `SELECT * FROM public."pinregJuridiniaiRysiai"
+           WHERE ${eiluciuKur}
+           ORDER BY ${RIKIAVIMAI[sort]} ${kryptis === "asc" ? "ASC" : "DESC"} NULLS LAST, "id" DESC
+           ${limitSql}${offsetSql}`,
+            eiluciuParams,
+        ),
+        postgres.query(
+            `SELECT "irasoTipas", COUNT(*)::int AS kiekis
+           FROM public."pinregJuridiniaiRysiai"
+           WHERE ${kur}
+           GROUP BY "irasoTipas"`,
+            params,
+        ),
+    ]);
 
-    // Prepare result arrays
-    let darbovietes = [];
-    let sutuoktinioDarbovietes = [];
-    let rysiaiSuJa = [];
+    const kiekiai = { darbovietes: 0, sutuoktiniuDarbovietes: 0, rysiaiSuJa: 0 };
+    for (const { irasoTipas, kiekis } of kiekiaiQuery.rows) {
+        const raktas = TIPAI[irasoTipas];
+        if (raktas) kiekiai[raktas] = kiekis;
+    }
 
-    // Helper to title-case and censor names
+    const darbovietesRows = [];
+    const sutuoktiniuRows = [];
+    const rysiaiRows = [];
+    for (const row of irasaiQuery.rows) {
+        if (row.irasoTipas === "DEKLARUOJANCIO_DARBOVIETE") {
+            darbovietesRows.push(row);
+        } else if (row.irasoTipas === "SUTUOKTINIO_DARBOVIETE") {
+            sutuoktiniuRows.push(row);
+        } else if (row.irasoTipas === "KITI_RYSIAI_SU_JA") {
+            rysiaiRows.push(row);
+        }
+    }
+
+    const darbovietesCount = kiekiai.darbovietes;
+    const sutuoktiniuCount = kiekiai.sutuoktiniuDarbovietes;
+    const rysiaiCount = kiekiai.rysiaiSuJa;
+    // Kiek įrašų atitinka VISUS filtrus (įskaitant tipą) – pagal tai puslapiuojama.
+    const filtruotaViso = tipas
+        ? kiekiai[TIPAI[TIPU_FILTRAI[tipas]]]
+        : darbovietesCount + sutuoktiniuCount + rysiaiCount;
+
+    // Užcenzūruotas vardas: paliekamos tik pirma ir paskutinė raidė.
     function formatName(name) {
         if (!name) return null;
 
-        // Title case
         const titleCased = name
             .toLowerCase()
             .split(" ")
             .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
             .join(" ");
 
-        // Censor except first and last letter
         return titleCased
             .split(" ")
             .map((w) =>
@@ -72,77 +139,84 @@ export async function gautiPinregDeklaracijasPagalJarKoda(
             .join(" ");
     }
 
-    // Process pinregDarbovietes data
-    try {
-        darbovietesRows.forEach((row) => {
-            const asmuo = formatName(
-                `${row.vardas || ""} ${row.pavarde || ""}`.trim(),
-            );
-
-            darbovietes.push({
-                ...row,
-                uuid: row.deklaracija,
-                asmuo,
-                pateikimoData: row.pateikimoData,
-            });
-        });
-    } catch (e) {
-        console.error("Error processing darbovietesRows:", e);
+    function paruostiDarboviete(row) {
+        return {
+            ...row,
+            uuid: row.deklaracija,
+            asmuo: formatName(`${row.vardas || ""} ${row.pavarde || ""}`.trim()),
+            pateikimoData: row.pateikimoData,
+        };
     }
 
-    // Process pinregSutuoktiniuDarbovietes data
-    sutuoktiniuRows.forEach((row) => {
+    function paruostiSutuoktinio(row) {
         const deklaruojancioVardas =
             row.deklaruojancioVardas || row.susijusioAsmensVardas || "";
         const deklaruojancioPavarde =
             row.deklaruojancioPavarde || row.susijusioAsmensPavarde || "";
         const sutuoktinioVardas = row.sutuoktinioVardas || row.vardas || "";
-        const sutuoktinioPavarde =
-            row.sutuoktinioPavarde || row.pavarde || "";
+        const sutuoktinioPavarde = row.sutuoktinioPavarde || row.pavarde || "";
 
-        const deklaruojancio = formatName(
-            `${deklaruojancioVardas} ${deklaruojancioPavarde}`.trim(),
-        );
-        const sutuoktinio = formatName(
-            `${sutuoktinioVardas} ${sutuoktinioPavarde}`.trim(),
-        );
-
-        sutuoktinioDarbovietes.push({
+        return {
             ...row,
             uuid: row.deklaracija,
-            asmuo: deklaruojancio,
-            sutuoktinis: sutuoktinio,
+            asmuo: formatName(
+                `${deklaruojancioVardas} ${deklaruojancioPavarde}`.trim(),
+            ),
+            sutuoktinis: formatName(
+                `${sutuoktinioVardas} ${sutuoktinioPavarde}`.trim(),
+            ),
             pateikimoData: row.pateikimoData,
-        });
-    });
+        };
+    }
 
-    // Process pinregRysiaiSuJa data
-    rysiaiRows.forEach((row) => {
-        const asmuo = formatName(
-            `${row.vardas || "-"} ${row.pavarde || "-"}`.trim(),
-        );
-        rysiaiSuJa.push({
+    function paruostiRysi(row) {
+        return {
             ...row,
             uuid: row.deklaracija,
-            asmuo,
+            asmuo: formatName(
+                `${row.vardas || "-"} ${row.pavarde || "-"}`.trim(),
+            ),
             pateikimoData: row.pateikimoData,
-        });
+        };
+    }
+
+    const darbovietes = darbovietesRows.map(paruostiDarboviete);
+    const sutuoktinioDarbovietes = sutuoktiniuRows.map(paruostiSutuoktinio);
+    const rysiaiSuJa = rysiaiRows.map(paruostiRysi);
+
+    // Plokščias sąrašas ta pačia tvarka, kokia atėjo iš duomenų bazės – jį rodo
+    // puslapio lentelė (rikiavimas jau pritaikytas visiems įrašams, ne tik šiam
+    // puslapiui). Grupuoti sąrašai lieka dėl MCP atsakymų struktūros.
+    const irasai = irasaiQuery.rows.map((row) => {
+        if (row.irasoTipas === "SUTUOKTINIO_DARBOVIETE") {
+            return { tipas: "sutuoktinio", ...paruostiSutuoktinio(row) };
+        }
+        if (row.irasoTipas === "KITI_RYSIAI_SU_JA") {
+            return { tipas: "rysiai", ...paruostiRysi(row) };
+        }
+        return { tipas: "darbovietes", ...paruostiDarboviete(row) };
     });
 
     return {
         darbovietes,
         sutuoktinioDarbovietes,
         rysiaiSuJa,
+        irasai,
         counts: {
             darbovietes: darbovietesCount,
             sutuoktiniuDarbovietes: sutuoktiniuCount,
             rysiaiSuJa: rysiaiCount,
         },
         total: darbovietesCount + sutuoktiniuCount + rysiaiCount,
+        filtruotaViso,
         rows:
             darbovietes.length +
             sutuoktinioDarbovietes.length +
             rysiaiSuJa.length,
         limit: limit,
+        offset,
+        sort,
+        kryptis,
+        filtrai: { tipas, pareigos, galiojimas },
     };
 }

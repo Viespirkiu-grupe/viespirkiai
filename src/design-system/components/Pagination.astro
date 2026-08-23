@@ -3,9 +3,19 @@ interface Props {
   currentPage: number;
   pageCount: number;
   queryParams: string;
+  /** Puslapio numerio parametras – kitoks, kai viename puslapyje puslapiuojama viena skiltis. */
+  pageParam?: string;
+  /** Inkaras, prie kurio grįžtama paspaudus (be `#`). */
+  hash?: string;
 }
 
-const { currentPage: current, pageCount: totalPages, queryParams } = Astro.props;
+const {
+  currentPage: current,
+  pageCount: totalPages,
+  queryParams,
+  pageParam = 'page',
+  hash,
+} = Astro.props;
 
 const maxVisible = 6;
 const half = Math.floor(maxVisible / 2);
@@ -15,23 +25,23 @@ if (current <= half) end = Math.min(totalPages, maxVisible);
 if (current + half > totalPages) start = Math.max(1, totalPages - maxVisible + 1);
 
 function pageLink(page: number) {
-  return `?page=${page}`;
+  return `?${pageParam}=${page}${queryParams}${hash ? `#${hash}` : ''}`;
 }
 ---
 
 <nav aria-label="Puslapiavimas">
   <ul class="pagination">
     {current > 1
-      ? <li><a href={pageLink(current - 1) + queryParams}>←</a></li>
+      ? <li><a href={pageLink(current - 1)}>←</a></li>
       : <li class="disabled"><span>←</span></li>
     }
     {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(i => (
       <li class={i === current ? 'active' : ''}>
-        <a href={pageLink(i) + queryParams}>{i}</a>
+        <a href={pageLink(i)}>{i}</a>
       </li>
     ))}
     {current < totalPages
-      ? <li><a href={pageLink(current + 1) + queryParams}>→</a></li>
+      ? <li><a href={pageLink(current + 1)}>→</a></li>
       : <li class="disabled"><span>→</span></li>
     }
   </ul>

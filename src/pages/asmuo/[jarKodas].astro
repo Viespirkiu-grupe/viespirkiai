@@ -41,11 +41,15 @@ const jarKodas = raw.replace(/\.(json|png)$/, '');
 
 const query = Object.fromEntries(Astro.url.searchParams);
 
+// Vieno PINREG puslapio dydis; net su `?pinregLimit=max` neatiduodame visko.
+const PINREG_LIMIT = 100;
+const PINREG_MAX_LIMIT = 500;
+
 function parseLimitai(q: Record<string, string>) {
   if (q.limitai === 'false') return {};
   const defaults: Record<string, number> = {
     regitra: 5, teismoNuosprendziai: 10, sutartys: 10, darboSkelbimai: 5,
-    rcPranesimai: 3, domenai: 3, pinreg: 3, kotis: 3, esInvesticijos: 5,
+    rcPranesimai: 3, domenai: 3, pinreg: 100, kotis: 3, esInvesticijos: 5,
     mvpAprasai: 1, vdiPazeidimai: 3,
   };
   const map: Record<string, string> = {
@@ -64,6 +68,22 @@ function parseLimitai(q: Record<string, string>) {
       return [k, { limit: defaults[k] }];
     })
   );
+  // PINREG skiltis filtruojama, rikiuojama ir puslapiuojama duomenų bazėje, tad
+  // limitas čia reiškia vieno puslapio dydį (visų įrašų iš karto nesiunčiame).
+  const pinregLimit = q.pinregLimit === 'max'
+    ? PINREG_MAX_LIMIT
+    : Math.min(PINREG_MAX_LIMIT, Math.max(1, Number(q.pinregLimit) || PINREG_LIMIT));
+  const pinregPuslapis = Math.max(1, Math.floor(Number(q.pinregPuslapis) || 1));
+  options.pinreg = {
+    limit: pinregLimit,
+    offset: (pinregPuslapis - 1) * pinregLimit,
+    sort: q.pinregSort,
+    kryptis: q.pinregKryptis,
+    tipas: q.pinregTipas,
+    pareigos: q.pinregPareigos,
+    galiojimas: q.pinregGaliojimas,
+  };
+
   const dokumentaiLimit = q.jarDokumentaiLimit;
   options.registruCentras = {
     dokumentaiLimit: dokumentaiLimit === 'max'
@@ -99,7 +119,9 @@ if (format === 'json' && tikSutartys) {
 }
 
 if (format === 'json' && asmuo) {
-  return new Response(JSON.stringify(asmuo, null, 2), {
+  // `pinreg.irasai` yra tik lentelei skirta tų pačių įrašų kopija plokščiu sąrašu.
+  const { irasai, ...pinregBeIrasu } = asmuo.pinreg ?? {};
+  return new Response(JSON.stringify(asmuo.pinreg ? { ...asmuo, pinreg: pinregBeIrasu } : asmuo, null, 2), {
     headers: { 'Content-Type': 'application/json' },
   });
 }

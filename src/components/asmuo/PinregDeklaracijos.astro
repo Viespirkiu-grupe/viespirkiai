@@ -1,85 +1,270 @@
 ---
-import ResultCardShell from '@design-system/components/ResultCardShell.astro';
-import SectionHeading from '@design-system/components/SectionHeading.astro';
-import Linksnis from '@design-system/components/Linksnis.astro';
+import PageSection from '@design-system/components/PageSection.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+import Table from '@design-system/components/Table.astro';
+import TableEmptyRow from '@design-system/components/TableEmptyRow.astro';
+import Badge from '@design-system/components/Badge.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import { linksniuotiOnly } from '@/utils/linksniai.js';
 
 const { asmuo } = Astro.props;
 const pinreg = asmuo.pinreg;
 if (!pinreg) return;
-const anyTruncated =
-  pinreg.counts.rysiaiSuJa > pinreg.rysiaiSuJa.length ||
-  pinreg.counts.darbovietes > pinreg.darbovietes.length ||
-  pinreg.counts.sutuoktiniuDarbovietes > pinreg.sutuoktinioDarbovietes.length;
+
+// Viskas – filtravimas, rikiavimas ir puslapiavimas – vyksta duomenų bazėje
+// (žr. modules/pinreg/pinregDeklaracijos.js), todėl rezultatas nepriklauso nuo
+// to, kiek eilučių atsiųsta į naršyklę: rikiuojama per visus įstaigos įrašus,
+// o į puslapį patenka tik vienas jų pjūvis.
+const TIPAI: Record<string, { label: string; variant: 'default' | 'info' | 'muted' }> = {
+  darbovietes: { label: 'Darbovietė', variant: 'info' },
+  sutuoktinio: { label: 'Sutuoktinio darbovietė', variant: 'muted' },
+  rysiai: { label: 'Kitas ryšys', variant: 'default' },
+};
+
+const kapitalizuoti = (t: string) => (t ? t[0].toUpperCase() + t.slice(1).toLowerCase() : '');
+
+const irasai = (pinreg.irasai || []).map((r: any) => ({
+  tipas: r.tipas,
+  uuid: r.uuid,
+  asmuo: r.tipas === 'sutuoktinio' ? r.sutuoktinis : r.asmuo,
+  // Sutuoktinio įrašuose deklaraciją pateikė kitas asmuo – jis lieka užuominoje,
+  // kad eilutė neišsipūstų į dvi eilutes.
+  priedas: r.tipas === 'sutuoktinio' && r.asmuo ? `Deklaravo ${r.asmuo}` : null,
+  aprasymas:
+    r.tipas === 'rysiai'
+      ? [r.rysioPobudzioPavadinimas, r.kienoRysys && kapitalizuoti(r.kienoRysys)].filter(Boolean).join(' · ')
+      : r.pareigos,
+  nuo: r.rysioPradzia ? String(r.rysioPradzia).slice(0, 10) : '',
+  iki: r.rysioPabaiga ? String(r.rysioPabaiga).slice(0, 10) : '',
+  pateikta: r.pateikimoData ? String(r.pateikimoData).replace('T', ' ').slice(0, 19) : '',
+}));
+
+const { tipas: tipoFiltras, pareigos: pareiguFiltras, galiojimas } = pinreg.filtrai ?? {};
+const arFiltruota = !!(tipoFiltras || pareiguFiltras || galiojimas);
+
+const limit = pinreg.limit || irasai.length || 1;
+const offset = pinreg.offset || 0;
+const viso = pinreg.filtruotaViso ?? pinreg.total;
+const puslapiu = Math.max(1, Math.ceil(viso / limit));
+const puslapis = Math.floor(offset / limit) + 1;
+
+// Nuorodos keičia tik savo parametrus – kitų puslapio skilčių būsena išlieka.
+const nuoroda = (pakeitimai: Record<string, string | number | null>) => {
+  const params = new URLSearchParams(Astro.url.search);
+  for (const [raktas, reiksme] of Object.entries(pakeitimai)) {
+    if (reiksme === null || reiksme === '') params.delete(raktas);
+    else params.set(raktas, String(reiksme));
+  }
+  const query = params.toString();
+  return `${Astro.url.pathname}${query ? `?${query}` : ''}#pinreg`;
+};
+
+// Datų stulpeliai pirmu paspaudimu rikiuojami nuo naujausių, tekstiniai – nuo A.
+const STULPELIAI: Array<{ raktas: string | null; label: string; numatytojiKryptis?: 'asc' | 'desc'; centre?: boolean }> = [
+  { raktas: null, label: 'Asmuo' },
+  { raktas: 'tipas', label: 'Tipas', numatytojiKryptis: 'asc' },
+  { raktas: 'pareigos', label: 'Pareigos / ryšys', numatytojiKryptis: 'asc' },
+  { raktas: 'nuo', label: 'Nuo', numatytojiKryptis: 'desc', centre: true },
+  { raktas: 'iki', label: 'Iki', numatytojiKryptis: 'desc', centre: true },
+  { raktas: 'pateikta', label: 'Pateikta', numatytojiKryptis: 'desc', centre: true },
+];
+
+const rikiavimoNuoroda = (raktas: string, numatytoji: string) => {
+  const kryptis = pinreg.sort === raktas && pinreg.kryptis === numatytoji
+    ? (numatytoji === 'asc' ? 'desc' : 'asc')
+    : numatytoji;
+  return nuoroda({ pinregSort: raktas, pinregKryptis: kryptis, pinregPuslapis: null });
+};
+
+// Filtrų forma gyvena už lentelės, o laukeliai antraštės eilutėje su ja
+// susiejami `form` atributu (formos elemento tarp <tr> dėti negalima).
+const FORMOS_ID = 'pinregFiltrai';
+const nekeiciami = [...new URLSearchParams(Astro.url.search)].filter(
+  ([raktas]) => !['pinregTipas', 'pinregPareigos', 'pinregGaliojimas', 'pinregPuslapis'].includes(raktas),
+);
+
+// Pagination pati sudeda `?pinregPuslapis=N`, tad likusius parametrus paduodame
+// jau paruoštus prisegti.
+const kitiParametrai = [...new URLSearchParams(Astro.url.search)]
+  .filter(([raktas]) => raktas !== 'pinregPuslapis')
+  .map(([raktas, reiksme]) => `&${encodeURIComponent(raktas)}=${encodeURIComponent(reiksme)}`)
+  .join('');
+
+const rodomaNuo = viso === 0 ? 0 : offset + 1;
+const rodomaIki = offset + irasai.length;
 ---
 
-<div class="page-section mb-10" id="pinreg">
-  <SectionHeading id="pinreg" title="Privačių interesų deklaracijos" />
-  {anyTruncated && (
-    <p class="text-muted text-sm mb-4">
-      Kiekvienoje grupėje rodomi po <Linksnis n={pinreg.limit} forms={['įrašas', 'įrašai', 'įrašų', 'įrašo']} />.{' '}
-      <a href="?pinregLimit=max#pinreg">Rodyti visus ({pinreg.total})</a>
-    </p>
-  )}
-  <div class="grid-3">
-    <div>
-      <h3 class="text-sm font-bold mb-3">Ryšiai su juridiniais asmenimis</h3>
-      {pinreg.rysiaiSuJa.length > 0 ? (
-        <div class="result-list">
-          {pinreg.rysiaiSuJa.map((r: any) => (
-            <ResultCardShell clickable={true}>
-              <dl slot="meta" class="result-card-meta">
-                <div><dt class="sr-only">Nuo</dt><dd>Nuo {r.rysioPradzia}</dd></div>
-                <div><dt class="sr-only">Kas</dt><dd>{r.kienoRysys && r.kienoRysys[0].toUpperCase() + r.kienoRysys.slice(1).toLowerCase()}</dd></div>
-                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(r.pateikimoData).toLocaleString('lt-LT')}</dd></div>
-              </dl>
-              <h3 slot="title" class="result-card-title">
-                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${r.uuid}`}>{r.asmuo}</a>
-              </h3>
-              <div slot="footer" class="result-card-footer"><span>{r.rysioPobudzioPavadinimas}</span></div>
-            </ResultCardShell>
-          ))}
-        </div>
-      ) : <p class="text-muted text-sm">Nėra duomenų</p>}
-    </div>
+<PageSection id="pinreg" title="Privačių interesų deklaracijos">
+  {/* Su aktyviu filtru lentelė rodoma net ir nieko neradus – kitaip nebūtų kaip
+      filtro išjungti. `total` jau yra filtruotas kiekis. */}
+  {pinreg.total > 0 || arFiltruota ? (
+    <>
+      <form method="get" id={FORMOS_ID} action={`${Astro.url.pathname}#pinreg`} class="pinreg-forma">
+        {nekeiciami.map(([raktas, reiksme]) => (
+          <input type="hidden" name={raktas} value={reiksme} />
+        ))}
+        <button type="submit" class="sr-only">Filtruoti</button>
+      </form>
 
-    <div>
-      <h3 class="text-sm font-bold mb-3">Darbovietės</h3>
-      {pinreg.darbovietes.length > 0 ? (
-        <div class="result-list">
-          {pinreg.darbovietes.map((d: any) => (
-            <ResultCardShell clickable={true}>
-              <dl slot="meta" class="result-card-meta">
-                <div><dt class="sr-only">Nuo</dt><dd>Nuo {d.rysioPradzia}</dd></div>
-                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(d.pateikimoData).toLocaleString('lt-LT')}</dd></div>
-              </dl>
-              <h3 slot="title" class="result-card-title">
-                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${d.uuid}`}>{d.asmuo}</a>
-              </h3>
-              <div slot="footer" class="result-card-footer"><span>{d.pareigos}</span></div>
-            </ResultCardShell>
-          ))}
-        </div>
-      ) : <p class="text-muted text-sm">Nėra duomenų</p>}
-    </div>
+      <p class="text-muted text-sm mb-4">
+        {viso > 0
+          ? <>Rodoma {rodomaNuo}–{rodomaIki} iš {viso} {arFiltruota ? 'atrinktų ' : ''}{linksniuotiOnly(viso, ['įrašo', 'įrašų', 'įrašų', 'įrašo'])}</>
+          : 'Pagal filtrus įrašų nerasta'}
+        {arFiltruota && <> · <a href={nuoroda({ pinregTipas: null, pinregPareigos: null, pinregGaliojimas: null, pinregPuslapis: null })}>išvalyti filtrus</a></>}
+      </p>
 
-    <div>
-      <h3 class="text-sm font-bold mb-3">Sutuoktinių darbovietės</h3>
-      {pinreg.sutuoktinioDarbovietes.length > 0 ? (
-        <div class="result-list">
-          {pinreg.sutuoktinioDarbovietes.map((d: any) => (
-            <ResultCardShell clickable={true}>
-              <dl slot="meta" class="result-card-meta">
-                <div><dt class="sr-only">Nuo</dt><dd>Nuo {d.rysioPradzia}</dd></div>
-                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(d.pateikimoData).toLocaleString('lt-LT')}</dd></div>
-              </dl>
-              <h3 slot="title" class="result-card-title">
-                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${d.uuid}`}>{d.asmuo} – {d.sutuoktinis}</a>
-              </h3>
-              <div slot="footer" class="result-card-footer"><span>{d.pareigos}</span></div>
-            </ResultCardShell>
-          ))}
+      <TableWrapper>
+        <Table>
+          <thead>
+            <tr>
+              {STULPELIAI.map((stulpelis) => {
+                const aktyvus = pinreg.sort === stulpelis.raktas;
+                return (
+                  <th
+                    class:list={[
+                      stulpelis.centre && 'cell-center',
+                      stulpelis.raktas && 'sortable',
+                      aktyvus && (pinreg.kryptis === 'asc' ? 'asc' : 'desc'),
+                    ]}
+                    aria-sort={stulpelis.raktas ? (aktyvus ? (pinreg.kryptis === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+                  >
+                    {stulpelis.raktas ? (
+                      <a
+                        class="pinreg-rikiavimas"
+                        href={rikiavimoNuoroda(stulpelis.raktas, stulpelis.numatytojiKryptis || 'desc')}
+                        title="Rikiuoti pagal šį stulpelį (per visus įrašus)"
+                      >{stulpelis.label}</a>
+                    ) : stulpelis.label}
+                  </th>
+                );
+              })}
+            </tr>
+            <tr class="pinreg-filtrai">
+              <td></td>
+              <td>
+                <select class="form-control form-control-sm" name="pinregTipas" form={FORMOS_ID} aria-label="Filtruoti pagal įrašo tipą">
+                  <option value="" selected={!tipoFiltras}>Visi tipai</option>
+                  {Object.entries(TIPAI).map(([reiksme, { label }]) => (
+                    <option value={reiksme} selected={tipoFiltras === reiksme}>{label}</option>
+                  ))}
+                </select>
+              </td>
+              <td>
+                <input
+                  class="form-control form-control-sm"
+                  type="search"
+                  name="pinregPareigos"
+                  form={FORMOS_ID}
+                  value={pareiguFiltras || ''}
+                  placeholder="Filtruoti…"
+                  aria-label="Filtruoti pagal pareigas ar ryšį"
+                />
+              </td>
+              <td></td>
+              <td>
+                <select class="form-control form-control-sm" name="pinregGaliojimas" form={FORMOS_ID} aria-label="Filtruoti pagal galiojimą">
+                  <option value="" selected={!galiojimas}>Visi</option>
+                  <option value="galiojantys" selected={galiojimas === 'galiojantys'}>Galiojantys</option>
+                  <option value="pasibaige" selected={galiojimas === 'pasibaige'}>Pasibaigę</option>
+                </select>
+              </td>
+              <td></td>
+            </tr>
+          </thead>
+          <tbody>
+            {irasai.length > 0 ? irasai.map((irasas: any) => (
+              <tr>
+                <td class="pinreg-asmuo" title={irasas.priedas || undefined}>
+                  <a href={`https://pinreg.vtek.lt/app/pid-perziura/${irasas.uuid}`}>{irasas.asmuo || '—'}</a>
+                </td>
+                <td><Badge variant={TIPAI[irasas.tipas].variant}>{TIPAI[irasas.tipas].label}</Badge></td>
+                <td class="pinreg-aprasymas" title={irasas.aprasymas || undefined}>{irasas.aprasymas || '—'}</td>
+                <td class="cell-center cell-mono cell-nowrap">{irasas.nuo || '—'}</td>
+                <td class="cell-center cell-mono cell-nowrap">{irasas.iki || '—'}</td>
+                <td class="cell-center cell-mono cell-nowrap">{irasas.pateikta || '—'}</td>
+              </tr>
+            )) : <TableEmptyRow colspan={STULPELIAI.length} message="Pagal filtrus įrašų nerasta" />}
+          </tbody>
+        </Table>
+      </TableWrapper>
+
+      {puslapiu > 1 && (
+        <div class="pinreg-puslapiai">
+          <Pagination
+            currentPage={puslapis}
+            pageCount={puslapiu}
+            queryParams={kitiParametrai}
+            pageParam="pinregPuslapis"
+            hash="pinreg"
+          />
         </div>
-      ) : <p class="text-muted text-sm">Nėra duomenų</p>}
-    </div>
-  </div>
-</div>
+      )}
+    </>
+  ) : <p class="text-muted text-sm">Nėra duomenų</p>}
+</PageSection>
+
+<style>
+  /* Vienos eilutės aukštis: ilgi pavadinimai nukerpami, visas tekstas lieka
+     `title` užuominoje. */
+  td.pinreg-asmuo,
+  td.pinreg-aprasymas {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  td.pinreg-asmuo {
+    max-width: 220px;
+  }
+
+  td.pinreg-aprasymas {
+    max-width: 460px;
+  }
+
+  .pinreg-forma {
+    display: contents;
+  }
+
+  /* Rikiavimo nuoroda perima antraštės tipografiją – rodyklę piešia bendra
+     `th.sortable::after` taisyklė (src/design-system/foundation/data.css). */
+  .pinreg-rikiavimas {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .pinreg-rikiavimas:hover {
+    text-decoration: underline;
+  }
+
+  /* Filtrų eilutė – lentelės antraštės dalis, ne atskira juosta virš jos. */
+  .pinreg-filtrai td {
+    padding: 6px 8px;
+    background: var(--shade-2);
+    border-bottom: var(--border);
+  }
+
+  .pinreg-filtrai :global(.form-control) {
+    min-width: 130px;
+  }
+
+  .pinreg-puslapiai {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
+  }
+</style>
+
+<script>
+  // Pakeitus filtrą forma pateikiama iš karto – mygtuko spausti nereikia.
+  const laukai = [...document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
+    '.pinreg-filtrai select, .pinreg-filtrai input',
+  )];
+  for (const laukas of laukai) {
+    laukas.addEventListener('change', () => laukas.form?.requestSubmit());
+  }
+
+  // Tušti filtrai į adresą nerašomi – išjungtų laukų naršyklė nesiunčia.
+  laukai[0]?.form?.addEventListener('submit', () => {
+    for (const laukas of laukai) if (!laukas.value) laukas.disabled = true;
+  });
+</script>
