@@ -33,6 +33,7 @@ const VIEW_FILES = [
 
 const TEST_TABLES = [
     '"xlsxPPAatmestiPasiulymai"',
+    '"xlsxPPAatmestuPasiulymuStatusai"',
     '"xlsxPPApasiulymuEile"',
     '"xlsxPPAdalyviai"',
     '"xlsxPPAataskaitos"',

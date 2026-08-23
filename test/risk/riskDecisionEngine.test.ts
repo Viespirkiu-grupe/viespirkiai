@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BaseParameters, EligibilityOutcome, Lot, Procurement, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
+import type { BaseParameters, Bid, EligibilityOutcome, Lot, Procurement, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
 import { ARiskIndicatorDecision } from "../../modules/risk/riskIndicatorDecision.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
 import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
@@ -83,7 +83,7 @@ function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
     };
 }
 
-function testLot(pirkimoNumeris: string, daliesNumeris: string): Lot {
+function testLot(pirkimoNumeris: string, daliesNumeris: string, bids: readonly Bid[] = []): Lot {
     return {
         subjektoRaktas: `cvpis:${pirkimoNumeris}:${daliesNumeris}`,
         saltinis: "cvpis",
@@ -96,6 +96,18 @@ function testLot(pirkimoNumeris: string, daliesNumeris: string): Lot {
         kainuSkaicius: null,
         atmestuSkaicius: null,
         participation: null,
+        bids,
+    };
+}
+
+function testBid(tiekejoKodas: string): Bid {
+    return {
+        tiekejoKodas,
+        eileNumeris: null,
+        pasiulymoKaina: null,
+        atmetimoPriezastis: null,
+        atmetimoStatusas: null,
+        reportedAt: null,
     };
 }
 
@@ -151,6 +163,52 @@ describe("RiskDecisionEngine", () => {
         engine.evaluateAll([testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]);
 
         expect(indicator.assessRiskCalls).toHaveLength(2);
+    });
+
+    it("builds one BidSubject per lot's bid, carrying its non-null parent lot and procurement", () => {
+        const lot = testLot("30", "1", [testBid("B1"), testBid("B2")]);
+        const procurement = testProcurement({ pirkimoNumeris: "30", lots: [lot] });
+        const bidIndicator = new TestIndicator({ key: { id: "LT-TEST-03", version: 1 }, subjectType: "bid" });
+        const engine = new RiskDecisionEngine([bidIndicator]);
+
+        engine.evaluateAll([procurement]);
+
+        expect(bidIndicator.assessRiskCalls).toHaveLength(2);
+        for (const bidSubject of bidIndicator.assessRiskCalls) {
+            expect(bidSubject.subjectType).toBe("bid");
+            if (bidSubject.subjectType === "bid") {
+                expect(bidSubject.lot).toBe(lot);
+                expect(bidSubject.procurement).toBe(procurement);
+            }
+        }
+        expect(bidIndicator.assessRiskCalls.map((s) => s.subjectKey).sort()).toEqual(["cvpis:30:1:B1", "cvpis:30:1:B2"]);
+    });
+
+    it("only routes bid subjects to a bid-subjectType indicator, not lot or procurement ones", () => {
+        const lot = testLot("40", "1", [testBid("B1")]);
+        const procurement = testProcurement({ pirkimoNumeris: "40", lots: [lot] });
+        const procurementIndicator = new TestIndicator({ subjectType: "procurement" });
+        const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
+        const bidIndicator = new TestIndicator({ key: { id: "LT-TEST-03", version: 1 }, subjectType: "bid" });
+        const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator, bidIndicator]);
+
+        engine.evaluateAll([procurement]);
+
+        expect(procurementIndicator.assessRiskCalls.every((s) => s.subjectType === "procurement")).toBe(true);
+        expect(lotIndicator.assessRiskCalls.every((s) => s.subjectType === "lot")).toBe(true);
+        expect(bidIndicator.assessRiskCalls).toHaveLength(1);
+        expect(bidIndicator.assessRiskCalls[0].subjectType).toBe("bid");
+    });
+
+    it("never walks a lot's bids when no bid-subjectType indicator is registered", () => {
+        const lot = testLot("50", "1", [testBid("B1")]);
+        const procurement = testProcurement({ pirkimoNumeris: "50", lots: [lot] });
+        const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
+        const engine = new RiskDecisionEngine([lotIndicator]);
+
+        const signals = engine.evaluateAll([procurement]);
+
+        expect(signals.every((s) => s.subjectType !== "bid")).toBe(true);
     });
 
 });

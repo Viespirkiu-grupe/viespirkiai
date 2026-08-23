@@ -1,5 +1,5 @@
 import { log } from "../../utils/log.js";
-import type { Lot, LotParticipation, Procurement, ProcurementParticipation } from "./types.ts";
+import type { Bid, Lot, LotParticipation, Procurement, ProcurementParticipation } from "./types.ts";
 import type { RiskDataSource } from "./riskDataSource.ts";
 import { PUBLIC_VIEWS_CTE } from "./procurementPublicViews.ts";
 
@@ -92,14 +92,50 @@ const PROCUREMENT_PARTICIPATION_SQL = `
     GROUP BY d."pirkimoNumeris"
 `;
 
+// Bid-grain rows for Lot.bids — one per (pirkimoNumeris, daliesNumeris,
+// tiekejoKodas), the "bid" SubjectType's grain (docs/indicators-story/
+// indicators-canonical.md §4's "Bid / bidder participation" subject
+// register). Distinct from LOT_PARTICIPATION_SQL's aggregate counts: this is
+// the individual bidder row a bid-grain indicator judges. Only rows with a
+// non-null tiekejoKodas are loaded — a null-coded participant has no durable
+// key to attach a Bid subject to; it is already represented in
+// LotParticipation's totalBids/validBids=0 case.
+//
+// DISTINCT ON collapses duplicate xlsxPPAdalyviai/xlsxPPAatmestiPasiulymai
+// rows for the same bidder (a real data-quality issue — the same rejection
+// entered twice with an identical ataskaitosData) down to one, preferring
+// whichever duplicate actually carries an outcome (a ranking or a rejection
+// status) over a duplicate that carries neither.
+const LOT_BIDS_SQL = `
+    ${PUBLIC_VIEWS_CTE}
+    SELECT DISTINCT ON (d."pirkimoNumeris", COALESCE(d."daliesNumeris", '0'), d."tiekejoKodas")
+           d."pirkimoNumeris"                                                          AS "pirkimoNumeris",
+           COALESCE(d."daliesNumeris", '0')                                            AS "daliesNumeris",
+           d."tiekejoKodas"                                                            AS "tiekejoKodas",
+           d."eileNumeris"                                                             AS "eileNumeris",
+           d."pasiulymoKaina"                                                          AS "pasiulymoKaina",
+           d."atmetimoPriezastis"                                                      AS "atmetimoPriezastis",
+           d."atmetimoStatusas"                                                        AS "atmetimoStatusas",
+           to_char(d."ataskaitosData" AT TIME ZONE 'UTC',
+                   'YYYY-MM-DD"T"HH24:MI:SS"Z"')                                        AS "reportedAt"
+    FROM v_dalyviai_v2 d
+    WHERE d."ataskaitosData" <= $1::timestamptz
+      AND d."tiekejoKodas" IS NOT NULL
+      AND ($2::text[] IS NULL OR d."pirkimoNumeris" = ANY ($2::text[]))
+    ORDER BY d."pirkimoNumeris", COALESCE(d."daliesNumeris", '0'), d."tiekejoKodas",
+             (d."eileNumeris" IS NOT NULL OR d."atmetimoStatusas" IS NOT NULL OR d."atmetimoPriezastis" IS NOT NULL) DESC,
+             d."ataskaitosData" DESC
+`;
+
 export type Page<T> = Readonly<{
     items: readonly T[];
     nextCursor: string | null;
 }>;
 
-type LotRow = Omit<Lot, "participation">;
+type LotRow = Omit<Lot, "participation" | "bids">;
 type LotParticipationRow = Readonly<{ pirkimoNumeris: string; daliesNumeris: string }> & LotParticipation;
 type ProcurementParticipationRow = Readonly<{ pirkimoNumeris: string }> & ProcurementParticipation;
+type BidRow = Readonly<{ pirkimoNumeris: string; daliesNumeris: string }> & Bid;
 
 function encodeCursor(saltinis: string, pirkimoNumeris: string): string {
     return `${saltinis}\u0000${pirkimoNumeris}`;
@@ -171,11 +207,12 @@ export class ProcurementReader {
     private async ensureLotUniverseLoaded(): Promise<void> {
         if (this.lotsByNumber !== null) return;
 
-        const [procurementIds, lotRows, lotParticipationRows, procurementParticipationRows] = await Promise.all([
+        const [procurementIds, lotRows, lotParticipationRows, procurementParticipationRows, bidRows] = await Promise.all([
             this.data.query<{ pirkimoNumeris: string }>(PROCUREMENT_IDS_SQL, [this.subjects]),
             this.data.query<LotRow>(LOT_SQL, [this.subjects]),
             this.data.query<LotParticipationRow>(LOT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
             this.data.query<ProcurementParticipationRow>(PROCUREMENT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
+            this.data.query<BidRow>(LOT_BIDS_SQL, [this.dataAsOf, this.subjects]),
         ]);
 
         const validIds = new Set(procurementIds.map((row) => row.pirkimoNumeris));
@@ -187,6 +224,21 @@ export class ProcurementReader {
             ]),
         );
 
+        const bidsByLotKey = new Map<string, Bid[]>();
+        for (const row of bidRows) {
+            const key = `${row.pirkimoNumeris}:${row.daliesNumeris}`;
+            const bucket = bidsByLotKey.get(key) ?? [];
+            bucket.push({
+                tiekejoKodas: row.tiekejoKodas,
+                eileNumeris: row.eileNumeris,
+                pasiulymoKaina: row.pasiulymoKaina,
+                atmetimoPriezastis: row.atmetimoPriezastis,
+                atmetimoStatusas: row.atmetimoStatusas,
+                reportedAt: row.reportedAt,
+            });
+            bidsByLotKey.set(key, bucket);
+        }
+
         const lotsByNumber = new Map<string, Lot[]>();
         let orphanCount = 0;
         for (const row of lotRows) {
@@ -194,9 +246,11 @@ export class ProcurementReader {
                 orphanCount++;
                 continue;
             }
+            const key = `${row.pirkimoNumeris}:${row.daliesNumeris}`;
             const lot: Lot = {
                 ...row,
-                participation: lotParticipationByKey.get(`${row.pirkimoNumeris}:${row.daliesNumeris}`) ?? null,
+                participation: lotParticipationByKey.get(key) ?? null,
+                bids: bidsByLotKey.get(key) ?? [],
             };
             const bucket = lotsByNumber.get(row.pirkimoNumeris) ?? [];
             bucket.push(lot);

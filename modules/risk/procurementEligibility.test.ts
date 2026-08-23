@@ -35,6 +35,7 @@ function lot(overrides: Partial<Lot> = {}): Lot {
         kainuSkaicius: 1,
         atmestuSkaicius: 0,
         participation: null,
+        bids: [],
         ...overrides,
     };
 }

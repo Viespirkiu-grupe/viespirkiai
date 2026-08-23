@@ -5,7 +5,7 @@
 // docs/indicators-story/risk-service-architecture-v2.md §3.4.
 
 export type IndicatorStage = "planning" | "tender" | "award" | "contract";
-export type SubjectType = "procurement" | "lot" | "contract" | "supplier";
+export type SubjectType = "procurement" | "lot" | "bid" | "contract" | "supplier";
 
 // The four states a calculation returns.
 export type IndicatorState = "triggered" | "not_triggered" | "insufficient_data" | "not_applicable";
@@ -112,6 +112,24 @@ export type Lot = Readonly<{
     kainuSkaicius: number | null;
     atmestuSkaicius: number | null;
     participation: LotParticipation | null;
+    bids: readonly Bid[];
+}>;
+
+// One supplier's individual bid within one lot, from public.v_dalyviai_v2 —
+// the "bid" SubjectType's evidence, merged onto Lot.bids by the Procurement
+// Reader's own bid-grain query. Distinct from LotParticipation (aggregate
+// counts): this is the per-bidder row itself, so a bid-grain indicator can
+// judge one supplier's outcome rather than the lot's totals. Only rows
+// carrying a tiekejoKodas are loaded — a null-coded participant has no
+// durable key to attach a Bid subject to, so it is represented in
+// LotParticipation's totalBids/validBids=0 case instead, never here.
+export type Bid = Readonly<{
+    tiekejoKodas: string;
+    eileNumeris: number | null;
+    pasiulymoKaina: number | null;
+    atmetimoPriezastis: string | null;
+    atmetimoStatusas: string | null;
+    reportedAt: string | null;
 }>;
 
 // The Subject a Risk Indicator's isEligible/assessRisk decide about (v2 §3.4).
@@ -139,10 +157,24 @@ export type LotSubject = Readonly<{
     procurement: Procurement;
 }>;
 
+// bid is always non-null and drawn from lot.bids: the Procurement Reader
+// only ever builds a BidSubject from a Bid already nested inside its parent
+// Lot.bids, itself nested inside Procurement.lots — mirroring the
+// LotSubject/orphan-lot invariant above, one level deeper.
+export type BidSubject = Readonly<{
+    subjectType: "bid";
+    subjectKey: string;
+    procurementSource: string | null;
+    procurementId: string;
+    bid: Bid;
+    lot: Lot;
+    procurement: Procurement;
+}>;
+
 // "contract"/"supplier" subjects (see SubjectType above) have no Subject
 // variant yet — extend this union when the first contract/supplier-level
 // indicator is built.
-export type Subject = ProcurementSubject | LotSubject;
+export type Subject = ProcurementSubject | LotSubject | BidSubject;
 
 // What isEligible() returns (v2 §3.4's EligibilityOutcome = eligible |
 // RiskSignal, made checkable): either the subject is eligible and

@@ -1,6 +1,6 @@
 import { log } from "../../utils/log.js";
 import type { ARiskIndicatorDecision } from "./riskIndicatorDecision.ts";
-import type { Lot, Procurement, RiskSignal, Subject } from "./types.ts";
+import type { Bid, Lot, Procurement, RiskSignal, Subject } from "./types.ts";
 
 /**
  * The Risk Decision Engine
@@ -15,6 +15,7 @@ import type { Lot, Procurement, RiskSignal, Subject } from "./types.ts";
 export class RiskDecisionEngine {
     private readonly procurementIndicators: readonly ARiskIndicatorDecision[];
     private readonly lotIndicators: readonly ARiskIndicatorDecision[];
+    private readonly bidIndicators: readonly ARiskIndicatorDecision[];
 
     /**
      * `indicators` are already evaluation-scoped — each carries its own
@@ -22,19 +23,22 @@ export class RiskDecisionEngine {
      * RiskIndicatorRegistry.createAllIndicators(context)
      * (registry.ts) — so this class never builds or resolves a context
      * itself. Split by subjectType once here, so evaluateProcurement/
-     * evaluateLot each walk only the indicators that apply to their subject.
+     * evaluateLot/evaluateBid each walk only the indicators that apply to
+     * their subject.
      */
     constructor(indicators: readonly ARiskIndicatorDecision[]) {
         this.procurementIndicators = indicators.filter((indicator) => indicator.subjectType === "procurement");
         this.lotIndicators = indicators.filter((indicator) => indicator.subjectType === "lot");
+        this.bidIndicators = indicators.filter((indicator) => indicator.subjectType === "bid");
     }
 
     /**
-     * Walks every procurement (evaluateProcurement) and its lots
-     * (evaluateLot) into one flat signal list. Each signal is already
-     * validated and frozen by ARiskIndicatorDecision.signalFor
-     * (riskIndicatorDecision.ts) at the moment it's built, so there's
-     * nothing left for the Engine to do but collect them.
+     * Walks every procurement (evaluateProcurement), its lots (evaluateLot)
+     * and each lot's individual bids (evaluateBid) into one flat signal
+     * list. Each signal is already validated and frozen by
+     * ARiskIndicatorDecision.signalFor (riskIndicatorDecision.ts) at the
+     * moment it's built, so there's nothing left for the Engine to do but
+     * collect them.
      */
     evaluateAll(procurements: readonly Procurement[]): readonly RiskSignal[] {
         const signals: RiskSignal[] = [];
@@ -43,6 +47,11 @@ export class RiskDecisionEngine {
             signals.push(...this.evaluateProcurement(procurement));
             for (const lot of procurement.lots) {
                 signals.push(...this.evaluateLot(lot, procurement));
+                if (this.bidIndicators.length > 0) {
+                    for (const bid of lot.bids) {
+                        signals.push(...this.evaluateBid(bid, lot, procurement));
+                    }
+                }
             }
         }
 
@@ -65,6 +74,17 @@ export class RiskDecisionEngine {
         const subject = this.subjectForLot(lot, procurement);
         const signals: RiskSignal[] = [];
         for (const indicator of this.lotIndicators) {
+            const signal = this.decide(indicator, subject);
+            if (signal) signals.push(signal);
+        }
+        return signals;
+    }
+
+    /** Every bid-subjectType indicator's signal for this one bid. */
+    private evaluateBid(bid: Bid, lot: Lot, procurement: Procurement): RiskSignal[] {
+        const subject = this.subjectForBid(bid, lot, procurement);
+        const signals: RiskSignal[] = [];
+        for (const indicator of this.bidIndicators) {
             const signal = this.decide(indicator, subject);
             if (signal) signals.push(signal);
         }
@@ -104,6 +124,18 @@ export class RiskDecisionEngine {
             subjectKey: lot.subjektoRaktas,
             procurementSource: lot.saltinis,
             procurementId: lot.pirkimoNumeris,
+            lot,
+            procurement,
+        };
+    }
+
+    private subjectForBid(bid: Bid, lot: Lot, procurement: Procurement): Subject {
+        return {
+            subjectType: "bid",
+            subjectKey: `${lot.subjektoRaktas}:${bid.tiekejoKodas}`,
+            procurementSource: lot.saltinis,
+            procurementId: lot.pirkimoNumeris,
+            bid,
             lot,
             procurement,
         };

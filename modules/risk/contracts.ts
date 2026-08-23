@@ -16,7 +16,7 @@ export function zodContract<T>(schema: z.ZodType<T>): RuntimeContract<T> {
 export const riskSignalSchema: z.ZodType<RiskSignal> = z.object({
     indicatorId: z.string().regex(/^LT-/),
     indicatorVersion: z.number().int().positive(),
-    subjectType: z.enum(["procurement", "lot", "contract", "supplier"]),
+    subjectType: z.enum(["procurement", "lot", "bid", "contract", "supplier"]),
     subjectKey: z.string().min(1),
     procurementSource: z.string().nullable(),
     procurementId: z.string().nullable(),

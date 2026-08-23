@@ -25,6 +25,16 @@ export function lookupOrInsertAtmetimoPriezastis(pavadinimas: string): Promise<n
     return lookupOrInsertId("xlsxPPAatmetimoPriezastys", pavadinimas);
 }
 
+export function lookupOrInsertAtmestoPasiulymoStatusas(pavadinimas: string): Promise<number> {
+    return lookupOrInsertId("xlsxPPAatmestuPasiulymuStatusai", pavadinimas);
+}
+
+// The one status label public.v_dalyviai(_v2) currently recognises as a
+// self-withdrawal (LT-COM-20's trigger) rather than a buyer-side rejection —
+// see xlsxPPAatmestuPasiulymuStatusai id 7 in the real database.
+export const WITHDRAWN_STATUS =
+    "Dalyvis (kandidatas) pasiūlymus (galutinius pasiūlymus) atsiėmė iki pasiūlymų eilės sudarymo";
+
 export async function insertAtaskaita(params: {
     pirkimoNumeris: string;
     pirkimoBudas: string;
@@ -68,11 +78,14 @@ export async function insertAtmestasPasiulymas(params: {
     daliesNumeris: string | null;
     dalyvioKodas: string;
     priezastis?: string;
+    /** The structured rejection status (e.g. WITHDRAWN_STATUS) — LT-COM-20 reads this, not priezastis. */
+    statusas?: string;
 }): Promise<void> {
     const atmetimoPriezastysId = await lookupOrInsertAtmetimoPriezastis(params.priezastis ?? "Atmestas");
+    const statusasId = params.statusas ? await lookupOrInsertAtmestoPasiulymoStatusas(params.statusas) : null;
     await riskDb.query(
-        `INSERT INTO public."xlsxPPAatmestiPasiulymai" ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "atmetimoPriezastysId")
-         VALUES ($1, $2, $3, $4)`,
-        [params.ataskaitaId, params.daliesNumeris, params.dalyvioKodas, atmetimoPriezastysId],
+        `INSERT INTO public."xlsxPPAatmestiPasiulymai" ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "atmetimoPriezastysId", "statusasId")
+         VALUES ($1, $2, $3, $4, $5)`,
+        [params.ataskaitaId, params.daliesNumeris, params.dalyvioKodas, atmetimoPriezastysId, statusasId],
     );
 }

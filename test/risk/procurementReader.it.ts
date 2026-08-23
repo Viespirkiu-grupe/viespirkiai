@@ -19,7 +19,13 @@ vi.mock("../../utils/log.js", () => ({ log: vi.fn() }));
 import { riskDb } from "../../postgres/riskDb.js";
 import { log } from "../../utils/log.js";
 import { ensurePublicTestSchema, truncateTestPublicTables } from "./testPublicDb.ts";
-import { insertAtaskaita, insertAtmestasPasiulymas, insertDalyvis, insertPasiulymas } from "../../modules/risk/indicators/test/xlsxPPAFixtures.ts";
+import {
+    insertAtaskaita,
+    insertAtmestasPasiulymas,
+    insertDalyvis,
+    insertPasiulymas,
+    WITHDRAWN_STATUS,
+} from "../../modules/risk/indicators/test/xlsxPPAFixtures.ts";
 import { PostgresRiskDataSource } from "../../modules/risk/riskDataSource.ts";
 import { ProcurementReader } from "../../modules/risk/procurementReader.ts";
 import type { Procurement } from "../../modules/risk/types.ts";
@@ -302,5 +308,82 @@ describe("ProcurementReader procurement-grain participation", () => {
 
         const [procurement] = await loadAll(reader(["950003"]));
         expect(procurement.participation).toBeNull();
+    });
+});
+
+describe("ProcurementReader bid-grain rows (Lot.bids)", () => {
+    it("loads one Bid per bidder, carrying its ranking and rejection outcome", async () => {
+        await insertViesiejiPirkimai(960001);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "960001",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertDalyvis({ ataskaitaId, kodas: "B1" });
+        await insertPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B1", kaina: "5000" });
+        await insertDalyvis({ ataskaitaId, kodas: "B2" });
+        await insertAtmestasPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B2", statusas: WITHDRAWN_STATUS });
+
+        const [procurement] = await loadAll(reader(["960001"]));
+        const bids = [...procurement.lots[0].bids].sort((a, b) => a.tiekejoKodas.localeCompare(b.tiekejoKodas));
+
+        expect(bids).toHaveLength(2);
+        expect(bids[0]).toMatchObject({ tiekejoKodas: "B1", eileNumeris: 1, pasiulymoKaina: 5000, atmetimoStatusas: null });
+        expect(bids[1]).toMatchObject({ tiekejoKodas: "B2", atmetimoStatusas: WITHDRAWN_STATUS });
+    });
+
+    it("excludes a null-coded participant — no durable key to attach a Bid subject to", async () => {
+        await insertViesiejiPirkimai(960002);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "960002",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertDalyvis({ ataskaitaId, kodas: null });
+
+        const [procurement] = await loadAll(reader(["960002"]));
+        expect(procurement.lots[0].bids).toEqual([]);
+        // Still visible in the aggregate participation count, just not as a Bid.
+        expect(procurement.lots[0].participation).toMatchObject({ totalBids: 0 });
+    });
+
+    it("collapses a duplicate rejection row for the same bidder to one Bid, preferring the one carrying an outcome", async () => {
+        await insertViesiejiPirkimai(960003);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "960003",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertDalyvis({ ataskaitaId, kodas: "B1" });
+        // Same bidder rejected twice under the same lot — a real data-quality
+        // issue observed in the warehouse (duplicate xlsxPPAatmestiPasiulymai
+        // rows with identical ataskaitosData).
+        await insertAtmestasPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B1", statusas: WITHDRAWN_STATUS });
+        await insertAtmestasPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B1", statusas: WITHDRAWN_STATUS });
+
+        const [procurement] = await loadAll(reader(["960003"]));
+        expect(procurement.lots[0].bids).toHaveLength(1);
+        expect(procurement.lots[0].bids[0]).toMatchObject({ tiekejoKodas: "B1", atmetimoStatusas: WITHDRAWN_STATUS });
+    });
+
+    it("hides a bid recorded after the cutoff, and shows it at a later one", async () => {
+        await insertViesiejiPirkimai(960004);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "960004",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-09-01T00:00:00Z",
+        });
+        await insertDalyvis({ ataskaitaId, kodas: "B1" });
+        await insertPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B1" });
+
+        const [beforeCutoff] = await loadAll(reader(["960004"], DATA_AS_OF));
+        expect(beforeCutoff.lots[0].bids).toEqual([]);
+
+        const [afterCutoff] = await loadAll(reader(["960004"], "2026-10-01T00:00:00.000Z"));
+        expect(afterCutoff.lots[0].bids).toHaveLength(1);
     });
 });

@@ -84,6 +84,11 @@ CREATE TABLE IF NOT EXISTS public."xlsxPPAatmetimoPriezastys" (
     "pavadinimas" text NOT NULL UNIQUE
 );
 
+CREATE TABLE IF NOT EXISTS public."xlsxPPAatmestuPasiulymuStatusai" (
+    "id"          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    "pavadinimas" text NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS public."xlsxPPAataskaitos" (
     "id"                                bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "pirkimoNumeris"                    text,
@@ -123,7 +128,8 @@ CREATE TABLE IF NOT EXISTS public."xlsxPPAatmestiPasiulymai" (
     "ataskaitaId"            bigint NOT NULL REFERENCES "xlsxPPAataskaitos" (id) ON DELETE CASCADE,
     "daliesNumeris"          text,
     "dalyvioKodas"           text,
-    "atmetimoPriezastysId"   integer REFERENCES "xlsxPPAatmetimoPriezastys" (id)
+    "atmetimoPriezastysId"   integer REFERENCES "xlsxPPAatmetimoPriezastys" (id),
+    "statusasId"             integer REFERENCES "xlsxPPAatmestuPasiulymuStatusai" (id)
 );
 
 CREATE TABLE IF NOT EXISTS public."jarAsmenys" (

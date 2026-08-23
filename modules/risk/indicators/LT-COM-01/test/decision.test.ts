@@ -54,6 +54,7 @@ function testLot(participation: LotParticipation | null): Lot {
         kainuSkaicius: null,
         atmestuSkaicius: null,
         participation,
+        bids: [],
     };
 }
 

@@ -3,9 +3,15 @@ import { RiskIndicatorRegistry } from "./registry.ts";
 import { LtCom01Decision } from "./indicators/LT-COM-01/decision.ts";
 import { LtCom02Decision } from "./indicators/LT-COM-02/decision.ts";
 import { LtCom03Decision } from "./indicators/LT-COM-03/decision.ts";
+import { LtCom20Decision } from "./indicators/LT-COM-20/decision.ts";
 
 // See docs/indicators-story/risk-service-architecture-v2.md §3.5.
-const deployedIndicatorClasses = [LtCom01Decision, LtCom02Decision, LtCom03Decision] as const satisfies readonly IndicatorClass[];
+const deployedIndicatorClasses = [
+    LtCom01Decision,
+    LtCom02Decision,
+    LtCom03Decision,
+    LtCom20Decision,
+] as const satisfies readonly IndicatorClass[];
 
 export const riskIndicatorRegistry = new RiskIndicatorRegistry(deployedIndicatorClasses);
 

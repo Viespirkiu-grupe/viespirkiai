@@ -22,7 +22,8 @@ SELECT a."pirkimoNumeris",
        p."daliesNumeris",
        p."eileNumeris",
        p."pasiulymoKaina",
-       p."atmetimoPriezastis"
+       p."atmetimoPriezastis",
+       p."atmetimoStatusas"
 FROM "xlsxPPAataskaitos" a
          LEFT JOIN "xlsxPPApirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
          JOIN "xlsxPPAdalyviai" d ON d."ataskaitaId" = a.id
@@ -31,7 +32,8 @@ FROM "xlsxPPAataskaitos" a
              SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
                     e."eileNumeris"                                 AS "eileNumeris",
                     e.kaina::numeric                                AS "pasiulymoKaina",
-                    apr.pavadinimas                                 AS "atmetimoPriezastis"
+                    apr.pavadinimas                                 AS "atmetimoPriezastis",
+                    aps.pavadinimas                                 AS "atmetimoStatusas"
              FROM "xlsxPPApasiulymuEile" e
                       FULL OUTER JOIN "xlsxPPAatmestiPasiulymai" ap
                                       ON ap."ataskaitaId" = e."ataskaitaId"
@@ -39,6 +41,8 @@ FROM "xlsxPPAataskaitos" a
                                           AND ap."daliesNumeris" = e."daliesNumeris"
                       LEFT JOIN "xlsxPPAatmetimoPriezastys" apr
                                 ON apr.id = ap."atmetimoPriezastysId"
+                      LEFT JOIN "xlsxPPAatmestuPasiulymuStatusai" aps
+                                ON aps.id = ap."statusasId"
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas
          ) p ON true
