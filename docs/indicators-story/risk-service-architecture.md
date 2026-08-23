@@ -206,6 +206,8 @@ classDiagram
     class ProcurementRiskDecisions {
         +procurementId: string | null
         +procurementSource: string | null
+        +createdAt: Date
+        +updatedAt: Date
     }
     note for ProcurementRiskDecisions "Created by Procurement Risk Decision Service"
     
