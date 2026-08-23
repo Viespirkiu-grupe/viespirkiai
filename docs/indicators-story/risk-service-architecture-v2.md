@@ -1,6 +1,4 @@
-# Procurement Risk Service Architecture v2
-
-Status: draft
+# Procurement Risk Service Architecture
 
 ## 1. Procurement Risk Process
 
@@ -374,64 +372,7 @@ Each deployed indicator version is one directory under `modules/risk/indicators/
 | `decision.ts`   | The `ARiskIndicatorDecision` subclass that exposes `isEligible` and `assessRisk`                                                                                                        |
 | `test/`         | Unit tests against risk indicator class                                                                                                                                                 |
 
-## 4. Risk Indicators
-
-### 4.1 Procurement Risk Indicators (28)
-
-| Code      | Canonical Indicator                                   |
-|-----------|-------------------------------------------------------|
-| LT-COM-03 | Only one supplier invited or consulted                |
-| LT-COM-18 | Procurement object has elevated cartel risk           |
-| LT-PRO-01 | Unjustified non-competitive procedure                 |
-| LT-PRO-02 | Direct award contrary to procurement plan             |
-| LT-PRO-04 | Procedure without prior publication                   |
-| LT-PRO-05 | Accelerated procedure without adequate grounds        |
-| LT-PRO-08 | Short submission/advertisement period                 |
-| LT-PRO-09 | Unreasonable prequalification requirements            |
-| LT-PRO-10 | Tailored or restrictive technical specifications      |
-| LT-PRO-11 | Unreasonable participation or document fees           |
-| LT-PRO-12 | Excessive tender guarantee                            |
-| LT-PRO-13 | Low predefined number of candidates                   |
-| LT-PRO-14 | Missing method for reducing candidate numbers         |
-| LT-PRI-05 | High estimated value                                  |
-| LT-PRI-06 | High estimated framework value                        |
-| LT-TRA-01 | Planning documents unavailable                        |
-| LT-TRA-02 | Tender insufficiently advertised                      |
-| LT-TRA-03 | Key tender information/documents unavailable          |
-| LT-TRA-05 | Bidder questions unanswered                           |
-| LT-TRA-06 | Procurement decision or reason not documented         |
-| LT-TRA-07 | Complaint received                                    |
-| LT-TRA-08 | Procurement challenged in court                       |
-| LT-TRA-09 | Procurement not conducted electronically              |
-| LT-OTH-01 | No documented market research                         |
-| LT-OTH-03 | Evaluation/decision period anomalously short or long  |
-| LT-OTH-04 | Award-to-signature period unusually long              |
-| LT-OTH-05 | Procedure unsuccessful or award not contracted        |
-| LT-OTH-06 | Strategic-policy objective not applied where relevant |
-
-### 4.2 Procurement Lot Risk Indicators (17)
-
-| Code      | Canonical Indicator                                           |
-|-----------|---------------------------------------------------------------|
-| LT-COM-01 | Single valid bid                                              |
-| LT-COM-02 | Low number of bidders                                         |
-| LT-COM-07 | Missing expected bidder                                       |
-| LT-COM-10 | Identical bid prices                                          |
-| LT-COM-11 | Fixed-multiple bid prices                                     |
-| LT-COM-12 | Suspiciously close bid prices                                 |
-| LT-COM-13 | Wide disparity in bid prices                                  |
-| LT-PRI-01 | Estimated value anomalous against market benchmark            |
-| LT-PRI-03 | Winning price close to or above estimate                      |
-| LT-PRI-08 | Bid prices deviate from Benford's Law                         |
-| LT-PRI-10 | Bid-price or discount movements inconsistent with competition |
-| LT-AWD-01 | All bids except winner disqualified                           |
-| LT-AWD-02 | Lowest bid disqualified                                       |
-| LT-AWD-03 | Poorly supported disqualification                             |
-| LT-AWD-04 | Excessive share of disqualified bids                          |
-| LT-AWD-07 | Evaluation criteria excessively discretionary                 |
-| LT-AWD-08 | Award criteria or scoring method incomplete                   |
-
-## 5. Open Questions
+## 4. Open Questions
 
 | # | Question                                                                                                                                                                                                                               |
 |---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

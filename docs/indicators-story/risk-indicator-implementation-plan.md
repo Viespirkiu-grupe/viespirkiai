@@ -126,9 +126,8 @@ mentioned in the handoff so the repo owner sees it as its own decision rather th
   `risk_signals_subject_type_check` constraint in `migrations/risk/001_risk.sql`.
   Today both allow only `procurement` | `lot` | `contract` | `supplier`.
 
-  [`indicators-canonical.md`](indicators-canonical.md) ("Evaluation subject and UI placement" → "Consequence for the
-  risk schema") assigns each of the 106 indicators a primary evaluation subject, and several of those subjects have no
-  value in that list yet: a **bid** (one participant's proposal in one lot), a **buyer** institution, a
+  [`indicators-canonical.md` §2.2](indicators-canonical.md#22-subject-register) assigns each of the 106 indicators a
+  primary evaluation subject, and several of those subjects have no value in that list yet: a **bid** (one participant's proposal in one lot), a **buyer** institution, a
   **buyer–supplier relationship**, a **bidder relationship** (a co-bidding pair or group), and a **market** (a CPV
   category over an analysis window). These are entity kinds the signal is about — not views, not tables, and nothing
   that needs its own storage. Adding one is two edits plus a schema recreate.
