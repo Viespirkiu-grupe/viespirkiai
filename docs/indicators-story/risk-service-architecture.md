@@ -109,9 +109,9 @@ classDiagram
     RunJob ..> SignalWriter : updateEvaluationRun(status, stats) — inserts on first call, updates after
 ```
 
-## 2. Procurement Business Object
+## 2. Procurement Risk Decision Service
 
-### 2.1 Diagram
+### 2.1 Input Data Object Model
 
 ```mermaid
 classDiagram
@@ -144,6 +144,8 @@ classDiagram
     }
     Procurement "1" *-- "0..*" ProcurementLot: lots
 ```
+
+### 2.1 Output Data Object Model
 
 ### 2.2 Field Provenance
 
@@ -372,7 +374,19 @@ Each deployed indicator version is one directory under `modules/risk/indicators/
 | `decision.ts`   | The `ARiskIndicatorDecision` subclass that exposes `isEligible` and `assessRisk`                                                                                                        |
 | `test/`         | Unit tests against risk indicator class                                                                                                                                                 |
 
-## 4. Open Questions
+## 4. Running the Service
+
+Entry point: `services/procurement-risk/index.ts` (`npm run risk:run`). One sequential evaluation run per invocation — not a daemon.
+
+```bash
+npm run risk:run                       # full run, every subject
+npm run risk:run -- <pirkimoNumeris...>  # only the named procurements
+npm run risk:run -- --limit 20         # light run: first 20 distinct ATN-1 procurement ids (deterministic)
+```
+
+`--limit N` and explicit subject ids are mutually exclusive. Requires `riskDb` (see `postgres/riskDb.js`) and the primary Postgres DB configured, as in [Local dev setup](../../CLAUDE.md).
+
+## 5. Open Questions
 
 | # | Question                                                                                                                                                                                                                               |
 |---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
