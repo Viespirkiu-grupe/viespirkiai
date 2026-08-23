@@ -94,6 +94,9 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
   const { loadPpaForPirkimas } = await import('./ppa.js');
   pirkimas.ppa = await loadPpaForPirkimas(String(pirkimas.pirkimoId));
 
+  const { loadProcurementRiskView } = await import('@/modules/risk/procurementDecisionsReader.ts');
+  pirkimas.riskView = await loadProcurementRiskView('cvpis', String(pirkimas.pirkimoId));
+
   return pirkimas;
 }
 

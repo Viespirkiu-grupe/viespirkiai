@@ -1,14 +1,24 @@
 ---
 import DataTable from '@design-system/components/DataTable.astro';
+import RiskSignalChip from '@design-system/components/RiskSignalChip.astro';
 import type { PpaSantrauka } from '../../lib/ppa.js';
+import type { ProcurementRiskView } from '../../../modules/risk/procurementDecisionsReader.ts';
 
-const { ppa } = Astro.props as { ppa: PpaSantrauka };
+const { ppa, riskView } = Astro.props as { ppa: PpaSantrauka; riskView?: ProcurementRiskView | null };
 const dalyviai = ppa.dalyviai ?? [];
 const eile = ppa.pasiulymuEile ?? [];
 const val = (v: any) => (v == null || v === '' ? '—' : v);
 const asmuoLink = (kodas: any, fizinisAsmuo: any, pavadinimas: any) =>
   kodas && fizinisAsmuo !== true ? { href: `/asmuo/${kodas}`, text: val(pavadinimas) } : null;
 const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesNumeris) > 1);
+
+const dalisKey = (daliesNumeris: any) => String(daliesNumeris ?? '0');
+const bidRiskFor = (e: any) => riskView?.bidsByDalisAndTiekejas.get(`${dalisKey(e.daliesNumeris)}:${e.dalyvioKodas}`) ?? [];
+const lotRiskEntries = riskView
+  ? [...new Set(eile.map((e) => dalisKey(e.daliesNumeris)))]
+      .map((dalis) => ({ dalis, signals: riskView.lotsByDalis.get(dalis) ?? [] }))
+      .filter((entry) => entry.signals.length > 0)
+  : [];
 ---
 
 <section class="dalyviai-section">
@@ -38,6 +48,18 @@ const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesN
   {eile.length > 0 && (
     <>
       <h3 class="mt-6 mb-3">Pasiūlymų eilė</h3>
+      {lotRiskEntries.length > 0 && (
+        <div class="lot-risk-lines mb-3">
+          {lotRiskEntries.map((entry) => (
+            <div class="lot-risk-line">
+              {keliosDalys && <span class="lot-risk-label">Dalis {entry.dalis}:</span>}
+              {entry.signals.map((signal) => (
+                <RiskSignalChip signal={signal} />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
       <DataTable
         size="sm"
         columns={[
@@ -45,16 +67,27 @@ const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesN
           { label: 'Eilė', headerClassName: 'dalyviai-col-num' },
           { label: 'Dalyvis' },
           { label: 'Kaina', headerClassName: 'cell-right' },
+          { label: 'Rizika' },
         ]}
       >
         {eile.map((e) => {
           const l = asmuoLink(e.dalyvioKodas, false, e.dalyvioPavadinimas);
+          const bidRisk = bidRiskFor(e);
           return (
             <tr>
               {keliosDalys && <td class="cell-mono">{val(e.daliesNumeris)}</td>}
               <td class="cell-mono">{val(e.eileNumeris)}</td>
               <td>{l ? <a href={l.href}>{l.text}</a> : val(e.dalyvioPavadinimas)}</td>
               <td class="cell-mono cell-right">{e.kaina ? `${e.kaina}${e.kainosIsraiska ? ` ${e.kainosIsraiska}` : ''}` : '—'}</td>
+              <td>
+                {bidRisk.length > 0 && (
+                  <div class="flex flex-wrap gap-1">
+                    {bidRisk.map((signal) => (
+                      <RiskSignalChip signal={signal} />
+                    ))}
+                  </div>
+                )}
+              </td>
             </tr>
           );
         })}
@@ -65,4 +98,22 @@ const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesN
 
 <style>
   .dalyviai-col-num { width: 4rem; }
+
+  .lot-risk-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lot-risk-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lot-risk-label {
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
 </style>

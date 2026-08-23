@@ -15,6 +15,7 @@ import PirkimasSkelbimai from '../../components/viesiejiPirkimai/PirkimasSkelbim
 import PirkimasTedNuorodos from '../../components/viesiejiPirkimai/PirkimasTedNuorodos.astro';
 import PirkimasDalyviai from '../../components/viesiejiPirkimai/PirkimasDalyviai.astro';
 import PirkimasAiSantrauka from '../../components/viesiejiPirkimai/PirkimasAiSantrauka.astro';
+import RiskSignalChip from '@design-system/components/RiskSignalChip.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { loadPirkimas, loadPirkimoAiSantrauka, buildTimelineItems, buildTedKorteles, getCvpisUrl } from '../../lib/viesiejiPirkimai.js';
 
@@ -102,7 +103,7 @@ const aiSantrauka = Astro.cookies.get('showAi')?.value === 'false'
       <PirkimasVykdytojas pirkimas={pirkimas} />
       <PirkimasTerminai items={timelineItems} />
       <PirkimasKlasifikacija pirkimas={pirkimas} />
-      {pirkimas.ppa && <PirkimasDalyviai ppa={pirkimas.ppa} />}
+      {pirkimas.ppa && <PirkimasDalyviai ppa={pirkimas.ppa} riskView={pirkimas.riskView} />}
       <PirkimasVerte pirkimas={pirkimas} />
       <PirkimasSalygos pirkimas={pirkimas} />
     </div>
@@ -120,6 +121,17 @@ const aiSantrauka = Astro.cookies.get('showAi')?.value === 'false'
           <div class="result-list mt-4">
             {pirkimas.sutartys.map((item: any) => (
               <SutartisCard item={item} showRedagavimoData={false} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {pirkimas.riskView && pirkimas.riskView.procurement.length > 0 && (
+        <section class="mb-7">
+          <h2>Rizikos Signalai</h2>
+          <div class="flex flex-wrap gap-2 mt-4">
+            {pirkimas.riskView.procurement.map((signal: any) => (
+              <RiskSignalChip signal={signal} />
             ))}
           </div>
         </section>

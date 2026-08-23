@@ -1,0 +1,104 @@
+---
+import Badge from './Badge.astro';
+import type { EnrichedRiskSignal } from '../../../modules/risk/procurementDecisionsReader.ts';
+
+interface Props {
+  signal: EnrichedRiskSignal;
+}
+
+const { signal } = Astro.props as Props;
+const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
+---
+
+<span class="risk-chip">
+  <button type="button" class="risk-chip-trigger">
+    <Badge variant="danger">{signal.titleLt}</Badge>
+  </button>
+  <div class="risk-chip-tooltip" role="tooltip">
+    <div class="risk-chip-tooltip-head">
+      <strong>{signal.titleLt}</strong>
+      <span class="risk-chip-id">{signal.indicatorId} v{signal.indicatorVersion}</span>
+    </div>
+    {signal.descriptionLt && <p>{signal.descriptionLt}</p>}
+    {signal.formulaLt && <p class="risk-chip-formula">{signal.formulaLt}</p>}
+    {signal.limitationLt && <p class="risk-chip-limitation">{signal.limitationLt}</p>}
+    <div class="risk-chip-meta">Duomenys nuo {dataAsOfStr}</div>
+  </div>
+</span>
+
+<style>
+  .risk-chip {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .risk-chip-trigger {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: default;
+    font: inherit;
+  }
+
+  .risk-chip-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: var(--z-tooltip);
+    width: max-content;
+    max-width: 320px;
+    white-space: normal;
+    background: var(--black);
+    color: var(--white);
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(2px);
+    transition: opacity var(--transition), transform var(--transition), visibility var(--transition);
+  }
+
+  .risk-chip:hover .risk-chip-tooltip,
+  .risk-chip:focus-within .risk-chip-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  .risk-chip-tooltip p {
+    margin: 6px 0 0;
+  }
+
+  .risk-chip-tooltip-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .risk-chip-id {
+    opacity: 0.7;
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+
+  .risk-chip-formula {
+    font-family: var(--font-mono, monospace);
+    opacity: 0.85;
+  }
+
+  .risk-chip-limitation {
+    opacity: 0.7;
+    font-style: italic;
+  }
+
+  .risk-chip-meta {
+    margin-top: 8px;
+    opacity: 0.6;
+  }
+</style>
