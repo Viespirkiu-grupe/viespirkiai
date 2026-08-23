@@ -6,15 +6,17 @@ import { riskDb } from "../../postgres/riskDb.js";
 // Test-only `public` schema shared by every Risk Indicator's collect.it.ts
 // and test/risk/procurementReader.it.ts: applies
 // migrations/risk/test/001_public_test_tables.sql plus the risk service's own
-// v_pirkimas_v2/v_pirkimo_dalis_v2/v_dalyviai_v2 view definitions onto the
-// local risk-dev Postgres, so calculation tests run the real SQL against
-// fixture rows — never against the real database. See
+// v_pirkimas_v2/v_pirkimo_dalis_v2/v_dalyviai_v2/v_pirkimo_pabaiga_v2 view
+// definitions onto the local risk-dev Postgres, so calculation tests run the
+// real SQL against fixture rows — never against the real database. See
 // docs/indicators-story/risk-service-architecture-v2.md.
 //
 // The risk service queries its own _v2-suffixed views (see
 // modules/mcp/analyst/views/v_pirkimas_v2.sql's header comment) rather than
 // the shared analyst v_pirkimas/v_pirkimo_dalis/v_dalyviai, so it never
 // depends on the shared views' column shape or naming drift.
+// v_pirkimo_pabaiga_v2 has no shared analyst counterpart at all — see its
+// own header comment.
 //
 // v_dalyviai_v2.sql reads xlsxPPA*-named tables — the real database renamed
 // these from an earlier atn1*-named schema (see git history on

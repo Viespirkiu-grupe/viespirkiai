@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 //
 // A CTE of the same name simply shadows a persisted view inside the query
 // that defines it, so this works unchanged against test/risk/testPublicDb.ts's
-// local Postgres too, where the same three files are also applied for real
+// local Postgres too, where the same four files are also applied for real
 // via CREATE VIEW (riskDb there is an admin-owned local Docker instance).
 //
 // Keep this in sync with modules/mcp/analyst/views/v_pirkimas_v2.sql,

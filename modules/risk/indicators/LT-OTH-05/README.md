@@ -22,8 +22,11 @@ of what it set out to procure.
 
 `Subject.procurement.procedureOutcome` (`lotOutcomes`/`reportedAt`) comes from
 `modules/risk/procurementReader.ts`'s consolidated procurement-grain `PROCEDURE_OUTCOME_SQL` query, reading
-`public.v_pirkimo_pabaiga_v2` — a new view (`modules/mcp/analyst/views/v_pirkimo_pabaiga.sql` +
-`v_pirkimo_pabaiga_v2.sql`) added for this indicator.
+`public.v_pirkimo_pabaiga_v2` — a new view (`modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql`) added for this
+indicator. Unlike `v_pirkimas_v2`/`v_dalyviai_v2`/`v_pirkimo_dalis_v2`, there is no already-persisted non-`_v2`
+`v_pirkimo_pabaiga` in the shared analyst schema this forks from — the entity is new, so only the one file exists.
+The `_v2` suffix here means "not yet persisted" (procurementPublicViews.ts inlines it as a CTE per query, same as
+the other three), not "forked from an existing view".
 
 ## Why a new view, not `v_dalyviai`
 
@@ -32,7 +35,7 @@ path that only produces a row when the report lists at least one participant. `x
 procedure-ending decision) is a sibling child table of `xlsxPPAataskaitos`, not of `xlsxPPAdalyviai` — a procedure
 that ended because **no supplier submitted anything at all** ("Per nustatytą terminą tiekėjams nepateikus nė vienos
 paraiškos...") has zero `xlsxPPAdalyviai` rows, so joining through `v_dalyviai` would silently drop exactly the
-outcome this indicator most needs to see. `v_pirkimo_pabaiga(_v2)` reads `xlsxPPAataskaitos`/`xlsxPPAproceduruPabaiga`
+outcome this indicator most needs to see. `v_pirkimo_pabaiga_v2` reads `xlsxPPAataskaitos`/`xlsxPPAproceduruPabaiga`
 directly instead.
 
 ## The `concludedOutcomes` list

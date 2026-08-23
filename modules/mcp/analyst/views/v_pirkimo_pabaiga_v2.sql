@@ -1,11 +1,14 @@
--- Risk service's own copy of v_pirkimo_pabaiga, isolated under a _v2 suffix
--- so the Procurement Reader (modules/risk/procurementReader.ts) never
--- depends on whatever the shared analyst v_pirkimo_pabaiga view happens to
--- look like at any given time. Same definition as v_pirkimo_pabaiga.sql —
--- keep the two in sync by hand until the shared view is retired in favor of
--- this one. Unlike v_pirkimas_v2/v_dalyviai_v2/v_pirkimo_dalis_v2, this view
--- reads its base tables directly and has no dependency on any other _v2
--- view.
+-- Risk service's own view, _v2-suffixed by the same convention as
+-- v_pirkimas_v2/v_dalyviai_v2/v_pirkimo_dalis_v2 (procurementPublicViews.ts's
+-- header explains why: applied fresh as a CTE per query rather than
+-- persisted, since the query role has no CREATE privilege on `public`).
+-- Unlike those three, there is no already-persisted non-_v2
+-- "v_pirkimo_pabaiga" in the shared analyst schema this forks from or could
+-- clash with — this entity is new — so no sibling file exists to keep in
+-- sync. The _v2 suffix here means "not yet persisted", not "forked from an
+-- existing view"; this is the definition that becomes the real view once it
+-- is eventually persisted. Also unlike those three, it reads its base tables
+-- directly and has no dependency on any other _v2 view.
 --
 -- Pirkimo procedūros pabaiga — one row per (pirkimas, dalis) procedure-ending
 -- decision recorded in the ATN-1/PPA procedure report

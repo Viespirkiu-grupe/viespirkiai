@@ -456,7 +456,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
     it("is still collected when a report has no participant rows — the 'no bids received' case", async () => {
         // No insertDalyvis call: this is exactly the case v_dalyviai/v_dalyviai_v2
         // cannot see (their JOIN on xlsxPPAdalyviai drops it), and the reason
-        // v_pirkimo_pabaiga(_v2) reads xlsxPPAataskaitos/xlsxPPAproceduruPabaiga
+        // v_pirkimo_pabaiga_v2 reads xlsxPPAataskaitos/xlsxPPAproceduruPabaiga
         // directly instead.
         await insertViesiejiPirkimai(970004);
         const ataskaitaId = await insertAtaskaita({

@@ -7,7 +7,7 @@ import { ltOth05Definition } from "./definition.ts";
 // procurement from the procedure-ending outcome labels the Procurement
 // Reader already merged onto Subject.procurement.procedureOutcome. See
 // docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4 and
-// modules/mcp/analyst/views/v_pirkimo_pabaiga.sql.
+// modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql.
 
 export class LtOth05Decision extends AProcurementIndicatorDecision<typeof ltOth05Definition> {
     static readonly definition = ltOth05Definition;
