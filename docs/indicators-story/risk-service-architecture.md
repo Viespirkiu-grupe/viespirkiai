@@ -29,64 +29,217 @@ flowchart LR
     WRITER -->|" risk_signals rows "| STORE
 ```
 
-### 1.2 Procurement Reader and Procurement Writer Components Class Diagram
+### 1.2 Procurement Reader and Signal Writer Components Class Diagram
 
 ```mermaid
 classDiagram
-    class ProcurementReader {
-        <<class>>
-        -PROCUREMENT_SQL
-        -LOT_SQL
-        +loadProcurements(subjects: string[], cursor: string, pageSize: number)$ Page~Procurement~
-    }
-    note for ProcurementReader "Orphan lots (no matching procurement) can't happen by business invariant.
-    If LOT_SQL still returns one, log its count at WARNING and drop it — it is not a Subject."
-
-    class Page~T~ {
-        <<type>>
-        +T[] items
-        +string nextCursor
-    }
-
-    class SignalWriter {
-        <<class>>
-        -EvaluationRun evaluationRun
-        +writeRiskSignals(signals: RiskSignal[])$ number
-        +updateEvaluationRun(update: Partial EvaluationRun)$ EvaluationRun
-    }
-    note for SignalWriter "updateEvaluationRun upserts: first call inserts the run row, later calls update it —
-    accumulating per-indicator stats across pages. No crash recovery, no retry."
-
     class RunJob {
         <<module runJob.ts>>
-        +runEvaluation(options: RunJobOptions)$ RunResult
-    }
-
-    class RiskDecisionEngine {
-        -riskIndicators: RiskIndicatorDecision[]
-        +evaluateAll(procurements: Procurement[])$ RiskSignal[]
-        -evaluateProcurement(procurement: Procurement)$ RiskSignal[]
-        -evaluateLot(lot: ProcurementLot)$ RiskSignal[]
+        +runEvaluation(options: RunJobOptions) Promise~RunResult~
     }
 
     class RunJobOptions {
         <<type>>
-        +string[] subjects
-        +number pageSize
+        +codeCommit: string
+        +subjects: string[] | null
+        +pageSize: number
     }
 
     class RunResult {
         <<type>>
-        +number runId
-        +RunStatus status
+        +runId: number
+        +status: RunStatus
+        +statistics: Record~string, IndicatorStats~
+    }
+    note for RunResult "RunStatus, IndicatorStats and the EvaluationRun row behind them: §2.3."
+
+    class ProcurementReader {
+        -subjects: string[] | null
+        -dataAsOf: string
+        +loadProcurements(cursor: string | null, pageSize: number) Promise~Page~Procurement~~
+    }
+    note for ProcurementReader "subjects and dataAsOf are bound once per run, not per page, so lots
+    and evidence load once. Orphan lots (no matching procurement) can't happen by business invariant;
+    if the query still returns one, its count is logged at WARNING and it is dropped — it is not a Subject."
+
+    class Page~T~ {
+        <<type>>
+        +items: T[]
+        +nextCursor: string | null
+    }
+
+    class RiskDecisionEngine {
+        -procurementIndicators: ARiskIndicatorDecision[]
+        -lotIndicators: ARiskIndicatorDecision[]
+        -bidIndicators: ARiskIndicatorDecision[]
+        +evaluateAll(procurements: Procurement[]) RiskSignal[]
+        -evaluateProcurement(procurement: Procurement) RiskSignal[]
+        -evaluateLot(lot: Lot, procurement: Procurement) RiskSignal[]
+        -evaluateBid(bid: Bid, lot: Lot, procurement: Procurement) RiskSignal[]
+    }
+
+    class SignalWriter {
+        -evaluationRun: EvaluationRun | null
+        +writeRiskSignals(signals: RiskSignal[]) Promise~number~
+        +updateEvaluationRun(update: Partial~EvaluationRun~) Promise~EvaluationRun~
+    }
+    note for SignalWriter "updateEvaluationRun upserts: the first call inserts the run row, later calls
+    update it — accumulating per-indicator stats across pages. No crash recovery, no retry."
+
+    RunJob ..> RunJobOptions: options
+    RunJob --> RunResult: returns
+    RunJob ..> ProcurementReader: loop — loads next page (subjects filter, cursor) until nextCursor is null
+    ProcurementReader --> Page: returns
+    RunJob ..> RiskDecisionEngine: evaluates one page of procurements
+    RunJob ..> SignalWriter: writes the page's signals, then checkpoints statistics
+```
+
+## 2. Procurement Risk Decision Service
+
+The service's data contract: what a run reads (§2.1, §2.2) and what it writes (§2.3, §2.4). Every type below is
+declared in `modules/risk/types.ts`; `RiskSignal` is additionally validated at runtime by `riskSignalSchema` in
+`modules/risk/contracts.ts`.
+
+### 2.1 Input Data Object Model
+
+The Procurement Reader loads one object graph per page, rooted at `Procurement`. A Risk Indicator reads only this
+graph, never the database. Its three grains are the three implemented subject types — `Procurement`, `Lot`, `Bid`;
+`contract` and `supplier` are admitted by the schema but have no object yet.
+
+```mermaid
+classDiagram
+    class Procurement {
+        +saltinis: string | null
+        +pirkimoNumeris: string
+        +pavadinimas: string | null
+        +jarKodas: string | null
+        +pirkimoBudas: string | null
+        +statusas: string | null
+        +pirkimoObjektoTipas: string | null
+        +numatomaVerteEUR: number | null
+        +paskelbimoData: string | null
+        +pasiulymuPateikimoTerminas: string | null
+        +bvpzKodai: string[] | null
+        +esFinansavimas: boolean | null
+        +lots: Lot[]
+        +participation: ProcurementParticipation | null
+        +procedureOutcome: ProcurementProcedureOutcome | null
+    }
+
+    class Lot {
+        +subjektoRaktas: string
+        +saltinis: string | null
+        +pirkimoNumeris: string
+        +daliesNumeris: string
+        +daliesPavadinimas: string | null
+        +deklaruota: boolean
+        +stebeta: boolean
+        +dalyviuSkaicius: number | null
+        +kainuSkaicius: number | null
+        +atmestuSkaicius: number | null
+        +participation: LotParticipation | null
+        +bids: Bid[]
+    }
+
+    class Bid {
+        +tiekejoKodas: string
+        +eileNumeris: number | null
+        +pasiulymoKaina: number | null
+        +atmetimoPriezastis: string | null
+        +atmetimoStatusas: string | null
+        +reportedAt: string | null
+    }
+
+    class LotParticipation {
+        +totalBids: number
+        +validBids: number
+        +reportedAt: string | null
+    }
+    class ProcurementParticipation {
+        +totalSuppliers: number
+        +reportedAt: string | null
+    }
+    class ProcurementProcedureOutcome {
+        +lotOutcomes: string[]
+        +reportedAt: string | null
+    }
+
+    Procurement "1" *-- "0..*" Lot: lots
+    Procurement "1" *-- "0..1" ProcurementParticipation: participation
+    Procurement "1" *-- "0..1" ProcurementProcedureOutcome: procedureOutcome
+    Lot "1" *-- "0..1" LotParticipation: participation
+    Lot "1" *-- "0..*" Bid: bids
+```
+
+- **`null` evidence means nothing was observed** — the `insufficient_data` case. A *present* `participation` whose
+  counts are zero is a different, real observation, and `hasRequiredData()` must not confuse the two.
+- **The run's `dataAsOf` cuts off evidence, not subjects.** `Bid`, both participations and `ProcurementProcedureOutcome`
+  are filtered `ataskaitosData <= dataAsOf`; `Procurement` and `Lot` are whatever the register currently holds.
+- **Aggregates are merged, not joined.** One batch query per grain per run, attached to the object — so a decision
+  issues no query, and every indicator at that grain shares one read. Orphan lots are dropped by the Reader, so
+  `Lot.pirkimoNumeris` always resolves.
+
+### 2.2 Input Data Object Model Source
+
+Each object is read through the risk service's own `_v2` copy of the view, inlined per query as a CTE by
+`procurementPublicViews.ts`.
+
+| Business Object               | Domain Model View       |
+|-------------------------------|-------------------------|
+| `Procurement`                 | `v_pirkimas`            |
+| `Lot`                         | `v_pirkimo_dalis`       |
+| `Bid`                         | `v_dalyviai`            |
+| `LotParticipation`            | `v_dalyviai`            |
+| `ProcurementParticipation`    | `v_dalyviai`            |
+| `ProcurementProcedureOutcome` | `v_proceduros_pabaiga`  |
+
+`v_proceduros_pabaiga` is still listed as not-yet-implemented in [`domain-model.md`](domain-model.md) §1.3; the risk
+service reads it today through a `_v2`-only view named `v_pirkimo_pabaiga_v2`, with no shared counterpart. Same
+entity, two names — to be reconciled.
+
+### 2.3 Output Data Object Model
+
+A run produces one `EvaluationRun` and one `RiskSignal` per (subject, indicator) pair it evaluated. Nothing else.
+
+```mermaid
+classDiagram
+    class RiskSignal {
+        +indicatorId: string
+        +indicatorVersion: number
+        +subjectType: SubjectType
+        +subjectKey: string
+        +procurementSource: string | null
+        +procurementId: string | null
+        +state: IndicatorState
+        +rawValue: Record~string, unknown~ | null
+        +threshold: Record~string, unknown~ | null
+        +appliedParameters: Record~string, unknown~ | null
+        +missingData: string[]
+        +dataAsOf: string
+    }
+    note for RiskSignal "Created by RiskIndicatorDecision"
+
+    class IndicatorState {
+        <<enumeration>>
+        triggered
+        not_triggered
+        insufficient_data
+        not_applicable
     }
 
     class EvaluationRun {
-        <<type>>
-        +number runId
-        +RunStatus status
-        +timestamp dataAsOf
-        +object statistics
+        +runId: number
+        +status: RunStatus
+        +dataAsOf: string
+        +codeCommit: string
+        +statistics: Record~string, IndicatorStats~
+    }
+    note for EvaluationRun "Created by Procurement Reader, updated by Procurement Writer"
+
+    class IndicatorStats {
+        +rows: number
+        +triggered: number
+        +inserted: number
     }
 
     class RunStatus {
@@ -98,68 +251,68 @@ classDiagram
     }
 
     EvaluationRun "1" --> "1" RunStatus: status
-    RunResult "1" --> "1" RunStatus: status
-    RunJob ..> RunJobOptions: options
-    RunJob --> RunResult: returns
-
-    RunJob ..> ProcurementReader : loop — loads next page (subjects filter, cursor) until nextCursor is null
-    ProcurementReader --> Page : returns
-    RunJob ..> RiskDecisionEngine : evaluates single batch of procurements
-    RunJob ..> SignalWriter : writes page's signals
-    RunJob ..> SignalWriter : updateEvaluationRun(status, stats) — inserts on first call, updates after
+    EvaluationRun "1" *-- "0..*" IndicatorStats: statistics, keyed by indicatorId
+    EvaluationRun "1" *-- "0..*" RiskSignal: produced in this run
+    RiskSignal "1" --> "1" IndicatorState: state
 ```
 
-## 2. Procurement Risk Decision Service
+### 2.4 Output Data Object Model Persistence
 
-### 2.1 Input Data Object Model
+`RiskSignal` → `risk.risk_signals`, one row per signal:
 
-```mermaid
-classDiagram
-    class Procurement {
-        +text saltinis
-        +text pirkimoNumeris
-        +text pavadinimas
-        +text jarKodas
-        +text pirkimoBudas
-        +text statusas
-        +text pirkimoObjektoTipas
-        +numeric numatomaVerteEUR
-        +date paskelbimoData
-        +timestamp pasiulymuPateikimoTerminas
-        +text[] bvpzKodai
-        +boolean esFinansavimas
-        +ProcurementLot[] lots
-    }
-    class ProcurementLot {
-        +text subjektoRaktas
-        +text saltinis
-        +text pirkimoNumeris
-        +text daliesNumeris
-        +text daliesPavadinimas
-        +boolean deklaruota
-        +boolean stebeta
-        +integer dalyviuSkaicius
-        +integer kainuSkaicius
-        +integer atmestuSkaicius
-    }
-    Procurement "1" *-- "0..*" ProcurementLot: lots
-```
+| Field               | Column               | Type          | Note                                                        |
+|---------------------|----------------------|---------------|-------------------------------------------------------------|
+| —                   | `run_id`             | `bigint`      | Supplied by the Signal Writer, not by the indicator          |
+| `subjectType`       | `subject_type`       | `text`        | CHECK: `procurement`, `lot`, `bid`, `contract`, `supplier`   |
+| `subjectKey`        | `subject_key`        | `text`        |                                                              |
+| `procurementSource` | `procurement_source` | `text`        | Denormalised, so a lot/bid row filters by procurement        |
+| `procurementId`     | `procurement_id`     | `text`        | Same                                                         |
+| `indicatorId`       | `indicator_id`       | `text`        |                                                              |
+| `indicatorVersion`  | `indicator_version`  | `integer`     | `NOT NULL` — an indicator's identity is (id, version)        |
+| `appliedParameters` | `applied_parameters` | `jsonb`       | The parameter entry in force at `dataAsOf`                   |
+| `state`             | `state`              | `text`        | CHECK: `IndicatorState` plus `calculation_error`             |
+| `rawValue`          | `raw_value`          | `jsonb`       | What was measured                                            |
+| `threshold`         | `threshold`          | `jsonb`       | What it was measured against                                 |
+| `missingData`       | `missing_data`       | `jsonb`       | Field names, when `state = insufficient_data`                |
+| `dataAsOf`          | `data_as_of`         | `timestamptz` | Copied from the run, so a row explains itself without a join |
 
-### 2.1 Output Data Object Model
+`EvaluationRun` → `risk.evaluation_runs`, one row per run:
 
-### 2.2 Field Provenance
+| Field        | Column        | Type          | Note                                                      |
+|--------------|---------------|---------------|-----------------------------------------------------------|
+| `runId`      | `id`          | `bigint`      | The FK every signal carries                               |
+| `dataAsOf`   | `data_as_of`  | `timestamptz` |                                                           |
+| `codeCommit` | `code_commit` | `text`        |                                                           |
+| `status`     | `status`      | `text`        | CHECK: the four `RunStatus` values                        |
+| `statistics` | `statistics`  | `jsonb`       | Per-indicator `rows` / `triggered` / `inserted`           |
+| —            | `started_at`  | `timestamptz` | `DEFAULT now()`                                           |
+| —            | `finished_at` | `timestamptz` | Stamped when status becomes terminal                      |
+| —            | `error`       | `text`        | Set only by the stale-run sweep at the next process start |
 
-| Business Object | Domain Model View | Key                           |
-|------------------|-------------------|-------------------------------|
-| Procurement      | `v_pirkimas`      | `saltinis` + `pirkimoNumeris` |
-| ProcurementLot    | `v_pirkimo_dalis` | `subjektoRaktas`              |
+`state`'s CHECK admits a fifth value, `calculation_error`, that no run writes: the engine contains a failing
+indicator by logging it and contributing no signal. The columns `error_info` and `duration_ms` belong to that same
+unused path.
+
+Three invariants:
+
+- **A run is an immutable snapshot.** `risk.risk_signals` is insert-only — `risk_rw` holds no UPDATE or DELETE — so
+  there is no current-state row to maintain. A superseded snapshot is deleted whole by the retention job.
+- **One result per subject and indicator, per run** — unique index `(run_id, subject_type, subject_key, indicator_id)`.
+- **At most one open run** — partial unique index on `status = 'running'`.
+
+Two views are the only read path, so the site, the retention job and the service cannot disagree about which
+snapshot is live:
+
+| View                           | Answers                                                                                    |
+|--------------------------------|--------------------------------------------------------------------------------------------|
+| `risk.v_latest_run`            | Which run the site shows — the most recently started `succeeded` or `partial` run           |
+| `risk.v_procurement_summaries` | Per procurement, within that run: counts by state and the list of `triggered` indicator ids |
 
 ## 3. Risk Decision Services (DRD)
 
-### Decision Areas
-
-- **Procurement Risk Decision Service** (subject: `procurement`)
-- **Procurement Lot Risk Decision Service** (subject: `lot`).
+Two decision areas are drawn below: the **Procurement Risk Decision Service** (subject `procurement`) and the
+**Procurement Lot Risk Decision Service** (subject `lot`). A third subject, `bid`, is implemented (§2.1, LT-COM-20)
+but has no decision service drawn here yet.
 
 ### 3.1 Legend
 
@@ -176,7 +329,7 @@ classDiagram
 ```mermaid
 flowchart BT
     IDP(["Procurement"])
-    IDL(["ProcurementLot"])
+    IDL(["Lot"])
 
     subgraph DSP["Procurement Risk Decision Service"]
         EDP["Procurement Eligibility Decision"]
@@ -253,115 +406,122 @@ flowchart BT
 classDiagram
     class RiskIndicatorDefinition~P~ {
         <<interface>>
-        +string id
-        +number version
-        +SubjectType subjectType
-        +IndicatorStage stage
-        +string[] references
-        +string[] sourceRelations
-        +string[] requiredInputs
-        +ParameterEntry~P~[] parameters
-        +RiskIndicatorStandard standard
-        +RiskIndicatorPublicText public
+        +key: RiskIndicatorKey
+        +subjectType: SubjectType
+        +stage: IndicatorStage
+        +references: string[]
+        +sourceRelations: string[]
+        +requiredInputs: string[]
+        +parameters: P
+        +standard: RiskIndicatorStandard
+        +public: RiskIndicatorPublicText
     }
-    class RiskIndicatorDecision {
-        <<interface>>
-        +isEligible(subject: Subject) EligibilityOutcome
-        +assessRisk(subject: Subject) RiskSignal
-    }
-    class ARiskIndicatorDecision~F D~ {
-        <<abstract>>
-        +D definition
-        +isEligible(subject: Subject) EligibilityOutcome*
-        +assessRisk(subject: Subject) RiskSignal
-    }
-    class AProcurementIndicatorDecision~F D~ {
-        <<abstract>>
-        +isEligible(subject: Subject) EligibilityOutcome
-    }
-    class ALotIndicatorDecision~F D~ {
-        <<abstract>>
-        +isEligible(subject: Subject) EligibilityOutcome
+    class RiskIndicatorKey {
+        <<type>>
+        +id: string
+        +version: number
     }
     class RiskIndicatorStandard {
         <<interface>>
-        +string name
-        +string url
-        +number page
+        +name: string
+        +url: string
+        +page?: number
     }
     class RiskIndicatorPublicText {
         <<interface>>
-        +string titleLt
-        +string descriptionLt
-        +string formulaLt
-        +string limitationLt
+        +titleLt: string
+        +descriptionLt: string
+        +formulaLt: string
+        +limitationLt: string
     }
-    class ParameterEntry {
-        <<interface>>
-        +string validFrom
-        +string validTo
-        +string source
-        +string note
+    class BaseParameters {
+        <<type>>
+        +validFrom: string
+        +validTo: string | null
+        +source: string
+        +note?: string
     }
-    note for ParameterEntry "P's own fields (the indicator's parameter values)
-    are intersected directly onto the entry, not nested under a values key."
+    note for BaseParameters "P extends BaseParameters: an indicator's own parameter values are
+    intersected directly onto it, not nested under a values key. One entry, one validity window —
+    parameterEntryFor(dataAsOf) returns it or null."
+
     class SubjectType {
         <<enumeration>>
-        procurement, lot,
+        procurement, lot, bid,
         contract, supplier
     }
-    class EligibilityOutcome {
-        <<type>>
-        eligible
-        RiskSignal
-    }
-    class Subject {
-        <<type>>
-        Procurement
-        ProcurementLot
-    }
-    note for Subject "Procurement | ProcurementLot — full fields in §2.1.
-    subjectType/subjectKey/procurementSource/procurementId (carried by RiskSignal below) are
-    derived from each object's own key (§2.2: saltinis+pirkimoNumeris for Procurement,
-    subjektoRaktas for ProcurementLot), not stored as separate fields on the object itself."
-    class RiskSignal {
-        <<interface>>
-        +string indicatorId
-        +SubjectType subjectType
-        +string subjectKey
-        +string procurementSource
-        +string procurementId
-        +SignalState state
-        +object rawValue
-        +object threshold
-        +object appliedParameters
-        +object evidence
-        +string[] missingData
-        +string dataAsOf
-    }
-    class SignalState {
+    class IndicatorStage {
         <<enumeration>>
-        triggered
-        not_triggered
-        insufficient_data
-        not_applicable
-        calculation_error
+        planning, tender,
+        award, contract
     }
 
+    class RiskIndicatorDecision~S~ {
+        <<interface>>
+        +isEligible(subject: S) EligibilityOutcome
+        +assessRisk(subject: S) RiskSignal
+    }
+    class ARiskIndicatorDecision~D S~ {
+        <<abstract>>
+        +definition: D
+        +context: EvaluationContext
+        +isEligible(subject: S) EligibilityOutcome*
+        +assessRisk(subject: S) RiskSignal*
+        #hasRequiredData(subject: S) boolean*
+        #signalFor(subject: S, partial: PartialRiskSignal) RiskSignal
+    }
+    class AProcurementIndicatorDecision~D~ {
+        <<abstract>>
+        +isEligible(subject: ProcurementSubject) EligibilityOutcome
+    }
+    class ALotIndicatorDecision~D~ {
+        <<abstract>>
+        +isEligible(subject: LotSubject) EligibilityOutcome
+    }
+    class ABidIndicatorDecision~D~ {
+        <<abstract>>
+        +isEligible(subject: BidSubject) EligibilityOutcome
+    }
+
+    class Subject {
+        <<type>>
+        ProcurementSubject
+        LotSubject
+        BidSubject
+    }
+    note for Subject "Each variant wraps the object the Reader already loaded — Procurement, Lot or Bid
+    (§2.1) — together with its non-null parents, so a decision never re-fetches what the Reader knows.
+    subjectType, subjectKey, procurementSource and procurementId are derived from the wrapped
+    object's own key, not stored on it."
+
+    class EligibilityOutcome {
+        <<type>>
+        +eligible: boolean
+        +signal: RiskSignal
+    }
+    note for EligibilityOutcome "A discriminated union: signal is present only when eligible is false,
+    and is then already the final RiskSignal (not_applicable or insufficient_data)."
+
+    class RiskSignal {
+        <<interface>>
+    }
+    note for RiskSignal "Fields, states and persistence: §2.3, §2.4."
+
+    RiskIndicatorDefinition "1" *-- "1" RiskIndicatorKey: key
     RiskIndicatorDefinition "1" --> "1" SubjectType: subjectType
+    RiskIndicatorDefinition "1" --> "1" IndicatorStage: stage
+    RiskIndicatorDefinition "1" *-- "1" BaseParameters: parameters
     RiskIndicatorDefinition "1" *-- "1" RiskIndicatorStandard: standard
     RiskIndicatorDefinition "1" *-- "1" RiskIndicatorPublicText: public
-    RiskIndicatorDefinition "1" *-- "0..*" ParameterEntry: parameters
     ARiskIndicatorDecision ..|> RiskIndicatorDecision
     ARiskIndicatorDecision "1" *-- "1" RiskIndicatorDefinition: definition
     AProcurementIndicatorDecision --|> ARiskIndicatorDecision
     ALotIndicatorDecision --|> ARiskIndicatorDecision
-    RiskIndicatorDecision "1" ..> "1" Subject: isEligible(subject)
-    RiskIndicatorDecision "1" ..> "1" Subject: assessRisk(subject)
+    ABidIndicatorDecision --|> ARiskIndicatorDecision
+    RiskIndicatorDecision "1" ..> "1" Subject: isEligible(subject), assessRisk(subject)
     RiskIndicatorDecision "1" ..> "1" EligibilityOutcome: isEligible() returns
     RiskIndicatorDecision "1" ..> "1" RiskSignal: assessRisk() returns
     EligibilityOutcome "1" ..> "0..1" RiskSignal: when not eligible
-    RiskSignal "1" --> "1" SignalState: state
 ```
 
 ### 3.5 Per-Indicator File Layout
