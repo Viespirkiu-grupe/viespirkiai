@@ -13,12 +13,12 @@ const asmuoLink = (kodas: any, fizinisAsmuo: any, pavadinimas: any) =>
 const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesNumeris) > 1);
 
 const dalisKey = (daliesNumeris: any) => String(daliesNumeris ?? '0');
-const bidRiskFor = (e: any) => riskView?.bidsByDalisAndTiekejas.get(`${dalisKey(e.daliesNumeris)}:${e.dalyvioKodas}`) ?? [];
-const lotRiskEntries = riskView
-  ? [...new Set(eile.map((e) => dalisKey(e.daliesNumeris)))]
-      .map((dalis) => ({ dalis, signals: riskView.lotsByDalis.get(dalis) ?? [] }))
-      .filter((entry) => entry.signals.length > 0)
-  : [];
+const riskFor = (e: any) => {
+  if (!riskView) return [];
+  const lot = riskView.lotsByDalis.get(dalisKey(e.daliesNumeris)) ?? [];
+  const bid = riskView.bidsByDalisAndTiekejas.get(`${dalisKey(e.daliesNumeris)}:${e.dalyvioKodas}`) ?? [];
+  return [...lot, ...bid];
+};
 ---
 
 <section class="dalyviai-section">
@@ -48,41 +48,31 @@ const lotRiskEntries = riskView
   {eile.length > 0 && (
     <>
       <h3 class="mt-6 mb-3">Pasiūlymų eilė</h3>
-      {lotRiskEntries.length > 0 && (
-        <div class="lot-risk-lines mb-3">
-          {lotRiskEntries.map((entry) => (
-            <div class="lot-risk-line">
-              {keliosDalys && <span class="lot-risk-label">Dalis {entry.dalis}:</span>}
-              {entry.signals.map((signal) => (
-                <RiskSignalChip signal={signal} />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
       <DataTable
         size="sm"
+        fixed
+        wrapperClassName="pasiulymu-eile-wrapper"
         columns={[
           ...(keliosDalys ? [{ label: 'Dalis', headerClassName: 'dalyviai-col-num' }] : []),
           { label: 'Eilė', headerClassName: 'dalyviai-col-num' },
           { label: 'Dalyvis' },
-          { label: 'Kaina', headerClassName: 'cell-right' },
-          { label: 'Rizika' },
+          { label: 'Kaina', headerClassName: 'cell-right dalyviai-col-kaina' },
+          { label: 'Rizika', headerClassName: 'dalyviai-col-risk' },
         ]}
       >
         {eile.map((e) => {
           const l = asmuoLink(e.dalyvioKodas, false, e.dalyvioPavadinimas);
-          const bidRisk = bidRiskFor(e);
+          const risk = riskFor(e);
           return (
             <tr>
               {keliosDalys && <td class="cell-mono">{val(e.daliesNumeris)}</td>}
               <td class="cell-mono">{val(e.eileNumeris)}</td>
               <td>{l ? <a href={l.href}>{l.text}</a> : val(e.dalyvioPavadinimas)}</td>
               <td class="cell-mono cell-right">{e.kaina ? `${e.kaina}${e.kainosIsraiska ? ` ${e.kainosIsraiska}` : ''}` : '—'}</td>
-              <td>
-                {bidRisk.length > 0 && (
+              <td class="dalyviai-col-risk">
+                {risk.length > 0 && (
                   <div class="flex flex-wrap gap-1">
-                    {bidRisk.map((signal) => (
+                    {risk.map((signal) => (
                       <RiskSignalChip signal={signal} />
                     ))}
                   </div>
@@ -98,22 +88,10 @@ const lotRiskEntries = riskView
 
 <style>
   .dalyviai-col-num { width: 4rem; }
+  .dalyviai-col-kaina { width: 7rem; }
 
-  .lot-risk-lines {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
+  .dalyviai-col-risk { width: 220px; }
+  .dalyviai-col-risk :global(.ds-badge) { white-space: normal; }
 
-  .lot-risk-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .lot-risk-label {
-    font-size: var(--text-xs);
-    color: var(--gray);
-  }
+  :global(.pasiulymu-eile-wrapper) { overflow: visible; }
 </style>

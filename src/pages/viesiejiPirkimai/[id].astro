@@ -112,7 +112,19 @@ const aiSantrauka = Astro.cookies.get('showAi')?.value === 'false'
       <div class="dok-span-2">
         <PirkimasDokumentai failai={t.failai ?? []} />
       </div>
-      <PirkimasSkelbimai skelbimai={t.skelbimai} />
+      <div>
+        <PirkimasSkelbimai skelbimai={t.skelbimai} />
+        {pirkimas.riskView && pirkimas.riskView.procurement.length > 0 && (
+          <section class="mb-7">
+            <h2>Rizikos Signalai</h2>
+            <div class="flex flex-wrap gap-2 mt-4">
+              {pirkimas.riskView.procurement.map((signal: any) => (
+                <RiskSignalChip signal={signal} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
       <PirkimasTedNuorodos korteles={tedKorteles} />
 
       {pirkimas.sutartys && pirkimas.sutartys.length > 0 && (
@@ -121,17 +133,6 @@ const aiSantrauka = Astro.cookies.get('showAi')?.value === 'false'
           <div class="result-list mt-4">
             {pirkimas.sutartys.map((item: any) => (
               <SutartisCard item={item} showRedagavimoData={false} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {pirkimas.riskView && pirkimas.riskView.procurement.length > 0 && (
-        <section class="mb-7">
-          <h2>Rizikos Signalai</h2>
-          <div class="flex flex-wrap gap-2 mt-4">
-            {pirkimas.riskView.procurement.map((signal: any) => (
-              <RiskSignalChip signal={signal} />
             ))}
           </div>
         </section>
