@@ -203,13 +203,19 @@ A run produces one `EvaluationRun` and one `RiskSignal` per (subject, indicator)
 
 ```mermaid
 classDiagram
+    class ProcurementRiskDecisions {
+        +procurementId: string | null
+        +procurementSource: string | null
+    }
+    note for ProcurementRiskDecisions "Created by Procurement Risk Decision Service"
+    
     class RiskSignal {
         +indicatorId: string
         +indicatorVersion: number
         +subjectType: SubjectType
         +subjectKey: string
-        +procurementSource: string | null
-        +procurementId: string | null
+        +(DEPRECATED) procurementSource: string | null 
+        +(DEPRECATED) procurementId: string | null
         +state: IndicatorState
         +rawValue: Record~string, unknown~ | null
         +threshold: Record~string, unknown~ | null
@@ -252,7 +258,8 @@ classDiagram
 
     EvaluationRun "1" --> "1" RunStatus: status
     EvaluationRun "1" *-- "0..*" IndicatorStats: statistics, keyed by indicatorId
-    EvaluationRun "1" *-- "0..*" RiskSignal: produced in this run
+    EvaluationRun "1" *-- "0..*" ProcurementRiskDecisions: decisions
+    ProcurementRiskDecisions "1" *-- "0..*" RiskSignal: riskSignals
     RiskSignal "1" --> "1" IndicatorState: state
 ```
 
