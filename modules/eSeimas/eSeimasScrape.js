@@ -633,6 +633,27 @@ export async function runStage(stage, options = {}) {
     }
 }
 
+/**
+ * Paieškos užklausa su pakartojimais — kaip planuoklio `suBandymais`, tik
+ * atradimui, kuris sukasi be planuoklio ir be DB backoff'o. Vienas nepavykęs
+ * puslapis (pvz. adapterio 502 „e-Seimas JSF ViewState was not found" — e-Seimas
+ * kartais numeta savo sesiją) nutraukdavo VISĄ atradimo grandinę ir procesas
+ * lūždavo; iš tikrųjų užtenka perklausti tą patį puslapį.
+ */
+async function searchSuBandymais(api, params, attempts = DEFAULT_ATTEMPTS) {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await api.searchLegalActs(params);
+        } catch (error) {
+            if (attempt >= attempts) throw error;
+            const pauzė = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
+            log(`paieška ${params.to} psl. ${params.page} bandymas ${attempt}/${attempts}`
+                + ` nepavyko (${error.message}) — kartojam po ${Math.round(pauzė / 1000)} s`);
+            await sleep(pauzė);
+        }
+    }
+}
+
 function previousDay(date) {
     const value = new Date(`${date}T00:00:00Z`);
     value.setUTCDate(value.getUTCDate() - 1);
@@ -655,9 +676,11 @@ function previousDay(date) {
  * @param {string} [opts.from] - nuo kurios datos pradėti (numatyta: seniausia turima − 1 d.)
  * @param {string|null} [opts.floor] - neprivaloma apatinė riba
  * @param {number} [opts.maxDays] - kiek dienų daugiausia (pasižvalgymui)
+ * @param {number} [opts.attempts] - kiek kartų bandyti vieną paieškos užklausą
  */
 export async function discoverBackward({
     from = null, floor = null, maxDays = Infinity, api = createESeimasApi(), trace = false,
+    attempts = DEFAULT_ATTEMPTS,
 } = {}) {
     let frontier = from ?? previousDay(await getOldestScrapeDay() ?? new Date().toISOString().slice(0, 10));
     let page = 1;
@@ -673,7 +696,7 @@ export async function discoverBackward({
         }
 
         const started = Date.now();
-        const response = await api.searchLegalActs({ to: frontier, page });
+        const response = await searchSuBandymais(api, { to: frontier, page }, attempts);
         const items = response.items ?? [];
         if (!items.length) {
             log(`Giliau nei ${frontier} aktų nebėra — pabaiga`);
@@ -948,6 +971,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
             floor: typeof args.floor === "string" ? args.floor : null,
             maxDays: numArg(args.limit, Infinity),
             trace: Boolean(args.trace),
+            attempts: Math.max(1, numArg(args.attempts, DEFAULT_ATTEMPTS)),
         }), null, 2));
     } else if (args.day) {
         console.log(JSON.stringify(await scrapeSingleDay(String(args.day), { trace: Boolean(args.trace) }), null, 2));
