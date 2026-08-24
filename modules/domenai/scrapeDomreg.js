@@ -31,6 +31,40 @@ const TOR_CONTROL_TIMEOUT_MS = 10_000;
 
 const proxyAgent = new SocksProxyAgent(config.torAddress);
 
+// Tinklo klaidų kodai, kuriuos domreg'as grąžina blokuodamas exit node'ą.
+const RATE_LIMIT_ERROR_CODES = new Set([
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "EPIPE",
+    "ETIMEDOUT",
+]);
+
+/**
+ * Signalizuoja, kad domreg'as blokuoja dabartinį IP (captcha, 429, nutraukta
+ * jungtis). Domenas dėl to nežymimas klaida — reikia tik pakeisti Tor tapatybę.
+ */
+class RateLimitError extends Error {
+    /** @param {string} reason */
+    constructor(reason) {
+        super(reason);
+        this.name = "RateLimitError";
+    }
+}
+
+/**
+ * Ar HTTP atsakymas iš tikrųjų yra užmaskuotas rate limit'as.
+ * Domreg'as, pasiekus limitą, bando parodyti captcha; jų pačių paveiksliuko
+ * generatorius dažnai nulūžta ir vietoj `{"error":100}` grįžta HTTP 400 su
+ * `captchaImage generation failed`.
+ * @param {number} status
+ * @param {string} body
+ * @returns {boolean}
+ */
+function isRateLimitResponse(status, body) {
+    if (status === 429 || status === 403) return true;
+    return status === 400 && /captcha/i.test(body);
+}
+
 /**
  * @typedef {object} DbDomainRow
  * @property {number} id
@@ -154,16 +188,31 @@ async function fetchDomainDetails(domain) {
             throw new Error(`Fetch timeout after ${FETCH_TIMEOUT_MS}ms for ${domain}`);
         }
 
+        const code = error.code ?? error.cause?.code;
+        if (RATE_LIMIT_ERROR_CODES.has(code)) {
+            throw new RateLimitError(`tinklo klaida ${code}`);
+        }
+
         throw error;
     } finally {
         clearTimeout(timeout);
     }
 
+    const body = await response.text();
+
     if (!response.ok) {
+        if (isRateLimitResponse(response.status, body)) {
+            throw new RateLimitError(`HTTP ${response.status} (captcha/blokas)`);
+        }
+
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return response.json();
+    try {
+        return JSON.parse(body);
+    } catch {
+        throw new Error(`Netinkamas JSON atsakymas (HTTP ${response.status})`);
+    }
 }
 
 /**
@@ -297,6 +346,25 @@ async function saveDomainData(domenas, data, scrapeStatus, scrapedAt) {
 }
 
 /**
+ * Pakeičia Tor tapatybę po rate limit'o ir palaukia, kol pakils naujas grandinės kelias.
+ * @param {string} domain
+ * @param {string} reason
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<void>}
+ */
+async function rotateAfterRateLimit(domain, reason, signal) {
+    logger.log(`Rate limited for ${domain} (${reason}); rotating Tor identity`);
+
+    try {
+        await newTorIdentity();
+    } catch (error) {
+        logger.log(`Tor identity rotation failed: ${error.message}`);
+    }
+
+    await sleep(TOR_WAIT_MS, signal);
+}
+
+/**
  * Scrapes and persists one oldest domain record.
  * @param {AbortSignal} [signal] Nutraukia rate limit retry ciklą per shutdown'ą.
  * @returns {Promise<boolean>} True when a domain was processed.
@@ -331,9 +399,7 @@ export async function nuskaitytiDomregDomena(signal) {
             const scrapedAt = now();
 
             if (data.error === 100) {
-                logger.log(`Rate limited for ${domenas.domain}; rotating Tor identity`);
-                await newTorIdentity();
-                await sleep(TOR_WAIT_MS, signal);
+                await rotateAfterRateLimit(domenas.domain, "error 100", signal);
                 continue;
             }
 
@@ -354,6 +420,11 @@ export async function nuskaitytiDomregDomena(signal) {
             logger.log(`Unexpected API error ${data.error} for ${domenas.domain}`);
             return true;
         } catch (error) {
+            if (error instanceof RateLimitError) {
+                await rotateAfterRateLimit(domenas.domain, error.message, signal);
+                continue;
+            }
+
             logger.log(`Fetch error for ${domenas.domain}: ${error.message}`);
             await postgres.query(
                 `UPDATE public.domenai
