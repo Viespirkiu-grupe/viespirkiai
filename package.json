@@ -42,6 +42,8 @@
         "juridiniai:papildomi": "node modules/juridiniai/importJarPapildomiDuomenys.js",
         "juridiniai:process": "node modules/juridiniai/processRefreshQueue.js",
         "juridiniai:backfill": "node modules/juridiniai/backfill.js",
+        "juridiniai:typesense": "node modules/juridiniai/typesenseProcessIndexQueue.js",
+        "juridiniai:typesense:requeue": "node modules/juridiniai/typesenseRequeue.js",
         "liteko2:klasifikatoriai": "node modules/liteko2/klasifikatoriai.js",
         "liteko2:scrape": "node modules/liteko2/scrape.js",
         "liteko2:turinys": "node modules/liteko2/scrapeContent.js",

@@ -23,8 +23,12 @@ function toUnixTimestamp(date) {
 ///////////////////////////
 
 const JAR_COLLECTION = "viespirkiaiJAR";
-const JAR_SCHEMA_VERSION = 11;
+const JAR_SCHEMA_VERSION = 12;
 
+// Šaltinis — kanoninė public."juridiniai" lentelė (žr.
+// modules/juridiniai/typesenseProcessIndexQueue.js). Laikomi tik tie laukai,
+// kuriuos realiai skaito paieška ar jos vartotojai: formos/statuso kodai,
+// `statusasNuo` ir `duomenuData` buvo nurašyti v12, nes jų niekas neužklausė.
 const jar_schema = {
     name: JAR_COLLECTION,
     fields: [
@@ -32,14 +36,11 @@ const jar_schema = {
         { name: "jarKodas", type: "string" },
         { name: "pavadinimas", type: "string" },
         { name: "pavadinimasBase", type: "string", optional: true },
-        { name: "adresas", type: "string" },
+        { name: "adresas", type: "string", optional: true },
         { name: "registravimoData", type: "int64" },
-        { name: "formosKodas", type: "int64" },
-        { name: "formosPavadinimas", type: "string" },
-        { name: "statusoKodas", type: "int64" },
-        { name: "statusoPavadinimas", type: "string" },
-        { name: "statusasNuo", type: "int64" },
-        { name: "duomenuData", type: "int64" },
+        { name: "isregistruotas", type: "bool", facet: true },
+        { name: "formosPavadinimas", type: "string", optional: true },
+        { name: "statusoPavadinimas", type: "string", optional: true },
     ],
     default_sorting_field: "registravimoData",
     metadata: {
@@ -110,35 +111,44 @@ export async function ensureJarCollection(options = {}) {
 }
 
 /**
- * Prideda kelis JAR dokumentus į Typesense paieškos kolekciją.
- * @param {Object[]} givenArray - Dokumentų masyvas
+ * Įterpia (upsert) JAR dokumentus į Typesense paieškos kolekciją.
+ * @param {Object[]} rows - public."juridiniai" eilutės su pavadinimasBase
  * @returns {Promise<void>}
  * @throws {Error} Jei nepavyksta pridėti dokumentų
  */
-export async function addDocumentsToJarSearch(givenArray) {
-    let documents = [];
-    for (const doc of givenArray) {
-        const tsDoc = {
-            id: doc.jarKodas?.toString() || doc.pavadinimas,
-            jarKodas: doc.jarKodas?.toString() || "",
-            pavadinimas: doc.pavadinimas || "",
-            pavadinimasBase: doc.pavadinimasBase || "",
-            adresas: doc.adresas || "",
-            registravimoData: toUnixTimestamp(doc.registravimoData),
-            formosKodas: doc.formosKodas || 0,
-            formosPavadinimas: doc.formosPavadinimas || "",
-            statusoKodas: doc.statusoKodas || 0,
-            statusoPavadinimas: doc.statusoPavadinimas || "",
-            statusasNuo: toUnixTimestamp(doc.statusasNuo),
-            duomenuData: toUnixTimestamp(doc.duomenuData),
-        };
-        documents.push(tsDoc);
-    }
+export async function addDocumentsToJarSearch(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    const documents = rows.map((row) => ({
+        id: String(row.jarKodas),
+        jarKodas: String(row.jarKodas),
+        pavadinimas: row.pavadinimas || "",
+        pavadinimasBase: row.pavadinimasBase || "",
+        adresas: row.adresas || "",
+        registravimoData: toUnixTimestamp(row.registravimoData),
+        isregistruotas: Boolean(row.isregistruotas),
+        formosPavadinimas: row.formosPavadinimas || "",
+        statusoPavadinimas: row.statusoPavadinimas || "",
+    }));
 
     return client
         .collections(JAR_COLLECTION)
         .documents()
         .import(documents, { action: "upsert" });
+}
+
+/**
+ * Ištrina JAR dokumentus iš Typesense kolekcijos.
+ * @param {(string|number)[]} jarKodai - Trinamų įrašų JAR kodai
+ * @returns {Promise<void>}
+ */
+export async function deleteJarFromSearch(jarKodai) {
+    if (!Array.isArray(jarKodai) || jarKodai.length === 0) return;
+
+    return client
+        .collections(JAR_COLLECTION)
+        .documents()
+        .delete({ filter_by: `id:[${jarKodai.map(String).join(",")}]` });
 }
 
 ///////////////////////////

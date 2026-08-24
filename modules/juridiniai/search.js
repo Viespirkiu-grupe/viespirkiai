@@ -1,7 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
 import { toLithuanianTime } from "../../utils/time.js";
 import { typesense } from "../../typesense/typesense.js";
-import { levenshtein, toAscii } from "../../utils/text.js";
+import { levenshtein } from "../../utils/text.js";
+import { toBaseCompanyName } from "./pavadinimas.js";
 import {
     JAR_ADDRESS_JOINS,
     JAR_ADDRESS_SQL,
@@ -185,67 +186,6 @@ export async function findSingleJuridinis(queryStr, options = {}) {
             " ",
         )[0],
     };
-}
-
-function toBaseCompanyName(name) {
-    if (!name) return "";
-
-    const companyTypes = [
-        "UAB",
-        "AB",
-        "MB",
-        "IĮ",
-        "VĮ",
-        "VšĮ",
-        "ŽŪB",
-        "KŪB",
-        "SĮ",
-        "BĮ",
-        "Uždaroji akcinė bendrovė",
-        "Akcinė bendrovė",
-        "Mažoji bendrija",
-        "Individuali įmonė",
-        "Viešoji įstaiga",
-        "Žemės ūkio bendrovė",
-        "Kooperatinė ūkinė bendrovė",
-        "Biudžetinė įstaiga",
-        "Savivaldybės įmonė",
-    ];
-
-    // filial. → filialas
-    name = name.replace(/filial\./gi, "filialas");
-    name = name.replace(
-        /prie LR finansų ministerijos/i,
-        "prie Lietuvos Respublikos finansų ministerijos",
-    );
-    name = name.replace(
-        /PRIE SADM/i,
-        "prie Socialinės apsaugos ir darbo ministerijos",
-    );
-    name = name.replace(/PRIE KAM/i, "prie Krašto apsaugos ministerijos");
-
-    // remove anything in  (...)
-    name = name.replace(/\(.*?\)/g, "");
-
-    // 1. Remove quotes, commas
-    let cleaned = name
-        .replace(/["“”„]/g, "")
-        .replace(/,/g, "")
-        .trim();
-
-    // 2. Convert to ASCII for comparison
-    let cleanedAscii = toAscii(cleaned).toLowerCase();
-
-    // 3. Remove company types anywhere in the string
-    for (const type of companyTypes) {
-        const typeAscii = toAscii(type).toLowerCase();
-        const pattern = "\\b" + typeAscii.replace(/\s+/g, "\\s+") + "\\b";
-        const regex = new RegExp(pattern, "gi"); // g = all occurrences
-        cleanedAscii = cleanedAscii.replace(regex, "");
-    }
-
-    // 4. Normalize spaces
-    return cleanedAscii.replace(/\s+/g, " ").trim();
 }
 
 if (import.meta.url.endsWith(process.argv[1])) {
