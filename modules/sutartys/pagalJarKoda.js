@@ -8,6 +8,42 @@ import { postgres } from "../../postgres/postgres.js";
 const JAR_KODAS_INT = (kodas) =>
     `CASE WHEN ${kodas} ~ '^[0-9]{1,9}$' THEN ${kodas}::integer END`;
 
+// Dalies kodų `jarAsmenys` lentelėje nėra: RC CSV faile jų nebeliko (pvz.
+// UAB "Fegda" – 110801759), arba tai užsienio PVM kodas, kurio JAR ir negali
+// turėti. Tokioms eilutėms pavadinimą pasiimam iš pačių sutarčių – ten šalies
+// pavadinimas visada įrašytas, tad TOP lentelėse nebeatsiranda „Nežinomas".
+// Abu lateral'ai naudoja `(pirmoTiekejoKodas|perkanciosiosOrganizacijosKodas,
+// redagavimoData DESC)` indeksus, tad vienai eilutei tai vienas index scan.
+const TIEKEJO_PAVADINIMAS_LATERAL = (kodas) => `
+             LEFT JOIN LATERAL (
+                 SELECT pavadinimas FROM (
+                     SELECT s."pavadinimas", v."redagavimoData"
+                     FROM public."vpmSutartys" v
+                     JOIN public."vpmSutartysSalys" s ON s."id" = v."pirmoTiekejoPavadinimoId"
+                     WHERE v."pirmoTiekejoKodas" = ${kodas} AND v."istrinta" = false
+                     ORDER BY v."redagavimoData" DESC NULLS LAST LIMIT 1
+                 ) pirmas
+                 UNION ALL
+                 SELECT pavadinimas FROM (
+                     SELECT s."pavadinimas", v."redagavimoData"
+                     FROM public."vpmSutartysPapildomiTiekejai" p
+                     JOIN public."vpmSutartys" v ON v."unikalusId" = p."unikalusId" AND v."istrinta" = false
+                     JOIN public."vpmSutartysSalys" s ON s."id" = p."tiekejoPavadinimoId"
+                     WHERE p."tiekejoKodas" = ${kodas}
+                     ORDER BY v."redagavimoData" DESC NULLS LAST LIMIT 1
+                 ) papildomas
+                 LIMIT 1
+             ) fallback ON true`;
+
+const PIRKEJO_PAVADINIMAS_LATERAL = (kodas) => `
+             LEFT JOIN LATERAL (
+                 SELECT s."pavadinimas"
+                 FROM public."vpmSutartys" v
+                 JOIN public."vpmSutartysSalys" s ON s."id" = v."perkanciosiosOrganizacijosPavadinimoId"
+                 WHERE v."perkanciosiosOrganizacijosKodas" = ${kodas} AND v."istrinta" = false
+                 ORDER BY v."redagavimoData" DESC NULLS LAST LIMIT 1
+             ) fallback ON true`;
+
 export async function gautiSutarciuDuomenisPagalJarKoda(
     jarKodas,
     options = {},
@@ -39,16 +75,18 @@ export async function gautiSutarciuDuomenisPagalJarKoda(
             [jarKodas],
         ),
         postgres.query(
-            `SELECT agg."tiekejoKodas" AS "jarKodas", COALESCE(j."pavadinimas", 'Nežinomas') AS "pavadinimas", agg."suma" AS "total", agg."pirkimai" AS "count"
+            `SELECT agg."tiekejoKodas" AS "jarKodas", COALESCE(j."pavadinimas", fallback."pavadinimas", 'Nežinomas') AS "pavadinimas", agg."suma" AS "total", agg."pirkimai" AS "count"
              FROM (SELECT "tiekejoKodas", "suma", "pirkimai" FROM "vpmSutartysSumosPirkejasTiekejas" WHERE "pirkejoKodas" = $1 AND "pirkimai" > 0 ORDER BY ("suma" = 'NaN'::numeric), "suma" DESC ${limitSql}) agg
              LEFT JOIN public."jarAsmenys" j ON j."jarKodas" = ${JAR_KODAS_INT(`agg."tiekejoKodas"`)}
+             ${TIEKEJO_PAVADINIMAS_LATERAL(`agg."tiekejoKodas"`)}
              ORDER BY (agg."suma" = 'NaN'::numeric), agg."suma" DESC`,
             [jarKodas],
         ),
         postgres.query(
-            `SELECT agg."pirkejoKodas" AS "jarKodas", COALESCE(j."pavadinimas", 'Nežinomas') AS "pavadinimas", agg."suma" AS "total", agg."pirkimai" AS "count"
+            `SELECT agg."pirkejoKodas" AS "jarKodas", COALESCE(j."pavadinimas", fallback."pavadinimas", 'Nežinomas') AS "pavadinimas", agg."suma" AS "total", agg."pirkimai" AS "count"
              FROM (SELECT "pirkejoKodas", "suma", "pirkimai" FROM "vpmSutartysSumosPirkejasTiekejas" WHERE "tiekejoKodas" = $1 AND "pirkimai" > 0 ORDER BY ("suma" = 'NaN'::numeric), "suma" DESC ${limitSql}) agg
              LEFT JOIN public."jarAsmenys" j ON j."jarKodas" = ${JAR_KODAS_INT(`agg."pirkejoKodas"`)}
+             ${PIRKEJO_PAVADINIMAS_LATERAL(`agg."pirkejoKodas"`)}
              ORDER BY (agg."suma" = 'NaN'::numeric), agg."suma" DESC`,
             [jarKodas],
         ),
