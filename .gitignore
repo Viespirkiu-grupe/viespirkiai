@@ -53,6 +53,7 @@ dist
 # Misc
 dbSchema
 modules/cvpp/ataskaitos
+modules/vptXlsxApjungtosAtaskaitos/data
 tmp/*
 old
 backup

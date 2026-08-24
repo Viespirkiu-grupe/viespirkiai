@@ -23,6 +23,7 @@
         "scrape:planuojami-pirkimai": "node modules/viesiejiPirkimai/updatePlanuojamiPirkimai.js",
         "export:planuojami-pirkimai-jsonl": "node modules/viesiejiPirkimai/scrapePlanuojamiPirkimai.js",
         "sidecars:sqlite-missing": "node modules/sidecars/sqliteMissing.js",
+        "vptAtaskaitos:importuoti": "node modules/vptXlsxApjungtosAtaskaitos/importuotiXlsx.js",
         "ppa:discover": "node modules/ppa/discover.js",
         "ppa:parse": "node modules/ppa/parse.js",
         "failai:nuskaitymo-eile": "node modules/failai/nuskaitymoEilesPapildymas.js",
