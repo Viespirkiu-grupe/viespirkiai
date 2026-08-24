@@ -270,3 +270,101 @@ export async function getScrapeStatus() {
     return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value)]));
 }
 
+
+/** Etapai, kurių žymas moka nuvalyti `resetScrapeMarks` — ta pati tvarka kaip `--stage`. */
+export const RESET_STAGES = ["days", "documents", "editions", "asr", "historical"];
+
+/** Akto lygio etapas → stulpelis "eTarLegalActScrape" lentelėje. */
+const AKTO_ETAPAI = {
+    documents: "documentScrapedAt",
+    editions: "editionsScrapedAt",
+    asr: "asrScrapedAt",
+};
+
+/**
+ * Nuvalo etapų „atlikta" žymas, kad eilės tuos pačius įrašus paimtų iš naujo.
+ *
+ * Rescrape'as be šito neįmanomas: `pick*` funkcijos renka tik tai, kur atitinkamas
+ * `*ScrapedAt IS NULL`, o `--force` veikia jau vėliau — tik apeina md5 trumpąjį
+ * kelią rašant (žr. `saveDocument`). Kartu nuvalom ir klaidų skaitiklį su
+ * `retryAfter`: kitaip 5 kartus lūžę aktai į naują pravažiavimą nebepatektų.
+ *
+ * Skaičiuojam tik tas eilutes, kurios žymą TURĖJO — grąžintas skaičius reiškia
+ * „tiek darbo grįžo į eilę", o ne lentelės dydį.
+ *
+ * @param {Object} opts
+ * @param {string[]} opts.stages - iš `RESET_STAGES`
+ * @param {string|null} [opts.legalActId] - apriboti vienu aktu (dienų neliečia)
+ * @param {boolean} [opts.dryRun] - tik suskaičiuoti, DB nekeisti
+ * @returns {Promise<Record<string, number>>} etapas → kiek eilučių (grįžtų) į eilę
+ */
+export async function resetScrapeMarks({ stages, legalActId = null, dryRun = false } = {}) {
+    const nežinomi = stages.filter(stage => !RESET_STAGES.includes(stage));
+    if (nežinomi.length) throw new Error(`Nežinomi etapai: ${nežinomi.join(", ")}`);
+
+    const rezultatas = {};
+
+    // Kiekvienas etapas – atskira užklausa, bet vienoje tranzakcijoje: pusiau
+    // nuvalyta būsena (dokumentai jau eilėje, redakcijos dar ne) būtų blogesnė
+    // nei jokia.
+    const client = await postgres.connect();
+    try {
+        await client.query("BEGIN");
+
+        for (const stage of RESET_STAGES) {
+            if (!stages.includes(stage)) continue;
+
+            if (stage === "days") {
+                // Dienos nėra akto savybė — `--act` jų neliečia.
+                if (legalActId) { rezultatas.days = 0; continue; }
+                const sąlyga = `"lastScrapedAt" IS NOT NULL`;
+                rezultatas.days = dryRun
+                    ? await countRows(client, `SELECT count(*) FROM "eTarScrapeDay" WHERE ${sąlyga}`)
+                    : (await client.query(
+                        `UPDATE "eTarScrapeDay" SET "lastScrapedAt" = NULL WHERE ${sąlyga}`,
+                    )).rowCount;
+                continue;
+            }
+
+            if (stage === "historical") {
+                const sąlyga = `"scrapedAt" IS NOT NULL AND ($1::text IS NULL OR "legalActId" = $1)`;
+                rezultatas.historical = dryRun
+                    ? await countRows(client, `SELECT count(*) FROM "eTarEdition" WHERE ${sąlyga}`, [legalActId])
+                    : (await client.query(
+                        `UPDATE "eTarEdition"
+                            SET "scrapedAt" = NULL, "failureCount" = 0,
+                                "lastError" = NULL, "retryAfter" = NULL
+                          WHERE ${sąlyga}`,
+                        [legalActId],
+                    )).rowCount;
+                continue;
+            }
+
+            const column = AKTO_ETAPAI[stage];
+            const sąlyga = `"${column}" IS NOT NULL AND ($1::text IS NULL OR "legalActId" = $1)`;
+            rezultatas[stage] = dryRun
+                ? await countRows(client, `SELECT count(*) FROM "eTarLegalActScrape" WHERE ${sąlyga}`, [legalActId])
+                : (await client.query(
+                    `UPDATE "eTarLegalActScrape"
+                        SET "${column}" = NULL, "failureCount" = 0,
+                            "lastError" = NULL, "retryAfter" = NULL
+                      WHERE ${sąlyga}`,
+                    [legalActId],
+                )).rowCount;
+        }
+
+        await client.query(dryRun ? "ROLLBACK" : "COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+
+    return rezultatas;
+}
+
+async function countRows(client, sql, params = []) {
+    const { rows: [row] } = await client.query(sql, params);
+    return Number(row.count);
+}
