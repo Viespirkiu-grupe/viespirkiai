@@ -16,6 +16,8 @@
         "pirkimai:aprasymu-eile": "node modules/viesiejiPirkimai/aprasymuEile.js",
         "sutartys:aprasyti": "node scripts/aprasytiSutartis.js",
         "db:schema:dump": "node postgres/dumpSchema.js",
+        "db:schema:komentarai": "node scripts/trukstamiLenteliuKomentarai.js",
+        "db:schema:rasytojai": "node scripts/aptiktiLenteliuRasytojus.js",
         "regitra:atnaujinti": "node modules/regitra/atnaujintiRegitra.js",
         "sodra:atnaujinti": "node modules/sodra/atnaujintiSodra.js",
         "scrape:planuojami-pirkimai": "node modules/viesiejiPirkimai/updatePlanuojamiPirkimai.js",

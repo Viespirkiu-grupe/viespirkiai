@@ -1,0 +1,106 @@
+---
+/**
+ * ER diagramos rėmelis: slenkamas konteineris jau paruoštam SVG.
+ *
+ * Komponentas neturi jokių domeno žinių – SVG sugeneruojamas puslapio pusėje.
+ * Spalvos imamos iš dizaino sistemos kintamųjų, tad viena diagrama tinka ir
+ * šviesiai, ir tamsiai temai.
+ */
+interface Props {
+  svgHtml: string;
+  title?: string;
+  /** Trumpas paaiškinimas po diagrama (legenda, režimas). */
+  note?: string;
+  maxHeight?: string;
+  className?: string;
+}
+
+const { svgHtml, title, note, maxHeight = '70vh', className = '' } = Astro.props;
+---
+
+<figure class={`er-diagram ${className}`.trim()}>
+  {title && <figcaption class="er-diagram__title">{title}</figcaption>}
+  <div class="er-diagram__scroll" style={`max-height: ${maxHeight}`} tabindex="0" set:html={svgHtml} />
+  {(note || Astro.slots.has('default')) && (
+    <figcaption class="er-diagram__note">
+      {note}
+      <slot />
+    </figcaption>
+  )}
+</figure>
+
+<style>
+  .er-diagram {
+    margin: 0 0 1.5rem;
+  }
+
+  .er-diagram__title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Diagrama slenkasi savo konteineryje – puslapio korpusas horizontaliai neslenka. */
+  .er-diagram__scroll {
+    overflow: auto;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--shade-1);
+    padding: 0.75rem;
+  }
+
+  .er-diagram__note {
+    margin-top: 0.5rem;
+    font-size: var(--text-xs);
+    color: var(--color-muted);
+  }
+
+  .er-diagram :global(.er-svg) {
+    display: block;
+    max-width: none;
+  }
+
+  .er-diagram :global(.er-box) {
+    fill: var(--shade-1);
+    stroke: var(--light-gray);
+    stroke-width: 1;
+  }
+
+  .er-diagram :global(.er-head) {
+    fill: var(--shade-4);
+  }
+
+  .er-diagram :global(.er-title) {
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--black);
+  }
+
+  .er-diagram :global(.er-col) {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    fill: var(--dark-gray);
+  }
+
+  .er-diagram :global(.er-edge) {
+    fill: none;
+    stroke: var(--gray);
+    stroke-width: 1.2;
+  }
+
+  .er-diagram :global(.er-arrow) {
+    fill: var(--gray);
+  }
+
+  .er-diagram :global(.er-node) {
+    cursor: pointer;
+  }
+
+  .er-diagram :global(.er-node:hover .er-box) {
+    stroke: var(--link);
+    stroke-width: 2;
+  }
+
+  .er-diagram :global(.er-node:hover .er-title) {
+    fill: var(--link);
+  }
+</style>

@@ -1,0 +1,188 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import Badge from '@design-system/components/Badge.astro';
+import Alert from '@design-system/components/Alert.astro';
+import config from '../../../lib/config.ts';
+import { getColorScheme, getFont } from '../../../lib/failai.ts';
+import { gautiSchemosModeli, grupesLenteles } from '../../../lib/dbSchema/modelis.ts';
+import { grupesUrl, lentelesUrl, NESUGRUPUOTA_RAKTAS } from '../../../lib/dbSchema/grupes.ts';
+import { dalis, dydis, eiluciuKiekis, rodomasVardas } from '../../../lib/dbSchema/formatavimas.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const modelis = await gautiSchemosModeli();
+const m = modelis.metrikos;
+
+const grupiuSantrauka = modelis.grupes.map((grupe) => {
+  const lenteles = grupesLenteles(modelis, grupe.raktas);
+  return {
+    grupe,
+    kiekis: lenteles.length,
+    dydis: lenteles.reduce((suma, l) => suma + l.bendrasDydis, 0),
+    eilutes: lenteles.reduce((suma, l) => suma + l.eiluciuIvertis, 0),
+    aprasyta: lenteles.filter((l) => l.aprasymas).length,
+  };
+});
+
+const nesugrupuotos = grupesLenteles(modelis, NESUGRUPUOTA_RAKTAS);
+const neaprasytos = modelis.lenteles
+  .filter((l) => !l.aprasymas)
+  .sort((a, b) => b.bendrasDydis - a.bendrasDydis)
+  .slice(0, 25);
+
+const visos = [...modelis.lenteles].sort((a, b) => b.bendrasDydis - a.bendrasDydis);
+
+Astro.response.headers.set('Cache-Control', 'public, max-age=60');
+---
+<Layout
+  pageTitle="Duomenų bazės lentelės"
+  pageDescription="Visų duomenų bazės lentelių schema, ryšiai, šaltiniai ir aprašymai"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext"><a href="/duomenys">Duomenys</a></Fragment>
+      Duomenų bazės lentelės
+    </PageHeader>
+
+    <p class="text-muted mb-7">
+      Puslapis generuojamas tiesiai iš duomenų bazės katalogo. Lentelių ir stulpelių aprašymai
+      saugomi kaip <code>COMMENT ON</code>, grupavimas ir šaltiniai — schemoje <code>dba</code>.
+    </p>
+
+    {modelis.metaKlaida && (
+      <Alert variant="warning" title="Metaduomenys nepasiekiami" className="mb-7">
+        {modelis.metaKlaida} Kol kas rodoma tik schema iš katalogo, be grupių ir šaltinių.
+      </Alert>
+    )}
+
+    <MetricCardGrid minWidth="150px" className="mb-10">
+      <MetricCard label="Lentelių" value={m.lenteliu.toLocaleString('lt-LT')} />
+      <MetricCard label="Stulpelių" value={m.stulpeliu.toLocaleString('lt-LT')} />
+      <MetricCard label="Išorinių raktų" value={m.isoriniuRaktu.toLocaleString('lt-LT')} />
+      <MetricCard label="Dydis" value={dydis(m.bendrasDydis)} />
+      <MetricCard label="Eilučių" value={eiluciuKiekis(m.eiluciuIvertis)} meta="apytiksliai" />
+      <MetricCard
+        label="Aprašyta lentelių"
+        value={dalis(m.aprasytaLenteliu, m.lenteliu)}
+        meta={`${m.aprasytaLenteliu} iš ${m.lenteliu}`}
+      />
+      <MetricCard
+        label="Aprašyta stulpelių"
+        value={dalis(m.aprasytaStulpeliu, m.stulpeliu)}
+        meta={`${m.aprasytaStulpeliu} iš ${m.stulpeliu}`}
+      />
+    </MetricCardGrid>
+
+    <section class="page-section mb-10">
+      <h2 class="mb-4">Grupės</h2>
+      <DataTable
+        sortable
+        columns={[
+          { label: 'Grupė', sortable: true },
+          { label: 'Šaltinis', sortable: true },
+          { label: 'Lentelių', className: 'cell-right', sortable: true, sortType: 'number' },
+          { label: 'Eilučių', className: 'cell-right', sortable: true, sortType: 'number' },
+          { label: 'Dydis', className: 'cell-right', sortable: true, sortType: 'number' },
+          { label: 'Aprašyta', className: 'cell-right', sortable: true, sortType: 'number' },
+        ]}
+        rows={grupiuSantrauka}
+        emptyText="Grupių nėra — pritaikykite dbaSchema.sql ir dbaSchemaSeed.sql."
+        size="sm"
+      >
+        {grupiuSantrauka.map((g) => (
+          <tr>
+            <td>
+              <a href={grupesUrl(g.grupe.raktas)}>{g.grupe.pavadinimas}</a>
+              {g.grupe.aprasymas && <div class="text-muted text-xs">{g.grupe.aprasymas}</div>}
+            </td>
+            <td class="text-sm">
+              {g.grupe.saltinioUrl
+                ? <a href={g.grupe.saltinioUrl} rel="noopener">{g.grupe.saltinis}</a>
+                : <span class="text-muted">{g.grupe.saltinis ?? '—'}</span>}
+            </td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={g.kiekis}>{g.kiekis}</td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={g.eilutes}>{eiluciuKiekis(g.eilutes)}</td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={g.dydis}>{dydis(g.dydis)}</td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={g.kiekis ? g.aprasyta / g.kiekis : 0}>
+              {dalis(g.aprasyta, g.kiekis)}
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+    </section>
+
+    {nesugrupuotos.length > 0 && (
+      <section class="page-section mb-10">
+        <h2 class="mb-1">Nesugrupuota <Badge variant="warning">{nesugrupuotos.length}</Badge></h2>
+        <p class="text-muted text-sm mb-4">
+          Šioms lentelėms netiko nė viena prefikso taisyklė. Pridėkite taisyklę į
+          <code>dba."grupiuTaisykles"</code> arba įrašą į <code>dba."lenteles"</code>.
+        </p>
+        <p class="text-sm">
+          {nesugrupuotos.map((l) => (
+            <><a href={lentelesUrl(l.grupe.raktas, l.schema, l.vardas)} class="cell-mono">{rodomasVardas(l.schema, l.vardas)}</a>{' '}</>
+          ))}
+        </p>
+      </section>
+    )}
+
+    {neaprasytos.length > 0 && (
+      <section class="page-section mb-10">
+        <h2 class="mb-1">Neaprašyta</h2>
+        <p class="text-muted text-sm mb-4">
+          Didžiausios lentelės be <code>COMMENT ON TABLE</code> — nuo jų verta pradėti aprašinėjimą.
+        </p>
+        <p class="text-sm">
+          {neaprasytos.map((l) => (
+            <><a href={lentelesUrl(l.grupe.raktas, l.schema, l.vardas)} class="cell-mono">{rodomasVardas(l.schema, l.vardas)}</a>{' '}</>
+          ))}
+        </p>
+      </section>
+    )}
+
+    <section class="page-section">
+      <h2 class="mb-1">Visos lentelės</h2>
+      <p class="text-muted text-sm mb-4">
+        Filtruokite naršyklės paieška (Ctrl+F) arba rikiuokite paspaudę stulpelio antraštę.
+        Eilučių kiekiai apytiksliai (<code>n_live_tup</code>).
+      </p>
+      <DataTable
+        sortable
+        columns={[
+          { label: 'Lentelė', sortable: true },
+          { label: 'Grupė', sortable: true },
+          { label: 'Aprašymas' },
+          { label: 'Stulpelių', className: 'cell-right', sortable: true, sortType: 'number' },
+          { label: 'Eilučių', className: 'cell-right', sortable: true, sortType: 'number' },
+          { label: 'Dydis', className: 'cell-right', sortable: true, sortType: 'number' },
+        ]}
+        rows={visos}
+        emptyText="Lentelių nerasta."
+        size="sm"
+      >
+        {visos.map((l) => (
+          <tr>
+            <td class="cell-nowrap">
+              <a href={lentelesUrl(l.grupe.raktas, l.schema, l.vardas)} class="cell-mono">
+                {rodomasVardas(l.schema, l.vardas)}
+              </a>
+            </td>
+            <td class="text-sm cell-nowrap"><a href={grupesUrl(l.grupe.raktas)}>{l.grupe.pavadinimas}</a></td>
+            <td class="text-sm">{l.aprasymas ?? <span class="text-muted">—</span>}</td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={l.stulpeliai.length}>{l.stulpeliai.length}</td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={l.eiluciuIvertis}>{eiluciuKiekis(l.eiluciuIvertis)}</td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={l.bendrasDydis}>{dydis(l.bendrasDydis)}</td>
+          </tr>
+        ))}
+      </DataTable>
+    </section>
+  </main>
+</Layout>

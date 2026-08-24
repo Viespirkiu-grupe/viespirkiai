@@ -1,4 +1,5 @@
 import { postgres } from '../../postgres/postgres.js';
+import { gautiLenteliuDydzius } from "./lenteliuDydziai.js";
 import { convertUnit } from '../../utils/units.js';
 import '../../utils/linksniai.js';
 
@@ -294,7 +295,10 @@ export async function gautiStatistika() {
         COALESCE(SUM(pages), 0)            AS "puslapiuSuma",
         COALESCE(SUM(characters), 0)       AS "simboliuSuma"
       FROM public."filesStats";`),
-    postgres.query(`SELECT s.relname AS "tableName", pg_table_size(s.relid) AS "dataSize", pg_indexes_size(s.relid) AS "indexSize", pg_table_size(s.relid) + pg_indexes_size(s.relid) AS "totalSize", st.n_live_tup AS "approxRowCount" FROM pg_catalog.pg_statio_user_tables s JOIN pg_catalog.pg_stat_user_tables st ON s.relid = st.relid ORDER BY s.relname ASC;`),
+    // Užklausa gyvena modules/statistika/lenteliuDydziai.js – ja dalinasi ir
+    // /duomenys/lenteles. Filtruojam į `public`, kad dokumentacijos schema `dba`
+    // nepatektų į bendrą statistiką.
+    gautiLenteliuDydzius({ schemos: ["public"] }).then((rows) => ({ rows })),
     postgres.query(`SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`),
     postgres.query(`SELECT current_database() AS db, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, deadlocks, temp_files, temp_bytes, extract(epoch from now() - stats_reset) AS stats_age_seconds, extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds FROM pg_stat_database WHERE datname = current_database();`),
     postgres.query(`SELECT * FROM "quickwitIndeksai" ORDER BY "lentele", "seq";`),

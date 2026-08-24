@@ -1,0 +1,251 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import ErDiagram from '@design-system/components/ErDiagram.astro';
+import Badge from '@design-system/components/Badge.astro';
+import Alert from '@design-system/components/Alert.astro';
+import config from '../../../../lib/config.ts';
+import { getColorScheme, getFont } from '../../../../lib/failai.ts';
+import { gautiSchemosModeli, kaimynyste, rasti } from '../../../../lib/dbSchema/modelis.ts';
+import { grupesUrl, lentelesUrl } from '../../../../lib/dbSchema/grupes.ts';
+import { piestiSvg } from '../../../../lib/dbSchema/erDiagrama.ts';
+import {
+  dydis, eiluciuKiekis, kodoNuoroda, ribojimoPavadinimas, rodomasVardas, trumpasTipas,
+} from '../../../../lib/dbSchema/formatavimas.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const { lentele: segmentas } = Astro.params;
+const modelis = await gautiSchemosModeli();
+
+// Vardas iš URL niekada nepatenka į SQL – ieškom jau įkeltame modelyje.
+const lentele = rasti(modelis, segmentas ?? '');
+if (!lentele) return Astro.redirect('/duomenys/lenteles');
+
+// Kanonizacija: jei grupė URL'e neteisinga, nukreipiam į teisingą adresą.
+if (Astro.params.grupe !== lentele.grupe.raktas) {
+  return Astro.redirect(lentelesUrl(lentele.grupe.raktas, lentele.schema, lentele.vardas), 301);
+}
+
+const pavadinimas = rodomasVardas(lentele.schema, lentele.vardas);
+
+const isEina = modelis.rysiai.filter((r) => r.is === lentele.raktas);
+const iEina = modelis.rysiai.filter((r) => r.i === lentele.raktas);
+
+const gylis = Astro.url.searchParams.get('gylis') === '2' ? 2 : 1;
+const aplinka = kaimynyste(modelis, lentele.raktas, gylis);
+const diagrama = piestiSvg(aplinka.lenteles, aplinka.rysiai, {
+  kompaktinis: aplinka.lenteles.length > 20,
+});
+
+const meta = lentele.meta;
+const saltinis = meta?.saltinis ?? lentele.grupe.saltinis;
+const saltinioUrl = meta?.saltinioUrl ?? lentele.grupe.saltinioUrl;
+
+const schemosFailas = `dbSchema/${lentele.schema}.${lentele.vardas}.sql`;
+
+const pagrindas: Array<{ label: string; value?: unknown; html?: string }> = [
+  { label: 'Grupė', html: `<a href="${grupesUrl(lentele.grupe.raktas)}">${lentele.grupe.pavadinimas}</a>` },
+  { label: 'Schema', value: lentele.schema },
+  {
+    label: 'Šaltinis',
+    html: saltinis
+      ? (saltinioUrl ? `<a href="${saltinioUrl}" rel="noopener">${saltinis}</a>` : saltinis)
+      : '<span class="text-muted">—</span>',
+  },
+  { label: 'Atnaujinimo būdas', value: meta?.atnaujinimoBudas ?? '—' },
+  { label: 'Dažnis', value: meta?.atnaujinimoDaznis ?? '—' },
+  { label: 'Būsena', value: meta?.busena ?? '—' },
+  { label: 'Eilučių (apytiksliai)', value: eiluciuKiekis(lentele.eiluciuIvertis) },
+  { label: 'Duomenys', value: dydis(lentele.duomenuDydis) },
+  { label: 'Indeksai', value: dydis(lentele.indeksuDydis) },
+  { label: 'Iš viso', value: dydis(lentele.bendrasDydis) },
+];
+
+if (lentele.quickwitIndeksai.length) {
+  pagrindas.push({ label: 'Quickwit indeksai', value: lentele.quickwitIndeksai.join(', ') });
+}
+
+Astro.response.headers.set('Cache-Control', 'public, max-age=60');
+---
+<Layout
+  pageTitle={`${pavadinimas} — lentelė`}
+  pageDescription={lentele.aprasymas ?? `Duomenų bazės lentelės ${pavadinimas} schema ir ryšiai`}
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext">
+        <a href="/duomenys/lenteles">Lentelės</a> / <a href={grupesUrl(lentele.grupe.raktas)}>{lentele.grupe.pavadinimas}</a>
+      </Fragment>
+      <span class="cell-mono">{pavadinimas}</span>
+    </PageHeader>
+
+    {lentele.aprasymas
+      ? <p class="mb-7">{lentele.aprasymas}</p>
+      : (
+        <Alert variant="muted" className="mb-7">
+          Lentelė dar neaprašyta. Aprašymas pridedamas <code>COMMENT ON TABLE</code> sakiniu.
+        </Alert>
+      )}
+
+    {meta?.pastabos && <p class="text-muted mb-7">{meta.pastabos}</p>}
+
+    <section class="page-section mb-10">
+      <h2 class="mb-4">Apie lentelę</h2>
+      <KeyValueList items={pagrindas} />
+    </section>
+
+    {(meta?.uzduotys?.length || meta?.moduliai?.length || meta?.komandos?.length) && (
+      <section class="page-section mb-10">
+        <h2 class="mb-1">Kas rašo</h2>
+        <p class="text-muted text-sm mb-4">Kodas, kuris į šią lentelę įrašo duomenis.</p>
+        <KeyValueList items={[
+          ...(meta.uzduotys?.length ? [{ label: 'Užduotys', value: meta.uzduotys.join(', ') }] : []),
+          ...(meta.moduliai?.length ? [{
+            label: 'Moduliai',
+            html: meta.moduliai.map((k) => `<a href="${kodoNuoroda(k)}" rel="noopener"><code>${k}</code></a>`).join('<br>'),
+          }] : []),
+          ...(meta.komandos?.length ? [{
+            label: 'Komandos',
+            html: meta.komandos.map((k) => `<code>npm run ${k}</code>`).join('<br>'),
+          }] : []),
+        ]} />
+      </section>
+    )}
+
+    <section class="page-section mb-10">
+      <h2 class="mb-1">Stulpeliai <span class="text-muted text-sm">({lentele.stulpeliai.length})</span></h2>
+      <DataTable
+        columns={[
+          { label: 'Stulpelis' },
+          { label: 'Tipas' },
+          { label: '' },
+          { label: 'Numatytoji' },
+          { label: 'Aprašymas' },
+        ]}
+        rows={lentele.stulpeliai}
+        emptyText="Stulpelių nerasta."
+        size="sm"
+      >
+        {lentele.stulpeliai.map((s) => (
+          <tr>
+            <td class="cell-mono cell-nowrap">{s.vardas}</td>
+            <td class="cell-mono cell-nowrap text-sm">{trumpasTipas(s.tipas)}</td>
+            <td class="cell-nowrap">
+              {s.arPirminis && <Badge variant="primary">PK</Badge>}
+              {s.isorinisRaktas && (
+                <a href={lentelesUrl(
+                  modelis.pagalRakta.get(s.isorinisRaktas)?.grupe.raktas ?? lentele.grupe.raktas,
+                  s.isorinisRaktas.split('.')[0],
+                  s.isorinisRaktas.split('.').slice(1).join('.'),
+                )}><Badge variant="info">FK</Badge></a>
+              )}
+              {s.arButinas && <Badge variant="muted">NOT NULL</Badge>}
+              {s.generuota && <Badge variant="muted">generuota</Badge>}
+            </td>
+            <td class="cell-mono text-xs">{s.numatytoji ?? <span class="text-muted">—</span>}</td>
+            <td class="text-sm">{s.aprasymas ?? <span class="text-muted">—</span>}</td>
+          </tr>
+        ))}
+      </DataTable>
+    </section>
+
+    <section class="page-section mb-10">
+      <h2 class="mb-4">Ryšiai</h2>
+      <div class="grid-2">
+        <div>
+          <h3 class="text-sm mb-3">Išeina ({isEina.length})</h3>
+          {isEina.length ? (
+            <ul class="text-sm">
+              {isEina.map((r) => (
+                <li>
+                  <code>{r.stulpeliai.join(', ')}</code> →{' '}
+                  <a href={lentelesUrl(
+                    modelis.pagalRakta.get(r.i)?.grupe.raktas ?? lentele.grupe.raktas,
+                    r.i.split('.')[0],
+                    r.i.split('.').slice(1).join('.'),
+                  )} class="cell-mono">{r.i.replace(/^public\./, '')}</a>
+                </li>
+              ))}
+            </ul>
+          ) : <p class="text-muted text-sm">Išorinių raktų nėra.</p>}
+        </div>
+        <div>
+          <h3 class="text-sm mb-3">Įeina ({iEina.length})</h3>
+          {iEina.length ? (
+            <ul class="text-sm">
+              {iEina.map((r) => (
+                <li>
+                  <a href={lentelesUrl(
+                    modelis.pagalRakta.get(r.is)?.grupe.raktas ?? lentele.grupe.raktas,
+                    r.is.split('.')[0],
+                    r.is.split('.').slice(1).join('.'),
+                  )} class="cell-mono">{r.is.replace(/^public\./, '')}</a>{' '}
+                  <code>{r.stulpeliai.join(', ')}</code>
+                </li>
+              ))}
+            </ul>
+          ) : <p class="text-muted text-sm">Į šią lentelę niekas nerodo.</p>}
+        </div>
+      </div>
+    </section>
+
+    {diagrama.mazgu > 1 && (
+      <section class="page-section mb-10">
+        <h2 class="mb-1">Kaimynystė</h2>
+        <p class="text-muted text-sm mb-4">
+          {diagrama.mazgu} lentelės, {gylis} lygio gylis.{' '}
+          {gylis === 1
+            ? <a href="?gylis=2">Rodyti 2 lygius</a>
+            : <a href="?gylis=1">Rodyti 1 lygį</a>}
+        </p>
+        <ErDiagram svgHtml={diagrama.svg} />
+      </section>
+    )}
+
+    <section class="page-section mb-10">
+      <h2 class="mb-4">Indeksai ir ribojimai</h2>
+      <DataTable
+        columns={[{ label: 'Tipas' }, { label: 'Vardas' }, { label: 'Apibrėžimas' }]}
+        rows={[...lentele.ribojimai, ...lentele.indeksai]}
+        emptyText="Nėra."
+        size="sm"
+      >
+        {lentele.ribojimai.map((r) => (
+          <tr>
+            <td class="cell-nowrap text-sm">{ribojimoPavadinimas(r.tipas)}</td>
+            <td class="cell-mono text-xs">{r.vardas}</td>
+            <td class="cell-mono text-xs">{r.apibrezimas}</td>
+          </tr>
+        ))}
+        {lentele.indeksai.filter((i) => !i.arPirminis).map((i) => (
+          <tr>
+            <td class="cell-nowrap text-sm">Indeksas <span class="text-muted">{dydis(i.dydis)}</span></td>
+            <td class="cell-mono text-xs">{i.vardas}</td>
+            <td class="cell-mono text-xs">{i.apibrezimas}</td>
+          </tr>
+        ))}
+      </DataTable>
+    </section>
+
+    {lentele.trigeriai.length > 0 && (
+      <section class="page-section mb-10">
+        <h2 class="mb-4">Trigeriai</h2>
+        <ul class="text-xs cell-mono">
+          {lentele.trigeriai.map((t) => <li>{t.apibrezimas}</li>)}
+        </ul>
+      </section>
+    )}
+
+    <p class="text-sm text-muted">
+      Pilnas DDL: <a href={kodoNuoroda(schemosFailas)} rel="noopener"><code>{schemosFailas}</code></a>
+      (generuojamas <code>npm run db:schema:dump</code>).
+    </p>
+  </main>
+</Layout>

@@ -1,0 +1,147 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import ErDiagram from '@design-system/components/ErDiagram.astro';
+import Badge from '@design-system/components/Badge.astro';
+import config from '../../../../lib/config.ts';
+import { getColorScheme, getFont } from '../../../../lib/failai.ts';
+import { gautiSchemosModeli, grupesLenteles } from '../../../../lib/dbSchema/modelis.ts';
+import { grupesUrl, lentelesUrl } from '../../../../lib/dbSchema/grupes.ts';
+import { KOMPAKTINIO_RIBA, piestiSvg } from '../../../../lib/dbSchema/erDiagrama.ts';
+import { dalis, dydis, eiluciuKiekis, rodomasVardas } from '../../../../lib/dbSchema/formatavimas.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const { grupe: grupesRaktas } = Astro.params;
+const modelis = await gautiSchemosModeli();
+const grupe = modelis.grupes.find((g) => g.raktas === grupesRaktas);
+
+if (!grupe) return Astro.redirect('/duomenys/lenteles');
+
+const lenteles = grupesLenteles(modelis, grupe.raktas);
+const savos = new Set(lenteles.map((l) => l.raktas));
+
+// Ryšiai grupės viduje. Į kitas grupes išeinantys FK rodomi lentelės puslapyje,
+// kad grupės diagrama neišsipūstų iki visos bazės.
+const rysiai = modelis.rysiai.filter((r) => savos.has(r.is) && savos.has(r.i));
+
+const rezimas = Astro.url.searchParams.get('rezimas');
+const kompaktinis = rezimas === 'kompaktinis'
+  || (rezimas !== 'pilnas' && lenteles.length > KOMPAKTINIO_RIBA);
+const diagrama = piestiSvg(lenteles, rysiai, { kompaktinis });
+
+const bendrasDydis = lenteles.reduce((s, l) => s + l.bendrasDydis, 0);
+const eilutes = lenteles.reduce((s, l) => s + l.eiluciuIvertis, 0);
+const aprasyta = lenteles.filter((l) => l.aprasymas).length;
+
+const suUzduotimis = lenteles.filter((l) => l.meta?.uzduotys?.length || l.meta?.moduliai?.length);
+
+Astro.response.headers.set('Cache-Control', 'public, max-age=60');
+---
+<Layout
+  pageTitle={`${grupe.pavadinimas} — lentelės`}
+  pageDescription={grupe.aprasymas ?? `Grupės ${grupe.pavadinimas} duomenų bazės lentelės`}
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext"><a href="/duomenys/lenteles">Duomenų bazės lentelės</a></Fragment>
+      {grupe.pavadinimas}
+    </PageHeader>
+
+    {grupe.aprasymas && <p class="text-muted mb-4">{grupe.aprasymas}</p>}
+    {grupe.saltinis && (
+      <p class="text-sm mb-7">
+        Šaltinis:{' '}
+        {grupe.saltinioUrl
+          ? <a href={grupe.saltinioUrl} rel="noopener">{grupe.saltinis}</a>
+          : grupe.saltinis}
+      </p>
+    )}
+
+    <MetricCardGrid minWidth="150px" className="mb-10">
+      <MetricCard label="Lentelių" value={lenteles.length} />
+      <MetricCard label="Ryšių grupėje" value={rysiai.length} />
+      <MetricCard label="Eilučių" value={eiluciuKiekis(eilutes)} meta="apytiksliai" />
+      <MetricCard label="Dydis" value={dydis(bendrasDydis)} />
+      <MetricCard label="Aprašyta" value={dalis(aprasyta, lenteles.length)} meta={`${aprasyta} iš ${lenteles.length}`} />
+    </MetricCardGrid>
+
+    {diagrama.mazgu > 0 && (
+      <section class="page-section mb-10">
+        <h2 class="mb-1">Ryšių diagrama</h2>
+        <p class="text-muted text-sm mb-4">
+          {diagrama.mazgu} lentelės, {diagrama.briaunu} išorinių raktų. Spustelėkite dėžutę, kad atidarytumėte lentelę.
+          {' '}
+          {kompaktinis
+            ? <a href={`${grupesUrl(grupe.raktas)}?rezimas=pilnas`}>Rodyti su stulpeliais</a>
+            : <a href={`${grupesUrl(grupe.raktas)}?rezimas=kompaktinis`}>Kompaktinis vaizdas</a>}
+        </p>
+        <ErDiagram
+          svgHtml={diagrama.svg}
+          note="Kairėje – lentelės be išorinių raktų (žodynai), dešinėje – nuo jų priklausančios."
+        />
+      </section>
+    )}
+
+    <section class="page-section mb-10">
+      <h2 class="mb-4">Lentelės</h2>
+      <DataTable
+        sortable
+        columns={[
+          { label: 'Lentelė', sortable: true },
+          { label: 'Aprašymas' },
+          { label: 'Atnaujinimas', sortable: true },
+          { label: 'Stulpelių', className: 'cell-right', sortable: true, sortType: 'number' },
+          { label: 'Eilučių', className: 'cell-right', sortable: true, sortType: 'number' },
+          { label: 'Dydis', className: 'cell-right', sortable: true, sortType: 'number' },
+        ]}
+        rows={lenteles}
+        emptyText="Grupėje lentelių nėra."
+        size="sm"
+      >
+        {lenteles.map((l) => (
+          <tr>
+            <td class="cell-nowrap">
+              <a href={lentelesUrl(l.grupe.raktas, l.schema, l.vardas)} class="cell-mono">
+                {rodomasVardas(l.schema, l.vardas)}
+              </a>
+            </td>
+            <td class="text-sm">{l.aprasymas ?? <span class="text-muted">—</span>}</td>
+            <td class="text-sm cell-nowrap">
+              {l.meta?.atnaujinimoBudas
+                ? <Badge variant="muted">{l.meta.atnaujinimoBudas}</Badge>
+                : <span class="text-muted">—</span>}
+            </td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={l.stulpeliai.length}>{l.stulpeliai.length}</td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={l.eiluciuIvertis}>{eiluciuKiekis(l.eiluciuIvertis)}</td>
+            <td class="cell-right cell-mono cell-nowrap" data-sort-value={l.bendrasDydis}>{dydis(l.bendrasDydis)}</td>
+          </tr>
+        ))}
+      </DataTable>
+    </section>
+
+    {suUzduotimis.length > 0 && (
+      <section class="page-section">
+        <h2 class="mb-1">Kaip duomenys atsiranda</h2>
+        <p class="text-muted text-sm mb-4">Lentelės, kurioms žinomas jas rašantis kodas.</p>
+        <ul class="text-sm">
+          {suUzduotimis.map((l) => (
+            <li>
+              <a href={lentelesUrl(l.grupe.raktas, l.schema, l.vardas)} class="cell-mono">{l.vardas}</a>
+              {' — '}
+              {l.meta?.uzduotys?.length ? l.meta.uzduotys.join(', ') : l.meta?.moduliai?.join(', ')}
+              {l.meta?.atnaujinimoDaznis && <span class="text-muted"> ({l.meta.atnaujinimoDaznis})</span>}
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </main>
+</Layout>
