@@ -9,6 +9,9 @@ const QUICKWIT_TEXT_FIELDS = [
     "tekstas",
     "pirkimoVykdytojas",
     "informacija",
+    // AI santraukos. Indekse `stored: false` — dalyvauja tik paieškoje, o eilučių
+    // kūnai vis tiek imami iš Postgres (search/rows.js), tad į UI nepatenka.
+    "aiAprasymai",
 ];
 
 function splitValues(val) {

@@ -8,7 +8,10 @@ import { pathToFileURL } from "node:url";
 
 const logger = new Logger();
 
-const BATCH_SIZE = 2500;
+// 500, o ne 2500: `aiAprasymai` prideda ~2 KB teksto kiekvienam pirkimui, tad
+// senoji porcija būtų virtusi kelių MB `indexDocs` POST'u (`dokumentai`
+// drainer'is naudoja 500 dėl to paties).
+const BATCH_SIZE = 500;
 const LENTELE = "viesiejiPirkimai";
 
 /**
@@ -32,14 +35,25 @@ export async function processViesiejiPirkimaiIndexQueue(opts = {}) {
             fetchRows: async (client, ids) => {
                 const { rows } = await client.query(
                     `SELECT
-                        "pirkimoId", pavadinimas, "pirkimoVykdytojas", informacija,
-                        "paskelbimoData", "pasiulymuPateikimoTerminas",
-                        "pirkimoBudas", statusas, "numatomaBendraPirkimoVerte",
-                        zingsnis, type, "numatomaVerteEUR", "bvpzKodai",
-                        "pirkimoObjektoTipas", "esFinansavimas",
-                        "pirkimoVykdytojasId", "jarKodas"
-                     FROM public."viesiejiPirkimai"
-                     WHERE "pirkimoId" = ANY($1::int[])`,
+                        p."pirkimoId", p.pavadinimas, p."pirkimoVykdytojas", p.informacija,
+                        p."paskelbimoData", p."pasiulymuPateikimoTerminas",
+                        p."pirkimoBudas", p.statusas, p."numatomaBendraPirkimoVerte",
+                        p.zingsnis, p.type, p."numatomaVerteEUR", p."bvpzKodai",
+                        p."pirkimoObjektoTipas", p."esFinansavimas",
+                        p."pirkimoVykdytojasId", p."jarKodas",
+                        a."aiAprasymai"
+                     FROM public."viesiejiPirkimai" p
+                     -- LATERAL, o ne paprastas JOIN: vienas pirkimas gali turėti po
+                     -- aprašymą kiekvienam modelio variantui, o mums reikia vienos
+                     -- eilutės su jų sąlaja.
+                     LEFT JOIN LATERAL (
+                         SELECT string_agg(v."aprasymas", ' ' ORDER BY v."sukurta")
+                                AS "aiAprasymai"
+                         FROM public."viesiejiPirkimaiAprasymai" v
+                         WHERE v."pirkimoId" = p."pirkimoId"
+                           AND v.success = true
+                     ) a ON true
+                     WHERE p."pirkimoId" = ANY($1::int[])`,
                     [ids],
                 );
                 return rows;
@@ -67,9 +81,16 @@ export function buildDoc(row) {
         ...bvpzKodai,
     ]).join(" "));
 
+    // Foldinam kaip ir `tekstas`, nes paieškos terminai foldinami (search/quickwitQuery.js).
+    // `undefined` laukas tiesiog nepatenka į doką — mapping yra `mode: lenient`.
+    const aiAprasymai = row.aiAprasymai
+        ? foldLithuanian(row.aiAprasymai)
+        : undefined;
+
     return {
         pirkimoId: String(row.pirkimoId),
         tekstas,
+        aiAprasymai,
         pavadinimas: row.pavadinimas,
         pirkimoVykdytojas: row.pirkimoVykdytojas,
         informacija: row.informacija,

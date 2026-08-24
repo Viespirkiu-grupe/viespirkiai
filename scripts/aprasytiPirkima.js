@@ -1,30 +1,11 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
-import { z } from "zod";
+import { mcpAdapter } from "../modules/openrouter/mcpAdapter.js";
 import { loadEnvFile } from "../utils/configEnv.js";
 import { runPirkimoAprasas } from "../modules/viesiejiPirkimai/pirkimoAprasasHarness.js";
 
 function usage() {
     return "Naudojimas: npm run pirkimas:aprasas -- <pirkimo-numeris>";
-}
-
-export function mcpAdapter(module) {
-    const inputSchema = z.object(module.schema);
-    const jsonSchema = z.toJSONSchema(inputSchema);
-    delete jsonSchema.$schema;
-
-    return {
-        definition: {
-            type: "function",
-            function: {
-                name: module.name,
-                description: module.description,
-                parameters: jsonSchema,
-            },
-        },
-        validate: (args) => inputSchema.parse(args),
-        handler: module.handler,
-    };
 }
 
 function parseResult(text) {

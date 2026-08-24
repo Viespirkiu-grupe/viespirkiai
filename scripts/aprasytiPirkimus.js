@@ -5,30 +5,20 @@ import { parseArgs, positiveInteger } from "../utils/cliArgs.js";
 import { postgres } from "../postgres/postgres.js";
 import { streamQuery } from "../postgres/streamQuery.js";
 import { FifoRateLimiter } from "../modules/openrouter/fifoRateLimiter.js";
-import * as getViesasisPirkimas from "../modules/mcp/tools/getViesasisPirkimas.js";
-import * as getFailas from "../modules/mcp/tools/getFailas.js";
-import * as getFailasTekstas from "../modules/mcp/tools/getFailasTekstas.js";
 import {
-    isFailureResult,
-    runPirkimoAprasas,
-} from "../modules/viesiejiPirkimai/pirkimoAprasasHarness.js";
+    apiModel,
+    aprasymoIrankiai,
+    aprasytiPirkima,
+    getVariant,
+} from "../modules/viesiejiPirkimai/aprasymoGeneravimas.js";
 import {
     runAdaptiveSlots,
     runWithSlots,
 } from "../modules/viesiejiPirkimai/runWithSlots.js";
-import { mcpAdapter } from "./aprasytiPirkima.js";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_RPS = 12.5;
 const MAX_AUTO_CONCURRENCY = 256;
-const DEFAULT_VARIANT = {
-    platforma: "openrouter",
-    tiekejas: "stealth",
-    modelis: "ox-alpha",
-    reasoningEffort: "max",
-    maxOutputTokens: 4000,
-    kontekstoIlgis: 1_000_000,
-};
 
 function usage() {
     return [
@@ -47,51 +37,6 @@ function positiveNumber(value, option) {
         throw new Error(`${option} turi būti teigiamas skaičius`);
     }
     return number;
-}
-
-async function ensureDefaultVariant() {
-    const { rows } = await postgres.query(
-        `INSERT INTO public."aiModelVariants"
-            ("platforma", "tiekejas", "modelis", "reasoningEffort",
-             "maxOutputTokens", "kontekstoIlgis")
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT ON CONSTRAINT "aiModelVariants_variantas_key"
-         DO UPDATE SET
-             "aktyvus" = true,
-             "kontekstoIlgis" = COALESCE(
-                 "aiModelVariants"."kontekstoIlgis",
-                 EXCLUDED."kontekstoIlgis"
-             )
-         RETURNING *`,
-        [
-            DEFAULT_VARIANT.platforma,
-            DEFAULT_VARIANT.tiekejas,
-            DEFAULT_VARIANT.modelis,
-            DEFAULT_VARIANT.reasoningEffort,
-            DEFAULT_VARIANT.maxOutputTokens,
-            DEFAULT_VARIANT.kontekstoIlgis,
-        ],
-    );
-    return rows[0];
-}
-
-async function getVariant(id) {
-    if (!id) return ensureDefaultVariant();
-    const { rows } = await postgres.query(
-        `SELECT * FROM public."aiModelVariants" WHERE "id" = $1`,
-        [id],
-    );
-    if (!rows[0]) throw new Error(`aiModelVariants.id=${id} nerastas.`);
-    return rows[0];
-}
-
-function apiModel(variant) {
-    if (variant.platforma !== "openrouter") {
-        throw new Error(`Kol kas palaikoma tik openrouter platforma, gauta: ${variant.platforma}`);
-    }
-    return variant.modelis.includes("/")
-        ? variant.modelis
-        : `${variant.tiekejas}/${variant.modelis}`;
 }
 
 async function missingPurchases(variantId, limit) {
@@ -162,7 +107,7 @@ export async function main(argv = process.argv.slice(2)) {
         : positiveInteger(args.variant, "--variant");
     const variant = await getVariant(variantId);
     const model = apiModel(variant);
-    const tools = [getViesasisPirkimas, getFailas, getFailasTekstas].map(mcpAdapter);
+    const tools = aprasymoIrankiai();
     const rateLimiter = new FifoRateLimiter(rps);
     const stats = { pradeta: 0, issaugota: 0, neaprasoma: 0, klaidos: 0, jauBuvo: 0 };
     const total = await missingPurchaseCount(variant.id, limit);
@@ -207,36 +152,19 @@ export async function main(argv = process.argv.slice(2)) {
         let symbol = "✓";
         let outcome = "išsaugota";
         try {
-            const aprasymas = await runPirkimoAprasas({
-                pirkimoId: String(pirkimoId),
-                apiKey: process.env.OPENROUTER_API_KEY,
-                tools,
+            const rezultatas = await aprasytiPirkima({
+                pirkimoId,
+                variant,
                 model,
-                reasoningEffort: variant.reasoningEffort,
-                maxOutputTokens: variant.maxOutputTokens ?? 4000,
-                temperature: variant.temperatura,
-                topP: variant.topP,
-                topK: variant.topK,
+                tools,
+                apiKey: process.env.OPENROUTER_API_KEY,
                 beforeRequest: () => rateLimiter.acquire(),
             });
-            const success = !isFailureResult(aprasymas);
-            const result = await postgres.query(
-                `INSERT INTO public."viesiejiPirkimaiAprasymai"
-                    ("pirkimoId", "modelioVariantasId", "success", "aprasymas")
-                 VALUES ($1, $2, $3, $4)
-                 ON CONFLICT ("pirkimoId", "modelioVariantasId") DO NOTHING`,
-                [pirkimoId, variant.id, success, success ? aprasymas : null],
-            );
-            if (result.rowCount === 1) {
-                if (success) {
-                    stats.issaugota++;
-                } else {
-                    stats.neaprasoma++;
-                    symbol = "○";
-                    outcome = "nepakanka duomenų";
-                }
-            } else {
-                stats.jauBuvo++;
+            stats[rezultatas]++;
+            if (rezultatas === "neaprasoma") {
+                symbol = "○";
+                outcome = "nepakanka duomenų";
+            } else if (rezultatas === "jauBuvo") {
                 symbol = "○";
                 outcome = "jau buvo";
             }

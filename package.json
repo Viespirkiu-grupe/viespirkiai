@@ -13,6 +13,7 @@
         "code:lines": "node scripts/codeLines.js",
         "pirkimas:aprasas": "node scripts/aprasytiPirkima.js",
         "pirkimai:aprasyti": "node scripts/aprasytiPirkimus.js",
+        "pirkimai:aprasymu-eile": "node modules/viesiejiPirkimai/aprasymuEile.js",
         "sutartys:aprasyti": "node scripts/aprasytiSutartis.js",
         "db:schema:dump": "node postgres/dumpSchema.js",
         "regitra:atnaujinti": "node modules/regitra/atnaujintiRegitra.js",

@@ -5,6 +5,7 @@ import { processPmc, processOldestPmcOffHours } from "../modules/viesiejiPirkima
 import { cleanReservationsHasMore } from "../modules/viesiejiPirkimai/cleanReservations.js";
 import { processNextVykdytojas } from "../modules/viesiejiPirkimai/viesiejiPirkimaiVykdytojaiScrape.js";
 import { processViesiejiPirkimaiIndexQueue } from "../modules/viesiejiPirkimai/quickwitProcessIndexQueue.js";
+import { processViesiejiPirkimaiAprasymaiQueue } from "../modules/viesiejiPirkimai/aprasymuEile.js";
 import { updateRecentPlanuojamiPirkimai } from "../modules/viesiejiPirkimai/updatePlanuojamiPirkimai.js";
 import { processNextPlanuojamuPirkimuVykdytojas } from "../modules/viesiejiPirkimai/planuojamiPirkimaiVykdytojai.js";
 import { WORK_SIGNALS } from "../utils/taskSignals.js";
@@ -71,6 +72,20 @@ export default [
         errorCooldown: 30,
         wakeOn: [WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED],
         job: processViesiejiPirkimaiIndexQueue,
+    },
+    {
+        // AI aprašymų generavimas. Į Quickwit nerašo — įrašius aprašymą, DB
+        // trigeris pats padeda 'patch' į viesiejiPirkimaiIndexQueue.
+        name: "viesiejiPirkimaiAprasymuEile",
+        mode: "asap",
+        // Žemiausias prioritetas: LLM darbas neturi trukdyti nei scrape'ui,
+        // nei indeksavimui. Lygiagretumas – viduje (runWithSlots + RPS ribotuvas),
+        // tad TaskRunner'iui užtenka vieno worker'io.
+        priority: 1,
+        concurrency: 1,
+        cooldown: 60,
+        errorCooldown: 300,
+        job: processViesiejiPirkimaiAprasymaiQueue,
     },
     {
         // 24 concurrent backfill workers — lowest priority so they yield to everything else

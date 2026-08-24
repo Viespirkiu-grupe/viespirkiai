@@ -16,7 +16,7 @@ import {
     runAdaptiveSlots,
     runWithSlots,
 } from "../modules/viesiejiPirkimai/runWithSlots.js";
-import { mcpAdapter } from "./aprasytiPirkima.js";
+import { mcpAdapter } from "../modules/openrouter/mcpAdapter.js";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_RPS = 12.5;
