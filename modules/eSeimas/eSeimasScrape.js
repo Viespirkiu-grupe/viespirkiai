@@ -703,7 +703,12 @@ export async function discoverBackward({
             break;
         }
 
-        const naujausia = items.find(item => item.adopted_at)?.adopted_at;
+        // e-Seimo paieškos ašis yra REGISTRACIJOS data: /v1/seimas/legal-acts
+        // `from`/`to` filtruoja būtent ją, o `adopted_at` čia beveik visada null
+        // (ir OpenAPI schemoje net neprivalomas). Slinktume pagal `adopted_at` —
+        // riba niekada nepasikeistų ir kiekvienai kalendorinei dienai iš naujo
+        // pertrauktume visą naujausių aktų sąrašą.
+        const naujausia = items.find(item => item.registered_at)?.registered_at;
         if (naujausia && naujausia > frontier) {
             // Be šito, e-Seimas ignoravus datos ribą, suktumės amžinai ties naujausiais.
             throw new Error(`e-Seimas ignoravo datos ribą: gauta ${naujausia}, riba ${frontier}`);
@@ -715,7 +720,7 @@ export async function discoverBackward({
         });
 
         // Ar šiame puslapyje jau matyti senesnė diena?
-        const kita = items.map(item => item.adopted_at).find(date => date && date < frontier);
+        const kita = items.map(item => item.registered_at).find(date => date && date < frontier);
         const totalPages = response.pagination?.total_pages ?? 1;
         const baigta = Boolean(kita) || page >= totalPages;
 
@@ -732,7 +737,7 @@ export async function discoverBackward({
 
         // Diena baigta. Žymim tik jei ji tikrai turėjo aktų — `--from` galėjo
         // nurodyti tuščią datą, ir tokios lentelėje nereikia.
-        if (items.some(item => item.adopted_at === frontier)) {
+        if (items.some(item => item.registered_at === frontier)) {
             await markDayScraped(frontier);
             days++;
         }
