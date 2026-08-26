@@ -67,12 +67,52 @@ export type RunStatus = "running" | "succeeded" | "partial" | "failed";
 
 export type IndicatorStats = Readonly<{ rows: number; triggered: number; written: number }>;
 
+// Run-wide counters (runJob.ts), alongside indicators' own per-indicator
+// breakdown — the numbers an operator watching a run cares about without
+// summing the per-indicator table by hand. procurementsEvaluated/
+// decisionsWritten and signalsEvaluated/signalsWritten can differ from one
+// another the same way an indicator's own rows/written can: a page whose
+// write fails still evaluated its procurements/signals, but wrote none of
+// them (the run then closes 'partial', not 'failed' — pagesFailed says how
+// many pages that happened to).
+export type RunTotals = Readonly<{
+    procurementsEvaluated: number;
+    decisionsWritten: number;
+    signalsEvaluated: number;
+    signalsTriggered: number;
+    signalsWritten: number;
+    orphanLotsDropped: number;
+    pagesProcessed: number;
+    pagesFailed: number;
+    durationSec: number;
+}>;
+
+export type RunStatistics = Readonly<{
+    totals: RunTotals;
+    indicators: Readonly<Record<string, IndicatorStats>>;
+}>;
+
+export const EMPTY_RUN_STATISTICS: RunStatistics = Object.freeze({
+    totals: Object.freeze({
+        procurementsEvaluated: 0,
+        decisionsWritten: 0,
+        signalsEvaluated: 0,
+        signalsTriggered: 0,
+        signalsWritten: 0,
+        orphanLotsDropped: 0,
+        pagesProcessed: 0,
+        pagesFailed: 0,
+        durationSec: 0,
+    }),
+    indicators: Object.freeze({}),
+});
+
 export type EvaluationRun = Readonly<{
     runId: number;
     status: RunStatus;
     dataAsOf: string;
     codeCommit: string;
-    statistics: Readonly<Record<string, IndicatorStats>>;
+    statistics: RunStatistics;
 }>;
 
 export type BaseParameters = Readonly<{

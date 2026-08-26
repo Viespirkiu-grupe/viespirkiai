@@ -181,11 +181,22 @@ export class ProcurementReader {
     private lotsByNumber: Map<string, Lot[]> | null = null;
     private procurementParticipationByNumber: Map<string, ProcurementParticipation> | null = null;
     private procedureOutcomeByNumber: Map<string, ProcurementProcedureOutcome> | null = null;
+    private orphanLotCount = 0;
 
     constructor(data: RiskDataSource, subjects: readonly string[] | null, dataAsOf: string) {
         this.data = data;
         this.subjects = subjects;
         this.dataAsOf = dataAsOf;
+    }
+
+    /**
+     * Lots whose pirkimoNumeris matched no procurement in this run's scope —
+     * dropped rather than surfaced as a Subject (see ensureLotUniverseLoaded's
+     * own comment). Always 0 before the first loadProcurements() call; stable
+     * afterwards, since the whole lot universe loads once, not per page.
+     */
+    get droppedOrphanLotCount(): number {
+        return this.orphanLotCount;
     }
 
     async loadProcurements(cursor: string | null, pageSize: number): Promise<Page<Procurement>> {
@@ -281,6 +292,7 @@ export class ProcurementReader {
         if (orphanCount > 0) {
             log(`procurementReader: dropped ${orphanCount} orphan lot(s) with no matching procurement`);
         }
+        this.orphanLotCount = orphanCount;
 
         this.lotsByNumber = lotsByNumber;
         this.procurementParticipationByNumber = new Map(

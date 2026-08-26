@@ -6,7 +6,7 @@ import { riskIndicatorRegistry } from "../../modules/risk/deployedIndicators.ts"
 import { ProcurementReader } from "../../modules/risk/procurementReader.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
 import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
-import type { IndicatorStats, ProcurementRiskDecisions } from "../../modules/risk/types.ts";
+import type { IndicatorStats, ProcurementRiskDecisions, RunStatistics, RunTotals } from "../../modules/risk/types.ts";
 import { DecisionWriter } from "./decisionWriter.ts";
 
 export type RunJobOptions = Readonly<{
@@ -22,7 +22,7 @@ export type RunJobOptions = Readonly<{
 export type RunResult = Readonly<{
     runId: number;
     status: "succeeded" | "partial" | "failed";
-    statistics: Record<string, unknown>;
+    statistics: RunStatistics;
 }>;
 
 const DEFAULT_PAGE_SIZE = 500;
@@ -63,6 +63,46 @@ function mergeIndicatorStats(
     }
 }
 
+function sumIndicatorField(indicators: Readonly<Record<string, IndicatorStats>>, field: keyof IndicatorStats): number {
+    let total = 0;
+    for (const stats of Object.values(indicators)) total += stats[field];
+    return total;
+}
+
+// Rounded to one decimal place — the checkpoint cadence (once per page) is
+// far coarser than a millisecond ever needs to be surfaced at.
+function elapsedSec(startedAt: number): number {
+    return Math.round((Date.now() - startedAt) / 100) / 10;
+}
+
+/**
+ * Assembles the run-wide RunTotals (types.ts) that sit alongside the
+ * per-indicator breakdown — signalsEvaluated/Triggered/Written are derived
+ * from that breakdown (a signal row is always exactly one indicator's), so
+ * there's nothing to track separately for those three; everything else
+ * (procurements, pages, orphan lots, wall time) has no per-indicator
+ * equivalent and is counted directly by the loop below.
+ */
+function buildStatistics(
+    indicators: Readonly<Record<string, IndicatorStats>>,
+    counters: Readonly<{
+        procurementsEvaluated: number;
+        decisionsWritten: number;
+        orphanLotsDropped: number;
+        pagesProcessed: number;
+        pagesFailed: number;
+        durationSec: number;
+    }>,
+): RunStatistics {
+    const totals: RunTotals = {
+        ...counters,
+        signalsEvaluated: sumIndicatorField(indicators, "rows"),
+        signalsTriggered: sumIndicatorField(indicators, "triggered"),
+        signalsWritten: sumIndicatorField(indicators, "written"),
+    };
+    return { totals, indicators };
+}
+
 /**
  * Closes any run left `running` by a previous crash. The partial unique
  * index on `status = 'running'` (risk-schema.md §1) is the database-enforced
@@ -87,7 +127,8 @@ async function closeStaleRunningRuns(): Promise<void> {
  * nextCursor is null, evaluates each page's Procurements through the
  * RiskDecisionEngine (one ProcurementRiskDecisions per procurement, spanning
  * every indicator), upserts that page's decisions in one transaction, and
- * checkpoints per-indicator statistics after every page.
+ * checkpoints run-wide totals plus per-indicator statistics (types.ts's
+ * RunStatistics) after every page.
  *
  * Per-indicator computation failures are contained by RiskDecisionEngine
  * itself (logged, that subject's signal just doesn't appear) and never reach
@@ -99,6 +140,7 @@ async function closeStaleRunningRuns(): Promise<void> {
 export async function runEvaluation(options: RunJobOptions): Promise<RunResult> {
     await closeStaleRunningRuns();
 
+    const startedAt = Date.now();
     const dataAsOf = new Date().toISOString();
     const subjects = options.subjects ?? null;
     const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
@@ -113,37 +155,60 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
         status: "running",
         dataAsOf,
         codeCommit: options.codeCommit,
-        statistics: {},
     });
     const evaluationContext = new EvaluationContext({ runId: openedRun.runId, dataAsOf });
     const engine = new RiskDecisionEngine(riskIndicatorRegistry.createAllIndicators(evaluationContext), evaluationContext);
 
-    const statistics: Record<string, IndicatorStats> = {};
+    const indicatorStats: Record<string, IndicatorStats> = {};
+    let procurementsEvaluated = 0;
+    let decisionsWritten = 0;
+    let pagesProcessed = 0;
+    let pagesFailed = 0;
     let anyFailed = false;
     let cursor: string | null = null;
 
     do {
         const page = await reader.loadProcurements(cursor, pageSize);
         const decisions = engine.evaluateAll(page.items);
+        pagesProcessed++;
+        procurementsEvaluated += decisions.length;
 
         let written = true;
         if (decisions.length > 0) {
             try {
                 await writer.writeDecisions(decisions);
+                decisionsWritten += decisions.length;
             } catch (err) {
                 written = false;
                 anyFailed = true;
+                pagesFailed++;
                 const message = err instanceof Error ? err.message : String(err);
                 log(`procurement-risk: failed writing a page's decisions: ${message}`);
             }
         }
 
-        mergeIndicatorStats(statistics, decisions, written);
+        mergeIndicatorStats(indicatorStats, decisions, written);
+        const statistics = buildStatistics(indicatorStats, {
+            procurementsEvaluated,
+            decisionsWritten,
+            orphanLotsDropped: reader.droppedOrphanLotCount,
+            pagesProcessed,
+            pagesFailed,
+            durationSec: elapsedSec(startedAt),
+        });
         await writer.updateEvaluationRun({ statistics });
         cursor = page.nextCursor;
     } while (cursor !== null);
 
     const status = anyFailed ? "partial" : "succeeded";
+    const statistics = buildStatistics(indicatorStats, {
+        procurementsEvaluated,
+        decisionsWritten,
+        orphanLotsDropped: reader.droppedOrphanLotCount,
+        pagesProcessed,
+        pagesFailed,
+        durationSec: elapsedSec(startedAt),
+    });
     const closed = await writer.updateEvaluationRun({ status, statistics });
     log(`procurement-risk: run ${closed.runId} ${status}`);
     return { runId: closed.runId, status, statistics };

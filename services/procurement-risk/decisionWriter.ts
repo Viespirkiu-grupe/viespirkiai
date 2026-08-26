@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { EvaluationRun, ProcurementRiskDecisions } from "../../modules/risk/types.ts";
+import { EMPTY_RUN_STATISTICS, type EvaluationRun, type ProcurementRiskDecisions } from "../../modules/risk/types.ts";
 import { writeDecisions } from "./write.ts";
 
 /**
@@ -50,14 +50,14 @@ export class DecisionWriter {
             const { rows } = await this.pool.query<{ id: number }>(
                 `INSERT INTO risk.risk_evaluation_runs (data_as_of, code_commit, status, statistics)
                  VALUES ($1, $2, $3, $4) RETURNING id`,
-                [update.dataAsOf, update.codeCommit, update.status ?? "running", JSON.stringify(update.statistics ?? {})],
+                [update.dataAsOf, update.codeCommit, update.status ?? "running", JSON.stringify(update.statistics ?? EMPTY_RUN_STATISTICS)],
             );
             this.evaluationRun = {
                 runId: rows[0].id,
                 status: update.status ?? "running",
                 dataAsOf: update.dataAsOf!,
                 codeCommit: update.codeCommit!,
-                statistics: update.statistics ?? {},
+                statistics: update.statistics ?? EMPTY_RUN_STATISTICS,
             };
             return this.evaluationRun;
         }
