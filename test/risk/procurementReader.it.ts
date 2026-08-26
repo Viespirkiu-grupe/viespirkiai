@@ -1,7 +1,7 @@
 // Integration test for the Procurement Reader (modules/risk/procurementReader.ts):
 // proves ProcurementReader against the real v_pirkimas_v2/v_pirkimo_dalis_v2/
-// v_dalyviai_v2/v_pirkimo_pabaiga_v2 views, in the local risk-dev Postgres's
-// test-only `public` schema. See
+// v_dalyviai_v2/v_pirkimo_pabaiga_v2/v_pirkimo_sutartys_v2 views, in the
+// local risk-dev Postgres's test-only `public` schema. See
 // docs/indicators-story/risk-service-architecture-v2.md §1.2.
 //
 // Named `.it.ts` to match this repo's integration-test convention
@@ -26,6 +26,7 @@ import {
     insertDalyvis,
     insertPasiulymas,
     insertProceduruPabaiga,
+    insertVpmSutartis,
     WITHDRAWN_STATUS,
 } from "../../modules/risk/indicators/test/xlsxPPAFixtures.ts";
 import { PostgresRiskDataSource } from "../../modules/risk/riskDataSource.ts";
@@ -519,5 +520,47 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         expect(afterCutoff.procedureOutcome!.lotOutcomes).toEqual([
             "Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus",
         ]);
+    });
+});
+
+describe("ProcurementReader contract signature dates (LT-OTH-04)", () => {
+    it("collects a single contract's signature date", async () => {
+        await insertViesiejiPirkimai(980001);
+        await insertVpmSutartis({ pirkimoNumeris: "980001", sudarymoData: "2026-05-15" });
+
+        const [procurement] = await loadAll(reader(["980001"]));
+        expect(procurement.contractSignatureDates).toEqual(["2026-05-15"]);
+    });
+
+    it("collects every distinct signature date across the procurement's own contracts", async () => {
+        await insertViesiejiPirkimai(980002);
+        await insertVpmSutartis({ pirkimoNumeris: "980002", sudarymoData: "2026-05-15" });
+        await insertVpmSutartis({ pirkimoNumeris: "980002", sudarymoData: "2026-06-20" });
+
+        const [procurement] = await loadAll(reader(["980002"]));
+        expect(procurement.contractSignatureDates!.slice().sort()).toEqual(["2026-05-15", "2026-06-20"]);
+    });
+
+    it("is null when no contract resolves to this procurement's pirkimoNumeris at all", async () => {
+        await insertViesiejiPirkimai(980003);
+
+        const [procurement] = await loadAll(reader(["980003"]));
+        expect(procurement.contractSignatureDates).toBeNull();
+    });
+
+    it("ignores a deleted contract", async () => {
+        await insertViesiejiPirkimai(980004);
+        await insertVpmSutartis({ pirkimoNumeris: "980004", sudarymoData: "2026-05-15", istrinta: true });
+
+        const [procurement] = await loadAll(reader(["980004"]));
+        expect(procurement.contractSignatureDates).toBeNull();
+    });
+
+    it("ignores a contract with no signature date", async () => {
+        await insertViesiejiPirkimai(980005);
+        await insertVpmSutartis({ pirkimoNumeris: "980005", sudarymoData: null });
+
+        const [procurement] = await loadAll(reader(["980005"]));
+        expect(procurement.contractSignatureDates).toBeNull();
     });
 });

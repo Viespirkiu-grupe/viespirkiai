@@ -155,6 +155,7 @@ export type Procurement = Readonly<{
     lots: readonly Lot[];
     participation: ProcurementParticipation | null;
     procedureOutcome: ProcurementProcedureOutcome | null;
+    contractSignatureDates: readonly string[] | null;
 }>;
 
 // Distinct-tiekejoKodas participation facts from public.v_dalyviai_v2, merged
@@ -200,6 +201,18 @@ export type ProcurementProcedureOutcome = Readonly<{
     lots: readonly ProcedureOutcomeLot[];
     reportedAt: string | null;
 }>;
+
+// Distinct contract signature ("sudarymoData") dates from
+// public.v_pirkimo_sutartys_v2, merged onto a Procurement by the Procurement
+// Reader — LT-OTH-04 pairs a lot's own award-decision date (above) against
+// the nearest of these on or after it. null means no contract resolved to
+// this procurement's pirkimoNumeris at all — the common case: domain-model.md
+// §5.2 measures only 6.1% of contracts legally obliged to carry a
+// procurement number as actually resolving to one. v_sutartys carries no
+// daliesNumeris, so this set is procurement-grain, not per-lot — a plausible
+// nearest match, not a verified one-to-one lot-to-contract link. See
+// Procurement.contractSignatureDates below.
+
 
 export type Lot = Readonly<{
     subjektoRaktas: string;

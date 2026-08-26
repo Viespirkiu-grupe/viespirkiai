@@ -45,6 +45,7 @@ function testProcurement(procedureOutcome: ProcurementProcedureOutcome | null, o
         lots: [],
         participation: null,
         procedureOutcome,
+        contractSignatureDates: null,
         ...overrides,
     };
 }

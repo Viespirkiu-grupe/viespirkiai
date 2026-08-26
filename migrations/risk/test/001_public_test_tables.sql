@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS public."vpmSutartys" (
     "unikalusId"                        bigint PRIMARY KEY,
     "perkanciosiosOrganizacijosKodas"   text,
     "pirkimoNumeris"                    text,
+    "sudarymoData"                      date,
     "istrinta"                          boolean DEFAULT false NOT NULL
 );
 

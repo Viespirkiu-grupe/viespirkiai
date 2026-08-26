@@ -156,6 +156,23 @@ const PROCEDURE_OUTCOME_SQL = `
     GROUP BY po."pirkimoNumeris"
 `;
 
+// Procurement-grain contract signature dates — every distinct "sudarymoData"
+// observed across the procurement's own contracts (matched by pirkimoNumeris,
+// v_pirkimo_sutartys_v2 already restricts to non-deleted, dated, plausibly-
+// numeric pirkimoNumeris rows), shared by LT-OTH-04. array_agg(DISTINCT ...)
+// collapses repeated dates (e.g. two lots of one procurement signed the same
+// day) to the set an indicator actually pairs against; the JOIN in
+// v_pirkimo_sutartys_v2 guarantees at least one row per group, so json_agg
+// is never null here.
+const CONTRACT_SIGNATURES_SQL = `
+    ${PUBLIC_VIEWS_CTE}
+    SELECT cs."pirkimoNumeris"                                             AS "pirkimoNumeris",
+           array_agg(DISTINCT to_char(cs."sudarymoData", 'YYYY-MM-DD'))    AS "signatureDates"
+    FROM v_pirkimo_sutartys_v2 cs
+    WHERE ($1::text[] IS NULL OR cs."pirkimoNumeris" = ANY ($1::text[]))
+    GROUP BY cs."pirkimoNumeris"
+`;
+
 export type Page<T> = Readonly<{
     items: readonly T[];
     nextCursor: string | null;
@@ -166,6 +183,7 @@ type LotParticipationRow = Readonly<{ pirkimoNumeris: string; daliesNumeris: str
 type ProcurementParticipationRow = Readonly<{ pirkimoNumeris: string }> & ProcurementParticipation;
 type ProcedureOutcomeRow = Readonly<{ pirkimoNumeris: string }> & ProcurementProcedureOutcome;
 type BidRow = Readonly<{ pirkimoNumeris: string; daliesNumeris: string }> & Bid;
+type ContractSignaturesRow = Readonly<{ pirkimoNumeris: string; signatureDates: readonly string[] }>;
 
 function encodeCursor(saltinis: string, pirkimoNumeris: string): string {
     return `${saltinis}\u0000${pirkimoNumeris}`;
@@ -193,6 +211,7 @@ export class ProcurementReader {
     private lotsByNumber: Map<string, Lot[]> | null = null;
     private procurementParticipationByNumber: Map<string, ProcurementParticipation> | null = null;
     private procedureOutcomeByNumber: Map<string, ProcurementProcedureOutcome> | null = null;
+    private contractSignatureDatesByNumber: Map<string, readonly string[]> | null = null;
     private orphanLotCount = 0;
 
     constructor(data: RiskDataSource, subjects: readonly string[] | null, dataAsOf: string) {
@@ -215,18 +234,16 @@ export class ProcurementReader {
         await this.ensureLotUniverseLoaded();
 
         const [cursorSaltinis, cursorPirkimoNumeris] = cursor === null ? [null, null] : decodeCursor(cursor);
-        const rows = await this.data.query<Omit<Procurement, "lots" | "participation" | "procedureOutcome">>(PROCUREMENT_SQL, [
-            this.subjects,
-            cursorSaltinis,
-            cursorPirkimoNumeris,
-            pageSize,
-        ]);
+        const rows = await this.data.query<
+            Omit<Procurement, "lots" | "participation" | "procedureOutcome" | "contractSignatureDates">
+        >(PROCUREMENT_SQL, [this.subjects, cursorSaltinis, cursorPirkimoNumeris, pageSize]);
 
         const items: Procurement[] = rows.map((row) => ({
             ...row,
             lots: this.lotsByNumber!.get(row.pirkimoNumeris) ?? [],
             participation: this.procurementParticipationByNumber!.get(row.pirkimoNumeris) ?? null,
             procedureOutcome: this.procedureOutcomeByNumber!.get(row.pirkimoNumeris) ?? null,
+            contractSignatureDates: this.contractSignatureDatesByNumber!.get(row.pirkimoNumeris) ?? null,
         }));
 
         // last.saltinis is asserted non-null: v_pirkimas_v2's saltinis is
@@ -250,7 +267,7 @@ export class ProcurementReader {
     private async ensureLotUniverseLoaded(): Promise<void> {
         if (this.lotsByNumber !== null) return;
 
-        const [procurementIds, lotRows, lotParticipationRows, procurementParticipationRows, bidRows, procedureOutcomeRows] =
+        const [procurementIds, lotRows, lotParticipationRows, procurementParticipationRows, bidRows, procedureOutcomeRows, contractSignatureRows] =
             await Promise.all([
                 this.data.query<{ pirkimoNumeris: string }>(PROCUREMENT_IDS_SQL, [this.subjects]),
                 this.data.query<LotRow>(LOT_SQL, [this.subjects]),
@@ -258,6 +275,7 @@ export class ProcurementReader {
                 this.data.query<ProcurementParticipationRow>(PROCUREMENT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
                 this.data.query<BidRow>(LOT_BIDS_SQL, [this.dataAsOf, this.subjects]),
                 this.data.query<ProcedureOutcomeRow>(PROCEDURE_OUTCOME_SQL, [this.dataAsOf, this.subjects]),
+                this.data.query<ContractSignaturesRow>(CONTRACT_SIGNATURES_SQL, [this.subjects]),
             ]);
 
         const validIds = new Set(procurementIds.map((row) => row.pirkimoNumeris));
@@ -318,6 +336,9 @@ export class ProcurementReader {
                 row.pirkimoNumeris,
                 { lotOutcomes: row.lotOutcomes, lots: row.lots, reportedAt: row.reportedAt },
             ]),
+        );
+        this.contractSignatureDatesByNumber = new Map(
+            contractSignatureRows.map((row) => [row.pirkimoNumeris, row.signatureDates]),
         );
     }
 }

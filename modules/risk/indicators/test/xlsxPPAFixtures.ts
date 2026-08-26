@@ -104,3 +104,20 @@ export async function insertProceduruPabaiga(params: {
         [params.ataskaitaId, params.daliesNumeris, params.proceduruPabaiga, params.sprendimoPriemimoData ?? null],
     );
 }
+
+let nextSutartisId = 1;
+
+/** A contract row — LT-OTH-04 reads its pirkimoNumeris/sudarymoData via v_pirkimo_sutartys_v2. */
+export async function insertVpmSutartis(params: {
+    pirkimoNumeris: string;
+    sudarymoData: string | null;
+    istrinta?: boolean;
+}): Promise<number> {
+    const unikalusId = nextSutartisId++;
+    await riskDb.query(
+        `INSERT INTO public."vpmSutartys" ("unikalusId", "pirkimoNumeris", "sudarymoData", "istrinta")
+         VALUES ($1, $2, $3, $4)`,
+        [unikalusId, params.pirkimoNumeris, params.sudarymoData, params.istrinta ?? false],
+    );
+    return unikalusId;
+}

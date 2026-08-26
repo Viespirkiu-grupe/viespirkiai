@@ -80,6 +80,7 @@ function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
         lots: [],
         participation: null,
         procedureOutcome: null,
+        contractSignatureDates: null,
         ...overrides,
     };
 }

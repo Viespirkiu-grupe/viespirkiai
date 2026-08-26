@@ -18,9 +18,9 @@ import { fileURLToPath } from "node:url";
 // via CREATE VIEW (riskDb there is an admin-owned local Docker instance).
 //
 // Keep this in sync with modules/mcp/analyst/views/v_pirkimas_v2.sql,
-// v_dalyviai_v2.sql, v_pirkimo_dalis_v2.sql and v_pirkimo_pabaiga_v2.sql by
-// hand — same convention those files already use to track their non-_v2
-// counterparts.
+// v_dalyviai_v2.sql, v_pirkimo_dalis_v2.sql, v_pirkimo_pabaiga_v2.sql and
+// v_pirkimo_sutartys_v2.sql by hand — same convention those files already
+// use to track their non-_v2 counterparts.
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const VIEWS_DIR = path.join(ROOT, "modules/mcp/analyst/views");
@@ -43,6 +43,9 @@ const PIRKIMO_DALIS_BODY = loadViewBody("v_pirkimo_dalis_v2.sql").replaceAll("pu
 // v_pirkimo_pabaiga_v2.sql has no dependency on any other view — it reads
 // xlsxPPAataskaitos/xlsxPPAproceduruPabaiga directly.
 const PIRKIMO_PABAIGA_BODY = loadViewBody("v_pirkimo_pabaiga_v2.sql");
+// v_pirkimo_sutartys_v2.sql likewise has no dependency on any other view —
+// it reads vpmSutartys directly.
+const PIRKIMO_SUTARTYS_BODY = loadViewBody("v_pirkimo_sutartys_v2.sql");
 
 // Prepended verbatim to every Procurement Reader query. An unreferenced CTE
 // costs nothing — Postgres never plans or executes one that the outer query
@@ -60,4 +63,7 @@ ${PIRKIMO_DALIS_BODY}
 ),
 v_pirkimo_pabaiga_v2 AS (
 ${PIRKIMO_PABAIGA_BODY}
+),
+v_pirkimo_sutartys_v2 AS (
+${PIRKIMO_SUTARTYS_BODY}
 )`;

@@ -39,6 +39,7 @@ function testProcurement(participation: ProcurementParticipation | null, overrid
         lots: [],
         participation,
         procedureOutcome: null,
+        contractSignatureDates: null,
         ...overrides,
     };
 }

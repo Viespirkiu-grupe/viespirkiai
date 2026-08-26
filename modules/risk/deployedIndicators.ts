@@ -5,6 +5,7 @@ import { LtCom02Decision } from "./indicators/LT-COM-02/decision.ts";
 import { LtCom03Decision } from "./indicators/LT-COM-03/decision.ts";
 import { LtCom20Decision } from "./indicators/LT-COM-20/decision.ts";
 import { LtOth03Decision } from "./indicators/LT-OTH-03/decision.ts";
+import { LtOth04Decision } from "./indicators/LT-OTH-04/decision.ts";
 import { LtOth05Decision } from "./indicators/LT-OTH-05/decision.ts";
 
 // See docs/indicators-story/risk-service-architecture-v2.md §3.5.
@@ -14,6 +15,7 @@ const deployedIndicatorClasses = [
     LtCom03Decision,
     LtCom20Decision,
     LtOth03Decision,
+    LtOth04Decision,
     LtOth05Decision,
 ] as const satisfies readonly IndicatorClass[];
 
