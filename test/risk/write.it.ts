@@ -2,7 +2,8 @@
 // write.ts), against the local risk-dev Postgres. Protects the storage
 // decision docs/indicators-story/risk-service-architecture.md §2.4 depends
 // on: risk_procurement_decisions is current-state, one row per procurement,
-// refreshed in place by INSERT ... ON CONFLICT DO UPDATE.
+// refreshed in place by INSERT ... ON CONFLICT DO UPDATE; risk_signals is its
+// own table, wiped and reinserted per procurement via decision_id.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { PoolClient } from "pg";
 import { riskDb } from "../../postgres/riskDb.js";
@@ -22,7 +23,6 @@ function signal(overrides: Partial<RiskSignal> = {}): RiskSignal {
         threshold: { a: 1 },
         appliedParameters: { a: 1 },
         missingData: [],
-        dataAsOf: "2026-08-12T00:00:00.000Z",
         ...overrides,
     };
 }
@@ -64,6 +64,16 @@ async function decisionsFor(procurementSource: string, procurementId: string) {
     return rows;
 }
 
+async function signalsFor(procurementSource: string, procurementId: string) {
+    const { rows } = await riskDb.query(
+        `SELECT s.* FROM risk.risk_signals s
+           JOIN risk.risk_procurement_decisions d ON d.id = s.decision_id
+          WHERE d.procurement_source = $1 AND d.procurement_id = $2`,
+        [procurementSource, procurementId],
+    );
+    return rows;
+}
+
 // These tests don't exercise the run open/close lifecycle, so runs are
 // inserted pre-closed to avoid colliding with the partial unique index on
 // status = 'running'.
@@ -80,8 +90,11 @@ async function openRun(): Promise<number> {
 // is a property of the runs table as a whole, so a leftover run from a
 // manual `npm run risk:run` would otherwise decide which row's provenance
 // these tests see. The DELETE grant this relies on is test-only — see
-// migrations/risk/test/000_grants.sql; nothing may delete a row in
-// production, rows are only ever overwritten.
+// migrations/risk/test/000_grants.sql; nothing may delete a
+// risk_procurement_decisions/risk_evaluation_runs row in production, rows
+// are only ever overwritten. risk_signals rows cascade away with their
+// parent decisions row (ON DELETE CASCADE), matching production's own
+// per-procurement DELETE.
 async function cleanUp(): Promise<void> {
     await riskDb.query(`DELETE FROM risk.risk_procurement_decisions`);
     await riskDb.query(`DELETE FROM risk.risk_evaluation_runs`);
@@ -106,6 +119,8 @@ describe("Decision Writer", () => {
 
         expect(await decisionsFor("cvpis", "1")).toHaveLength(1);
         expect(await decisionsFor("cvpis", "2")).toHaveLength(1);
+        expect(await signalsFor("cvpis", "1")).toHaveLength(1);
+        expect(await signalsFor("cvpis", "2")).toHaveLength(1);
     });
 
     it("writes nothing for an empty page", async () => {
@@ -126,15 +141,17 @@ describe("Decision Writer", () => {
             writeDecisions(client, runId2, [decisions({ signals: [signal({ state: "not_triggered" })] })]),
         );
         const rows = await decisionsFor("cvpis", "1");
+        const signals = await signalsFor("cvpis", "1");
 
         expect(rows).toHaveLength(1);
         expect(rows[0].run_id).toBe(String(runId2));
-        expect(rows[0].signals[0].state).toBe("not_triggered");
+        expect(signals).toHaveLength(1);
+        expect(signals[0].state).toBe("not_triggered");
         expect(rows[0].created_at).toEqual(first.created_at);
         expect(new Date(rows[0].updated_at).getTime()).toBeGreaterThanOrEqual(new Date(first.updated_at).getTime());
     });
 
-    it("holds every signal for a procurement (procurement, lot and bid grains) as one jsonb array", async () => {
+    it("holds every signal for a procurement (procurement, lot and bid grains) as separate risk_signals rows", async () => {
         const runId = await openRun();
         const mixedSignals = [
             signal({ subjectType: "procurement", subjectKey: "cvpis:1" }),
@@ -143,9 +160,32 @@ describe("Decision Writer", () => {
         ];
         await withTransaction((client) => writeDecisions(client, runId, [decisions({ signals: mixedSignals })]));
 
-        const [row] = await decisionsFor("cvpis", "1");
-        expect(row.signals).toHaveLength(3);
-        expect(row.signals.map((s: RiskSignal) => s.subjectType).sort()).toEqual(["bid", "lot", "procurement"]);
+        const rows = await signalsFor("cvpis", "1");
+        expect(rows).toHaveLength(3);
+        expect(rows.map((s) => s.subject_type).sort()).toEqual(["bid", "lot", "procurement"]);
+    });
+
+    it("wipes and reinserts a procurement's signals on refresh, never updating in place", async () => {
+        const runId1 = await openRun();
+        await withTransaction((client) =>
+            writeDecisions(client, runId1, [
+                decisions({
+                    signals: [
+                        signal({ indicatorId: "LT-WRITE-TEST-01", state: "triggered" }),
+                        signal({ indicatorId: "LT-WRITE-TEST-02", state: "triggered" }),
+                    ],
+                }),
+            ]),
+        );
+        expect(await signalsFor("cvpis", "1")).toHaveLength(2);
+
+        const runId2 = await openRun();
+        await withTransaction((client) =>
+            writeDecisions(client, runId2, [decisions({ signals: [signal({ indicatorId: "LT-WRITE-TEST-03", state: "not_triggered" })] })]),
+        );
+        const rows = await signalsFor("cvpis", "1");
+        expect(rows).toHaveLength(1);
+        expect(rows[0].indicator_id).toBe("LT-WRITE-TEST-03");
     });
 
     it("rejects two procurements with the same natural key in one call", async () => {
@@ -173,7 +213,7 @@ describe("risk.v_latest_run", () => {
 });
 
 describe("risk.v_procurement_summaries", () => {
-    it("computes per-procurement counts from that row's own signals", async () => {
+    it("computes per-procurement counts from that row's risk_signals", async () => {
         const runId = await openRun();
         await withTransaction((client) =>
             writeDecisions(client, runId, [

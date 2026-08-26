@@ -23,7 +23,6 @@ export const riskSignalSchema: z.ZodType<RiskSignal> = z.object({
     threshold: z.record(z.string(), z.unknown()).nullable(),
     appliedParameters: z.record(z.string(), z.unknown()).nullable(),
     missingData: z.array(z.string()),
-    dataAsOf: z.string(),
 });
 
 export const riskSignalContract: RuntimeContract<RiskSignal> = zodContract(riskSignalSchema);

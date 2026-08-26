@@ -24,9 +24,12 @@ export type RiskIndicatorKey = Readonly<{
 }>;
 
 // RiskSignal (risk-service-architecture.md §2.3), validated at runtime by
-// contracts.ts's riskSignalSchema. Stored as an element of
-// risk.risk_procurement_decisions.signals (jsonb), never as its own row —
-// procurementSource/procurementId are held once on that row instead.
+// contracts.ts's riskSignalSchema. Persisted as its own row in
+// risk.risk_signals, linked to its procurement only via that row's
+// decision_id (a surrogate FK, resolved by joining risk_procurement_decisions
+// — never stamped onto the signal itself). Carries neither
+// procurementSource/procurementId nor dataAsOf: both are held once on the
+// parent ProcurementRiskDecisions/risk_procurement_decisions row instead.
 export type RiskSignal = Readonly<{
     indicatorId: string;
     indicatorVersion: number;
@@ -37,18 +40,19 @@ export type RiskSignal = Readonly<{
     threshold: Readonly<Record<string, unknown>> | null;
     appliedParameters: Readonly<Record<string, unknown>> | null;
     missingData: readonly string[];
-    dataAsOf: string;
 }>;
 
 // One procurement's whole risk picture (risk-service-architecture.md §2.3):
 // every RiskSignal the run produced for it, its lots and its bids, collected
 // by RiskDecisionEngine.evaluateAll (riskDecisionEngine.ts) and persisted by
-// the Decision Writer as one row in risk.risk_procurement_decisions, keyed by
-// (procurementSource, procurementId). runId/dataAsOf describe the run that
-// last refreshed the row; createdAt/updatedAt are best-effort placeholders
-// here — the upsert SQL (services/procurement-risk/write.ts) is the actual
-// authority on those two columns (DEFAULT now() on insert, now() on every
-// refresh, created_at otherwise untouched).
+// the Decision Writer as one row in risk.risk_procurement_decisions (metadata
+// only), keyed by (procurementSource, procurementId), plus one row per signal
+// in risk.risk_signals linked back via that row's id (decision_id). runId/
+// dataAsOf describe the run that last refreshed the row; createdAt/updatedAt
+// are best-effort placeholders here — the upsert SQL
+// (services/procurement-risk/write.ts) is the actual authority on those two
+// columns (DEFAULT now() on insert, now() on every refresh, created_at
+// otherwise untouched).
 export type ProcurementRiskDecisions = Readonly<{
     procurementSource: string;
     procurementId: string;
@@ -80,7 +84,7 @@ export type BaseParameters = Readonly<{
 
 // What a Risk Indicator's assessRisk() (or isEligible()) returns — the
 // indicator-specific fields only; ARiskIndicatorDecision.signalFor() fills in
-// the rest (identity, subject fields, dataAsOf) around it. `state` is the one
+// the rest (identity, subject fields) around it. `state` is the one
 // field every branch must supply; everything else defaults when omitted.
 export type PartialRiskSignal = Readonly<{
     state: IndicatorState;

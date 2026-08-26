@@ -3,19 +3,50 @@ import { log } from "../../utils/log.js";
 import type { RiskSignal, SubjectType } from "./types.ts";
 import { riskCatalogue } from "./deployedIndicators.ts";
 
-// Reads risk.risk_procurement_decisions for display on the procurement
-// detail page (src/pages/viesiejiPirkimai/[id].astro). No existing module
-// read this table back before — services/procurement-risk/write.ts and the
+// Reads risk.risk_procurement_decisions joined to risk.risk_signals for
+// display on the procurement detail page
+// (src/pages/viesiejiPirkimai/[id].astro). No existing module read these
+// tables back before — services/procurement-risk/write.ts and the
 // integration tests are the only other callers. See
 // docs/indicators-story/risk-service-architecture.md §2.4.
 
+// dataAsOf isn't part of the persisted RiskSignal (it lives once on the
+// parent decisions row, §2.4) — the reader stamps it back on for display,
+// since the GUI shows it per chip.
 export type EnrichedRiskSignal = RiskSignal &
     Readonly<{
+        dataAsOf: string;
         titleLt: string;
         descriptionLt: string;
         formulaLt: string;
         limitationLt: string;
     }>;
+
+type RiskSignalRow = Readonly<{
+    indicator_id: string;
+    indicator_version: number;
+    subject_type: SubjectType;
+    subject_key: string;
+    state: RiskSignal["state"];
+    raw_value: Readonly<Record<string, unknown>> | null;
+    threshold: Readonly<Record<string, unknown>> | null;
+    applied_parameters: Readonly<Record<string, unknown>> | null;
+    missing_data: readonly string[] | null;
+}>;
+
+function rowToSignal(row: RiskSignalRow): RiskSignal {
+    return {
+        indicatorId: row.indicator_id,
+        indicatorVersion: row.indicator_version,
+        subjectType: row.subject_type,
+        subjectKey: row.subject_key,
+        state: row.state,
+        rawValue: row.raw_value,
+        threshold: row.threshold,
+        appliedParameters: row.applied_parameters,
+        missingData: row.missing_data ?? [],
+    };
+}
 
 export type ProcurementRiskView = Readonly<{
     // subjectType === "procurement", state === "triggered".
@@ -35,10 +66,11 @@ export type ProcurementRiskView = Readonly<{
 // or throwing (unlike RiskIndicatorRegistry.require, which throws).
 const catalogueByKey = new Map(riskCatalogue.map((entry) => [`${entry.id}/${entry.version}`, entry]));
 
-function enrich(signal: RiskSignal): EnrichedRiskSignal {
+function enrich(signal: RiskSignal, dataAsOf: string): EnrichedRiskSignal {
     const entry = catalogueByKey.get(`${signal.indicatorId}/${signal.indicatorVersion}`);
     return {
         ...signal,
+        dataAsOf,
         titleLt: entry?.public.titleLt ?? signal.indicatorId,
         descriptionLt: entry?.public.descriptionLt ?? "",
         formulaLt: entry?.public.formulaLt ?? "",
@@ -70,14 +102,25 @@ export async function loadProcurementRiskView(
     procurementSource: string,
     procurementId: string,
 ): Promise<ProcurementRiskView | null> {
-    let row: { signals: RiskSignal[]; data_as_of: unknown } | undefined;
+    let decisionRow: { id: string; data_as_of: unknown } | undefined;
+    let signalRows: readonly RiskSignalRow[] = [];
     try {
-        const { rows } = await riskDb.query(
-            `SELECT signals, data_as_of FROM risk.risk_procurement_decisions
+        const { rows } = await riskDb.query<{ id: string; data_as_of: unknown }>(
+            `SELECT id, data_as_of FROM risk.risk_procurement_decisions
               WHERE procurement_source = $1 AND procurement_id = $2`,
             [procurementSource, procurementId],
         );
-        row = rows[0];
+        decisionRow = rows[0];
+        if (decisionRow) {
+            const signals = await riskDb.query<RiskSignalRow>(
+                `SELECT indicator_id, indicator_version, subject_type, subject_key, state,
+                        raw_value, threshold, applied_parameters, missing_data
+                   FROM risk.risk_signals
+                  WHERE decision_id = $1 AND state = 'triggered'`,
+                [decisionRow.id],
+            );
+            signalRows = signals.rows;
+        }
     } catch (err) {
         // The risk DB is a separate Postgres instance (postgres/riskDb.js) that
         // isn't guaranteed to be up in every dev environment — never let a
@@ -85,15 +128,15 @@ export async function loadProcurementRiskView(
         log(`rizikos signalų nepavyko nuskaityti (${procurementSource}:${procurementId}): ${(err as Error)?.message ?? err}`);
         return null;
     }
-    if (!row) return null;
+    if (!decisionRow) return null;
 
-    const triggered = row.signals.filter((s) => s.state === "triggered").map(enrich);
+    const dataAsOf = decisionRow.data_as_of instanceof Date ? decisionRow.data_as_of.toISOString() : String(decisionRow.data_as_of);
+
+    const triggered = signalRows.map((row) => enrich(rowToSignal(row), dataAsOf));
     const bySubjectType = (subjectType: SubjectType) => triggered.filter((s) => s.subjectType === subjectType);
 
     const lots = bySubjectType("lot");
     const bids = bySubjectType("bid");
-
-    const dataAsOf = row.data_as_of instanceof Date ? row.data_as_of.toISOString() : String(row.data_as_of);
 
     return {
         procurement: bySubjectType("procurement"),

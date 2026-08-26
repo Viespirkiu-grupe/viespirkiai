@@ -174,7 +174,6 @@ export abstract class ARiskIndicatorDecision<
             threshold: partial.threshold ?? null,
             appliedParameters: partial.appliedParameters ?? null,
             missingData: [...(partial.missingData ?? [])],
-            dataAsOf: this.context.dataAsOf,
         });
         return Object.freeze(signal);
     }

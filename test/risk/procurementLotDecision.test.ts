@@ -174,7 +174,6 @@ describe("AProcurementIndicatorDecision", () => {
             threshold: { threshold: 10 },
             appliedParameters: { threshold: 10 },
             missingData: [],
-            dataAsOf: "2026-08-01",
         });
     });
 
