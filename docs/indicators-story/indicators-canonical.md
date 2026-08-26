@@ -153,7 +153,7 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 | LT-OTH-03 | Evaluation/decision period anomalously short or long  | Other              | OCP-R015; OCP-R061; OCP-R062; OLAF-CA08; OT-I05; VPT-I10                                                                                                       | Accepted         |
 | LT-OTH-04 | Award-to-signature period unusually long              | Other              | OCP-R060                                                                                                                                                       | Accepted         |
 | LT-OTH-05 | Procedure unsuccessful or award not contracted        | Other              | OLAF-CA05; OLAF-CA06; OLAF-CA07; VPT-I11                                                                                                                       | Accepted         |
-| LT-OTH-06 | Strategic-policy objective not applied where relevant | Other              | VPT-I02; VPT-I03; VPT-I04; VPT-I05; OECD-GOV-04                                                                                                                |                  |
+| LT-OTH-06 | Strategic-policy objective not applied where relevant | Other              | VPT-I02; VPT-I03; VPT-I04; VPT-I05; OECD-GOV-04                                                                                                                | Cannot implement |
 | LT-PRI-05 | High estimated value                                  | Pricing            | OLAF-CN06                                                                                                                                                      |                  |
 | LT-PRI-06 | High estimated framework value                        | Pricing            | OLAF-CN04                                                                                                                                                      |                  |
 | LT-PRO-01 | Unjustified non-competitive procedure                 | Procedure design   | OCP-R010; OLAF-CN23; OT-I03; STT-I08; VPT-I15                                                                                                                  |                  |
@@ -277,6 +277,22 @@ buyer may or may not use to mention market research, so testing for it would mea
 unbounded vocabulary rather than reading a structured fact, the kind of fragile-regex approach Phase 1 of the
 implementation plan warns against. Revisit if a structured "preliminary market consultation" field is ever ingested
 (e.g. a future PPA report revision, or a CVP IS notice field mirroring TED's prior-market-consultation indicator).
+
+**LT-OTH-06** — Strategic-policy objective not applied where relevant: not implementable with currently ingested
+data. The only structured self-reported flags for these objectives — `xlsxPPAsutartys."centralizuotasPirkimas"` /
+`"zaliasisPirkimas"` / `"inovatyvusProduktas"` and `xlsxPPAvertinimoKriterijai."vertinimoKriterijus"`, all sourced
+from the Atn-1 procedure report (`xlsxPPAataskaitos`, 6,583 of 264,415 procurements, ~2.5%) — record only whether a
+policy was self-reported as *applied*, never whether it was *relevant* to the specific procurement, and the
+catalogue concept is precisely the gap between the two. No table in the warehouse carries the Lithuanian reference
+data that would establish relevance independently of self-report — e.g. the government's mandatory-centralized-
+purchasing product list or the environment ministry's green-procurement product-group list — so "relevant" cannot be
+derived from CPV code or object description either. Sampling also shows the self-report flag is not a discriminating
+signal even on its own terms: `"zaliasisPirkimas"` is `true` for 9,583 of 9,725 non-null rows (98.5%) across
+unrelated objects — a bridge reconstruction, an echoscope, health-insurance services, a forklift rental, a car
+purchase all read `true` — which rules it out as an audit signal before the relevance question is even reached.
+Hand-picking CPV categories as "where relevant" from general literature would be the same unsourced, un-auditable
+judgment call the LT-COM-18 explanation above rejects. Revisit if a Lithuanian reference dataset establishing which
+categories each objective (green/innovative/quality/centralized) applies to is ever ingested.
 
 **LT-PRI-02** — Line-item price anomalously high or low: not implementable with currently ingested data.
 `v_dalyviai."pasiulymoKaina"` is a single total bid price per (procurement, lot, bidder); no ingested source breaks a
