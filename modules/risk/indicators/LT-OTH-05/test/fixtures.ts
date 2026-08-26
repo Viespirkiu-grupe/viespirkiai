@@ -17,12 +17,27 @@ export const oneLotConcluded: ProcurementProcedureOutcome = {
     lotOutcomes: [
         "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
     ],
+    lots: [
+        {
+            daliesNumeris: "0",
+            proceduruPabaiga:
+                "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+            sprendimoPriemimoData: REPORTED_AT,
+        },
+    ],
     reportedAt: REPORTED_AT,
 };
 
 // One lot, no bids received within the deadline — the plain triggered case.
 export const oneLotNoBids: ProcurementProcedureOutcome = {
     lotOutcomes: ["Per nustatytą terminą tiekėjams nepateikus nė vienos paraiškos, pasiūlymo, projekto konkurso plano ar projekto"],
+    lots: [
+        {
+            daliesNumeris: "0",
+            proceduruPabaiga: "Per nustatytą terminą tiekėjams nepateikus nė vienos paraiškos, pasiūlymo, projekto konkurso plano ar projekto",
+            sprendimoPriemimoData: REPORTED_AT,
+        },
+    ],
     reportedAt: REPORTED_AT,
 };
 
@@ -30,6 +45,13 @@ export const oneLotNoBids: ProcurementProcedureOutcome = {
 // from "no bids at all".
 export const oneLotAllRejected: ProcurementProcedureOutcome = {
     lotOutcomes: ["Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus"],
+    lots: [
+        {
+            daliesNumeris: "0",
+            proceduruPabaiga: "Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus",
+            sprendimoPriemimoData: REPORTED_AT,
+        },
+    ],
     reportedAt: REPORTED_AT,
 };
 
@@ -41,6 +63,15 @@ export const mixedLotsOneConcluded: ProcurementProcedureOutcome = {
         "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
         "Nutraukus pirkimo ar projekto konkurso procedūras",
     ],
+    lots: [
+        {
+            daliesNumeris: "0",
+            proceduruPabaiga:
+                "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+            sprendimoPriemimoData: REPORTED_AT,
+        },
+        { daliesNumeris: "1", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: REPORTED_AT },
+    ],
     reportedAt: REPORTED_AT,
 };
 
@@ -50,6 +81,14 @@ export const twoLotsBothUnsuccessful: ProcurementProcedureOutcome = {
         "Nutraukus pirkimo ar projekto konkurso procedūras",
         "Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus",
     ],
+    lots: [
+        { daliesNumeris: "0", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: REPORTED_AT },
+        {
+            daliesNumeris: "1",
+            proceduruPabaiga: "Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus",
+            sprendimoPriemimoData: REPORTED_AT,
+        },
+    ],
     reportedAt: REPORTED_AT,
 };
 
@@ -57,5 +96,12 @@ export const twoLotsBothUnsuccessful: ProcurementProcedureOutcome = {
 // (capitalization/wording variants — see definition.ts's concludedOutcomes).
 export const oneLotConcludedVariant: ProcurementProcedureOutcome = {
     lotOutcomes: ["Sudarius pirkimo sutartį (preliminariąją sutartį) arba nustačius projekto konkurso laimėtoją"],
+    lots: [
+        {
+            daliesNumeris: "0",
+            proceduruPabaiga: "Sudarius pirkimo sutartį (preliminariąją sutartį) arba nustačius projekto konkurso laimėtoją",
+            sprendimoPriemimoData: REPORTED_AT,
+        },
+    ],
     reportedAt: REPORTED_AT,
 };

@@ -173,6 +173,16 @@ export type ProcurementParticipation = Readonly<{
     reportedAt: string | null;
 }>;
 
+// One (pirkimoNumeris, daliesNumeris) row from public.v_pirkimo_pabaiga_v2 —
+// the per-lot outcome label and decision date LT-OTH-03 needs to compute a
+// per-lot evaluation period, which the collapsed lotOutcomes/reportedAt
+// aggregates below cannot carry (they lose the label-to-date correlation).
+export type ProcedureOutcomeLot = Readonly<{
+    daliesNumeris: string;
+    proceduruPabaiga: string;
+    sprendimoPriemimoData: string | null;
+}>;
+
 // Procedure-ending outcomes from public.v_pirkimo_pabaiga_v2, merged onto a
 // Procurement by the Procurement Reader's own batch query. null means no
 // ATN-1 procedure-ending decision was observed for this procurement at all
@@ -181,9 +191,13 @@ export type ProcurementParticipation = Readonly<{
 // procurement's lots — an indicator matches this closed-vocabulary list
 // against known outcome labels in code (types.ts carries no judgement of
 // which labels mean success), the same convention Bid.atmetimoStatusas
-// already uses.
+// already uses. lots is the same evidence at its natural per-lot grain (one
+// entry per procedure-ending row observed, duplicates included), for an
+// indicator that needs a specific lot's outcome paired with its own decision
+// date rather than the collapsed cross-lot set.
 export type ProcurementProcedureOutcome = Readonly<{
     lotOutcomes: readonly string[];
+    lots: readonly ProcedureOutcomeLot[];
     reportedAt: string | null;
 }>;
 

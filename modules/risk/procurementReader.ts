@@ -133,10 +133,22 @@ const LOT_BIDS_SQL = `
 // (currently LT-OTH-05). array_agg(DISTINCT ...) collapses repeated labels
 // across lots (and across the rare duplicate report) to the set an
 // indicator actually needs to test membership against.
+//
+// "lots" carries the same rows at their natural per-lot grain instead —
+// (daliesNumeris, proceduruPabaiga, sprendimoPriemimoData) triples, one per
+// procedure-ending row observed — for LT-OTH-03, which needs a lot's own
+// decision date paired with its own outcome label rather than the collapsed
+// cross-lot set lotOutcomes/reportedAt provide. json_agg is never null here:
+// the JOIN in v_pirkimo_pabaiga_v2 guarantees at least one row per group.
 const PROCEDURE_OUTCOME_SQL = `
     ${PUBLIC_VIEWS_CTE}
     SELECT po."pirkimoNumeris"                                                            AS "pirkimoNumeris",
            array_agg(DISTINCT po."proceduruPabaiga")                                       AS "lotOutcomes",
+           json_agg(json_build_object(
+               'daliesNumeris', po."daliesNumeris",
+               'proceduruPabaiga', po."proceduruPabaiga",
+               'sprendimoPriemimoData', to_char(po."sprendimoPriemimoData", 'YYYY-MM-DD')
+           ))                                                                              AS "lots",
            to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt"
     FROM v_pirkimo_pabaiga_v2 po
     WHERE po."ataskaitosData" <= $1::timestamptz
@@ -304,7 +316,7 @@ export class ProcurementReader {
         this.procedureOutcomeByNumber = new Map(
             procedureOutcomeRows.map((row) => [
                 row.pirkimoNumeris,
-                { lotOutcomes: row.lotOutcomes, reportedAt: row.reportedAt },
+                { lotOutcomes: row.lotOutcomes, lots: row.lots, reportedAt: row.reportedAt },
             ]),
         );
     }

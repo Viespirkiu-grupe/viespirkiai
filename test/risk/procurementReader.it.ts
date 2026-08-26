@@ -411,6 +411,14 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
             lotOutcomes: [
                 "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
             ],
+            lots: [
+                {
+                    daliesNumeris: "0",
+                    proceduruPabaiga:
+                        "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+                    sprendimoPriemimoData: "2026-05-10",
+                },
+            ],
             reportedAt: "2026-05-10",
         });
     });
@@ -444,6 +452,19 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
             ].sort(),
         );
         expect(procurement.procedureOutcome!.reportedAt).toBe("2026-05-20");
+        // Each lot's own outcome stays paired with its own decision date —
+        // the correlation lotOutcomes/reportedAt collapse away, which
+        // LT-OTH-03 depends on (a lot's evaluation period is undefined
+        // without knowing which decision date belongs to which lot).
+        expect([...procurement.procedureOutcome!.lots].sort((a, b) => a.daliesNumeris.localeCompare(b.daliesNumeris))).toEqual([
+            {
+                daliesNumeris: "1",
+                proceduruPabaiga:
+                    "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+                sprendimoPriemimoData: "2026-05-10",
+            },
+            { daliesNumeris: "2", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2026-05-20" },
+        ]);
     });
 
     it("is null when no procedure-ending decision was observed at all", async () => {
