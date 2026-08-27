@@ -14,7 +14,7 @@ import { boundaryValue, highValue, lowValue, procedureOutcome, veryHighValue } f
 // eligibility-gate and hasRequiredData cases belong to the "end to end"
 // describe block, which goes through RiskDecisionEngine itself.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
 const ltPri06v1 = new LtPri06Decision(CONTEXT);
 
 function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
@@ -50,15 +50,15 @@ function procurementSubject(overrides: Partial<Procurement> = {}): ProcurementSu
     };
 }
 
-function assessRiskFor(isFramework: boolean, numatomaVerteEUR: number | null) {
-    return ltPri06v1.assessRisk(procurementSubject({ numatomaVerteEUR, procedureOutcome: procedureOutcome(isFramework) }));
+function assessRiskFor(preliminariSutartis: boolean, numatomaVerteEUR: number | null) {
+    return ltPri06v1.assessRisk(procurementSubject({ numatomaVerteEUR, procedureOutcome: procedureOutcome(preliminariSutartis) }));
 }
 
 describe("LtPri06Decision.assessRisk", () => {
     it("triggers when a framework's estimated value is above the threshold", () => {
         const signal = assessRiskFor(true, highValue);
         expect(signal.state).toBe("triggered");
-        expect(signal.rawValue).toEqual({ isFramework: true, numatomaVerteEUR: highValue });
+        expect(signal.rawValue).toEqual({ preliminariSutartis: true, numatomaVerteEUR: highValue });
         expect(signal.threshold).toEqual({ minimumValueEUR: 5_000_000 });
     });
 
@@ -70,26 +70,26 @@ describe("LtPri06Decision.assessRisk", () => {
     it("does not trigger at exactly the boundary — minimumValueEUR: 5_000_000", () => {
         const signal = assessRiskFor(true, boundaryValue);
         expect(signal.state).toBe("not_triggered");
-        expect(signal.rawValue).toEqual({ isFramework: true, numatomaVerteEUR: boundaryValue });
+        expect(signal.rawValue).toEqual({ preliminariSutartis: true, numatomaVerteEUR: boundaryValue });
     });
 
     it("does not trigger for a framework with a low estimated value", () => {
         const signal = assessRiskFor(true, lowValue);
         expect(signal.state).toBe("not_triggered");
-        expect(signal.rawValue).toEqual({ isFramework: true, numatomaVerteEUR: lowValue });
+        expect(signal.rawValue).toEqual({ preliminariSutartis: true, numatomaVerteEUR: lowValue });
     });
 
     it("does not trigger for a non-framework procurement, regardless of value", () => {
         const signal = assessRiskFor(false, veryHighValue);
         expect(signal.state).toBe("not_triggered");
-        expect(signal.rawValue).toEqual({ isFramework: false });
+        expect(signal.rawValue).toEqual({ preliminariSutartis: false });
     });
 
     it("is total: every scenario returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
-        for (const isFramework of [true, false]) {
+        for (const preliminariSutartis of [true, false]) {
             for (const value of [0, 1, lowValue, boundaryValue, highValue, veryHighValue]) {
-                const signal = assessRiskFor(isFramework, value);
+                const signal = assessRiskFor(preliminariSutartis, value);
                 expect(states).toContain(signal.state);
             }
         }
@@ -110,7 +110,7 @@ describe("LtPri06Decision end to end (through RiskDecisionEngine, no database)",
             indicatorId: "LT-PRI-06",
             subjectType: "procurement",
             state: "triggered",
-            rawValue: { isFramework: true, numatomaVerteEUR: highValue },
+            rawValue: { preliminariSutartis: true, numatomaVerteEUR: highValue },
         });
     });
 

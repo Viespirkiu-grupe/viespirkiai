@@ -20,7 +20,7 @@ of what it set out to procure.
 | `decision.ts`   | The `AProcurementIndicatorDecision` subclass whose `assessRisk()` judges the subject              |
 | `test/`         | How we know it works                                                                              |
 
-`Subject.procurement.procedureOutcome` (`lotOutcomes`/`reportedAt`) comes from
+`Subject.procurement.procedureOutcome` (`proceduruPabaigos`/`reportedAt`) comes from
 `modules/risk/procurementReader.ts`'s consolidated procurement-grain `PROCEDURE_OUTCOME_SQL` query, reading
 `public.v_pirkimo_pabaiga_v2` — a new view (`modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql`) added for this
 indicator. Unlike `v_pirkimas_v2`/`v_dalyviai_v2`/`v_pirkimo_dalis_v2`, there is no already-persisted non-`_v2`
@@ -52,7 +52,7 @@ Sudarius pirkimo sutartį (preliminariąją sutartį) arba nustačius projekto k
 Sudarius pirkimo sutartį
 ```
 
-`decision.ts` matches `lotOutcomes` against this list with plain `.includes()`, the same convention
+`decision.ts` matches `proceduruPabaigos` against this list with plain `.includes()`, the same convention
 `LT-COM-20`'s `withdrawalStatuses` already uses for `atmetimoStatusas` — never a free-text pattern. Everything not
 in this list (including "Visiems tiekėjams atšaukus pasiūlymus... ar atsisakius sudaryti pirkimo sutartį" and
 "Pasibaigus pasiūlymų galiojimo laikui ir nesudarius pirkimo sutarties..." — OLAF-CA07's "successful procedure

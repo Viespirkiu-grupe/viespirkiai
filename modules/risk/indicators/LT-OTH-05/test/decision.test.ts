@@ -25,7 +25,7 @@ import {
 // goes through RiskDecisionEngine itself, since that is genuinely how a
 // ProcurementSubject reaches assessRisk in production.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
 const ltOth05v1 = new LtOth05Decision(CONTEXT);
 
 function testProcurement(procedureOutcome: ProcurementProcedureOutcome | null, overrides: Partial<Procurement> = {}): Procurement {
@@ -69,7 +69,7 @@ describe("LtOth05Decision.assessRisk", () => {
     it("does not trigger when the single lot concluded in a contract", () => {
         const signal = assessRiskFor(oneLotConcluded);
         expect(signal.state).toBe("not_triggered");
-        expect(signal.rawValue).toEqual({ lotOutcomes: oneLotConcluded.lotOutcomes });
+        expect(signal.rawValue).toEqual({ proceduruPabaigos: oneLotConcluded.proceduruPabaigos });
     });
 
     it("recognizes the near-duplicate 'concluded' phrasing as not_triggered too", () => {
@@ -80,7 +80,7 @@ describe("LtOth05Decision.assessRisk", () => {
     it("triggers when no bids were received at all within the deadline", () => {
         const signal = assessRiskFor(oneLotNoBids);
         expect(signal.state).toBe("triggered");
-        expect(signal.rawValue).toEqual({ lotOutcomes: oneLotNoBids.lotOutcomes });
+        expect(signal.rawValue).toEqual({ proceduruPabaigos: oneLotNoBids.proceduruPabaigos });
     });
 
     it("triggers when every submitted tender was rejected", () => {
@@ -121,7 +121,7 @@ describe("LtOth05Decision end to end (through RiskDecisionEngine, no database)",
             indicatorId: "LT-OTH-05",
             subjectType: "procurement",
             state: "triggered",
-            rawValue: { lotOutcomes: oneLotNoBids.lotOutcomes },
+            rawValue: { proceduruPabaigos: oneLotNoBids.proceduruPabaigos },
         });
     });
 

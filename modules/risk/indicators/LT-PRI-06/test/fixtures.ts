@@ -19,20 +19,20 @@ export const highValue = 5_156_400.83;
 // Far above the boundary — a large, clearly triggered case.
 export const veryHighValue = 24_341_864;
 
-// isFramework scenarios — Subject.procurement.procedureOutcome, the shape
+// preliminariSutartis scenarios — Subject.procurement.procedureOutcome, the shape
 // the Procurement Reader merges from public.v_pirkimo_pabaiga_v2's
 // bool_or'd "preliminariSutartis" (modules/risk/procurementReader.ts). Only
-// isFramework matters to this indicator; the other fields are carried
+// preliminariSutartis matters to this indicator; the other fields are carried
 // unused, the same way LT-OTH-03/04/05's fixtures do for their own unused
 // fields.
-export function procedureOutcome(isFramework: boolean | null): ProcurementProcedureOutcome {
+export function procedureOutcome(preliminariSutartis: boolean | null): ProcurementProcedureOutcome {
     return {
-        lotOutcomes: ["Sudarius pirkimo sutartį"],
+        proceduruPabaigos: ["Sudarius pirkimo sutartį"],
         lots: [{ daliesNumeris: "0", proceduruPabaiga: "Sudarius pirkimo sutartį", sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
         reportedAt: "2026-01-01",
-        isFramework,
-        complaintFiled: null,
-        courtChallenged: null,
-        electronicProcurement: null,
+        preliminariSutartis,
+        pretenzijaPateikta: null,
+        ieskinysTeismui: null,
+        elektroninisPirkimas: null,
     };
 }

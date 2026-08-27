@@ -14,7 +14,7 @@ const UNSUCCESSFUL = "Nutraukus pirkimo ar projekto konkurso procedūras";
 
 // One lot, decision reason stated — the plain not_triggered case.
 export const oneLotDocumented: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [
         {
             daliesNumeris: "0",
@@ -24,10 +24,10 @@ export const oneLotDocumented: ProcurementProcedureOutcome = {
         },
     ],
     reportedAt: REPORTED_AT,
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 
 // One lot, decision reason left blank — the plain triggered case. Applies
@@ -37,42 +37,42 @@ export const oneLotDocumented: ProcurementProcedureOutcome = {
 // 2026-08 measurement) — the catalogue concept (STT-I15) is documentation
 // completeness, not success/failure.
 export const oneLotUndocumented: ProcurementProcedureOutcome = {
-    lotOutcomes: [UNSUCCESSFUL],
+    proceduruPabaigos: [UNSUCCESSFUL],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: UNSUCCESSFUL, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: null }],
     reportedAt: REPORTED_AT,
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 
 // A concluded (successful) outcome with no stated reason — proves the
 // formula is not collinear with the outcome label.
 export const oneLotConcludedButUndocumented: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: null }],
     reportedAt: REPORTED_AT,
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 
 // Blank reason text ("" or whitespace-only) counts the same as a NULL
 // column — the report form allows a submitted-but-empty field.
 export const oneLotBlankReason: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: "   " }],
     reportedAt: REPORTED_AT,
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 
 // Two lots, both documented — not_triggered.
 export const twoLotsBothDocumented: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED, UNSUCCESSFUL],
+    proceduruPabaigos: [CONCLUDED, UNSUCCESSFUL],
     lots: [
         { daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: "Vienintelis pasiūlymas" },
         {
@@ -83,24 +83,24 @@ export const twoLotsBothDocumented: ProcurementProcedureOutcome = {
         },
     ],
     reportedAt: REPORTED_AT,
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 
 // Two lots: one documented, one not — triggered. Unlike LT-OTH-05's
 // "ALL lots must fail" formula, one lot's undocumented decision is not
 // offset by another lot's well-documented one — see decision.ts.
 export const twoLotsOneUndocumented: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED, UNSUCCESSFUL],
+    proceduruPabaigos: [CONCLUDED, UNSUCCESSFUL],
     lots: [
         { daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: "Vienintelis pasiūlymas" },
         { daliesNumeris: "1", proceduruPabaiga: UNSUCCESSFUL, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: null },
     ],
     reportedAt: REPORTED_AT,
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };

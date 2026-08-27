@@ -17,7 +17,7 @@ import { boundaryValue, highValue, lowValue, veryHighValue } from "./fixtures.ts
 // goes through RiskDecisionEngine itself, since that is genuinely how a
 // ProcurementSubject reaches assessRisk in production.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
 const ltPri05v1 = new LtPri05Decision(CONTEXT);
 
 function testProcurement(numatomaVerteEUR: number | null, overrides: Partial<Procurement> = {}): Procurement {

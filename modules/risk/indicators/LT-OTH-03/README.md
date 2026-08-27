@@ -21,11 +21,11 @@ anomalous lot is itself the finding here, not something a well-behaved sibling l
 `Subject.procurement.procedureOutcome.lots` (per-lot `daliesNumeris`/`proceduruPabaiga`/`sprendimoPriemimoData`)
 comes from `modules/risk/procurementReader.ts`'s `PROCEDURE_OUTCOME_SQL`, reading `public.v_pirkimo_pabaiga_v2` — the
 same view LT-OTH-05 reads, at its natural per-lot grain rather than LT-OTH-05's collapsed cross-lot
-`lotOutcomes`/`reportedAt`. `Subject.procurement.pasiulymuPateikimoTerminas` (the procurement's own submission
+`proceduruPabaigos`/`reportedAt`. `Subject.procurement.pasiulymuPateikimoTerminas` (the procurement's own submission
 deadline) comes from `public.v_pirkimas_v2`, already merged onto every `Procurement` — no new view or reader change
 was needed for that half.
 
-## Why `lots`, not just `lotOutcomes`
+## Why `lots`, not just `proceduruPabaigos`
 
 LT-OTH-05 only ever needs to know *whether any* lot's outcome label is "concluded" — the collapsed, deduplicated set
 of labels is enough. LT-OTH-03 needs a specific lot's *own* decision date paired with its *own* outcome label: a

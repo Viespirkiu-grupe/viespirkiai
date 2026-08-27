@@ -5,7 +5,7 @@ import { ltTra09Definition } from "./definition.ts";
 
 // LT-TRA-09 — Procurement not conducted electronically: judges a whole
 // procurement from the ATN-1 (PPA) report's own "elektroninisPirkimas"
-// field, merged onto Subject.procurement.procedureOutcome.electronicProcurement
+// field, merged onto Subject.procurement.procedureOutcome.elektroninisPirkimas
 // by the Procurement Reader (shared with LT-TRA-06/LT-TRA-07/LT-TRA-08/
 // LT-PRI-06 — see modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql). No
 // threshold beyond the field itself: the catalogue concept is "the
@@ -23,17 +23,17 @@ export class LtTra09Decision extends AProcurementIndicatorDecision<typeof ltTra0
     }
 
     protected hasRequiredData(subject: ProcurementSubject): boolean {
-        return (subject.procurement.procedureOutcome?.electronicProcurement ?? null) !== null;
+        return (subject.procurement.procedureOutcome?.elektroninisPirkimas ?? null) !== null;
     }
 
     assessRisk(subject: ProcurementSubject): RiskSignal {
         // hasRequiredData already proved this is non-null.
-        const electronicProcurement = subject.procurement.procedureOutcome!.electronicProcurement!;
+        const elektroninisPirkimas = subject.procurement.procedureOutcome!.elektroninisPirkimas!;
 
         return this.signalFor(subject, {
-            state: electronicProcurement ? "not_triggered" : "triggered",
-            rawValue: { electronicProcurement },
-            threshold: { electronicProcurement: false },
+            state: elektroninisPirkimas ? "not_triggered" : "triggered",
+            rawValue: { elektroninisPirkimas },
+            threshold: { elektroninisPirkimas: false },
             appliedParameters: {},
         });
     }

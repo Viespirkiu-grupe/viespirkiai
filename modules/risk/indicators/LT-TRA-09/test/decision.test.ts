@@ -14,7 +14,7 @@ import { procedureOutcome } from "./fixtures.ts";
 // eligibility-gate and hasRequiredData cases belong to the "end to end"
 // describe block, which goes through RiskDecisionEngine itself.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
 const ltTra09v1 = new LtTra09Decision(CONTEXT);
 
 function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
@@ -50,28 +50,28 @@ function procurementSubject(overrides: Partial<Procurement> = {}): ProcurementSu
     };
 }
 
-function assessRiskFor(electronicProcurement: boolean | null) {
-    return ltTra09v1.assessRisk(procurementSubject({ procedureOutcome: procedureOutcome(electronicProcurement) }));
+function assessRiskFor(elektroninisPirkimas: boolean | null) {
+    return ltTra09v1.assessRisk(procurementSubject({ procedureOutcome: procedureOutcome(elektroninisPirkimas) }));
 }
 
 describe("LtTra09Decision.assessRisk", () => {
     it("triggers when the report says the procedure was not conducted electronically", () => {
         const signal = assessRiskFor(false);
         expect(signal.state).toBe("triggered");
-        expect(signal.rawValue).toEqual({ electronicProcurement: false });
-        expect(signal.threshold).toEqual({ electronicProcurement: false });
+        expect(signal.rawValue).toEqual({ elektroninisPirkimas: false });
+        expect(signal.threshold).toEqual({ elektroninisPirkimas: false });
     });
 
     it("does not trigger when the report positively says the procedure was electronic", () => {
         const signal = assessRiskFor(true);
         expect(signal.state).toBe("not_triggered");
-        expect(signal.rawValue).toEqual({ electronicProcurement: true });
+        expect(signal.rawValue).toEqual({ elektroninisPirkimas: true });
     });
 
     it("is total: every scenario returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
-        for (const electronicProcurement of [true, false]) {
-            const signal = assessRiskFor(electronicProcurement);
+        for (const elektroninisPirkimas of [true, false]) {
+            const signal = assessRiskFor(elektroninisPirkimas);
             expect(states).toContain(signal.state);
         }
     });
@@ -91,7 +91,7 @@ describe("LtTra09Decision end to end (through RiskDecisionEngine, no database)",
             indicatorId: "LT-TRA-09",
             subjectType: "procurement",
             state: "triggered",
-            rawValue: { electronicProcurement: false },
+            rawValue: { elektroninisPirkimas: false },
         });
     });
 

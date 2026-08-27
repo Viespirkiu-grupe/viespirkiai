@@ -5,7 +5,7 @@ Source: OLAF-supported Red Flags indicators (OLAF-CN04 "High estimated framework
 [olaf.md](../../../../docs/indicators-story/indicators/olaf.md).
 
 Unit of analysis is the **procurement** — one row per `pirkimoNumeris`, keyed by `saltinis` + `pirkimoNumeris`. The
-formula is: `isFramework = true AND numatomaVerteEUR > minimumValueEUR`, where `isFramework` comes from the ATN-1
+formula is: `preliminariSutartis = true AND numatomaVerteEUR > minimumValueEUR`, where `preliminariSutartis` comes from the ATN-1
 (PPA) procedure report's own `preliminariSutartis` field, not from `pirkimoBudas` or any other free-text/procedure
 label — see "Why `preliminariSutartis`, not something else" below.
 
@@ -36,16 +36,16 @@ procedure filing, the same evidentiary status as every other field that view alr
 
 `modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql` now also selects `a."preliminariSutartis"` (procurement-level,
 carried on every per-lot row of the view). `modules/risk/procurementReader.ts`'s `PROCEDURE_OUTCOME_SQL` aggregates
-it with `bool_or(po."preliminariSutartis")`, added to `Procurement.procedureOutcome.isFramework`
+it with `bool_or(po."preliminariSutartis")`, added to `Procurement.procedureOutcome.preliminariSutartis`
 (`modules/risk/types.ts`): `true` if any report revision under the `pirkimoNumeris` said so, `false` if every
 revision said no, `null` if no revision ever populated the field. `bool_or` ignores `NULL` inputs, which is exactly
 the aggregation this needs — no separate branch for "no revision answered" was written by hand.
 
 ## `hasRequiredData()` is not "is one field null"
 
-A report that positively says `isFramework: false` already answers the formula — `not_triggered`, regardless of
+A report that positively says `preliminariSutartis: false` already answers the formula — `not_triggered`, regardless of
 whether `numatomaVerteEUR` is known — the same "a null field can still mean something definite" principle
-LT-OTH-05's `proceduruPabaiga` gate follows. Only when `isFramework` is `true` (or unknown) does the value's
+LT-OTH-05's `proceduruPabaiga` gate follows. Only when `preliminariSutartis` is `true` (or unknown) does the value's
 presence become load-bearing. `missingDataWhenAbsent` names both `preliminariSutartis` and `numatomaVerteEUR`
 regardless of which one was actually missing, the same convention every other indicator in this package uses.
 

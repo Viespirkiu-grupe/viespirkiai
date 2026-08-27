@@ -34,21 +34,21 @@ left for a human reviewer to read on the underlying report, not parsed here.
 `modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql` now also selects `a."elektroninisPirkimas"` (procurement-level,
 carried on every per-lot row of the view, the same way `ieskinysTeismui`/`pretenzijaPateikta`/`preliminariSutartis`
 already are). `modules/risk/procurementReader.ts`'s `PROCEDURE_OUTCOME_SQL` aggregates it with
-`bool_or(po."elektroninisPirkimas")`, added to `Procurement.procedureOutcome.electronicProcurement`
+`bool_or(po."elektroninisPirkimas")`, added to `Procurement.procedureOutcome.elektroninisPirkimas`
 (`modules/risk/types.ts`): `true` if any report revision under the `pirkimoNumeris` said so, `false` if every
 revision said no, `null` if no revision ever populated the field. `bool_or` ignores `NULL` inputs, the same
-aggregation `courtChallenged`/`complaintFiled`/`isFramework` already rely on — no separate branch for "no revision
+aggregation `ieskinysTeismui`/`pretenzijaPateikta`/`preliminariSutartis` already rely on — no separate branch for "no revision
 answered" was written by hand.
 
 ## `hasRequiredData()` is not "is one field null"
 
 Same principle as every other indicator built on this report: a report that positively says
-`electronicProcurement: true` already answers the formula (`not_triggered`) — only a total absence of report data
-(`electronicProcurement === null`) is `insufficient_data`. `missingDataWhenAbsent` names `elektroninisPirkimas`.
+`elektroninisPirkimas: true` already answers the formula (`not_triggered`) — only a total absence of report data
+(`elektroninisPirkimas === null`) is `insufficient_data`. `missingDataWhenAbsent` names `elektroninisPirkimas`.
 
 ## Direction is inverted relative to the raw field
 
-Unlike `courtChallenged`/`complaintFiled`/`isFramework`, this indicator's `triggered` state corresponds to the raw
+Unlike `ieskinysTeismui`/`pretenzijaPateikta`/`preliminariSutartis`, this indicator's `triggered` state corresponds to the raw
 field being `false`, not `true` — the catalogue concept is "not conducted electronically", the opposite polarity of
 the source column's own name. `decision.ts` calls this out explicitly in a comment to avoid a silent sign error.
 

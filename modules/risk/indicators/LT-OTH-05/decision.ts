@@ -24,13 +24,13 @@ export class LtOth05Decision extends AProcurementIndicatorDecision<typeof ltOth0
     assessRisk(subject: ProcurementSubject): RiskSignal {
         const { procurement } = subject;
         // hasRequiredData already proved this is non-null.
-        const { lotOutcomes } = procurement.procedureOutcome!;
+        const { proceduruPabaigos } = procurement.procedureOutcome!;
         const { concludedOutcomes } = this.definition.parameters;
 
-        const anyLotConcluded = lotOutcomes.some((outcome) => concludedOutcomes.includes(outcome));
+        const anyLotConcluded = proceduruPabaigos.some((outcome) => concludedOutcomes.includes(outcome));
         return this.signalFor(subject, {
             state: anyLotConcluded ? "not_triggered" : "triggered",
-            rawValue: { lotOutcomes },
+            rawValue: { proceduruPabaigos },
             threshold: { concludedOutcomes },
             appliedParameters: { concludedOutcomes },
         });

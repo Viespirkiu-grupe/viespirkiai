@@ -32,16 +32,16 @@ dispute escalation; `ieskinysTeismui` is the later, more severe one.
 `modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql` now also selects `a."ieskinysTeismui"` (procurement-level,
 carried on every per-lot row of the view, the same way `pretenzijaPateikta` already is).
 `modules/risk/procurementReader.ts`'s `PROCEDURE_OUTCOME_SQL` aggregates it with `bool_or(po."ieskinysTeismui")`,
-added to `Procurement.procedureOutcome.courtChallenged` (`modules/risk/types.ts`): `true` if any report revision
+added to `Procurement.procedureOutcome.ieskinysTeismui` (`modules/risk/types.ts`): `true` if any report revision
 under the `pirkimoNumeris` said so, `false` if every revision said no, `null` if no revision ever populated the
-field. `bool_or` ignores `NULL` inputs, the same aggregation `complaintFiled`/`isFramework` already rely on — no
+field. `bool_or` ignores `NULL` inputs, the same aggregation `pretenzijaPateikta`/`preliminariSutartis` already rely on — no
 separate branch for "no revision answered" was written by hand.
 
 ## `hasRequiredData()` is not "is one field null"
 
 Same principle as every other indicator built on this report: a report that positively says
-`courtChallenged: false` already answers the formula (`not_triggered`) — only a total absence of report data
-(`courtChallenged === null`) is `insufficient_data`. `missingDataWhenAbsent` names `ieskinysTeismui`.
+`ieskinysTeismui: false` already answers the formula (`not_triggered`) — only a total absence of report data
+(`ieskinysTeismui === null`) is `insufficient_data`. `missingDataWhenAbsent` names `ieskinysTeismui`.
 
 ## Why no threshold is stated in the source
 

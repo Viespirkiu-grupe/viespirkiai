@@ -35,15 +35,15 @@ in court") concept and is not read by this indicator.
 `modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql` now also selects `a."pretenzijaPateikta"` (procurement-level,
 carried on every per-lot row of the view, the same way `preliminariSutartis` already is).
 `modules/risk/procurementReader.ts`'s `PROCEDURE_OUTCOME_SQL` aggregates it with `bool_or(po."pretenzijaPateikta")`,
-added to `Procurement.procedureOutcome.complaintFiled` (`modules/risk/types.ts`): `true` if any report revision under
+added to `Procurement.procedureOutcome.pretenzijaPateikta` (`modules/risk/types.ts`): `true` if any report revision under
 the `pirkimoNumeris` said so, `false` if every revision said no, `null` if no revision ever populated the field.
-`bool_or` ignores `NULL` inputs, the same aggregation `isFramework` already relies on — no separate branch for "no
+`bool_or` ignores `NULL` inputs, the same aggregation `preliminariSutartis` already relies on — no separate branch for "no
 revision answered" was written by hand.
 
 ## `hasRequiredData()` is not "is one field null"
 
-Same principle as every other indicator built on this report: a report that positively says `complaintFiled: false`
-already answers the formula (`not_triggered`) — only a total absence of report data (`complaintFiled === null`) is
+Same principle as every other indicator built on this report: a report that positively says `pretenzijaPateikta: false`
+already answers the formula (`not_triggered`) — only a total absence of report data (`pretenzijaPateikta === null`) is
 `insufficient_data`. `missingDataWhenAbsent` names `pretenzijaPateikta`.
 
 ## Why no threshold is stated in the source

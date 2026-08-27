@@ -409,7 +409,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
 
         const [procurement] = await loadAll(reader(["970001"]));
         expect(procurement.procedureOutcome).toEqual({
-            lotOutcomes: [
+            proceduruPabaigos: [
                 "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
             ],
             lots: [
@@ -422,10 +422,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
                 },
             ],
             reportedAt: "2026-05-10",
-            isFramework: null,
-            complaintFiled: null,
-            courtChallenged: null,
-            electronicProcurement: null,
+            preliminariSutartis: null,
+            pretenzijaPateikta: null,
+            ieskinysTeismui: null,
+            elektroninisPirkimas: null,
         });
     });
 
@@ -451,7 +451,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970002"]));
-        expect(procurement.procedureOutcome!.lotOutcomes.sort()).toEqual(
+        expect(procurement.procedureOutcome!.proceduruPabaigos.sort()).toEqual(
             [
                 "Nutraukus pirkimo ar projekto konkurso procedūras",
                 "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
@@ -459,7 +459,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         );
         expect(procurement.procedureOutcome!.reportedAt).toBe("2026-05-20");
         // Each lot's own outcome stays paired with its own decision date —
-        // the correlation lotOutcomes/reportedAt collapse away, which
+        // the correlation proceduruPabaigos/reportedAt collapse away, which
         // LT-OTH-03 depends on (a lot's evaluation period is undefined
         // without knowing which decision date belongs to which lot).
         expect([...procurement.procedureOutcome!.lots].sort((a, b) => a.daliesNumeris.localeCompare(b.daliesNumeris))).toEqual([
@@ -533,7 +533,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970004"]));
-        expect(procurement.procedureOutcome!.lotOutcomes).toEqual([
+        expect(procurement.procedureOutcome!.proceduruPabaigos).toEqual([
             "Per nustatytą terminą tiekėjams nepateikus nė vienos paraiškos, pasiūlymo, projekto konkurso plano ar projekto",
         ]);
     });
@@ -556,12 +556,12 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         expect(beforeCutoff.procedureOutcome).toBeNull();
 
         const [afterCutoff] = await loadAll(reader(["970005"], "2026-10-01T00:00:00.000Z"));
-        expect(afterCutoff.procedureOutcome!.lotOutcomes).toEqual([
+        expect(afterCutoff.procedureOutcome!.proceduruPabaigos).toEqual([
             "Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus",
         ]);
     });
 
-    it("carries isFramework: true (LT-PRI-06) from xlsxPPAataskaitos.preliminariSutartis", async () => {
+    it("carries preliminariSutartis: true (LT-PRI-06) from xlsxPPAataskaitos.preliminariSutartis", async () => {
         await insertViesiejiPirkimai(970006);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970006",
@@ -577,10 +577,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970006"]));
-        expect(procurement.procedureOutcome!.isFramework).toBe(true);
+        expect(procurement.procedureOutcome!.preliminariSutartis).toBe(true);
     });
 
-    it("carries isFramework: false when the report positively says this is not a framework agreement", async () => {
+    it("carries preliminariSutartis: false when the report positively says this is not a framework agreement", async () => {
         await insertViesiejiPirkimai(970007);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970007",
@@ -596,10 +596,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970007"]));
-        expect(procurement.procedureOutcome!.isFramework).toBe(false);
+        expect(procurement.procedureOutcome!.preliminariSutartis).toBe(false);
     });
 
-    it("isFramework is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
+    it("preliminariSutartis is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
         await insertViesiejiPirkimai(970008);
         const falseAtaskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970008",
@@ -627,10 +627,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970008"]));
-        expect(procurement.procedureOutcome!.isFramework).toBe(true);
+        expect(procurement.procedureOutcome!.preliminariSutartis).toBe(true);
     });
 
-    it("isFramework is null when no report revision ever populated the field", async () => {
+    it("preliminariSutartis is null when no report revision ever populated the field", async () => {
         await insertViesiejiPirkimai(970009);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970009",
@@ -645,10 +645,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970009"]));
-        expect(procurement.procedureOutcome!.isFramework).toBeNull();
+        expect(procurement.procedureOutcome!.preliminariSutartis).toBeNull();
     });
 
-    it("carries complaintFiled: true (LT-TRA-07) from xlsxPPAataskaitos.pretenzijaPateikta", async () => {
+    it("carries pretenzijaPateikta: true (LT-TRA-07) from xlsxPPAataskaitos.pretenzijaPateikta", async () => {
         await insertViesiejiPirkimai(970011);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970011",
@@ -664,10 +664,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970011"]));
-        expect(procurement.procedureOutcome!.complaintFiled).toBe(true);
+        expect(procurement.procedureOutcome!.pretenzijaPateikta).toBe(true);
     });
 
-    it("carries complaintFiled: false when the report positively says no complaint was filed", async () => {
+    it("carries pretenzijaPateikta: false when the report positively says no complaint was filed", async () => {
         await insertViesiejiPirkimai(970012);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970012",
@@ -683,10 +683,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970012"]));
-        expect(procurement.procedureOutcome!.complaintFiled).toBe(false);
+        expect(procurement.procedureOutcome!.pretenzijaPateikta).toBe(false);
     });
 
-    it("complaintFiled is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
+    it("pretenzijaPateikta is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
         await insertViesiejiPirkimai(970013);
         const falseAtaskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970013",
@@ -714,10 +714,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970013"]));
-        expect(procurement.procedureOutcome!.complaintFiled).toBe(true);
+        expect(procurement.procedureOutcome!.pretenzijaPateikta).toBe(true);
     });
 
-    it("complaintFiled is null when no report revision ever populated the field", async () => {
+    it("pretenzijaPateikta is null when no report revision ever populated the field", async () => {
         await insertViesiejiPirkimai(970014);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970014",
@@ -732,10 +732,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970014"]));
-        expect(procurement.procedureOutcome!.complaintFiled).toBeNull();
+        expect(procurement.procedureOutcome!.pretenzijaPateikta).toBeNull();
     });
 
-    it("carries courtChallenged: true (LT-TRA-08) from xlsxPPAataskaitos.ieskinysTeismui", async () => {
+    it("carries ieskinysTeismui: true (LT-TRA-08) from xlsxPPAataskaitos.ieskinysTeismui", async () => {
         await insertViesiejiPirkimai(970015);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970015",
@@ -751,10 +751,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970015"]));
-        expect(procurement.procedureOutcome!.courtChallenged).toBe(true);
+        expect(procurement.procedureOutcome!.ieskinysTeismui).toBe(true);
     });
 
-    it("carries courtChallenged: false when the report positively says no lawsuit was filed", async () => {
+    it("carries ieskinysTeismui: false when the report positively says no lawsuit was filed", async () => {
         await insertViesiejiPirkimai(970016);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970016",
@@ -770,10 +770,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970016"]));
-        expect(procurement.procedureOutcome!.courtChallenged).toBe(false);
+        expect(procurement.procedureOutcome!.ieskinysTeismui).toBe(false);
     });
 
-    it("courtChallenged is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
+    it("ieskinysTeismui is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
         await insertViesiejiPirkimai(970017);
         const falseAtaskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970017",
@@ -801,10 +801,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970017"]));
-        expect(procurement.procedureOutcome!.courtChallenged).toBe(true);
+        expect(procurement.procedureOutcome!.ieskinysTeismui).toBe(true);
     });
 
-    it("courtChallenged is null when no report revision ever populated the field", async () => {
+    it("ieskinysTeismui is null when no report revision ever populated the field", async () => {
         await insertViesiejiPirkimai(970018);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970018",
@@ -819,10 +819,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970018"]));
-        expect(procurement.procedureOutcome!.courtChallenged).toBeNull();
+        expect(procurement.procedureOutcome!.ieskinysTeismui).toBeNull();
     });
 
-    it("carries electronicProcurement: true (LT-TRA-09) from xlsxPPAataskaitos.elektroninisPirkimas", async () => {
+    it("carries elektroninisPirkimas: true (LT-TRA-09) from xlsxPPAataskaitos.elektroninisPirkimas", async () => {
         await insertViesiejiPirkimai(970019);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970019",
@@ -838,10 +838,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970019"]));
-        expect(procurement.procedureOutcome!.electronicProcurement).toBe(true);
+        expect(procurement.procedureOutcome!.elektroninisPirkimas).toBe(true);
     });
 
-    it("carries electronicProcurement: false when the report positively says the procedure was not electronic", async () => {
+    it("carries elektroninisPirkimas: false when the report positively says the procedure was not electronic", async () => {
         await insertViesiejiPirkimai(970020);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970020",
@@ -857,10 +857,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970020"]));
-        expect(procurement.procedureOutcome!.electronicProcurement).toBe(false);
+        expect(procurement.procedureOutcome!.elektroninisPirkimas).toBe(false);
     });
 
-    it("electronicProcurement is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
+    it("elektroninisPirkimas is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
         await insertViesiejiPirkimai(970021);
         const falseAtaskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970021",
@@ -888,10 +888,10 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970021"]));
-        expect(procurement.procedureOutcome!.electronicProcurement).toBe(true);
+        expect(procurement.procedureOutcome!.elektroninisPirkimas).toBe(true);
     });
 
-    it("electronicProcurement is null when no report revision ever populated the field", async () => {
+    it("elektroninisPirkimas is null when no report revision ever populated the field", async () => {
         await insertViesiejiPirkimai(970022);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970022",
@@ -906,7 +906,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         });
 
         const [procurement] = await loadAll(reader(["970022"]));
-        expect(procurement.procedureOutcome!.electronicProcurement).toBeNull();
+        expect(procurement.procedureOutcome!.elektroninisPirkimas).toBeNull();
     });
 });
 

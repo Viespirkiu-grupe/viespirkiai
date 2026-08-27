@@ -31,7 +31,7 @@ class TestDecision extends ARiskIndicatorDecision<TestDefinition> {
     }
 }
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
 
 function testDefinition(overrides: {
     id?: string;

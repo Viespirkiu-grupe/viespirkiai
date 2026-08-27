@@ -14,7 +14,7 @@ import { procedureOutcome } from "./fixtures.ts";
 // eligibility-gate and hasRequiredData cases belong to the "end to end"
 // describe block, which goes through RiskDecisionEngine itself.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
 const ltTra08v1 = new LtTra08Decision(CONTEXT);
 
 function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
@@ -50,28 +50,28 @@ function procurementSubject(overrides: Partial<Procurement> = {}): ProcurementSu
     };
 }
 
-function assessRiskFor(courtChallenged: boolean | null) {
-    return ltTra08v1.assessRisk(procurementSubject({ procedureOutcome: procedureOutcome(courtChallenged) }));
+function assessRiskFor(ieskinysTeismui: boolean | null) {
+    return ltTra08v1.assessRisk(procurementSubject({ procedureOutcome: procedureOutcome(ieskinysTeismui) }));
 }
 
 describe("LtTra08Decision.assessRisk", () => {
     it("triggers when the report says a lawsuit was filed in court", () => {
         const signal = assessRiskFor(true);
         expect(signal.state).toBe("triggered");
-        expect(signal.rawValue).toEqual({ courtChallenged: true });
-        expect(signal.threshold).toEqual({ courtChallenged: true });
+        expect(signal.rawValue).toEqual({ ieskinysTeismui: true });
+        expect(signal.threshold).toEqual({ ieskinysTeismui: true });
     });
 
     it("does not trigger when the report positively says no lawsuit was filed", () => {
         const signal = assessRiskFor(false);
         expect(signal.state).toBe("not_triggered");
-        expect(signal.rawValue).toEqual({ courtChallenged: false });
+        expect(signal.rawValue).toEqual({ ieskinysTeismui: false });
     });
 
     it("is total: every scenario returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
-        for (const courtChallenged of [true, false]) {
-            const signal = assessRiskFor(courtChallenged);
+        for (const ieskinysTeismui of [true, false]) {
+            const signal = assessRiskFor(ieskinysTeismui);
             expect(states).toContain(signal.state);
         }
     });
@@ -91,7 +91,7 @@ describe("LtTra08Decision end to end (through RiskDecisionEngine, no database)",
             indicatorId: "LT-TRA-08",
             subjectType: "procurement",
             state: "triggered",
-            rawValue: { courtChallenged: true },
+            rawValue: { ieskinysTeismui: true },
         });
     });
 

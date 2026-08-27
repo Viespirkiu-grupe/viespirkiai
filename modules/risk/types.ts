@@ -176,7 +176,7 @@ export type ProcurementParticipation = Readonly<{
 
 // One (pirkimoNumeris, daliesNumeris) row from public.v_pirkimo_pabaiga_v2 —
 // the per-lot outcome label and decision date LT-OTH-03 needs to compute a
-// per-lot evaluation period, which the collapsed lotOutcomes/reportedAt
+// per-lot evaluation period, which the collapsed proceduruPabaigos/reportedAt
 // aggregates below cannot carry (they lose the label-to-date correlation).
 // sprendimoPriezastys (xlsxPPAproceduruPabaiga.sprendimoPriezastys) is the
 // report's free-text statement of why the lot's procedure ended the way it
@@ -192,7 +192,7 @@ export type ProcedureOutcomeLot = Readonly<{
 // Procedure-ending outcomes from public.v_pirkimo_pabaiga_v2, merged onto a
 // Procurement by the Procurement Reader's own batch query. null means no
 // ATN-1 procedure-ending decision was observed for this procurement at all
-// (the procedure hasn't concluded yet, or no report was filed). lotOutcomes
+// (the procedure hasn't concluded yet, or no report was filed). proceduruPabaigos
 // is every distinct "proceduruPabaiga" label observed across the
 // procurement's lots — an indicator matches this closed-vocabulary list
 // against known outcome labels in code (types.ts carries no judgement of
@@ -200,27 +200,27 @@ export type ProcedureOutcomeLot = Readonly<{
 // already uses. lots is the same evidence at its natural per-lot grain (one
 // entry per procedure-ending row observed, duplicates included), for an
 // indicator that needs a specific lot's outcome paired with its own decision
-// date rather than the collapsed cross-lot set. isFramework is
-// xlsxPPAataskaitos.preliminariSutartis (LT-PRI-06) — a procurement-level
+// date rather than the collapsed cross-lot set. preliminariSutartis
+// (xlsxPPAataskaitos.preliminariSutartis, LT-PRI-06) is a procurement-level
 // fact, not per-lot, aggregated across every report revision filed under
 // this pirkimoNumeris with bool_or (true if any revision said so, false if
 // every revision said no, null if no revision ever populated the field).
-// complaintFiled is xlsxPPAataskaitos.pretenzijaPateikta (LT-TRA-07) — the
+// pretenzijaPateikta (xlsxPPAataskaitos.pretenzijaPateikta, LT-TRA-07) is the
 // same kind of procurement-level, self-reported, bool_or-aggregated fact as
-// isFramework. courtChallenged is xlsxPPAataskaitos.ieskinysTeismui
-// (LT-TRA-08) — the report's sibling field recording a lawsuit filed in
-// court, aggregated the same way. electronicProcurement is
-// xlsxPPAataskaitos.elektroninisPirkimas (LT-TRA-09) — the report's
+// preliminariSutartis. ieskinysTeismui (xlsxPPAataskaitos.ieskinysTeismui,
+// LT-TRA-08) is the report's sibling field recording a lawsuit filed in
+// court, aggregated the same way. elektroninisPirkimas
+// (xlsxPPAataskaitos.elektroninisPirkimas, LT-TRA-09) is the report's
 // self-reported flag for whether the procedure was conducted through CVP IS
 // electronic means, aggregated the same bool_or way.
 export type ProcurementProcedureOutcome = Readonly<{
-    lotOutcomes: readonly string[];
+    proceduruPabaigos: readonly string[];
     lots: readonly ProcedureOutcomeLot[];
     reportedAt: string | null;
-    isFramework: boolean | null;
-    complaintFiled: boolean | null;
-    courtChallenged: boolean | null;
-    electronicProcurement: boolean | null;
+    preliminariSutartis: boolean | null;
+    pretenzijaPateikta: boolean | null;
+    ieskinysTeismui: boolean | null;
+    elektroninisPirkimas: boolean | null;
 }>;
 
 // Distinct contract signature ("sudarymoData") dates from

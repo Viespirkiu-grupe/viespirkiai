@@ -14,7 +14,7 @@ import { procedureOutcome } from "./fixtures.ts";
 // eligibility-gate and hasRequiredData cases belong to the "end to end"
 // describe block, which goes through RiskDecisionEngine itself.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01", subjects: null });
+const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
 const ltTra07v1 = new LtTra07Decision(CONTEXT);
 
 function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
@@ -50,28 +50,28 @@ function procurementSubject(overrides: Partial<Procurement> = {}): ProcurementSu
     };
 }
 
-function assessRiskFor(complaintFiled: boolean | null) {
-    return ltTra07v1.assessRisk(procurementSubject({ procedureOutcome: procedureOutcome(complaintFiled) }));
+function assessRiskFor(pretenzijaPateikta: boolean | null) {
+    return ltTra07v1.assessRisk(procurementSubject({ procedureOutcome: procedureOutcome(pretenzijaPateikta) }));
 }
 
 describe("LtTra07Decision.assessRisk", () => {
     it("triggers when the report says a complaint was filed", () => {
         const signal = assessRiskFor(true);
         expect(signal.state).toBe("triggered");
-        expect(signal.rawValue).toEqual({ complaintFiled: true });
-        expect(signal.threshold).toEqual({ complaintFiled: true });
+        expect(signal.rawValue).toEqual({ pretenzijaPateikta: true });
+        expect(signal.threshold).toEqual({ pretenzijaPateikta: true });
     });
 
     it("does not trigger when the report positively says no complaint was filed", () => {
         const signal = assessRiskFor(false);
         expect(signal.state).toBe("not_triggered");
-        expect(signal.rawValue).toEqual({ complaintFiled: false });
+        expect(signal.rawValue).toEqual({ pretenzijaPateikta: false });
     });
 
     it("is total: every scenario returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
-        for (const complaintFiled of [true, false]) {
-            const signal = assessRiskFor(complaintFiled);
+        for (const pretenzijaPateikta of [true, false]) {
+            const signal = assessRiskFor(pretenzijaPateikta);
             expect(states).toContain(signal.state);
         }
     });
@@ -91,7 +91,7 @@ describe("LtTra07Decision end to end (through RiskDecisionEngine, no database)",
             indicatorId: "LT-TRA-07",
             subjectType: "procurement",
             state: "triggered",
-            rawValue: { complaintFiled: true },
+            rawValue: { pretenzijaPateikta: true },
         });
     });
 

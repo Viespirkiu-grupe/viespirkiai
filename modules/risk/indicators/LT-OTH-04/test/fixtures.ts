@@ -14,26 +14,26 @@ const CONCLUDED = "Sudarius pirkimo sutartį";
 // 2026-01-12 — 11 days, squarely inside maximumDays: 36, the plain
 // not_triggered case.
 export const oneLotOrdinaryPeriod: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 export const oneLotOrdinaryPeriodSignatures: readonly string[] = ["2026-01-12"];
 
 // One concluded lot, decided 2026-01-01, paired with a contract signed the
 // same day — 0 days, not_triggered.
 export const oneLotSignedSameDay: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 export const oneLotSignedSameDaySignatures: readonly string[] = ["2026-01-01"];
 
@@ -41,26 +41,26 @@ export const oneLotSignedSameDaySignatures: readonly string[] = ["2026-01-01"];
 // exactly 36 days later — the boundary; 36 is not "strictly above"
 // maximumDays: 36, so not_triggered.
 export const oneLotAtMaximumBoundary: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 export const oneLotAtMaximumBoundarySignatures: readonly string[] = ["2026-02-06"];
 
 // One concluded lot, decided 2026-01-01, paired with a contract signed 37
 // days later — anomalously long (above maximumDays: 36).
 export const oneLotSignedLate: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 export const oneLotSignedLateSignatures: readonly string[] = ["2026-02-07"];
 
@@ -73,29 +73,29 @@ export const oneLotSignedLateSignatures: readonly string[] = ["2026-02-07"];
 // Triggers, since only one lot needs to breach the bound (LT-OTH-03's "any
 // lot" aggregation, not LT-OTH-05's "every lot must fail").
 export const mixedLotsOneAnomalous: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [
         { daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null },
         { daliesNumeris: "1", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-13", sprendimoPriezastys: null },
     ],
     reportedAt: "2026-01-13",
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 export const mixedLotsOneAnomalousSignatures: readonly string[] = ["2026-01-12", "2026-03-01"];
 
 // One lot terminated before any evaluation could happen, and no concluded
 // lot at all — insufficient_data, mirroring LT-OTH-03/LT-OTH-05.
 export const onlyTerminated: ProcurementProcedureOutcome = {
-    lotOutcomes: ["Nutraukus pirkimo ar projekto konkurso procedūras"],
+    proceduruPabaigos: ["Nutraukus pirkimo ar projekto konkurso procedūras"],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2025-12-15", sprendimoPriezastys: null }],
     reportedAt: "2025-12-15",
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 
 // One concluded lot with a real decision date, but every contract this
@@ -106,24 +106,24 @@ export const onlyTerminated: ProcurementProcedureOutcome = {
 // a fabricated negative-period trigger — insufficient_data, since no other
 // lot pairs successfully either.
 export const onlyContractPredatesDecision: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };
 export const onlyContractPredatesDecisionSignatures: readonly string[] = ["2020-11-04"];
 
 // One concluded lot, but its decision date was never recorded — still
 // insufficient_data, the same as no procedure-ending decision at all.
 export const oneLotConcludedNoDate: ProcurementProcedureOutcome = {
-    lotOutcomes: [CONCLUDED],
+    proceduruPabaigos: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: null, sprendimoPriezastys: null }],
     reportedAt: null,
-    isFramework: null,
-    complaintFiled: null,
-    courtChallenged: null,
-    electronicProcurement: null,
+    preliminariSutartis: null,
+    pretenzijaPateikta: null,
+    ieskinysTeismui: null,
+    elektroninisPirkimas: null,
 };

@@ -5,7 +5,7 @@ import { ltTra08Definition } from "./definition.ts";
 
 // LT-TRA-08 — Procurement challenged in court: judges a whole procurement
 // from the ATN-1 (PPA) report's own "ieskinysTeismui" field, merged onto
-// Subject.procurement.procedureOutcome.courtChallenged by the Procurement
+// Subject.procurement.procedureOutcome.ieskinysTeismui by the Procurement
 // Reader (shared with LT-TRA-06/LT-TRA-07/LT-PRI-06 — see
 // modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql). No threshold beyond
 // the field itself: the catalogue concept is "a court challenge exists", not
@@ -20,17 +20,17 @@ export class LtTra08Decision extends AProcurementIndicatorDecision<typeof ltTra0
     }
 
     protected hasRequiredData(subject: ProcurementSubject): boolean {
-        return (subject.procurement.procedureOutcome?.courtChallenged ?? null) !== null;
+        return (subject.procurement.procedureOutcome?.ieskinysTeismui ?? null) !== null;
     }
 
     assessRisk(subject: ProcurementSubject): RiskSignal {
         // hasRequiredData already proved this is non-null.
-        const courtChallenged = subject.procurement.procedureOutcome!.courtChallenged!;
+        const ieskinysTeismui = subject.procurement.procedureOutcome!.ieskinysTeismui!;
 
         return this.signalFor(subject, {
-            state: courtChallenged ? "triggered" : "not_triggered",
-            rawValue: { courtChallenged },
-            threshold: { courtChallenged: true },
+            state: ieskinysTeismui ? "triggered" : "not_triggered",
+            rawValue: { ieskinysTeismui },
+            threshold: { ieskinysTeismui: true },
             appliedParameters: {},
         });
     }

@@ -5,7 +5,7 @@ import { ltTra07Definition } from "./definition.ts";
 
 // LT-TRA-07 — Complaint received: judges a whole procurement from the ATN-1
 // (PPA) report's own "pretenzijaPateikta" field, merged onto
-// Subject.procurement.procedureOutcome.complaintFiled by the Procurement
+// Subject.procurement.procedureOutcome.pretenzijaPateikta by the Procurement
 // Reader (shared with LT-TRA-06/LT-PRI-06 — see
 // modules/mcp/analyst/views/v_pirkimo_pabaiga_v2.sql). No threshold beyond
 // the field itself: the catalogue concept is "a complaint exists", not "how
@@ -20,17 +20,17 @@ export class LtTra07Decision extends AProcurementIndicatorDecision<typeof ltTra0
     }
 
     protected hasRequiredData(subject: ProcurementSubject): boolean {
-        return (subject.procurement.procedureOutcome?.complaintFiled ?? null) !== null;
+        return (subject.procurement.procedureOutcome?.pretenzijaPateikta ?? null) !== null;
     }
 
     assessRisk(subject: ProcurementSubject): RiskSignal {
         // hasRequiredData already proved this is non-null.
-        const complaintFiled = subject.procurement.procedureOutcome!.complaintFiled!;
+        const pretenzijaPateikta = subject.procurement.procedureOutcome!.pretenzijaPateikta!;
 
         return this.signalFor(subject, {
-            state: complaintFiled ? "triggered" : "not_triggered",
-            rawValue: { complaintFiled },
-            threshold: { complaintFiled: true },
+            state: pretenzijaPateikta ? "triggered" : "not_triggered",
+            rawValue: { pretenzijaPateikta },
+            threshold: { pretenzijaPateikta: true },
             appliedParameters: {},
         });
     }

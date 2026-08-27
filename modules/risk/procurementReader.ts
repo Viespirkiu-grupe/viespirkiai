@@ -139,14 +139,13 @@ const LOT_BIDS_SQL = `
 // (daliesNumeris, proceduruPabaiga, sprendimoPriemimoData, sprendimoPriezastys)
 // tuples, one per procedure-ending row observed — for LT-OTH-03, which needs
 // a lot's own decision date paired with its own outcome label rather than the
-// collapsed cross-lot set lotOutcomes/reportedAt provide, and for LT-TRA-06,
+// collapsed cross-lot set proceduruPabaigos/reportedAt provide, and for LT-TRA-06,
 // which needs a lot's own stated reason text. json_agg is never null here:
 // the JOIN in v_pirkimo_pabaiga_v2 guarantees at least one row per group.
 //
-// "isFramework" (LT-PRI-06) is xlsxPPAataskaitos.preliminariSutartis,
-// "complaintFiled" (LT-TRA-07) is xlsxPPAataskaitos.pretenzijaPateikta,
-// "courtChallenged" (LT-TRA-08) is xlsxPPAataskaitos.ieskinysTeismui, and
-// "electronicProcurement" (LT-TRA-09) is xlsxPPAataskaitos.elektroninisPirkimas,
+// preliminariSutartis (LT-PRI-06), pretenzijaPateikta (LT-TRA-07),
+// ieskinysTeismui (LT-TRA-08), and elektroninisPirkimas (LT-TRA-09) are all
+// xlsxPPAataskaitos fields carried straight through unrenamed,
 // each bool_or'd across every lot and every report revision under this
 // pirkimoNumeris: true if any revision ever said so, false if every revision
 // said no, null if no revision ever populated the field (bool_or ignores
@@ -154,7 +153,7 @@ const LOT_BIDS_SQL = `
 const PROCEDURE_OUTCOME_SQL = `
     ${PUBLIC_VIEWS_CTE}
     SELECT po."pirkimoNumeris"                                                            AS "pirkimoNumeris",
-           array_agg(DISTINCT po."proceduruPabaiga")                                       AS "lotOutcomes",
+           array_agg(DISTINCT po."proceduruPabaiga")                                       AS "proceduruPabaigos",
            json_agg(json_build_object(
                'daliesNumeris', po."daliesNumeris",
                'proceduruPabaiga', po."proceduruPabaiga",
@@ -162,10 +161,10 @@ const PROCEDURE_OUTCOME_SQL = `
                'sprendimoPriezastys', po."sprendimoPriezastys"
            ))                                                                              AS "lots",
            to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt",
-           bool_or(po."preliminariSutartis")                                               AS "isFramework",
-           bool_or(po."pretenzijaPateikta")                                                AS "complaintFiled",
-           bool_or(po."ieskinysTeismui")                                                   AS "courtChallenged",
-           bool_or(po."elektroninisPirkimas")                                              AS "electronicProcurement"
+           bool_or(po."preliminariSutartis")                                               AS "preliminariSutartis",
+           bool_or(po."pretenzijaPateikta")                                                AS "pretenzijaPateikta",
+           bool_or(po."ieskinysTeismui")                                                   AS "ieskinysTeismui",
+           bool_or(po."elektroninisPirkimas")                                              AS "elektroninisPirkimas"
     FROM v_pirkimo_pabaiga_v2 po
     WHERE po."ataskaitosData" <= $1::timestamptz
       AND ($2::text[] IS NULL OR po."pirkimoNumeris" = ANY ($2::text[]))
@@ -352,13 +351,13 @@ export class ProcurementReader {
             procedureOutcomeRows.map((row) => [
                 row.pirkimoNumeris,
                 {
-                    lotOutcomes: row.lotOutcomes,
+                    proceduruPabaigos: row.proceduruPabaigos,
                     lots: row.lots,
                     reportedAt: row.reportedAt,
-                    isFramework: row.isFramework,
-                    complaintFiled: row.complaintFiled,
-                    courtChallenged: row.courtChallenged,
-                    electronicProcurement: row.electronicProcurement,
+                    preliminariSutartis: row.preliminariSutartis,
+                    pretenzijaPateikta: row.pretenzijaPateikta,
+                    ieskinysTeismui: row.ieskinysTeismui,
+                    elektroninisPirkimas: row.elektroninisPirkimas,
                 },
             ]),
         );
