@@ -143,10 +143,16 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 
 ### 4.1 Procurement Risk Decision Service (56)
 
+`Note` values: **Accepted** — implemented and registered. **Cannot implement** — no currently ingested data can support
+the concept at all; see the explanation below the relevant table. **Design Required** — the required data exists and the
+concept is implementable, but the formula needs a design decision (e.g. a peer-group baseline, a window, a granularity)
+materially beyond a same-lot/same-row threshold, so it is scoped out for a dedicated design pass rather than implemented
+ad hoc; see the explanation below the relevant table. Blank — not yet triaged.
+
 #### Subject `procurement` — Procurement (28)
 
 | Code      | Canonical indicator                                   | Canonical category | Reference indicators                                                                                                                                           | Note             |
-|-----------|-------------------------------------------------------|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+|-----------|-------------------------------------------------------|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
 | LT-COM-03 | Only one supplier invited or consulted                | Competition        | STT-I02                                                                                                                                                        | Accepted         |
 | LT-COM-18 | Procurement object has elevated cartel risk           | Competition        | OLAF-CN05                                                                                                                                                      | Cannot implement |
 | LT-OTH-01 | No documented market research                         | Other              | STT-I01; OECD-TD-01                                                                                                                                            | Cannot implement |
@@ -178,25 +184,25 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 
 #### Subject `lot` — Lot (17)
 
-| Code      | Canonical indicator                                           | Canonical category | Reference indicators                                       | Note      |
-|-----------|---------------------------------------------------------------|--------------------|------------------------------------------------------------|-----------|
-| LT-AWD-01 | All bids except winner disqualified                           | Award              | OCP-R035; OT-I11                                           | Accepted |
-| LT-AWD-02 | Lowest bid disqualified                                       | Award              | OCP-R036                                                   | Accepted |
-| LT-AWD-03 | Poorly supported disqualification                             | Award              | OCP-R037; STT-I14                                          | Accepted |
-| LT-AWD-04 | Excessive share of disqualified bids                          | Award              | OCP-R038                                                   | Accepted |
-| LT-AWD-07 | Evaluation criteria excessively discretionary                 | Award              | OCP-R021; STT-I13                                          |          |
-| LT-AWD-08 | Award criteria or scoring method incomplete                   | Award              | OLAF-CN26; OLAF-CN27; OLAF-CN28; OT-I10                    |          |
-| LT-COM-01 | Single valid bid                                              | Competition        | OCP-R018; OLAF-CA02; OT-I01; STT-I03; VPT-I01              | Accepted |
-| LT-COM-02 | Low number of bidders                                         | Competition        | OCP-R019; OLAF-CN01; OLAF-CN02; OLAF-CA02; VPT-I12         | Accepted |
-| LT-COM-07 | Missing expected bidder                                       | Competition        | OCP-R027; OECD-BR-03                                       |          |
-| LT-COM-10 | Identical bid prices                                          | Competition        | OCP-R028; OECD-BR-24                                       |          |
-| LT-COM-11 | Fixed-multiple bid prices                                     | Competition        | OCP-R023; OECD-BR-25                                       |          |
-| LT-COM-12 | Suspiciously close bid prices                                 | Competition        | OCP-R024; OECD-BR-26                                       |          |
-| LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       |          |
-| LT-PRI-01 | Estimated value anomalous against market benchmark            | Pricing            | OCP-R016; OLAF-CN07; STT-I10                               |          |
-| LT-PRI-03 | Winning price close to or above estimate                      | Pricing            | OCP-R031; OLAF-CN13; OECD-BR-28                            |          |
-| LT-PRI-08 | Bid prices deviate from Benford's Law                         | Pricing            | OCP-R029; OT-I07                                           |          |
-| LT-PRI-10 | Bid-price or discount movements inconsistent with competition | Pricing            | OECD-BR-20; OECD-BR-21; OECD-BR-22; OECD-BR-23; OECD-BR-29 |          |
+| Code      | Canonical indicator                                           | Canonical category | Reference indicators                                       | Note             |
+|-----------|---------------------------------------------------------------|--------------------|------------------------------------------------------------|------------------|
+| LT-AWD-01 | All bids except winner disqualified                           | Award              | OCP-R035; OT-I11                                           | Accepted         |
+| LT-AWD-02 | Lowest bid disqualified                                       | Award              | OCP-R036                                                   | Accepted         |
+| LT-AWD-03 | Poorly supported disqualification                             | Award              | OCP-R037; STT-I14                                          | Accepted         |
+| LT-AWD-04 | Excessive share of disqualified bids                          | Award              | OCP-R038                                                   | Accepted         |
+| LT-AWD-07 | Evaluation criteria excessively discretionary                 | Award              | OCP-R021; STT-I13                                          | Cannot implement |
+| LT-AWD-08 | Award criteria or scoring method incomplete                   | Award              | OLAF-CN26; OLAF-CN27; OLAF-CN28; OT-I10                    | Cannot implement |
+| LT-COM-01 | Single valid bid                                              | Competition        | OCP-R018; OLAF-CA02; OT-I01; STT-I03; VPT-I01              | Accepted         |
+| LT-COM-02 | Low number of bidders                                         | Competition        | OCP-R019; OLAF-CN01; OLAF-CN02; OLAF-CA02; VPT-I12         | Accepted         |
+| LT-COM-07 | Missing expected bidder                                       | Competition        | OCP-R027; OECD-BR-03                                       | Design Required  |
+| LT-COM-10 | Identical bid prices                                          | Competition        | OCP-R028; OECD-BR-24                                       |                  |
+| LT-COM-11 | Fixed-multiple bid prices                                     | Competition        | OCP-R023; OECD-BR-25                                       |                  |
+| LT-COM-12 | Suspiciously close bid prices                                 | Competition        | OCP-R024; OECD-BR-26                                       |                  |
+| LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       |                  |
+| LT-PRI-01 | Estimated value anomalous against market benchmark            | Pricing            | OCP-R016; OLAF-CN07; STT-I10                               |                  |
+| LT-PRI-03 | Winning price close to or above estimate                      | Pricing            | OCP-R031; OLAF-CN13; OECD-BR-28                            |                  |
+| LT-PRI-08 | Bid prices deviate from Benford's Law                         | Pricing            | OCP-R029; OT-I07                                           |                  |
+| LT-PRI-10 | Bid-price or discount movements inconsistent with competition | Pricing            | OECD-BR-20; OECD-BR-21; OECD-BR-22; OECD-BR-23; OECD-BR-29 |                  |
 
 #### Subject `bid` — Bid / bidder participation (11)
 
@@ -214,6 +220,26 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 | LT-PRI-11 | Supplier bid much higher than for a comparable contract | Pricing            | OECD-BR-27                                                                                                 | Accepted         |
 | LT-PRI-12 | Anomalous geographic delivery or transport pricing      | Pricing            | OECD-BR-30; OECD-BR-31                                                                                     | Cannot implement |
 
+#### Design Required Explanations
+
+**LT-COM-07** — Missing expected bidder: implementable, but not from a same-lot threshold the way `LT-COM-10`…
+`LT-PRI-10` are — it needs a peer-group baseline that doesn't exist in the codebase yet. The concept ("a supplier who
+regularly bids in this buyer's tenders for this kind of purchase is conspicuously absent from this one") requires, for
+each lot, a comparison set of the buyer's *other* lots in the same market segment and the suppliers who bid on them,
+then a definition of "regular" bidder against that set — none of which is a single row's data, unlike every
+`Accepted` lot-grain indicator so far. The underlying data exists: `v_dalyviai`/`v_dalyviai_v2` (ATN-1 report source,
+same ~2.5% procurement coverage already accepted for `LT-COM-01`/`LT-COM-02`/`LT-COM-20`) carries `pirkejoKodas` and
+`pagrindinisKodasBvpz` per lot, and a direct check against the buyer + 2-digit-CPV-division grouping shows a peer group
+is often available: of 1,873 (buyer, CPV-2) pairs with at least one lot carrying bidder data, 640 have 2–4 peer lots and
+382 have 5 or more (2026-08 measurement) — enough to build a "regular bidder" baseline for roughly 55% of pairs, with
+the rest correctly falling to `insufficient_data`. What's still open, and needs a design pass rather than a reasonable
+default picked in-line, is: the CPV grouping granularity (2-digit is coarse enough to risk lumping unrelated
+goods/services together, narrower codes risk too few peer lots to mean anything), the trailing time window, and the
+participation-rate cutoff that defines "regular" — three interacting parameters with no value handed to us by the
+canonical row or its OCP/OECD references, each shifting both the false-positive rate and how much of the
+55%-with-a-peer-group population actually gets evaluated. Revisit with a dedicated design pass that picks and validates
+(Phase 6-style, against real triggered examples) those three parameters before implementing.
+
 #### Cannot Implement Explanations
 
 **LT-AWD-05** — Late bid accepted and won: not implementable with currently ingested data. The only per-bid data source
@@ -229,6 +255,41 @@ applied to a lot, not a per-bidder compliance verdict against them. No ingested 
 actually satisfied each criterion — `v_dalyviai` only carries the resulting rank (`eileNumeris`) and, for rejected bids,
 a free-text rejection reason. Without a compliance-verdict signal the indicator would only ever produce
 `insufficient_data`. Revisit if a source carrying per-criterion compliance assessments is ever ingested.
+
+**LT-AWD-07** — Evaluation criteria excessively discretionary: not implementable with currently ingested data. The
+concept needs to know whether a lot's award-criteria scoring rubric leaves assessors broad, unstructured discretion
+(e.g. a vague "overall impression" quality sub-criterion with no defined point-allocation rule) rather than measurable,
+objective sub-criteria. The only ingested sources naming award criteria at all —
+`xlsxPPAvertinimoKriterijai."vertinimoKriterijus"` (the ATN-1 procedure report, 14,118 rows) and its notice-level
+counterpart `viesiejiPirkimaiKeys."pasiulymuVertinimoKriterijai"` (39,495 of 51,565 rows populated) — record only which
+top-level award *method* a lot used, drawn from a closed dictionary of five (resp. three) values: `Kaina` (10,788
+rows) / `Kaina/Sąnaudos` (31,808 rows) / `Sąnaudos` (6 rows) for price- or cost-only awards, and `Kainos ir kokybės
+santykis` (3,278 rows) / `Kainos/sąnaudų ir kokybės santykis` (7,687 rows) / `Sąnaudų ir kokybės santykis` (31 rows)
+for a price/cost-quality-ratio mix. Neither column names, weights, or describes a single actual sub-criterion — there is
+no way to tell a lot whose quality component is "price + delivery time" (objective) from one scored on "price + overall
+impression" (highly discretionary) once its method is anything but pure price/cost. The planned
+`v_vertinimo_kriterijai` entity ([domain-model.md](domain-model.md) §1.3) is specified against this exact same source
+table, so implementing that view would add no missing detail — the underlying data itself stops at the method label,
+never the criteria content or scoring rubric a discretion judgment requires. Revisit if a source recording per-criterion
+descriptions, weights, or scoring rubrics is ever ingested (e.g. a future PPA report revision, or
+`v_dokumentas` with structured tender-document content — see the `LT-PRO-09`/`LT-PRO-10` explanations below for the
+parallel document-content gap).
+
+**LT-AWD-08** — Award criteria or scoring method incomplete: not implementable with currently ingested data, for the
+same underlying reason as `LT-AWD-07` above — both are blocked by the same unimplemented `v_vertinimo_kriterijai`
+entity ([domain-model.md](domain-model.md) §1.3), specified against the identical source columns. The concept bundles
+three sub-checks — too few constituent evaluation factors (`OLAF-CN26`), no defined scoring/evaluation method
+(`OLAF-CN27`), and payment deadline used as an award criterion (`OLAF-CN28`) — and every one of them needs the actual
+*list* of a lot's award sub-criteria (names, weights, point-allocation rules), not just which top-level method it used.
+The two ingested sources that name award criteria at all,
+`xlsxPPAvertinimoKriterijai."vertinimoKriterijus"` (14,118 rows: `Kaina` 10,788 / `Kainos ir kokybės santykis` 3,278 /
+`Sąnaudų ir kokybės santykis` 31 / `Sąnaudos` 6 / blank 15) and `viesiejiPirkimaiKeys."pasiulymuVertinimoKriterijai"`
+(51,565 rows: `Kaina/Sąnaudos` 31,808 / `Kainos/sąnaudų ir kokybės santykis` 7,687 / blank 12,070), both stop at this
+same closed method label — neither carries a factor count, a "was a scoring method defined" flag, or a per-criterion
+name that could be tested for "payment deadline". A schema-wide search for `%kriterij%`, `%vertinim%`, `%faktori%`,
+`%svor%` (weight), and `%metod%` across every table finds no other candidate column. Fabricating a factor count or a
+"payment deadline used" flag from the method label alone would be guessing, not measuring. Revisit alongside
+`LT-AWD-07` if a source recording per-criterion descriptions, weights, or scoring rubrics is ever ingested.
 
 **LT-COM-16** — Similar bid documents: not implementable with currently ingested data. Every document table in the
 warehouse — `viesiejiPirkimaiFailai`, `cvppFailai`, `vpmSutartysFailai`, and the planned `v_dokumentas` — is keyed to a
@@ -248,15 +309,15 @@ Revisit alongside LT-AWD-05 if submission-order data is ever ingested.
 procurement's CPV codes (`v_pirkimas."bvpzKodai"`, 99.9% populated on the primary `cvpis` source) are available, but
 `OLAF-CN05`'s source booklet (the OLAF-supported *"Red Flags" – a New Automatic Warning System*, p. 9, item I.6)
 names this only as a summary-list title, "Object of public procurement (cartel risk)", with no operational definition,
-threshold, or list of cartel-prone product categories in the booklet itself — the underlying Hungarian methodology
-paper it references is not included and, being built from Hungary's own TED cartel-case history, would not transfer
-to Lithuania regardless. No table in the warehouse records Lithuanian cartel or bid-rigging case history by CPV
-division (`\dt` for `kartel`/`konkurenc`/`cartel`/`competition` finds nothing), so there is no data-grounded way to
-classify which CPV divisions carry elevated cartel risk for the Lithuanian market specifically. Hand-picking sectors
-from general international literature (construction, waste management, catering, etc.) would be an unsourced,
-un-auditable judgment call disguised as a formula, not a reflection of the catalogue concept. Revisit if a Lithuanian
-Competition Council (Konkurencijos taryba) cartel/bid-rigging case dataset, coded to CPV or a comparable sector
-classification, is ever ingested.
+threshold, or list of cartel-prone product categories in the booklet itself — the underlying Hungarian methodology paper
+it references is not included and, being built from Hungary's own TED cartel-case history, would not transfer to
+Lithuania regardless. No table in the warehouse records Lithuanian cartel or bid-rigging case history by CPV division
+(`\dt` for `kartel`/`konkurenc`/`cartel`/`competition` finds nothing), so there is no data-grounded way to classify
+which CPV divisions carry elevated cartel risk for the Lithuanian market specifically. Hand-picking sectors from general
+international literature (construction, waste management, catering, etc.) would be an unsourced, un-auditable judgment
+call disguised as a formula, not a reflection of the catalogue concept. Revisit if a Lithuanian Competition Council
+(Konkurencijos taryba) cartel/bid-rigging case dataset, coded to CPV or a comparable sector classification, is ever
+ingested.
 
 **LT-COM-23** — Bidder statements indicate collusion: not implementable with currently ingested data. The only
 report-level fields that resemble a collusion signal — `konkurencijaIskreipiantisAsmuo` and `konkurencijosPriemones`
@@ -265,34 +326,34 @@ on `xlsxPPAataskaitos` — record whether the buyer ran pre-tender market consul
 conduct), not statements made by bidders during the procedure. No source captures bidder correspondence, minutes, or
 testimony. Revisit if a source carrying bidder statements or procedural minutes is ever ingested.
 
-**LT-OTH-01** — No documented market research: not implementable with currently ingested data. No table in the
-warehouse records whether, or how, a buyer researched the market before starting a procurement. The only report-level
-fields that come close — `xlsxPPAataskaitos."konkurencijaIskreipiantisAsmuo"`/`"konkurencijosPriemones"` — record
-whether the buyer identified a competition-distorting economic operator among those who helped prepare the tender
-(5,177 of 6,583 reports carry a non-null flag, 606 true) and what measures were taken about it, not whether market
-research preceded the procurement; `planuojamiPirkimaiDuomenys` (the planning-document entity) carries a price
-estimate and a free-text `aprasymas`, but no market-research field either. The remaining candidates —
-`pirkimoBudoPagrindimas` (procurement-method justification) and `kitaInformacija` — are unstructured free text a
-buyer may or may not use to mention market research, so testing for it would mean pattern-matching prose for an
-unbounded vocabulary rather than reading a structured fact, the kind of fragile-regex approach Phase 1 of the
-implementation plan warns against. Revisit if a structured "preliminary market consultation" field is ever ingested
-(e.g. a future PPA report revision, or a CVP IS notice field mirroring TED's prior-market-consultation indicator).
+**LT-OTH-01** — No documented market research: not implementable with currently ingested data. No table in the warehouse
+records whether, or how, a buyer researched the market before starting a procurement. The only report-level fields that
+come close — `xlsxPPAataskaitos."konkurencijaIskreipiantisAsmuo"`/`"konkurencijosPriemones"` — record whether the buyer
+identified a competition-distorting economic operator among those who helped prepare the tender (5,177 of 6,583 reports
+carry a non-null flag, 606 true) and what measures were taken about it, not whether market research preceded the
+procurement; `planuojamiPirkimaiDuomenys` (the planning-document entity) carries a price estimate and a free-text
+`aprasymas`, but no market-research field either. The remaining candidates —
+`pirkimoBudoPagrindimas` (procurement-method justification) and `kitaInformacija` — are unstructured free text a buyer
+may or may not use to mention market research, so testing for it would mean pattern-matching prose for an unbounded
+vocabulary rather than reading a structured fact, the kind of fragile-regex approach Phase 1 of the implementation plan
+warns against. Revisit if a structured "preliminary market consultation" field is ever ingested (e.g. a future PPA
+report revision, or a CVP IS notice field mirroring TED's prior-market-consultation indicator).
 
-**LT-OTH-06** — Strategic-policy objective not applied where relevant: not implementable with currently ingested
-data. The only structured self-reported flags for these objectives — `xlsxPPAsutartys."centralizuotasPirkimas"` /
-`"zaliasisPirkimas"` / `"inovatyvusProduktas"` and `xlsxPPAvertinimoKriterijai."vertinimoKriterijus"`, all sourced
-from the Atn-1 procedure report (`xlsxPPAataskaitos`, 6,583 of 264,415 procurements, ~2.5%) — record only whether a
-policy was self-reported as *applied*, never whether it was *relevant* to the specific procurement, and the
-catalogue concept is precisely the gap between the two. No table in the warehouse carries the Lithuanian reference
-data that would establish relevance independently of self-report — e.g. the government's mandatory-centralized-
-purchasing product list or the environment ministry's green-procurement product-group list — so "relevant" cannot be
-derived from CPV code or object description either. Sampling also shows the self-report flag is not a discriminating
-signal even on its own terms: `"zaliasisPirkimas"` is `true` for 9,583 of 9,725 non-null rows (98.5%) across
-unrelated objects — a bridge reconstruction, an echoscope, health-insurance services, a forklift rental, a car
-purchase all read `true` — which rules it out as an audit signal before the relevance question is even reached.
-Hand-picking CPV categories as "where relevant" from general literature would be the same unsourced, un-auditable
-judgment call the LT-COM-18 explanation above rejects. Revisit if a Lithuanian reference dataset establishing which
-categories each objective (green/innovative/quality/centralized) applies to is ever ingested.
+**LT-OTH-06** — Strategic-policy objective not applied where relevant: not implementable with currently ingested data.
+The only structured self-reported flags for these objectives — `xlsxPPAsutartys."centralizuotasPirkimas"` /
+`"zaliasisPirkimas"` / `"inovatyvusProduktas"` and `xlsxPPAvertinimoKriterijai."vertinimoKriterijus"`, all sourced from
+the Atn-1 procedure report (`xlsxPPAataskaitos`, 6,583 of 264,415 procurements, ~2.5%) — record only whether a policy
+was self-reported as *applied*, never whether it was *relevant* to the specific procurement, and the catalogue concept
+is precisely the gap between the two. No table in the warehouse carries the Lithuanian reference data that would
+establish relevance independently of self-report — e.g. the government's mandatory-centralized- purchasing product list
+or the environment ministry's green-procurement product-group list — so "relevant" cannot be derived from CPV code or
+object description either. Sampling also shows the self-report flag is not a discriminating signal even on its own
+terms: `"zaliasisPirkimas"` is `true` for 9,583 of 9,725 non-null rows (98.5%) across unrelated objects — a bridge
+reconstruction, an echoscope, health-insurance services, a forklift rental, a car purchase all read `true` — which rules
+it out as an audit signal before the relevance question is even reached. Hand-picking CPV categories as "where relevant"
+from general literature would be the same unsourced, un-auditable judgment call the LT-COM-18 explanation above rejects.
+Revisit if a Lithuanian reference dataset establishing which categories each objective
+(green/innovative/quality/centralized) applies to is ever ingested.
 
 **LT-PRI-02** — Line-item price anomalously high or low: not implementable with currently ingested data.
 `v_dalyviai."pasiulymoKaina"` is a single total bid price per (procurement, lot, bidder); no ingested source breaks a
@@ -304,26 +365,26 @@ ingested source records a delivery location, distance, or transport-cost compone
 undifferentiated total, and `v_company."adresas"` is the supplier's registered address, not a delivery site. Revisit if
 delivery-location or transport-cost data is ever ingested.
 
-**LT-PRO-02** — Direct award contrary to procurement plan: not implementable with currently ingested data. The
-concept requires linking a specific procurement to the specific plan entry it fulfilled, then comparing the plan's
-declared `pirkimoBudas` against the procedure the buyer actually ran. `v_pirkimo_planas` (`planuojamiPirkimai` +
+**LT-PRO-02** — Direct award contrary to procurement plan: not implementable with currently ingested data. The concept
+requires linking a specific procurement to the specific plan entry it fulfilled, then comparing the plan's declared
+`pirkimoBudas` against the procedure the buyer actually ran. `v_pirkimo_planas` (`planuojamiPirkimai` +
 `planuojamiPirkimaiDuomenys`) carries no procurement number — the plan register and the notice register are two
 independent Public Procurement Office datasets that were never joined by key — so any link is a heuristic match over
 buyer, CPV code and a time window, "with its own confidence" per [domain-model.md](domain-model.md) §5.2
 (`v_pirkimo_planas` → `v_pirkimas`: "no key exists"). Sampling 20 real procurements and counting candidate plan rows
-sharing the same buyer, an overlapping CPV code, and a loose ±3/12-month window around the notice date shows the
-match is not resolvable to one row: candidate counts range from 0 (no plan found at all) to 109, with most non-zero
-cases landing at 2–14 plausible candidates and no field left to break the tie. Loosening or tightening the window
-does not fix this — it trades false negatives (0 candidates) for false positives (dozens of candidates), because
-CPV codes on the plan are broad and a buyer with hundreds of planned purchases in a year has many candidates in any
-reasonable window. `LT-PRO-01`'s implementation independently reached and documented the same conclusion about this
-link (see its README's "only *published* negotiated procedures are visible" section) when it needed the plan's
+sharing the same buyer, an overlapping CPV code, and a loose ±3/12-month window around the notice date shows the match
+is not resolvable to one row: candidate counts range from 0 (no plan found at all) to 109, with most non-zero cases
+landing at 2–14 plausible candidates and no field left to break the tie. Loosening or tightening the window does not fix
+this — it trades false negatives (0 candidates) for false positives (dozens of candidates), because CPV codes on the
+plan are broad and a buyer with hundreds of planned purchases in a year has many candidates in any reasonable window.
+`LT-PRO-01`'s implementation independently reached and documented the same conclusion about this link (see its README's
+"only *published* negotiated procedures are visible" section) when it needed the plan's
 `Neskelbiamos derybos` label for the same reason. Fabricating a single "most likely" match per procurement from an
 ambiguous candidate set would be an unsourced, un-auditable judgment call, not a reflection of the catalogue concept.
 Revisit if the Public Procurement Office ever publishes a key linking a plan entry to the procurement it became.
 
-**LT-PRO-04** — Procedure without prior publication: not implementable with currently ingested data. The concept
-needs to identify procurements actually run under a "negotiated without prior publication of a call for tenders"
+**LT-PRO-04** — Procedure without prior publication: not implementable with currently ingested data. The concept needs
+to identify procurements actually run under a "negotiated without prior publication of a call for tenders"
 legal basis (Lithuanian `Neskelbiamos derybos` / `Neskelbiama apklausa`), the sub-threshold or sole-source mechanism
 that, by definition, does not produce the notice our `procurement` subject is built from. Checking every
 `pirkimoBudas` dictionary actually populated on an executed or reported procurement in the warehouse confirms this
@@ -333,14 +394,14 @@ method — [domain-model.md](domain-model.md) §5.1) carries 15 distinct labels 
 procedure type — no "Neskelbiama…" label appears at all. The `cvpp` fallback (213,522 rows, the majority of
 `v_pirkimas`) never carries `pirkimoBudas` at all (0%, per the same table), so it cannot help either way.
 `xlsxPPApirkimoBudai` (the PPA procedure-report method dictionary behind `v_dalyviai`) has only four values —
-`Skelbiamos derybos`, `Atviras konkursas`, `Ribotas konkursas`, `Atviras konkuras` — again all published types. The
-only warehouse table that names an unpublished method at all is the plan register
-(`planuojamiPirkimaiBudai`: `Neskelbiama apklausa` 24,830 rows, `Neskelbiamos derybos pagal VPĮ/GSPĮ` 2,026,
+`Skelbiamos derybos`, `Atviras konkursas`, `Ribotas konkursas`, `Atviras konkuras` — again all published types. The only
+warehouse table that names an unpublished method at all is the plan register (`planuojamiPirkimaiBudai`:
+`Neskelbiama apklausa` 24,830 rows, `Neskelbiamos derybos pagal VPĮ/GSPĮ` 2,026,
 `Neskelbiamos derybos pagal PĮ/KĮ` 528, `Vidaus sandoriai` 17, `Pirkimai iš susijusių įmonių` 4), and that register
 cannot be linked to the procurement it became with any confidence — see the `LT-PRO-02` explanation above for the
 measured ambiguity of that same link. `LT-PRO-01`'s README independently reached the same conclusion about the
-`cvpis` notice source for the same underlying reason ("only *published* negotiated procedures are visible"). Revisit
-if a source recording unpublished/negotiated-without-publication procedures at procurement grain — not just planning
+`cvpis` notice source for the same underlying reason ("only *published* negotiated procedures are visible"). Revisit if
+a source recording unpublished/negotiated-without-publication procedures at procurement grain — not just planning
 intent — is ever ingested.
 
 **LT-PRO-09** — Unreasonable prequalification requirements: not implementable with currently ingested data. The
@@ -357,145 +418,144 @@ carries any reason text at all, and that text names a market-consultation notice
 capacity figure; meanwhile 25 of the 5,849 `false` rows carry non-empty reason text — a pairing that contradicts the
 hypothesis that the text is "the justification for a `true` value", so even this one candidate's meaning cannot be
 trusted at its current, sparse coverage. No other structured column anywhere in the schema records a qualification
-requirement's actual content (minimum turnover, capital level, reference-value ratio, reference period, required
-years of expert experience, geographic technical-capacity restriction, exclusion grounds). Extracting these from the
+requirement's actual content (minimum turnover, capital level, reference-value ratio, reference period, required years
+of expert experience, geographic technical-capacity restriction, exclusion grounds). Extracting these from the
 unstructured tender documents themselves would mean parsing free text for an open-ended vocabulary of numeric
-thresholds — the same fragile, un-auditable approach the `LT-OTH-01` and `LT-COM-16` explanations above already
-reject for the same underlying reason. Revisit if `v_dokumentas` is implemented with structured qualification-
-requirement fields (not just file metadata), or if a source recording tender qualification criteria in structured
-form is ever ingested.
+thresholds — the same fragile, un-auditable approach the `LT-OTH-01` and `LT-COM-16` explanations above already reject
+for the same underlying reason. Revisit if `v_dokumentas` is implemented with structured qualification- requirement
+fields (not just file metadata), or if a source recording tender qualification criteria in structured form is ever
+ingested.
 
 **LT-PRO-10** — Tailored or restrictive technical specifications: not implementable with currently ingested data, for
-the same underlying reason as `LT-PRO-09`. The concept needs the actual content of a tender's technical specification
-— whether it names a specific brand/manufacturer/product without an "or equivalent" clause (the Article 42(4),
-Directive 2014/24/EU concept OLAF-CN20/STT-I04/OT-I10 all point at), or otherwise sets requirements only one supplier
-could meet. That content lives, if anywhere, in `v_dokumentas` (domain-model.md §1.3/§4.3, listed there as blocking
-both `LT-PRO-09` and `LT-PRO-10`), which is itself unimplemented: only its raw warehouse sources are ingested
-(`dokumentai`, `viesiejiPirkimaiFailai`, `vpmSutartysFailai`, `cvppFailai`), and every one of them carries file
-*metadata* (filename, MIME type, page/word/character count, size, download link) — never the document's text. A
-schema-wide search for a structured column recording specification content, brand restrictions, or an "equivalent"
+the same underlying reason as `LT-PRO-09`. The concept needs the actual content of a tender's technical specification —
+whether it names a specific brand/manufacturer/product without an "or equivalent" clause (the Article 42 (4), Directive
+2014/24/EU concept OLAF-CN20/STT-I04/OT-I10 all point at), or otherwise sets requirements only one supplier could meet.
+That content lives, if anywhere, in `v_dokumentas` (domain-model.md §1.3/§4.3, listed there as blocking both `LT-PRO-09`
+and `LT-PRO-10`), which is itself unimplemented: only its raw warehouse sources are ingested (`dokumentai`,
+`viesiejiPirkimaiFailai`, `vpmSutartysFailai`, `cvppFailai`), and every one of them carries file *metadata* (filename,
+MIME type, page/word/character count, size, download link) — never the document's text. A schema-wide search for a
+structured column recording specification content, brand restrictions, or an "equivalent"
 clause (`%specifik%`, `%konkret%`, `%technin%`, `%lygiavert%`, `%zenkl%`, `%gamintoj%`) finds nothing usable: the one
 `%zenkl%` hit (`cvppViesiejiPirkimai."zenkliukas"`) is a scraped-page UI icon flag, not a trademark field, and the
 `%gamintoj%` hits are all in the unrelated vehicle registry (`regitra`). `v_vertinimo_kriterijai`
 (`xlsxPPAvertinimoKriterijai."vertinimoKriterijus"`) is an award-criteria weighting label (price/quality mix), not
 technical-spec content either. The only free-text notice fields that exist (`cvppPirkimai."aprasymas"`/`"turinysHtml"`,
-`planuojamiPirkimaiDuomenys."aprasymas"`) are unstructured summary prose of the notice, not the specification
-document, and building a formula on regex/NLP over open-ended prose is the same fragile, un-auditable approach the
-`LT-OTH-01` and `LT-COM-16` explanations above already reject. Revisit if `v_dokumentas` is implemented with
-structured technical-specification or brand-restriction fields (not just file metadata), or if a source recording
-tender specification content in structured form is ever ingested.
+`planuojamiPirkimaiDuomenys."aprasymas"`) are unstructured summary prose of the notice, not the specification document,
+and building a formula on regex/NLP over open-ended prose is the same fragile, un-auditable approach the
+`LT-OTH-01` and `LT-COM-16` explanations above already reject. Revisit if `v_dokumentas` is implemented with structured
+technical-specification or brand-restriction fields (not just file metadata), or if a source recording tender
+specification content in structured form is ever ingested.
 
 **LT-PRO-11** — Unreasonable participation or document fees: not implementable — a legal/procurement-system mismatch
 rather than a data gap. `OCP-R008`/`OCP-R009` (the World Bank OCP catalogue's "Unreasonable participation fees" and
 "Buyer increases the cost of the bidding documents") target jurisdictions where bidders must pay to obtain tender
 documents or to participate; Lithuania's CVP IS, the mandatory national e-procurement portal in force since ~2011,
-provides free electronic access to tender documents and charges no participation fee, so the underlying real-world
-event this indicator would detect essentially does not occur under the current legal regime. Confirming this is not
-just an assumption: a schema-wide search of `dbSchema/*.sql` for `%mokest%` (fee/payment) finds no procurement-related
-hit — the only matches are `darboVieta` (salary data) and `mokesciai` (a municipal tax-payment fact table), both
-unrelated to tenders — and no `%dalyvavimo%` (participation) or document-cost column exists on `viesiejiPirkimai` or
-any other procurement table; it carries only value/estimate fields (`numatomaVerteEUR`,
+provides free electronic access to tender documents and charges no participation fee, so the underlying real-world event
+this indicator would detect essentially does not occur under the current legal regime. Confirming this is not just an
+assumption: a schema-wide search of `dbSchema/*.sql` for `%mokest%` (fee/payment) finds no procurement-related hit — the
+only matches are `darboVieta` (salary data) and `mokesciai` (a municipal tax-payment fact table), both unrelated to
+tenders — and no `%dalyvavimo%` (participation) or document-cost column exists on `viesiejiPirkimai` or any other
+procurement table; it carries only value/estimate fields (`numatomaVerteEUR`,
 `numatomaBendraPirkimoVerte`), never a fee. The planned `v_dokumentas` entity (domain-model.md §1.3, also blocking
 `LT-PRO-09`/`LT-PRO-10`) lists LT-PRO-11 among the indicators it would need to support, but even its own not-yet-fixed
 attribute list proposes no fee/price field — the team has not identified a real value here to capture. Revisit only if
 Lithuanian procurement law reintroduces paid tender-document access or participation fees, and a source records it.
 
 **LT-PRO-12** — Excessive tender guarantee: not implementable with currently ingested data. Lithuanian procurement law
-does allow a buyer to require a "pasiūlymo galiojimo užtikrinimas" (bid/tender security) as a guarantee that a
-submitted bid stays valid, but no structured field anywhere in the warehouse records its amount or percentage. A
-schema-wide search of `dbSchema/*.sql` for `%garantij%` (guarantee) returns zero hits across every procurement table,
-and the only near-miss terms (`%uztikrinim%`/`%galiojimo%`) all name bid- or notice-*validity dates/periods* —
+does allow a buyer to require a "pasiūlymo galiojimo užtikrinimas" (bid/tender security) as a guarantee that a submitted
+bid stays valid, but no structured field anywhere in the warehouse records its amount or percentage. A schema-wide
+search of `dbSchema/*.sql` for `%garantij%` (guarantee) returns zero hits across every procurement table, and the only
+near-miss terms (`%uztikrinim%`/`%galiojimo%`) all name bid- or notice- *validity dates/periods* —
 `viesiejiPirkimaiKeys."pasiulymoGaliojimoTerminasDienomisArbaMenesiais"` (bid validity period, days/months),
-`viesiejiPirkimaiKeys."dpsGaliojimoDataIrLaikas"`/`"kvsGaliojimoDataIrLaikas"`, `cvppSkelbimai."galiojimoData"`,
-and several contract-validity-date columns — never a guarantee sum. The ATN-1 procedure-report table
-(`atn1ataskaitos`, the source behind `xlsxPPAataskaitos` in other indicators' documentation) carries no guarantee
-field either; its full column list has no fee/guarantee-shaped entry. The only place a guarantee amount could live is
-the actual tender-document text, i.e. the unimplemented `v_dokumentas` entity (raw file metadata only, no content —
-see the `LT-PRO-09`/`LT-PRO-10` explanations above for why parsing that is not viable). Revisit if a tender-security
-amount/percentage is ever ingested as a structured field, e.g. from a future PPA report revision or a parsed
-tender-document field.
+`viesiejiPirkimaiKeys."dpsGaliojimoDataIrLaikas"`/`"kvsGaliojimoDataIrLaikas"`, `cvppSkelbimai."galiojimoData"`, and
+several contract-validity-date columns — never a guarantee sum. The ATN-1 procedure-report table (`atn1ataskaitos`, the
+source behind `xlsxPPAataskaitos` in other indicators' documentation) carries no guarantee field either; its full column
+list has no fee/guarantee-shaped entry. The only place a guarantee amount could live is the actual tender-document text,
+i.e. the unimplemented `v_dokumentas` entity (raw file metadata only, no content — see the `LT-PRO-09`/`LT-PRO-10`
+explanations above for why parsing that is not viable). Revisit if a tender-security amount/percentage is ever ingested
+as a structured field, e.g. from a future PPA report revision or a parsed tender-document field.
 
-**LT-PRO-13** — Low predefined number of candidates: not implementable with currently ingested data. The concept
-needs a buyer's pre-announced maximum number of candidates it will invite to bid after prequalification (a
+**LT-PRO-13** — Low predefined number of candidates: not implementable with currently ingested data. The concept needs a
+buyer's pre-announced maximum number of candidates it will invite to bid after prequalification (a
 restricted/negotiated-procedure feature). The procedure-type field itself is populated
-(`viesiejiPirkimai."pirkimoBudas"`, e.g. "Ribotas konkursas"), so the gate is not the blocker — but no companion
-numeric field exists anywhere in the schema for a pre-announced invite cap. A search across `viesiejiPirkimai*`,
+(`viesiejiPirkimai."pirkimoBudas"`, e.g. "Ribotas konkursas"), so the gate is not the blocker — but no companion numeric
+field exists anywhere in the schema for a pre-announced invite cap. A search across `viesiejiPirkimai*`,
 `cvppViesiejiPirkimai`, `planuojamiPirkimai*`, `atn1*`, and `cvppDumpAtn1*` for `%kandidat%` (candidate),
 `%kviec%`/`%kviest%` (invite), and `%maksimal%`/`%minimal%` (max/min) finds no such column. The closest-named tables,
 `cvppDumpAtn1ContractedCandidates` and `cvppDumpAtn1RejectedCandidates`, are post-hoc per-candidate outcome records
 (name, price/quality ratio, rejection reason) captured after the procedure ends, not a pre-announced cap set at
 publication time. Revisit if a source recording the pre-announced maximum invited-candidate count is ever ingested.
 
-**LT-PRO-14** — Missing method for reducing candidate numbers: not implementable with currently ingested data, for
-the same root cause as `LT-PRO-13` — since no field records whether a buyer capped invited candidates at all, there
-is nothing to check "did they publish a reduction method" against. No column anywhere stores objective
+**LT-PRO-14** — Missing method for reducing candidate numbers: not implementable with currently ingested data, for the
+same root cause as `LT-PRO-13` — since no field records whether a buyer capped invited candidates at all, there is
+nothing to check "did they publish a reduction method" against. No column anywhere stores objective
 selection-method/criteria text for choosing among qualified candidates when a cap is exceeded either; the one
 plausible-looking free-text field, `atn1dalyviai."atrinktoPasirinkomoPriezastys"` ("reason candidate was selected"),
 lives in the post-award report, is per-candidate rather than a published pre-procedure method statement, and isn't
-reliably populated for restricted-procedure selection methodology. Revisit alongside `LT-PRO-13` if both a candidate
-cap and a published selection-method field are ever ingested.
+reliably populated for restricted-procedure selection methodology. Revisit alongside `LT-PRO-13` if both a candidate cap
+and a published selection-method field are ever ingested.
 
-**LT-TRA-01** — Planning documents unavailable: not implementable at `procurement` grain — blocked by the identical
-root cause as `LT-PRO-02`. The concept needs to know, for a specific procurement, whether its buyer's planning
-documents (procurement-plan entry, prior information notice) were published; that requires linking `v_pirkimas` to
-its `v_pirkimo_planas` entry, and [domain-model.md](domain-model.md) §5.2 states plainly that "no key exists" —
+**LT-TRA-01** — Planning documents unavailable: not implementable at `procurement` grain — blocked by the identical root
+cause as `LT-PRO-02`. The concept needs to know, for a specific procurement, whether its buyer's planning documents
+(procurement-plan entry, prior information notice) were published; that requires linking `v_pirkimas` to its
+`v_pirkimo_planas` entry, and [domain-model.md](domain-model.md) §5.2 states plainly that "no key exists" —
 "The plan register records no procurement number. Any link is a match over buyer, object and period, with its own
 confidence." `LT-PRO-02`'s explanation above documents the measured ambiguity of that same heuristic match (0 to 109
-candidate plan rows per procurement, no field to break the tie). A schema-wide search for a genuine FK-like field on
-the notice side — `%plan%`, `%PIN%`, `%ankstesn%` (prior), `%preliminar%` across `viesiejiPirkimai*`,
+candidate plan rows per procurement, no field to break the tie). A schema-wide search for a genuine FK-like field on the
+notice side — `%plan%`, `%PIN%`, `%ankstesn%` (prior), `%preliminar%` across `viesiejiPirkimai*`,
 `cvppViesiejiPirkimai`, `cvppSkelbimai`, `atn1*`, `cvppDumpAtn1*` — finds only false leads:
 `atn1ataskaitos."ankstesnioNumeris"` and `cvppDumpAtn1PreviousProcurements."procurementNo"` both record a *prior
-procurement procedure number* (re-tendering history), not a planning-document reference. No plan-entry field records
-a "was this published" flag independent of a link either — every `planuojamiPirkimai`/`cvppPlanuojamiPirkimai` row is
-by construction a scraped, already-published entry. A `buyer`-grain aggregate ("did this buyer publish any plan
-entries this period") is theoretically computable from `v_pirkimo_planas` alone without the link, but that changes
-the indicator's subject away from the `procurement` grain the canonical catalogue fixes for `LT-TRA-01` — a Phase 0a-
-scale scope change, not a fix available within this row's current definition. Revisit alongside `LT-PRO-02` if the
-Public Procurement Office ever publishes a key linking a plan entry to the procurement it became.
+procurement procedure number* (re-tendering history), not a planning-document reference. No plan-entry field records a
+"was this published" flag independent of a link either — every `planuojamiPirkimai`/`cvppPlanuojamiPirkimai` row is by
+construction a scraped, already-published entry. A `buyer`-grain aggregate ("did this buyer publish any plan entries
+this period") is theoretically computable from `v_pirkimo_planas` alone without the link, but that changes the
+indicator's subject away from the `procurement` grain the canonical catalogue fixes for `LT-TRA-01` — a Phase 0a- scale
+scope change, not a fix available within this row's current definition. Revisit alongside `LT-PRO-02` if the Public
+Procurement Office ever publishes a key linking a plan entry to the procurement it became.
 
 **LT-TRA-02** — Tender insufficiently advertised: not implementable with currently ingested data — the concept splits
 into two halves and both are unmeasurable here. The first half, "a procurement exists with no corresponding public
 notice," is structurally excluded from this data model: `v_pirkimas_v2`'s `cvpp` branch only produces a row *because*
 a call-for-tenders notice was found (`WHERE c."skelbimoTipas" = 'Skelbimas apie pirkimą'`), and the `cvpis` branch
 (`viesiejiPirkimai`) is itself CVP IS's scraped notice register — a procurement without a notice cannot appear as a
-subject at all, so that half would only ever produce a vacuous `not_triggered`. The second half, "published through
-an inadequate channel" (e.g. CVP IS only, never reaching TED/OJEU for an above-EU-threshold value), has no backing
-column anywhere: `v_skelbimas` (350,157 rows, `viesiejiPirkimaiSkelbimai` ∪ `cvppSkelbimai`,
+subject at all, so that half would only ever produce a vacuous `not_triggered`. The second half, "published through an
+inadequate channel" (e.g. CVP IS only, never reaching TED/OJEU for an above-EU-threshold value), has no backing column
+anywhere: `v_skelbimas` (350,157 rows, `viesiejiPirkimaiSkelbimai` ∪ `cvppSkelbimai`,
 [domain-model.md](domain-model.md) §1.2/§4.2) records notice *kind* (`skelbimoTipas`/`skelbimoRusis` — "Skelbimas apie
 pirkimą" / "Pataisos skelbimas" / etc.), never publication *channel*, and no table anywhere records a TED/OJEU
-cross-reference or an EU-threshold flag to compare against. `v_skelbimas` is also not currently read by the risk
-service at all (`modules/risk/procurementReader.ts` has no reference to it) and its link to `v_pirkimas` is a soft
-value-match on `pirkimoNumeris` — the domain model's own §3 notes no relationship here is an enforced foreign key,
-and unlike every other relationship in §5.2's coverage table, this one has no measured match rate. Revisit if a
-TED/OJEU publication cross-reference or an EU-threshold flag is ever ingested.
+cross-reference or an EU-threshold flag to compare against. `v_skelbimas` is also not currently read by the risk service
+at all (`modules/risk/procurementReader.ts` has no reference to it) and its link to `v_pirkimas` is a soft value-match
+on `pirkimoNumeris` — the domain model's own §3 notes no relationship here is an enforced foreign key, and unlike every
+other relationship in §5.2's coverage table, this one has no measured match rate. Revisit if a TED/OJEU publication
+cross-reference or an EU-threshold flag is ever ingested.
 
 **LT-TRA-03** — Key tender information/documents unavailable: not implementable — the one candidate signal exists but
 fails on measured data-quality grounds, not mere absence. Unlike `LT-PRO-09`/`LT-PRO-10`, this concept only needs
 document *existence* (are any files attached at all), which the file-metadata tables can in principle answer without
 `v_dokumentas`: `viesiejiPirkimaiFailai."pirkimoId"` joins cleanly to the `cvpis`-sourced branch of `v_pirkimas`
-(19.5% of the 264,415 subjects), and there only 128 of 51,540 procurements (0.25%) show zero attached files —
-plausibly a genuine signal on that branch alone. But the `cvpp`-sourced branch is 80.5% of `v_pirkimas`
+(19.5% of the 264,415 subjects), and there only 128 of 51,540 procurements (0.25%) show zero attached files — plausibly
+a genuine signal on that branch alone. But the `cvpp`-sourced branch is 80.5% of `v_pirkimas`
 (213,522 rows) and file existence there requires a two-hop join, `cvppFailai."pirkimoId"` →
 `cvppPirkimai."pirkimoId"` → `cvppPirkimai."pirkimoId"::text = cvppViesiejiPirkimai."pirkimoNumeris"` (the identity
 `v_pirkimas` actually uses for this branch, per `modules/mcp/analyst/views/v_pirkimas_v2.sql` line 30 —
-`cvppPirkimai."pirkimoNumeris"` itself is unusable, populated on only 12,236 of 217,786 rows). Measured directly
-against the live warehouse (2026-08): of the 213,522 `cvpp`-branch procurements, **111,553 (52.2%) have no matching
+`cvppPirkimai."pirkimoNumeris"` itself is unusable, populated on only 12,236 of 217,786 rows). Measured directly against
+the live warehouse (2026-08): of the 213,522 `cvpp`-branch procurements, **111,553 (52.2%) have no matching
 `cvppPirkimai` row at all** — `cvppPirkimai` is itself a partial detail-scrape covering roughly half of
 `cvppViesiejiPirkimai`'s notices, not a complete mirror of the notice register. For those 111K+ procurements, "zero
 files found" is indistinguishable from "our detail-scrape hasn't reached this procurement yet" — a scraper-coverage
 artifact, not a buyer-transparency failure. Building the formula on this data would make roughly half of `triggered`
-results on the majority source wrong for reasons that have nothing to do with what the buyer actually published,
-which Phase 1's coverage-quantification guidance treats as disqualifying rather than a caveat to word around: scoping
-the formula to the reliable `cvpis` minority alone would silently drop 80% of the subject population the canonical
-row is meant to cover, and flagging the `cvpp` majority as designed would make the indicator mostly measure our own
-ingestion backlog. Revisit if `cvppPirkimai`'s detail-scrape coverage of `cvppViesiejiPirkimai` improves materially
-(re-measure the match rate first), or if `v_dokumentas` ships with a reliable per-procurement document-existence
-signal across both sources.
+results on the majority source wrong for reasons that have nothing to do with what the buyer actually published, which
+Phase 1's coverage-quantification guidance treats as disqualifying rather than a caveat to word around: scoping the
+formula to the reliable `cvpis` minority alone would silently drop 80% of the subject population the canonical row is
+meant to cover, and flagging the `cvpp` majority as designed would make the indicator mostly measure our own ingestion
+backlog. Revisit if `cvppPirkimai`'s detail-scrape coverage of `cvppViesiejiPirkimai` improves materially (re-measure
+the match rate first), or if `v_dokumentas` ships with a reliable per-procurement document-existence signal across both
+sources.
 
 **LT-TRA-05** — Bidder questions unanswered: not implementable with currently ingested data. The concept needs the
 actual clarification-question thread for a procurement — which questions bidders submitted, when, and whether/when the
-buyer answered each one — but no warehouse table records individual questions or answers at all. A schema-wide search
-of `dbSchema/*.sql` for `%klausim%` (question), `%atsakym%` (answer), and `%paaiskin%`/`%paaiškin%` (explanation/
+buyer answered each one — but no warehouse table records individual questions or answers at all. A schema-wide search of
+`dbSchema/*.sql` for `%klausim%` (question), `%atsakym%` (answer), and `%paaiskin%`/`%paaiškin%` (explanation/
 clarification) finds exactly one table with a hit, `viesiejiPirkimaiKeys`, and its two matching columns —
 `"paaiskinimuTerminoPabaiga"` (end of the clarifications period) and `"prasymuPateiktiPaaiskinimusTerminoPabaiga"`
 (deadline for submitting a clarification request) — are both buyer-declared *deadlines* set at notice publication, the
@@ -504,10 +564,9 @@ same kind of process-design metadata already used elsewhere (e.g. the procuremen
 including the file-metadata tables (`viesiejiPirkimaiFailai`, `cvppFailai`) and the ATN-1 procedure report
 (`atn1ataskaitos`) — carries a question count, an answer count, a per-question timestamp, or even a boolean flag for
 "a question went unanswered". Building a proxy from document titles (e.g. matching `dokumentasPavadinimas` for
-"atsakymai į klausimus") would mean pattern-matching free-text filenames for an unbounded, un-auditable vocabulary,
-the same fragile-regex approach the `LT-OTH-01` and `LT-COM-16` explanations above already reject for the same
-underlying reason. Revisit if a source recording individual clarification questions and their answer status is ever
-ingested.
+"atsakymai į klausimus") would mean pattern-matching free-text filenames for an unbounded, un-auditable vocabulary, the
+same fragile-regex approach the `LT-OTH-01` and `LT-COM-16` explanations above already reject for the same underlying
+reason. Revisit if a source recording individual clarification questions and their answer status is ever ingested.
 
 ### 4.2 Contract Risk Decision Service (17)
 
