@@ -201,8 +201,8 @@ ad hoc; see the explanation below the relevant table. Blank — not yet triaged.
 | LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       | Accepted         |
 | LT-PRI-01 | Estimated value anomalous against market benchmark            | Pricing            | OCP-R016; OLAF-CN07; STT-I10                               | Cannot implement |
 | LT-PRI-03 | Winning price close to or above estimate                      | Pricing            | OCP-R031; OLAF-CN13; OECD-BR-28                            | Cannot implement |
-| LT-PRI-08 | Bid prices deviate from Benford's Law                         | Pricing            | OCP-R029; OT-I07                                           |                  |
-| LT-PRI-10 | Bid-price or discount movements inconsistent with competition | Pricing            | OECD-BR-20; OECD-BR-21; OECD-BR-22; OECD-BR-23; OECD-BR-29 |                  |
+| LT-PRI-08 | Bid prices deviate from Benford's Law                         | Pricing            | OCP-R029; OT-I07                                           | Cannot implement |
+| LT-PRI-10 | Bid-price or discount movements inconsistent with competition | Pricing            | OECD-BR-20; OECD-BR-21; OECD-BR-22; OECD-BR-23; OECD-BR-29 | Cannot implement |
 
 #### Subject `bid` — Bid / bidder participation (11)
 
@@ -404,6 +404,55 @@ populated) — even restricted to single-lot procurements, where the attribution
 was already examined and rejected there as a scope-narrowing proxy, not a reflection of the catalogue concept; the same
 reasoning applies unchanged here since the source data has not changed. Revisit if a source recording a lot-level
 pre-tender estimated value is ever ingested.
+
+**LT-PRI-08** — Bid prices deviate from Benford's Law: not implementable at `lot` grain — a statistical-power blocker,
+not a missing-column one. A Benford first-digit conformance test (chi-square or mean-absolute-deviation against the
+expected `log10(1+1/d)` distribution) needs a genuinely large set of numbers to be meaningful at all; Nigrini's
+standard guidance for this exact test (the same source both `OCP-R029` and `OT-I07` ultimately draw on) recommends a
+minimum of roughly 300 observations, and even loosely worded audit practice treats anything under a few dozen as too
+thin to distinguish real deviation from sampling noise. Querying `public.v_dalyviai` (the same `pasiulymoKaina`
+source `LT-COM-10`…`LT-COM-13` read at lot grain, 2026-08 measurement) for the number of usable priced bids
+(`pasiulymoKaina > 0`) per `(pirkimoNumeris, daliesNumeris)` lot shows that no lot anywhere in the warehouse comes within
+an order of magnitude of that floor: of 13,393 lots carrying any priced-bid row, the single largest lot has 51 priced
+bids, only 7 lots nationwide reach 30 or more, and 96.4% (12,918 of 13,393) have fewer than 10 — the same thin
+per-lot participation
+`LT-COM-01`/`LT-COM-02`/`LT-COM-20` already document for this data source. No design choice (a different digit
+position, a different goodness-of-fit statistic, a lower ad hoc observation floor) manufactures data that isn't
+there — the blocker is the sample size itself, not a threshold or window parameter, which is what would make this
+`Design Required` rather than `Cannot implement`. A large-enough sample does exist, but only by pooling many lots'
+prices together: grouping the same `pasiulymoKaina` rows by buyer (`pirkejoKodas`) instead, 9 buyers cross 300
+pooled priced bids and a further 92 sit at 30–99 — enough for the test to mean something — but that pools bids
+*across* a buyer's many lots into one set, which changes the primary evaluation subject from `lot` to `buyer`
+(the `supplier`/`buyer` company-grain subject type registered separately in [§2.2](#22-subject-register)), the
+same scope-expanding move the `LT-TRA-01` explanation above already declines as out of reach for a row whose
+canonical placement fixes a different grain. Revisit as a `buyer`-or-`supplier`-grain proposal, not a `lot`-grain
+fix, if a dedicated design pass re-scopes this row's subject.
+
+**LT-PRI-10** — Bid-price or discount movements inconsistent with competition: not implementable with currently
+ingested data. The concept (`OECD-BR-20` sudden/identical price increases, `OECD-BR-21`/`OECD-BR-22` discounts
+disappearing or falling below market norms, `OECD-BR-23` prices static despite market change, `OECD-BR-29` prices
+falling after a new entrant) needs a price value that is comparable across repeated observations of the same
+recurring purchase — either across successive rounds of one negotiation/e-auction, or across a buyer's repeat
+tenders for the same item over time — and neither comparison is possible with what's ingested.
+
+No round-level or auction-stage data exists at all: the warehouse has no table recording a bid's price at more than
+one point in time within a single procedure (`neskelbiamosDerybos` is a negotiated-procedure eligibility flag, not a
+bid-history table), so within-lot price movement can't be observed in the first place.
+
+Across time, the only per-bid price field is `pasiulymoKaina` (== `xlsxPPApasiulymuEile."kaina"`, the same source
+`LT-COM-10`…`LT-COM-13` already read at lot grain), and it is not a comparable single-currency total: 95.9% of priced
+rows (22,482 / 23,451, 2026-08 measurement) carry a `"kainosIsraiskaId"` reference into `xlsxPPAkainosIsraiskos`, and
+that lookup table's 359 distinct labels mix plain VAT-treatment annotations (`"Eur, su PVM"`), genuine per-unit rates
+(`"1 kg kaina Eur be PVM"`, `"Eur/km"`), evaluation-score points (`"100 balų"`), a catch-all `"Kita"`, and — for the
+large majority, 329 of 359 — a label that is itself just a bare number, i.e. the source spreadsheet re-states the
+price rather than describing its unit. Nothing on the row says which of these a given `kaina` value is, so there is
+no reliable way to tell a genuine lump-sum total from a per-kg or per-km rate or a points score before comparing it
+across lots or over time — the same undifferentiated-total problem `LT-PRI-02`'s line-item/unit-price gap already
+documents, here blocking a time-series comparison rather than a within-bid breakdown. Separately, no ingested source
+records a "discount" concept at all (a bid price relative to a list/catalogue/reference price) — zero columns in the
+warehouse match `nuolaid`/`discount` — so the `OECD-BR-21`/`OECD-BR-22` half of this row's concept has no candidate
+field to begin with, structurally, not just thinly covered. Revisit if either an auction/negotiation-round price
+history is ingested, or a unit-normalized/discount-relative price field becomes available.
 
 **LT-PRI-12** — Anomalous geographic delivery or transport pricing: not implementable with currently ingested data. No
 ingested source records a delivery location, distance, or transport-cost component for a bid — `pasiulymoKaina` is one
