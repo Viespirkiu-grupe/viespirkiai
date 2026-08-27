@@ -351,6 +351,29 @@ const classes = ['ds-navmenu', className].filter(Boolean).join(' ');
     transform: translateX(0);
   }
 
+  /* Prie dešinio krašto lygiuotam meniu („Apie") flyout atsiveria į kairę,
+     kad neišlįstų už ekrano. */
+  .ds-navmenu__viewport[data-align="end"] .ds-navmenu__flyout {
+    left: auto;
+    right: calc(100% + 6px);
+    transform: translateX(6px);
+  }
+
+  .ds-navmenu__viewport[data-align="end"] .ds-navmenu__child--parent:hover > .ds-navmenu__flyout,
+  .ds-navmenu__viewport[data-align="end"] .ds-navmenu__child--parent:focus-within > .ds-navmenu__flyout {
+    transform: translateX(0);
+  }
+
+  /* Rodyklė taip pat rodo į kairę. */
+  .ds-navmenu__viewport[data-align="end"] .ds-navmenu__caret {
+    transform: rotate(180deg);
+  }
+
+  .ds-navmenu__viewport[data-align="end"] .ds-navmenu__child--parent:hover > .ds-navmenu__link .ds-navmenu__caret,
+  .ds-navmenu__viewport[data-align="end"] .ds-navmenu__child--parent:focus-within > .ds-navmenu__link .ds-navmenu__caret {
+    transform: rotate(180deg) translateX(2px);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .ds-navmenu__flyout,
     .ds-navmenu__caret {
@@ -420,6 +443,10 @@ const classes = ['ds-navmenu', className].filter(Boolean).join(' ');
         : itemRect.left - navRect.left;
 
       const wasOpen = menu.hasAttribute('data-nav-open');
+
+      // Dešinėje lygiuotam meniu sub-dropdown'ai atsiveria į kairę (žr. CSS).
+      if (src.classList.contains('ds-navmenu__content--end')) viewport.dataset.align = 'end';
+      else delete viewport.dataset.align;
 
       if (!wasOpen) {
         // Šaltas atidarymas – pozicionuojam be perėjimo (neslysta iš kairės),
