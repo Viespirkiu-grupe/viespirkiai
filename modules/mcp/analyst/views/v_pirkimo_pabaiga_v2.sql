@@ -27,12 +27,12 @@
 -- contract, or one of several unsuccessful/terminated phrasings) — an
 -- indicator matches against a short list of known labels, the same
 -- convention v_dalyviai_v2's "atmetimoStatusas" already uses, never a
--- free-text pattern. "preliminariSutartis" (LT-PRI-06) is a procurement-level
--- fact on the report itself, not per-lot — carried on every row of this view
--- so the reader's GROUP BY pirkimoNumeris can bool_or() it across every lot
--- and every report revision. "sprendimoPriezastys" (LT-TRA-06) is the
--- report's free-text statement of why the lot's procedure ended the way it
--- did.
+-- free-text pattern. "preliminariSutartis" (LT-PRI-06) and "pretenzijaPateikta"
+-- (LT-TRA-07) are both procurement-level facts on the report itself, not
+-- per-lot — carried on every row of this view so the reader's GROUP BY
+-- pirkimoNumeris can bool_or() each across every lot and every report
+-- revision. "sprendimoPriezastys" (LT-TRA-06) is the report's free-text
+-- statement of why the lot's procedure ended the way it did.
 
 CREATE OR REPLACE VIEW v_pirkimo_pabaiga_v2 AS
 SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
@@ -41,7 +41,8 @@ SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
        pb."proceduruPabaiga"                 AS "proceduruPabaiga",
        pb."sprendimoPriemimoData"            AS "sprendimoPriemimoData",
        pb."sprendimoPriezastys"              AS "sprendimoPriezastys",
-       a."preliminariSutartis"               AS "preliminariSutartis"
+       a."preliminariSutartis"               AS "preliminariSutartis",
+       a."pretenzijaPateikta"                AS "pretenzijaPateikta"
 FROM "xlsxPPAataskaitos" a
          JOIN "xlsxPPAproceduruPabaiga" pb ON pb."ataskaitaId" = a.id
 WHERE pb."proceduruPabaiga" IS NOT NULL

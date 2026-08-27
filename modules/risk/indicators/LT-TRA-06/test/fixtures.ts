@@ -25,6 +25,7 @@ export const oneLotDocumented: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // One lot, decision reason left blank — the plain triggered case. Applies
@@ -38,6 +39,7 @@ export const oneLotUndocumented: ProcurementProcedureOutcome = {
     lots: [{ daliesNumeris: "0", proceduruPabaiga: UNSUCCESSFUL, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: null }],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // A concluded (successful) outcome with no stated reason — proves the
@@ -47,6 +49,7 @@ export const oneLotConcludedButUndocumented: ProcurementProcedureOutcome = {
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: null }],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // Blank reason text ("" or whitespace-only) counts the same as a NULL
@@ -56,6 +59,7 @@ export const oneLotBlankReason: ProcurementProcedureOutcome = {
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: REPORTED_AT, sprendimoPriezastys: "   " }],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // Two lots, both documented — not_triggered.
@@ -72,6 +76,7 @@ export const twoLotsBothDocumented: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // Two lots: one documented, one not — triggered. Unlike LT-OTH-05's
@@ -85,4 +90,5 @@ export const twoLotsOneUndocumented: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };

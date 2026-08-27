@@ -42,13 +42,22 @@ export async function insertAtaskaita(params: {
     sukurtaAt: string;
     /** xlsxPPAataskaitos.preliminariSutartis — LT-PRI-06 reads this. Defaults to null (not reported). */
     preliminariSutartis?: boolean | null;
+    /** xlsxPPAataskaitos.pretenzijaPateikta — LT-TRA-07 reads this. Defaults to null (not reported). */
+    pretenzijaPateikta?: boolean | null;
 }): Promise<number> {
     const pirkimoBudasId = await lookupOrInsertPirkimoBudas(params.pirkimoBudas);
     const { rows } = await riskDb.query<{ id: number }>(
-        `INSERT INTO public."xlsxPPAataskaitos" ("pirkimoNumeris", "pirkimoBudasId", "daliuSkaicius", "sukurtaAt", "preliminariSutartis")
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO public."xlsxPPAataskaitos" ("pirkimoNumeris", "pirkimoBudasId", "daliuSkaicius", "sukurtaAt", "preliminariSutartis", "pretenzijaPateikta")
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [params.pirkimoNumeris, pirkimoBudasId, params.daliuSkaicius, params.sukurtaAt, params.preliminariSutartis ?? null],
+        [
+            params.pirkimoNumeris,
+            pirkimoBudasId,
+            params.daliuSkaicius,
+            params.sukurtaAt,
+            params.preliminariSutartis ?? null,
+            params.pretenzijaPateikta ?? null,
+        ],
     );
     return rows[0].id;
 }

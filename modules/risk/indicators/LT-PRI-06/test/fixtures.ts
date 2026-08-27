@@ -31,5 +31,6 @@ export function procedureOutcome(isFramework: boolean | null): ProcurementProced
         lots: [{ daliesNumeris: "0", proceduruPabaiga: "Sudarius pirkimo sutartį", sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
         reportedAt: "2026-01-01",
         isFramework,
+        complaintFiled: null,
     };
 }

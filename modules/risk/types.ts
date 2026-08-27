@@ -205,11 +205,15 @@ export type ProcedureOutcomeLot = Readonly<{
 // fact, not per-lot, aggregated across every report revision filed under
 // this pirkimoNumeris with bool_or (true if any revision said so, false if
 // every revision said no, null if no revision ever populated the field).
+// complaintFiled is xlsxPPAataskaitos.pretenzijaPateikta (LT-TRA-07) — the
+// same kind of procurement-level, self-reported, bool_or-aggregated fact as
+// isFramework.
 export type ProcurementProcedureOutcome = Readonly<{
     lotOutcomes: readonly string[];
     lots: readonly ProcedureOutcomeLot[];
     reportedAt: string | null;
     isFramework: boolean | null;
+    complaintFiled: boolean | null;
 }>;
 
 // Distinct contract signature ("sudarymoData") dates from

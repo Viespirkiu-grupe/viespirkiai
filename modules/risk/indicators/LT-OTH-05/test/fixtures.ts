@@ -28,6 +28,7 @@ export const oneLotConcluded: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // One lot, no bids received within the deadline — the plain triggered case.
@@ -43,6 +44,7 @@ export const oneLotNoBids: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // One lot, all submitted tenders rejected — another triggered case, distinct
@@ -59,6 +61,7 @@ export const oneLotAllRejected: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // Two lots: one concluded, one not — not_triggered, since at least one lot
@@ -81,6 +84,7 @@ export const mixedLotsOneConcluded: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // Two lots, both unsuccessful, different reasons — still triggered.
@@ -100,6 +104,7 @@ export const twoLotsBothUnsuccessful: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };
 
 // The near-duplicate "concluded" phrasing real data also carries
@@ -116,4 +121,5 @@ export const oneLotConcludedVariant: ProcurementProcedureOutcome = {
     ],
     reportedAt: REPORTED_AT,
     isFramework: null,
+    complaintFiled: null,
 };

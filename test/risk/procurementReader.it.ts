@@ -423,6 +423,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
             ],
             reportedAt: "2026-05-10",
             isFramework: null,
+            complaintFiled: null,
         });
     });
 
@@ -643,6 +644,93 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
 
         const [procurement] = await loadAll(reader(["970009"]));
         expect(procurement.procedureOutcome!.isFramework).toBeNull();
+    });
+
+    it("carries complaintFiled: true (LT-TRA-07) from xlsxPPAataskaitos.pretenzijaPateikta", async () => {
+        await insertViesiejiPirkimai(970011);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970011",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            pretenzijaPateikta: true,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970011"]));
+        expect(procurement.procedureOutcome!.complaintFiled).toBe(true);
+    });
+
+    it("carries complaintFiled: false when the report positively says no complaint was filed", async () => {
+        await insertViesiejiPirkimai(970012);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970012",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            pretenzijaPateikta: false,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970012"]));
+        expect(procurement.procedureOutcome!.complaintFiled).toBe(false);
+    });
+
+    it("complaintFiled is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
+        await insertViesiejiPirkimai(970013);
+        const falseAtaskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970013",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            pretenzijaPateikta: false,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId: falseAtaskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+        const trueAtaskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970013",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-06-01T09:30:00Z",
+            pretenzijaPateikta: true,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId: trueAtaskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970013"]));
+        expect(procurement.procedureOutcome!.complaintFiled).toBe(true);
+    });
+
+    it("complaintFiled is null when no report revision ever populated the field", async () => {
+        await insertViesiejiPirkimai(970014);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970014",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970014"]));
+        expect(procurement.procedureOutcome!.complaintFiled).toBeNull();
     });
 });
 

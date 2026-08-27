@@ -170,9 +170,9 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 | LT-TRA-01 | Planning documents unavailable                        | Transparency       | OCP-R001; VPT-I09; OECD-GOV-01                                                                                                                                 | Cannot implement |
 | LT-TRA-02 | Tender insufficiently advertised                      | Transparency       | OCP-R004; OLAF-CN30; OT-I02                                                                                                                                    | Cannot implement |
 | LT-TRA-03 | Key tender information/documents unavailable          | Transparency       | OCP-R005; STT-I15                                                                                                                                              | Cannot implement |
-| LT-TRA-05 | Bidder questions unanswered                           | Transparency       | OCP-R039                                                                                                                                                       |                  |
+| LT-TRA-05 | Bidder questions unanswered                           | Transparency       | OCP-R039                                                                                                                                                       | Cannot implement |
 | LT-TRA-06 | Procurement decision or reason not documented         | Transparency       | STT-I15; OLAF-CA06                                                                                                                                             | Accepted         |
-| LT-TRA-07 | Complaint received                                    | Transparency       | OCP-R020; VPT-I13; OECD-GOV-11                                                                                                                                 |                  |
+| LT-TRA-07 | Complaint received                                    | Transparency       | OCP-R020; VPT-I13; OECD-GOV-11                                                                                                                                 | Accepted         |
 | LT-TRA-08 | Procurement challenged in court                       | Transparency       | VPT-I14                                                                                                                                                        |                  |
 | LT-TRA-09 | Procurement not conducted electronically              | Transparency       | VPT-I06; OECD-GOV-07                                                                                                                                           |                  |
 
@@ -491,6 +491,23 @@ row is meant to cover, and flagging the `cvpp` majority as designed would make t
 ingestion backlog. Revisit if `cvppPirkimai`'s detail-scrape coverage of `cvppViesiejiPirkimai` improves materially
 (re-measure the match rate first), or if `v_dokumentas` ships with a reliable per-procurement document-existence
 signal across both sources.
+
+**LT-TRA-05** — Bidder questions unanswered: not implementable with currently ingested data. The concept needs the
+actual clarification-question thread for a procurement — which questions bidders submitted, when, and whether/when the
+buyer answered each one — but no warehouse table records individual questions or answers at all. A schema-wide search
+of `dbSchema/*.sql` for `%klausim%` (question), `%atsakym%` (answer), and `%paaiskin%`/`%paaiškin%` (explanation/
+clarification) finds exactly one table with a hit, `viesiejiPirkimaiKeys`, and its two matching columns —
+`"paaiskinimuTerminoPabaiga"` (end of the clarifications period) and `"prasymuPateiktiPaaiskinimusTerminoPabaiga"`
+(deadline for submitting a clarification request) — are both buyer-declared *deadlines* set at notice publication, the
+same kind of process-design metadata already used elsewhere (e.g. the procurement timeline in
+`src/lib/viesiejiPirkimai.ts`), not records of whether a question was actually asked or answered. No table anywhere —
+including the file-metadata tables (`viesiejiPirkimaiFailai`, `cvppFailai`) and the ATN-1 procedure report
+(`atn1ataskaitos`) — carries a question count, an answer count, a per-question timestamp, or even a boolean flag for
+"a question went unanswered". Building a proxy from document titles (e.g. matching `dokumentasPavadinimas` for
+"atsakymai į klausimus") would mean pattern-matching free-text filenames for an unbounded, un-auditable vocabulary,
+the same fragile-regex approach the `LT-OTH-01` and `LT-COM-16` explanations above already reject for the same
+underlying reason. Revisit if a source recording individual clarification questions and their answer status is ever
+ingested.
 
 ### 4.2 Contract Risk Decision Service (17)
 
