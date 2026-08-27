@@ -195,7 +195,7 @@ ad hoc; see the explanation below the relevant table. Blank — not yet triaged.
 | LT-COM-01 | Single valid bid                                              | Competition        | OCP-R018; OLAF-CA02; OT-I01; STT-I03; VPT-I01              | Accepted         |
 | LT-COM-02 | Low number of bidders                                         | Competition        | OCP-R019; OLAF-CN01; OLAF-CN02; OLAF-CA02; VPT-I12         | Accepted         |
 | LT-COM-07 | Missing expected bidder                                       | Competition        | OCP-R027; OECD-BR-03                                       | Design Required  |
-| LT-COM-10 | Identical bid prices                                          | Competition        | OCP-R028; OECD-BR-24                                       |                  |
+| LT-COM-10 | Identical bid prices                                          | Competition        | OCP-R028; OECD-BR-24                                       | Accepted         |
 | LT-COM-11 | Fixed-multiple bid prices                                     | Competition        | OCP-R023; OECD-BR-25                                       |                  |
 | LT-COM-12 | Suspiciously close bid prices                                 | Competition        | OCP-R024; OECD-BR-26                                       |                  |
 | LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       |                  |
