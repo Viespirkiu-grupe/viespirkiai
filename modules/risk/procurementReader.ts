@@ -143,9 +143,10 @@ const LOT_BIDS_SQL = `
 // the JOIN in v_pirkimo_pabaiga_v2 guarantees at least one row per group.
 //
 // "isFramework" (LT-PRI-06) is xlsxPPAataskaitos.preliminariSutartis,
-// "complaintFiled" (LT-TRA-07) is xlsxPPAataskaitos.pretenzijaPateikta, and
-// "courtChallenged" (LT-TRA-08) is xlsxPPAataskaitos.ieskinysTeismui, each
-// bool_or'd across every lot and every report revision under this
+// "complaintFiled" (LT-TRA-07) is xlsxPPAataskaitos.pretenzijaPateikta,
+// "courtChallenged" (LT-TRA-08) is xlsxPPAataskaitos.ieskinysTeismui, and
+// "electronicProcurement" (LT-TRA-09) is xlsxPPAataskaitos.elektroninisPirkimas,
+// each bool_or'd across every lot and every report revision under this
 // pirkimoNumeris: true if any revision ever said so, false if every revision
 // said no, null if no revision ever populated the field (bool_or ignores
 // NULL inputs, matching that semantics exactly).
@@ -162,7 +163,8 @@ const PROCEDURE_OUTCOME_SQL = `
            to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt",
            bool_or(po."preliminariSutartis")                                               AS "isFramework",
            bool_or(po."pretenzijaPateikta")                                                AS "complaintFiled",
-           bool_or(po."ieskinysTeismui")                                                   AS "courtChallenged"
+           bool_or(po."ieskinysTeismui")                                                   AS "courtChallenged",
+           bool_or(po."elektroninisPirkimas")                                              AS "electronicProcurement"
     FROM v_pirkimo_pabaiga_v2 po
     WHERE po."ataskaitosData" <= $1::timestamptz
       AND ($2::text[] IS NULL OR po."pirkimoNumeris" = ANY ($2::text[]))
@@ -354,6 +356,7 @@ export class ProcurementReader {
                     isFramework: row.isFramework,
                     complaintFiled: row.complaintFiled,
                     courtChallenged: row.courtChallenged,
+                    electronicProcurement: row.electronicProcurement,
                 },
             ]),
         );

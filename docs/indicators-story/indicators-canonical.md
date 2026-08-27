@@ -174,7 +174,7 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 | LT-TRA-06 | Procurement decision or reason not documented         | Transparency       | STT-I15; OLAF-CA06                                                                                                                                             | Accepted         |
 | LT-TRA-07 | Complaint received                                    | Transparency       | OCP-R020; VPT-I13; OECD-GOV-11                                                                                                                                 | Accepted         |
 | LT-TRA-08 | Procurement challenged in court                       | Transparency       | VPT-I14                                                                                                                                                        | Accepted         |
-| LT-TRA-09 | Procurement not conducted electronically              | Transparency       | VPT-I06; OECD-GOV-07                                                                                                                                           |                  |
+| LT-TRA-09 | Procurement not conducted electronically              | Transparency       | VPT-I06; OECD-GOV-07                                                                                                                                           | Accepted         |
 
 #### Subject `lot` — Lot (17)
 

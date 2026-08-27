@@ -33,5 +33,6 @@ export function procedureOutcome(isFramework: boolean | null): ProcurementProced
         isFramework,
         complaintFiled: null,
         courtChallenged: null,
+        electronicProcurement: null,
     };
 }

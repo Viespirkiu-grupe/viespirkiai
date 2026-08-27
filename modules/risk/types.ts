@@ -209,7 +209,10 @@ export type ProcedureOutcomeLot = Readonly<{
 // same kind of procurement-level, self-reported, bool_or-aggregated fact as
 // isFramework. courtChallenged is xlsxPPAataskaitos.ieskinysTeismui
 // (LT-TRA-08) — the report's sibling field recording a lawsuit filed in
-// court, aggregated the same way.
+// court, aggregated the same way. electronicProcurement is
+// xlsxPPAataskaitos.elektroninisPirkimas (LT-TRA-09) — the report's
+// self-reported flag for whether the procedure was conducted through CVP IS
+// electronic means, aggregated the same bool_or way.
 export type ProcurementProcedureOutcome = Readonly<{
     lotOutcomes: readonly string[];
     lots: readonly ProcedureOutcomeLot[];
@@ -217,6 +220,7 @@ export type ProcurementProcedureOutcome = Readonly<{
     isFramework: boolean | null;
     complaintFiled: boolean | null;
     courtChallenged: boolean | null;
+    electronicProcurement: boolean | null;
 }>;
 
 // Distinct contract signature ("sudarymoData") dates from

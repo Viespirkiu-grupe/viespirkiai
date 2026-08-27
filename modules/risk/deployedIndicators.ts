@@ -15,6 +15,7 @@ import { LtPro08Decision } from "./indicators/LT-PRO-08/decision.ts";
 import { LtTra06Decision } from "./indicators/LT-TRA-06/decision.ts";
 import { LtTra07Decision } from "./indicators/LT-TRA-07/decision.ts";
 import { LtTra08Decision } from "./indicators/LT-TRA-08/decision.ts";
+import { LtTra09Decision } from "./indicators/LT-TRA-09/decision.ts";
 
 // See docs/indicators-story/risk-service-architecture-v2.md §3.5.
 const deployedIndicatorClasses = [
@@ -33,6 +34,7 @@ const deployedIndicatorClasses = [
     LtTra06Decision,
     LtTra07Decision,
     LtTra08Decision,
+    LtTra09Decision,
 ] as const satisfies readonly IndicatorClass[];
 
 export const riskIndicatorRegistry = new RiskIndicatorRegistry(deployedIndicatorClasses);

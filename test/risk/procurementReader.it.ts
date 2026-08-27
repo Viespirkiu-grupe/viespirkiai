@@ -425,6 +425,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
             isFramework: null,
             complaintFiled: null,
             courtChallenged: null,
+            electronicProcurement: null,
         });
     });
 
@@ -819,6 +820,93 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
 
         const [procurement] = await loadAll(reader(["970018"]));
         expect(procurement.procedureOutcome!.courtChallenged).toBeNull();
+    });
+
+    it("carries electronicProcurement: true (LT-TRA-09) from xlsxPPAataskaitos.elektroninisPirkimas", async () => {
+        await insertViesiejiPirkimai(970019);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970019",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            elektroninisPirkimas: true,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970019"]));
+        expect(procurement.procedureOutcome!.electronicProcurement).toBe(true);
+    });
+
+    it("carries electronicProcurement: false when the report positively says the procedure was not electronic", async () => {
+        await insertViesiejiPirkimai(970020);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970020",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            elektroninisPirkimas: false,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970020"]));
+        expect(procurement.procedureOutcome!.electronicProcurement).toBe(false);
+    });
+
+    it("electronicProcurement is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
+        await insertViesiejiPirkimai(970021);
+        const falseAtaskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970021",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            elektroninisPirkimas: false,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId: falseAtaskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+        const trueAtaskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970021",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-06-01T09:30:00Z",
+            elektroninisPirkimas: true,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId: trueAtaskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970021"]));
+        expect(procurement.procedureOutcome!.electronicProcurement).toBe(true);
+    });
+
+    it("electronicProcurement is null when no report revision ever populated the field", async () => {
+        await insertViesiejiPirkimai(970022);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970022",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970022"]));
+        expect(procurement.procedureOutcome!.electronicProcurement).toBeNull();
     });
 });
 

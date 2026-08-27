@@ -22,6 +22,7 @@ export const oneLotOrdinaryPeriod: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };
 
 // One concluded lot, decided the same day as the deadline — anomalously
@@ -33,6 +34,7 @@ export const oneLotDecidedSameDay: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };
 
 // One concluded lot, decided before the deadline — an even more extreme
@@ -46,6 +48,7 @@ export const oneLotDecidedBeforeDeadline: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };
 
 // One concluded lot, decided exactly at the boundary — 3 days is not
@@ -57,6 +60,7 @@ export const oneLotAtMinimumBoundary: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };
 
 // One concluded lot, decided 121 days after the deadline — anomalously long
@@ -68,6 +72,7 @@ export const oneLotDecidedLate: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };
 
 // One concluded lot, decided exactly at the boundary — 120 days is not
@@ -79,6 +84,7 @@ export const oneLotAtMaximumBoundary: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };
 
 // Two lots: one ordinary, one anomalously long — triggers, since only one
@@ -94,6 +100,7 @@ export const mixedLotsOneAnomalous: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };
 
 // One lot terminated before the deadline (a common, benign pattern — the
@@ -107,6 +114,7 @@ export const onlyTerminatedBeforeDeadline: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };
 
 // One concluded lot, but its decision date was never recorded — still
@@ -118,4 +126,5 @@ export const oneLotConcludedNoDate: ProcurementProcedureOutcome = {
     isFramework: null,
     complaintFiled: null,
     courtChallenged: null,
+    electronicProcurement: null,
 };

@@ -46,11 +46,13 @@ export async function insertAtaskaita(params: {
     pretenzijaPateikta?: boolean | null;
     /** xlsxPPAataskaitos.ieskinysTeismui — LT-TRA-08 reads this. Defaults to null (not reported). */
     ieskinysTeismui?: boolean | null;
+    /** xlsxPPAataskaitos.elektroninisPirkimas — LT-TRA-09 reads this. Defaults to null (not reported). */
+    elektroninisPirkimas?: boolean | null;
 }): Promise<number> {
     const pirkimoBudasId = await lookupOrInsertPirkimoBudas(params.pirkimoBudas);
     const { rows } = await riskDb.query<{ id: number }>(
-        `INSERT INTO public."xlsxPPAataskaitos" ("pirkimoNumeris", "pirkimoBudasId", "daliuSkaicius", "sukurtaAt", "preliminariSutartis", "pretenzijaPateikta", "ieskinysTeismui")
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO public."xlsxPPAataskaitos" ("pirkimoNumeris", "pirkimoBudasId", "daliuSkaicius", "sukurtaAt", "preliminariSutartis", "pretenzijaPateikta", "ieskinysTeismui", "elektroninisPirkimas")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
         [
             params.pirkimoNumeris,
@@ -60,6 +62,7 @@ export async function insertAtaskaita(params: {
             params.preliminariSutartis ?? null,
             params.pretenzijaPateikta ?? null,
             params.ieskinysTeismui ?? null,
+            params.elektroninisPirkimas ?? null,
         ],
     );
     return rows[0].id;

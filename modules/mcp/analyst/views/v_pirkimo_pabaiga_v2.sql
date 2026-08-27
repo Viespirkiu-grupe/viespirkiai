@@ -35,7 +35,10 @@
 -- statement of why the lot's procedure ended the way it did.
 -- "ieskinysTeismui" (LT-TRA-08) is the report's sibling field to
 -- "pretenzijaPateikta", recording whether a lawsuit was filed in court —
--- aggregated the same procurement-level way.
+-- aggregated the same procurement-level way. "elektroninisPirkimas"
+-- (LT-TRA-09) is the report's self-reported flag for whether the procedure
+-- was conducted electronically through CVP IS — also procurement-level, also
+-- aggregated the same bool_or way.
 
 CREATE OR REPLACE VIEW v_pirkimo_pabaiga_v2 AS
 SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
@@ -46,7 +49,8 @@ SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
        pb."sprendimoPriezastys"              AS "sprendimoPriezastys",
        a."preliminariSutartis"               AS "preliminariSutartis",
        a."pretenzijaPateikta"                AS "pretenzijaPateikta",
-       a."ieskinysTeismui"                   AS "ieskinysTeismui"
+       a."ieskinysTeismui"                   AS "ieskinysTeismui",
+       a."elektroninisPirkimas"              AS "elektroninisPirkimas"
 FROM "xlsxPPAataskaitos" a
          JOIN "xlsxPPAproceduruPabaiga" pb ON pb."ataskaitaId" = a.id
 WHERE pb."proceduruPabaiga" IS NOT NULL

@@ -13,5 +13,6 @@ export function procedureOutcome(courtChallenged: boolean | null): ProcurementPr
         isFramework: null,
         complaintFiled: null,
         courtChallenged,
+        electronicProcurement: null,
     };
 }
