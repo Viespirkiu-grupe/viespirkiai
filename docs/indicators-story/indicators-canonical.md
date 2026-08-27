@@ -178,25 +178,25 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 
 #### Subject `lot` — Lot (17)
 
-| Code      | Canonical indicator                                           | Canonical category | Reference indicators                                       |
-|-----------|---------------------------------------------------------------|--------------------|------------------------------------------------------------|
-| LT-AWD-01 | All bids except winner disqualified                           | Award              | OCP-R035; OT-I11                                           |
-| LT-AWD-02 | Lowest bid disqualified                                       | Award              | OCP-R036                                                   |
-| LT-AWD-03 | Poorly supported disqualification                             | Award              | OCP-R037; STT-I14                                          |
-| LT-AWD-04 | Excessive share of disqualified bids                          | Award              | OCP-R038                                                   |
-| LT-AWD-07 | Evaluation criteria excessively discretionary                 | Award              | OCP-R021; STT-I13                                          |
-| LT-AWD-08 | Award criteria or scoring method incomplete                   | Award              | OLAF-CN26; OLAF-CN27; OLAF-CN28; OT-I10                    |
-| LT-COM-01 | Single valid bid                                              | Competition        | OCP-R018; OLAF-CA02; OT-I01; STT-I03; VPT-I01              |
-| LT-COM-02 | Low number of bidders                                         | Competition        | OCP-R019; OLAF-CN01; OLAF-CN02; OLAF-CA02; VPT-I12         |
-| LT-COM-07 | Missing expected bidder                                       | Competition        | OCP-R027; OECD-BR-03                                       |
-| LT-COM-10 | Identical bid prices                                          | Competition        | OCP-R028; OECD-BR-24                                       |
-| LT-COM-11 | Fixed-multiple bid prices                                     | Competition        | OCP-R023; OECD-BR-25                                       |
-| LT-COM-12 | Suspiciously close bid prices                                 | Competition        | OCP-R024; OECD-BR-26                                       |
-| LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       |
-| LT-PRI-01 | Estimated value anomalous against market benchmark            | Pricing            | OCP-R016; OLAF-CN07; STT-I10                               |
-| LT-PRI-03 | Winning price close to or above estimate                      | Pricing            | OCP-R031; OLAF-CN13; OECD-BR-28                            |
-| LT-PRI-08 | Bid prices deviate from Benford's Law                         | Pricing            | OCP-R029; OT-I07                                           |
-| LT-PRI-10 | Bid-price or discount movements inconsistent with competition | Pricing            | OECD-BR-20; OECD-BR-21; OECD-BR-22; OECD-BR-23; OECD-BR-29 |
+| Code      | Canonical indicator                                           | Canonical category | Reference indicators                                       | Note      |
+|-----------|---------------------------------------------------------------|--------------------|------------------------------------------------------------|-----------|
+| LT-AWD-01 | All bids except winner disqualified                           | Award              | OCP-R035; OT-I11                                           | Accepted |
+| LT-AWD-02 | Lowest bid disqualified                                       | Award              | OCP-R036                                                   |          |
+| LT-AWD-03 | Poorly supported disqualification                             | Award              | OCP-R037; STT-I14                                          |          |
+| LT-AWD-04 | Excessive share of disqualified bids                          | Award              | OCP-R038                                                   |          |
+| LT-AWD-07 | Evaluation criteria excessively discretionary                 | Award              | OCP-R021; STT-I13                                          |          |
+| LT-AWD-08 | Award criteria or scoring method incomplete                   | Award              | OLAF-CN26; OLAF-CN27; OLAF-CN28; OT-I10                    |          |
+| LT-COM-01 | Single valid bid                                              | Competition        | OCP-R018; OLAF-CA02; OT-I01; STT-I03; VPT-I01              | Accepted |
+| LT-COM-02 | Low number of bidders                                         | Competition        | OCP-R019; OLAF-CN01; OLAF-CN02; OLAF-CA02; VPT-I12         | Accepted |
+| LT-COM-07 | Missing expected bidder                                       | Competition        | OCP-R027; OECD-BR-03                                       |          |
+| LT-COM-10 | Identical bid prices                                          | Competition        | OCP-R028; OECD-BR-24                                       |          |
+| LT-COM-11 | Fixed-multiple bid prices                                     | Competition        | OCP-R023; OECD-BR-25                                       |          |
+| LT-COM-12 | Suspiciously close bid prices                                 | Competition        | OCP-R024; OECD-BR-26                                       |          |
+| LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       |          |
+| LT-PRI-01 | Estimated value anomalous against market benchmark            | Pricing            | OCP-R016; OLAF-CN07; STT-I10                               |          |
+| LT-PRI-03 | Winning price close to or above estimate                      | Pricing            | OCP-R031; OLAF-CN13; OECD-BR-28                            |          |
+| LT-PRI-08 | Bid prices deviate from Benford's Law                         | Pricing            | OCP-R029; OT-I07                                           |          |
+| LT-PRI-10 | Bid-price or discount movements inconsistent with competition | Pricing            | OECD-BR-20; OECD-BR-21; OECD-BR-22; OECD-BR-23; OECD-BR-29 |          |
 
 #### Subject `bid` — Bid / bidder participation (11)
 
