@@ -198,7 +198,7 @@ ad hoc; see the explanation below the relevant table. Blank — not yet triaged.
 | LT-COM-10 | Identical bid prices                                          | Competition        | OCP-R028; OECD-BR-24                                       | Accepted         |
 | LT-COM-11 | Fixed-multiple bid prices                                     | Competition        | OCP-R023; OECD-BR-25                                       | Accepted         |
 | LT-COM-12 | Suspiciously close bid prices                                 | Competition        | OCP-R024; OECD-BR-26                                       | Accepted         |
-| LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       |                  |
+| LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       | Accepted         |
 | LT-PRI-01 | Estimated value anomalous against market benchmark            | Pricing            | OCP-R016; OLAF-CN07; STT-I10                               |                  |
 | LT-PRI-03 | Winning price close to or above estimate                      | Pricing            | OCP-R031; OLAF-CN13; OECD-BR-28                            |                  |
 | LT-PRI-08 | Bid prices deviate from Benford's Law                         | Pricing            | OCP-R029; OT-I07                                           |                  |

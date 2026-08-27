@@ -10,6 +10,7 @@ import { LtCom03Decision } from "./indicators/LT-COM-03/decision.ts";
 import { LtCom10Decision } from "./indicators/LT-COM-10/decision.ts";
 import { LtCom11Decision } from "./indicators/LT-COM-11/decision.ts";
 import { LtCom12Decision } from "./indicators/LT-COM-12/decision.ts";
+import { LtCom13Decision } from "./indicators/LT-COM-13/decision.ts";
 import { LtCom20Decision } from "./indicators/LT-COM-20/decision.ts";
 import { LtOth03Decision } from "./indicators/LT-OTH-03/decision.ts";
 import { LtOth04Decision } from "./indicators/LT-OTH-04/decision.ts";
@@ -36,6 +37,7 @@ const deployedIndicatorClasses = [
     LtCom10Decision,
     LtCom11Decision,
     LtCom12Decision,
+    LtCom13Decision,
     LtCom20Decision,
     LtOth03Decision,
     LtOth04Decision,
