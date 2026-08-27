@@ -41,6 +41,7 @@
         "quickwit:top-pdf-metadata": "node quickwit/topPdfMetadata.js",
         "quickwit:juridiniai": "node modules/juridiniai/quickwitProcessIndexQueue.js",
         "quickwit:mcp-tool-calls": "node modules/mcp/quickwitProcessIndexQueue.js",
+        "export:juridiniai-jsonl": "node modules/juridiniai/eksportuotiJsonl.js",
         "juridiniai:atnaujinti": "node modules/juridiniai/updateJarCsv.js",
         "juridiniai:papildomi": "node modules/juridiniai/importJarPapildomiDuomenys.js",
         "juridiniai:process": "node modules/juridiniai/processRefreshQueue.js",
