@@ -7,9 +7,13 @@ import { streamQuery } from "../postgres/streamQuery.js";
 import { FifoRateLimiter } from "../modules/openrouter/fifoRateLimiter.js";
 import {
     apiModel,
+    getPaskirtis,
+    getVariant,
+    PASKIRTYS,
+} from "../modules/openrouter/modelioVariantai.js";
+import {
     aprasymoIrankiai,
     aprasytiPirkima,
-    getVariant,
 } from "../modules/viesiejiPirkimai/aprasymoGeneravimas.js";
 import {
     runAdaptiveSlots,
@@ -27,7 +31,8 @@ function usage() {
         "  --limit N          aprašyti daugiausia N pirkimų (numatyta: visus)",
         "  --rps N            OpenRouter užklausų per sekundę (numatyta: 12.5)",
         "  --concurrency N    fiksuotas darbų skaičius (numatyta: automatinis)",
-        "  --variant N        naudoti esamą aiModelVariants.id",
+        "  --variant N        naudoti esamą aiModelVariants.id (numatyta: pagal aiModelPaskirtys)",
+        "  --force            aprašyti net kai aiModelPaskirtys.aktyvus = false",
     ].join("\n");
 }
 
@@ -105,7 +110,18 @@ export async function main(argv = process.argv.slice(2)) {
     const variantId = args.variant == null
         ? null
         : positiveInteger(args.variant, "--variant");
-    const variant = await getVariant(variantId);
+    // Modelis imamas iš DB (`aiModelPaskirtys`), nebent nurodytas `--variant`.
+    // Ta pati vėliava, kuri stabdo eilę, stabdo ir šį backfill'ą — kad
+    // sustabdytas darbas nepasileistų per rankinį paleidimą netyčia.
+    const paskirtis = await getPaskirtis(PASKIRTYS.VIESUJU_PIRKIMU_APRASYMAS);
+    if (!paskirtis.aktyvus && !args.force) {
+        process.stderr.write(
+            `Pirkimų aprašymas išjungtas (aiModelPaskirtys."${paskirtis.paskirtis}".aktyvus = false).`
+            + " Nieko nedaroma; priverstinai – su --force.\n",
+        );
+        return;
+    }
+    const variant = variantId ? await getVariant(variantId) : paskirtis.variant;
     const model = apiModel(variant);
     const tools = aprasymoIrankiai();
     const rateLimiter = new FifoRateLimiter(rps);

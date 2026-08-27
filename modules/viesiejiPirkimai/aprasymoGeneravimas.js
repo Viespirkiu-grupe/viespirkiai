@@ -10,73 +10,14 @@ Vieno pirkimo AI aprašymo generavimas ir įrašymas.
 
 Bendra dalis dviem kviečiantiesiems: `scripts/aprasytiPirkimus.js` (masinis
 backfill'as su progreso išvedimu) ir `modules/viesiejiPirkimai/aprasymuEile.js`
-(nuolatinis taskRunner darbas). Čia laikomos tik modelio variantų paieškos ir
-vieno pirkimo aprašymo taisyklės — jokio lygiagretumo ar eilės logikos.
+(nuolatinis taskRunner darbas). Čia laikomos tik vieno pirkimo aprašymo
+taisyklės — jokio lygiagretumo ar eilės logikos. Kuriuo modeliu aprašoma,
+sprendžia DB (žr. modules/openrouter/modelioVariantai.js).
 */
-
-export const DEFAULT_VARIANT = {
-    platforma: "openrouter",
-    tiekejas: "stealth",
-    modelis: "ox-alpha",
-    reasoningEffort: "max",
-    maxOutputTokens: 4000,
-    kontekstoIlgis: 1_000_000,
-};
 
 /** Aprašymo įrankiai — tie patys MCP įrankiai, adaptuoti OpenRouter formatui. */
 export function aprasymoIrankiai() {
     return [getViesasisPirkimas, getFailas, getFailasTekstas].map(mcpAdapter);
-}
-
-/** Numatytasis modelio variantas; sukuriamas, jei dar neegzistuoja. */
-export async function ensureDefaultVariant() {
-    const { rows } = await postgres.query(
-        `INSERT INTO public."aiModelVariants"
-            ("platforma", "tiekejas", "modelis", "reasoningEffort",
-             "maxOutputTokens", "kontekstoIlgis")
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT ON CONSTRAINT "aiModelVariants_variantas_key"
-         DO UPDATE SET
-             "aktyvus" = true,
-             "kontekstoIlgis" = COALESCE(
-                 "aiModelVariants"."kontekstoIlgis",
-                 EXCLUDED."kontekstoIlgis"
-             )
-         RETURNING *`,
-        [
-            DEFAULT_VARIANT.platforma,
-            DEFAULT_VARIANT.tiekejas,
-            DEFAULT_VARIANT.modelis,
-            DEFAULT_VARIANT.reasoningEffort,
-            DEFAULT_VARIANT.maxOutputTokens,
-            DEFAULT_VARIANT.kontekstoIlgis,
-        ],
-    );
-    return rows[0];
-}
-
-/**
- * @param {number|null} [id] - `aiModelVariants.id`; be jo grąžinamas numatytasis.
- * @returns {Promise<Record<string, any>>}
- */
-export async function getVariant(id) {
-    if (!id) return ensureDefaultVariant();
-    const { rows } = await postgres.query(
-        `SELECT * FROM public."aiModelVariants" WHERE "id" = $1`,
-        [id],
-    );
-    if (!rows[0]) throw new Error(`aiModelVariants.id=${id} nerastas.`);
-    return rows[0];
-}
-
-/** `aiModelVariants` eilutė → OpenRouter modelio pavadinimas. */
-export function apiModel(variant) {
-    if (variant.platforma !== "openrouter") {
-        throw new Error(`Kol kas palaikoma tik openrouter platforma, gauta: ${variant.platforma}`);
-    }
-    return variant.modelis.includes("/")
-        ? variant.modelis
-        : `${variant.tiekejas}/${variant.modelis}`;
 }
 
 /**

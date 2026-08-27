@@ -17,18 +17,16 @@ import {
     runWithSlots,
 } from "../modules/viesiejiPirkimai/runWithSlots.js";
 import { mcpAdapter } from "../modules/openrouter/mcpAdapter.js";
+import {
+    apiModel,
+    getPaskirtis,
+    getVariant,
+    PASKIRTYS,
+} from "../modules/openrouter/modelioVariantai.js";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_RPS = 12.5;
 const MAX_AUTO_CONCURRENCY = 256;
-const DEFAULT_VARIANT = {
-    platforma: "openrouter",
-    tiekejas: "stealth",
-    modelis: "ox-alpha",
-    reasoningEffort: "max",
-    maxOutputTokens: 4000,
-    kontekstoIlgis: 1_000_000,
-};
 
 function usage() {
     return [
@@ -37,7 +35,8 @@ function usage() {
         "  --limit N          aprašyti daugiausia N sutarčių (numatyta: visas eilėje)",
         "  --rps N            OpenRouter užklausų per sekundę (numatyta: 12.5)",
         "  --concurrency N    fiksuotas darbų skaičius (numatyta: automatinis)",
-        "  --variant N        naudoti esamą aiModelVariants.id",
+        "  --variant N        naudoti esamą aiModelVariants.id (numatyta: pagal aiModelPaskirtys)",
+        "  --force            aprašyti net kai aiModelPaskirtys.aktyvus = false",
     ].join("\n");
 }
 
@@ -47,51 +46,6 @@ function positiveNumber(value, option) {
         throw new Error(`${option} turi būti teigiamas skaičius`);
     }
     return number;
-}
-
-async function ensureDefaultVariant() {
-    const { rows } = await postgres.query(
-        `INSERT INTO public."aiModelVariants"
-            ("platforma", "tiekejas", "modelis", "reasoningEffort",
-             "maxOutputTokens", "kontekstoIlgis")
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT ON CONSTRAINT "aiModelVariants_variantas_key"
-         DO UPDATE SET
-             "aktyvus" = true,
-             "kontekstoIlgis" = COALESCE(
-                 "aiModelVariants"."kontekstoIlgis",
-                 EXCLUDED."kontekstoIlgis"
-             )
-         RETURNING *`,
-        [
-            DEFAULT_VARIANT.platforma,
-            DEFAULT_VARIANT.tiekejas,
-            DEFAULT_VARIANT.modelis,
-            DEFAULT_VARIANT.reasoningEffort,
-            DEFAULT_VARIANT.maxOutputTokens,
-            DEFAULT_VARIANT.kontekstoIlgis,
-        ],
-    );
-    return rows[0];
-}
-
-async function getVariant(id) {
-    if (!id) return ensureDefaultVariant();
-    const { rows } = await postgres.query(
-        `SELECT * FROM public."aiModelVariants" WHERE "id" = $1`,
-        [id],
-    );
-    if (!rows[0]) throw new Error(`aiModelVariants.id=${id} nerastas.`);
-    return rows[0];
-}
-
-function apiModel(variant) {
-    if (variant.platforma !== "openrouter") {
-        throw new Error(`Kol kas palaikoma tik openrouter platforma, gauta: ${variant.platforma}`);
-    }
-    return variant.modelis.includes("/")
-        ? variant.modelis
-        : `${variant.tiekejas}/${variant.modelis}`;
 }
 
 async function queuedContracts(limit) {
@@ -172,7 +126,18 @@ export async function main(argv = process.argv.slice(2)) {
     const variantId = args.variant == null
         ? null
         : positiveInteger(args.variant, "--variant");
-    const variant = await getVariant(variantId);
+    // Modelis ir įjungimo vėliava — DB lentelėje `aiModelPaskirtys`. Sutarčių
+    // aprašymas sustabdytas ten (`aktyvus = false`), tad be `--force` skriptas
+    // nieko nedaro, net jei kas nors paleistų jį iš įpročio.
+    const paskirtis = await getPaskirtis(PASKIRTYS.SUTARCIU_APRASYMAS);
+    if (!paskirtis.aktyvus && !args.force) {
+        process.stderr.write(
+            `Sutarčių aprašymas išjungtas (aiModelPaskirtys."${paskirtis.paskirtis}".aktyvus = false).`
+            + " Nieko nedaroma; priverstinai – su --force.\n",
+        );
+        return;
+    }
+    const variant = variantId ? await getVariant(variantId) : paskirtis.variant;
     const model = apiModel(variant);
     const tools = [getSutartis, getFailas, getFailasTekstas].map(mcpAdapter);
     const rateLimiter = new FifoRateLimiter(rps);

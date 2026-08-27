@@ -79,8 +79,8 @@ export default [
         name: "viesiejiPirkimaiAprasymuEile",
         mode: "asap",
         // Žemiausias prioritetas: LLM darbas neturi trukdyti nei scrape'ui,
-        // nei indeksavimui. Lygiagretumas – viduje (runWithSlots + RPS ribotuvas),
-        // tad TaskRunner'iui užtenka vieno worker'io.
+        // nei indeksavimui. Jokio lygiagretumo: vienas worker'is aprašo po
+        // vieną pirkimą (BATCH_SIZE = 1) ir, kol eilė netuščia, kartoja iškart.
         priority: 1,
         concurrency: 1,
         cooldown: 60,

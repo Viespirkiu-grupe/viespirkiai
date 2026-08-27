@@ -6,11 +6,13 @@ import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 import { FifoRateLimiter } from "../openrouter/fifoRateLimiter.js";
 import {
     apiModel,
+    getPaskirtis,
+    PASKIRTYS,
+} from "../openrouter/modelioVariantai.js";
+import {
     aprasymoIrankiai,
     aprasytiPirkima,
-    getVariant,
 } from "./aprasymoGeneravimas.js";
-import { runWithSlots } from "./runWithSlots.js";
 
 /*
 AI aprašymų generavimo eilė — `viesiejiPirkimaiAprasymaiQueue`.
@@ -28,11 +30,16 @@ Eilę pildo trigeris ant `viesiejiPirkimai` (naujas pirkimas) — žr.
 
 const logger = new Logger();
 
-/** Kiek pirkimų rezervuojama vienam ciklui. */
-const BATCH_SIZE = 24;
-/** Lygiagrečių LLM darbų viename cikle. */
-const CONCURRENCY = 8;
-/** OpenRouter užklausų per sekundę. */
+/*
+Vienas ciklas – vienas pirkimas.
+
+Eilė sąmoningai dirba po vieną: taip niekada nelaikoma daugiau nei viena
+rezervacija (mažiau šansų, kad kritus procesui kabotų 24 eilutės iki
+LOCK_TIMEOUT) ir LLM apkrova lieka nuspėjama. Worker'is, gavęs `true`, iškart
+kartoja ciklą, tad našumo riba yra vieno aprašymo trukmė, o ne cooldown'as.
+*/
+const BATCH_SIZE = 1;
+/** OpenRouter užklausų per sekundę (agento žingsniai eina nuosekliai). */
 const RPS = 12.5;
 /** Po tiek nesėkmių pirkimas iš eilės nebeimamas (eilutė lieka apžiūrai). */
 const MAX_BANDYMAI = 5;
@@ -85,6 +92,7 @@ const FAILAI_PARUOSTI_SQL = `
 const NODE_NAME = `${os.hostname()}:${process.pid}`;
 
 let apiKeyWarned = false;
+let isjungtaPranesta = false;
 
 /**
  * Įdeda pirkimus į aprašymų eilę.
@@ -220,8 +228,20 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
     await atlaisvintiPakibusius();
 
     // Variantas išsiaiškinamas PRIEŠ rezervaciją — pagal jį atsijojami pirkimai,
-    // kurie šiuo modeliu jau aprašyti.
-    const variant = await getVariant();
+    // kurie šiuo modeliu jau aprašyti. Modelis ir įjungimo vėliava — DB
+    // lentelėje `aiModelPaskirtys`, tad juos galima keisti nestabdant runner'io.
+    const { aktyvus, variant } = await getPaskirtis(PASKIRTYS.VIESUJU_PIRKIMU_APRASYMAS);
+    if (!aktyvus) {
+        if (!isjungtaPranesta) {
+            isjungtaPranesta = true;
+            logger.log(
+                "aprasymuEile: išjungta per aiModelPaskirtys"
+                + ` ("${PASKIRTYS.VIESUJU_PIRKIMU_APRASYMAS}".aktyvus = false) — eilė nedirbs`,
+            );
+        }
+        return false;
+    }
+    isjungtaPranesta = false;
     const model = apiModel(variant);
 
     const eile = await paimtiAprasymus(variant.id);
@@ -235,7 +255,7 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
 
     logger.log(`aprasymuEile: paimta ${eile.length} pirkimų · ${model}`);
 
-    await runWithSlots(eile, async ({ pirkimoId }) => {
+    for (const { pirkimoId } of eile) {
         try {
             const rezultatas = await aprasytiPirkima({
                 pirkimoId,
@@ -252,7 +272,7 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
             logger.log(`aprasymuEile: #${pirkimoId} klaida: ${error.message}`);
             await pazymetiAprasymoRezultata(pirkimoId, error);
         }
-    }, CONCURRENCY);
+    }
 
     logger.log(
         `aprasymuEile: ${stats.issaugota} išsaugota · ${stats.neaprasoma} neaprašomi`
