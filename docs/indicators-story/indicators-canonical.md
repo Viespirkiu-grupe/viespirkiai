@@ -199,8 +199,8 @@ ad hoc; see the explanation below the relevant table. Blank — not yet triaged.
 | LT-COM-11 | Fixed-multiple bid prices                                     | Competition        | OCP-R023; OECD-BR-25                                       | Accepted         |
 | LT-COM-12 | Suspiciously close bid prices                                 | Competition        | OCP-R024; OECD-BR-26                                       | Accepted         |
 | LT-COM-13 | Wide disparity in bid prices                                  | Competition        | OCP-R022; OECD-BR-26                                       | Accepted         |
-| LT-PRI-01 | Estimated value anomalous against market benchmark            | Pricing            | OCP-R016; OLAF-CN07; STT-I10                               |                  |
-| LT-PRI-03 | Winning price close to or above estimate                      | Pricing            | OCP-R031; OLAF-CN13; OECD-BR-28                            |                  |
+| LT-PRI-01 | Estimated value anomalous against market benchmark            | Pricing            | OCP-R016; OLAF-CN07; STT-I10                               | Cannot implement |
+| LT-PRI-03 | Winning price close to or above estimate                      | Pricing            | OCP-R031; OLAF-CN13; OECD-BR-28                            | Cannot implement |
 | LT-PRI-08 | Bid prices deviate from Benford's Law                         | Pricing            | OCP-R029; OT-I07                                           |                  |
 | LT-PRI-10 | Bid-price or discount movements inconsistent with competition | Pricing            | OECD-BR-20; OECD-BR-21; OECD-BR-22; OECD-BR-23; OECD-BR-29 |                  |
 
@@ -355,10 +355,55 @@ from general literature would be the same unsourced, un-auditable judgment call 
 Revisit if a Lithuanian reference dataset establishing which categories each objective
 (green/innovative/quality/centralized) applies to is ever ingested.
 
+**LT-PRI-01** — Estimated value anomalous against market benchmark: not implementable with currently ingested data.
+The concept needs two things at `lot` grain: the lot's own estimated value, and a market benchmark (the average/typical
+value for its item category) to compare it against. Neither exists. `v_pirkimo_dalis` (domain-model.md §1, backed by
+`viesiejiPirkimaiDalys`) carries only `id`, `pirkimoId`, `rusis`, `numeris`, `pavadinimas` — a schema-wide check of
+every table joined into `v_pirkimo_dalis_v2`/`v_dalyviai_v2` (`viesiejiPirkimaiDalys`, `atn1ataskaitos`,
+`atn1sutartys`, `viesiejiPirkimaiKeys`) for a `%verte%`/`%numatoma%` column paired with a lot/dalis identifier finds
+none: the only "numatoma" (estimated) value fields in the entire warehouse
+(`viesiejiPirkimai."numatomaVerteEUR"`/`"numatomaBendraPirkimoVerte"`, `planuojamiPirkimaiDuomenys`,
+`cvppPlanuojamiPirkimai`) are all at *procurement* grain — already used by `LT-PRI-05`/`LT-PRI-06` — and
+`viesiejiPirkimaiKeys`'s value-adjacent fields (`bendraSutarciuVerte`, `daliuSkaicius`) are also procurement-wide
+totals/counts, never a per-lot amount. A multi-lot procurement's total estimated value cannot be safely divided or
+attributed to one lot without data the warehouse doesn't carry (lot weighting), so approximating a lot's value from
+its parent procurement's total would only be sound for single-lot procurements — a scope-narrowing proxy the
+`LT-PRO-02`/`LT-COM-18` explanations above already reject as an unsourced judgment call, not a reflection of the
+catalogue concept. Even setting that aside, no category-average benchmark exists either: `v_rinka`
+(domain-model.md §1, one row per BVPŽ/CPV division) carries only `pirkimuSkaicius` and `pirkejuSkaicius` (purchase
+and buyer counts), no value aggregate to benchmark against — the same underlying gap the `LT-COM-07` Design Required
+explanation above flags for a bidder-frequency baseline, except here the baseline's raw input (a per-lot value) is
+missing entirely, not just the peer-group parameters, so this is a harder blocker than a design pass could resolve.
+Revisit if a source recording a lot-level estimated value is ever ingested, alongside a value aggregate on `v_rinka`
+(or an equivalent category-benchmark source) to compare it against.
+
 **LT-PRI-02** — Line-item price anomalously high or low: not implementable with currently ingested data.
 `v_dalyviai."pasiulymoKaina"` is a single total bid price per (procurement, lot, bidder); no ingested source breaks a
 bid down into its constituent line items or unit prices — no such table exists in the warehouse. Revisit if a
 line-item/unit-price data source is ever ingested.
+
+**LT-PRI-03** — Winning price close to or above estimate: not implementable with currently ingested data, for the same
+root cause as `LT-PRI-01` above — no per-`lot` pre-tender estimated value exists anywhere in the warehouse. Only half of
+this concept's comparison is available: the winning bid price is a normal `v_dalyviai."pasiulymoKaina"` read at lot
+grain, the same field `LT-COM-10`…`LT-COM-13` already use. The
+estimate half is missing structurally, not just thinly covered — checked against every candidate this time, not only
+`viesiejiPirkimaiDalys` (`LT-PRI-01`'s check): `xlsxPPAsutartys` (the ATN-1 procedure report's per-lot contract-result
+rows, keyed by `daliesNumeriai`, 9,939 rows) carries exactly one value field, `"sutartiesVerte"`, paired with a boolean
+`"orientacineVerte"` ("is this value indicative rather than final" — 3,203 of 9,491 non-null rows) — that is the
+contract's own post-award value, sometimes marked provisional, never a separate pre-tender budget figure to compare it
+against; the `cvpp` counterpart of the same report section, `cvppDumpAtn1Contracts` ("totalValueOfPart" +
+"isIndicative", 13,356 rows), has the identical one-value-plus-flag shape for the same reason. The one lookup table
+whose name looked promising, `xlsxPPApirkimoVertes`, turns out to be a 4-row import artifact (one row's `pavadinimas`
+literally reads "3. Pirkimo vertė (pasirinkti iš sąrašo)", an Excel dropdown-instruction string, not procurement data)
+— not a value at all. The only place a *pair* of estimated-vs-final values exists side by side in the warehouse is
+`vpmSutartys."numatomaVerte"`/`"faktineVerte"` — but that table backs the `contract` entity (`v_sutartys`), one grain
+up from `lot`, and is already the basis for the separate canonical row `LT-PRI-04` ("Final-to-estimated value ratio
+anomalous", §4.2); it does not carry a lot number and cannot substitute for a lot-grain estimate. As with `LT-PRI-01`,
+approximating a lot's estimate from its parent procurement's `numatomaVerteEUR` (17,200 of 264,415 procurements
+populated) — even restricted to single-lot procurements, where the attribution would be exact rather than a division —
+was already examined and rejected there as a scope-narrowing proxy, not a reflection of the catalogue concept; the same
+reasoning applies unchanged here since the source data has not changed. Revisit if a source recording a lot-level
+pre-tender estimated value is ever ingested.
 
 **LT-PRI-12** — Anomalous geographic delivery or transport pricing: not implementable with currently ingested data. No
 ingested source records a delivery location, distance, or transport-cost component for a bid — `pasiulymoKaina` is one
