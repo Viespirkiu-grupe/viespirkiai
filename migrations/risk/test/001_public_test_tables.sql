@@ -132,7 +132,8 @@ CREATE TABLE IF NOT EXISTS public."xlsxPPAatmestiPasiulymai" (
     "daliesNumeris"          text,
     "dalyvioKodas"           text,
     "atmetimoPriezastysId"   integer REFERENCES "xlsxPPAatmetimoPriezastys" (id),
-    "statusasId"             integer REFERENCES "xlsxPPAatmestuPasiulymuStatusai" (id)
+    "statusasId"             integer REFERENCES "xlsxPPAatmestuPasiulymuStatusai" (id),
+    "pasiulymoKaina"         text
 );
 
 CREATE TABLE IF NOT EXISTS public."xlsxPPAproceduruPabaiga" (

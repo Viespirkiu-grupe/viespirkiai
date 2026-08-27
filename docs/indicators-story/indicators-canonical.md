@@ -181,7 +181,7 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 | Code      | Canonical indicator                                           | Canonical category | Reference indicators                                       | Note      |
 |-----------|---------------------------------------------------------------|--------------------|------------------------------------------------------------|-----------|
 | LT-AWD-01 | All bids except winner disqualified                           | Award              | OCP-R035; OT-I11                                           | Accepted |
-| LT-AWD-02 | Lowest bid disqualified                                       | Award              | OCP-R036                                                   |          |
+| LT-AWD-02 | Lowest bid disqualified                                       | Award              | OCP-R036                                                   | Accepted |
 | LT-AWD-03 | Poorly supported disqualification                             | Award              | OCP-R037; STT-I14                                          |          |
 | LT-AWD-04 | Excessive share of disqualified bids                          | Award              | OCP-R038                                                   |          |
 | LT-AWD-07 | Evaluation criteria excessively discretionary                 | Award              | OCP-R021; STT-I13                                          |          |

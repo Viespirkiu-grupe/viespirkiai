@@ -98,13 +98,22 @@ export async function insertAtmestasPasiulymas(params: {
     priezastis?: string;
     /** The structured rejection status (e.g. WITHDRAWN_STATUS) — LT-COM-20 reads this, not priezastis. */
     statusas?: string;
+    /**
+     * xlsxPPAatmestiPasiulymai.pasiulymoKaina — the price this bidder offered before being
+     * rejected, recorded on the rejection row itself (distinct from xlsxPPApasiulymuEile.kaina,
+     * which only exists for a bid that made it into the price ranking). LT-AWD-02 reads this via
+     * v_dalyviai_v2's COALESCE fallback. Undefined leaves it unset, mirroring most real rejection
+     * rows.
+     */
+    kaina?: string;
 }): Promise<void> {
     const atmetimoPriezastysId = await lookupOrInsertAtmetimoPriezastis(params.priezastis ?? "Atmestas");
     const statusasId = params.statusas ? await lookupOrInsertAtmestoPasiulymoStatusas(params.statusas) : null;
     await riskDb.query(
-        `INSERT INTO public."xlsxPPAatmestiPasiulymai" ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "atmetimoPriezastysId", "statusasId")
-         VALUES ($1, $2, $3, $4, $5)`,
-        [params.ataskaitaId, params.daliesNumeris, params.dalyvioKodas, atmetimoPriezastysId, statusasId],
+        `INSERT INTO public."xlsxPPAatmestiPasiulymai"
+             ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "atmetimoPriezastysId", "statusasId", "pasiulymoKaina")
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [params.ataskaitaId, params.daliesNumeris, params.dalyvioKodas, atmetimoPriezastysId, statusasId, params.kaina ?? null],
     );
 }
 

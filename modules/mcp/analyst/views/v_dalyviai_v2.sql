@@ -37,7 +37,14 @@ FROM "xlsxPPAataskaitos" a
          LEFT JOIN LATERAL (
              SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
                     e."eileNumeris"                                 AS "eileNumeris",
-                    e.kaina::numeric                                AS "pasiulymoKaina",
+                    -- e.kaina (xlsxPPApasiulymuEile, "pasiūlymų eilė su kainomis") only
+                    -- carries a price for a bid that made it into the price ranking.
+                    -- ap.pasiulymoKaina (xlsxPPAatmestiPasiulymai) carries the same fact
+                    -- for a bid that never was, recorded at rejection time — without this
+                    -- fallback a disqualified bid's price is populated for ~1% of
+                    -- disqualified bids instead of ~40% (see LT-AWD-02's README).
+                    COALESCE(e.kaina::numeric,
+                             NULLIF(ap."pasiulymoKaina", '')::numeric)                     AS "pasiulymoKaina",
                     apr.pavadinimas                                 AS "atmetimoPriezastis",
                     aps.pavadinimas                                 AS "atmetimoStatusas"
              FROM "xlsxPPApasiulymuEile" e
