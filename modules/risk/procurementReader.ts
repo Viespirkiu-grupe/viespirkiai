@@ -116,6 +116,7 @@ const LOT_BIDS_SQL = `
            d."pasiulymoKaina"                                                          AS "pasiulymoKaina",
            d."atmetimoPriezastis"                                                      AS "atmetimoPriezastis",
            d."atmetimoStatusas"                                                        AS "atmetimoStatusas",
+           d."atmetimoTeisinisPagrindas"                                               AS "atmetimoTeisinisPagrindas",
            to_char(d."ataskaitosData" AT TIME ZONE 'UTC',
                    'YYYY-MM-DD"T"HH24:MI:SS"Z"')                                        AS "reportedAt"
     FROM v_dalyviai_v2 d
@@ -312,6 +313,7 @@ export class ProcurementReader {
                 pasiulymoKaina: row.pasiulymoKaina,
                 atmetimoPriezastis: row.atmetimoPriezastis,
                 atmetimoStatusas: row.atmetimoStatusas,
+                atmetimoTeisinisPagrindas: row.atmetimoTeisinisPagrindas,
                 reportedAt: row.reportedAt,
             });
             bidsByLotKey.set(key, bucket);

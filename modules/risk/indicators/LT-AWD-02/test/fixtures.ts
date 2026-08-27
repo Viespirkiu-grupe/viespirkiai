@@ -14,6 +14,7 @@ function bid(overrides: Partial<Bid> & { tiekejoKodas: string }): Bid {
         pasiulymoKaina: null,
         atmetimoPriezastis: null,
         atmetimoStatusas: null,
+        atmetimoTeisinisPagrindas: null,
         reportedAt: REPORTED_AT,
         ...overrides,
     };

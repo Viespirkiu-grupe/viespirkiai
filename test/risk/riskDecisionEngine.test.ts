@@ -109,6 +109,7 @@ function testBid(tiekejoKodas: string): Bid {
         pasiulymoKaina: null,
         atmetimoPriezastis: null,
         atmetimoStatusas: null,
+        atmetimoTeisinisPagrindas: null,
         reportedAt: null,
     };
 }

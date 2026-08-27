@@ -19,6 +19,7 @@ export const withdrawnBid: Bid = {
     pasiulymoKaina: null,
     atmetimoPriezastis: null,
     atmetimoStatusas: WITHDRAWN_STATUS,
+    atmetimoTeisinisPagrindas: null,
     reportedAt: REPORTED_AT,
 };
 
@@ -29,6 +30,7 @@ export const rankedBid: Bid = {
     pasiulymoKaina: 15000,
     atmetimoPriezastis: null,
     atmetimoStatusas: null,
+    atmetimoTeisinisPagrindas: null,
     reportedAt: REPORTED_AT,
 };
 
@@ -40,6 +42,7 @@ export const rejectedForCauseBid: Bid = {
     pasiulymoKaina: null,
     atmetimoPriezastis: "Pasiūlyta per didelė, perkančiajai organizacijai nepriimtina kaina",
     atmetimoStatusas: "Dalyvio pasiūlymas buvo atmestas",
+    atmetimoTeisinisPagrindas: null,
     reportedAt: REPORTED_AT,
 };
 
@@ -53,6 +56,7 @@ export const rankedThenWithdrawnBid: Bid = {
     pasiulymoKaina: 9135,
     atmetimoPriezastis: null,
     atmetimoStatusas: WITHDRAWN_STATUS,
+    atmetimoTeisinisPagrindas: null,
     reportedAt: REPORTED_AT,
 };
 
@@ -65,5 +69,6 @@ export const noOutcomeBid: Bid = {
     pasiulymoKaina: null,
     atmetimoPriezastis: null,
     atmetimoStatusas: null,
+    atmetimoTeisinisPagrindas: null,
     reportedAt: REPORTED_AT,
 };

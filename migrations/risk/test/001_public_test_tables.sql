@@ -90,6 +90,11 @@ CREATE TABLE IF NOT EXISTS public."xlsxPPAatmestuPasiulymuStatusai" (
     "pavadinimas" text NOT NULL UNIQUE
 );
 
+CREATE TABLE IF NOT EXISTS public."xlsxPPAatmetimoTeisiniaiPagrindai" (
+    "id"          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    "pavadinimas" text NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS public."xlsxPPAataskaitos" (
     "id"                                bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "pirkimoNumeris"                    text,
@@ -133,6 +138,7 @@ CREATE TABLE IF NOT EXISTS public."xlsxPPAatmestiPasiulymai" (
     "dalyvioKodas"           text,
     "atmetimoPriezastysId"   integer REFERENCES "xlsxPPAatmetimoPriezastys" (id),
     "statusasId"             integer REFERENCES "xlsxPPAatmestuPasiulymuStatusai" (id),
+    "atmetimoTeisinisPagrindasId" integer REFERENCES "xlsxPPAatmetimoTeisiniaiPagrindai" (id),
     "pasiulymoKaina"         text
 );
 

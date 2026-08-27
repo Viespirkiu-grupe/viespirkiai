@@ -264,6 +264,13 @@ export type Bid = Readonly<{
     pasiulymoKaina: number | null;
     atmetimoPriezastis: string | null;
     atmetimoStatusas: string | null;
+    // xlsxPPAatmestiPasiulymai.atmetimoTeisinisPagrindasId ->
+    // xlsxPPAatmetimoTeisiniaiPagrindai.pavadinimas — the report's structured
+    // (dropdown) legal-basis field for a rejection, e.g. a VPĮ/KSPĮ article
+    // citation, distinct from the free-text atmetimoPriezastis. LT-AWD-03
+    // reads this to judge whether a disqualification cites a specific legal
+    // ground or none/a generic one ("Kita").
+    atmetimoTeisinisPagrindas: string | null;
     reportedAt: string | null;
 }>;
 

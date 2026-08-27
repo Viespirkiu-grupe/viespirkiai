@@ -29,6 +29,10 @@ export function lookupOrInsertAtmestoPasiulymoStatusas(pavadinimas: string): Pro
     return lookupOrInsertId("xlsxPPAatmestuPasiulymuStatusai", pavadinimas);
 }
 
+export function lookupOrInsertAtmetimoTeisinisPagrindas(pavadinimas: string): Promise<number> {
+    return lookupOrInsertId("xlsxPPAatmetimoTeisiniaiPagrindai", pavadinimas);
+}
+
 // The one status label public.v_dalyviai(_v2) currently recognises as a
 // self-withdrawal (LT-COM-20's trigger) rather than a buyer-side rejection —
 // see xlsxPPAatmestuPasiulymuStatusai id 7 in the real database.
@@ -106,14 +110,33 @@ export async function insertAtmestasPasiulymas(params: {
      * rows.
      */
     kaina?: string;
+    /**
+     * xlsxPPAatmestiPasiulymai.atmetimoTeisinisPagrindasId — the structured (dropdown) legal-basis
+     * label for the rejection, e.g. a VPĮ/KSPĮ article citation, or "Kita" when none was cited.
+     * LT-AWD-03 reads this. Undefined leaves it unset, mirroring a rejection with no legal basis
+     * recorded.
+     */
+    teisinisPagrindas?: string;
 }): Promise<void> {
     const atmetimoPriezastysId = await lookupOrInsertAtmetimoPriezastis(params.priezastis ?? "Atmestas");
     const statusasId = params.statusas ? await lookupOrInsertAtmestoPasiulymoStatusas(params.statusas) : null;
+    const teisinisPagrindasId = params.teisinisPagrindas
+        ? await lookupOrInsertAtmetimoTeisinisPagrindas(params.teisinisPagrindas)
+        : null;
     await riskDb.query(
         `INSERT INTO public."xlsxPPAatmestiPasiulymai"
-             ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "atmetimoPriezastysId", "statusasId", "pasiulymoKaina")
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [params.ataskaitaId, params.daliesNumeris, params.dalyvioKodas, atmetimoPriezastysId, statusasId, params.kaina ?? null],
+             ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "atmetimoPriezastysId", "statusasId",
+              "atmetimoTeisinisPagrindasId", "pasiulymoKaina")
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+            params.ataskaitaId,
+            params.daliesNumeris,
+            params.dalyvioKodas,
+            atmetimoPriezastysId,
+            statusasId,
+            teisinisPagrindasId,
+            params.kaina ?? null,
+        ],
     );
 }
 
