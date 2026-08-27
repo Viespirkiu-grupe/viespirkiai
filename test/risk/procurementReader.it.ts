@@ -418,6 +418,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
                     proceduruPabaiga:
                         "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
                     sprendimoPriemimoData: "2026-05-10",
+                    sprendimoPriezastys: null,
                 },
             ],
             reportedAt: "2026-05-10",
@@ -464,9 +465,43 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
                 proceduruPabaiga:
                     "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
                 sprendimoPriemimoData: "2026-05-10",
+                sprendimoPriezastys: null,
             },
-            { daliesNumeris: "2", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2026-05-20" },
+            {
+                daliesNumeris: "2",
+                proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras",
+                sprendimoPriemimoData: "2026-05-20",
+                sprendimoPriezastys: null,
+            },
         ]);
+    });
+
+    it("carries the lot's stated decision reason (LT-TRA-06), and null when the report leaves it blank", async () => {
+        await insertViesiejiPirkimai(970010);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970010",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 2,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: "1",
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+            sprendimoPriemimoData: "2026-05-10",
+            sprendimoPriezastys: "Ekonomiškai naudingiausias pasiūlymas",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: "2",
+            proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras",
+            sprendimoPriemimoData: "2026-05-20",
+        });
+
+        const [procurement] = await loadAll(reader(["970010"]));
+        const lots = [...procurement.procedureOutcome!.lots].sort((a, b) => a.daliesNumeris.localeCompare(b.daliesNumeris));
+        expect(lots[0].sprendimoPriezastys).toBe("Ekonomiškai naudingiausias pasiūlymas");
+        expect(lots[1].sprendimoPriezastys).toBeNull();
     });
 
     it("is null when no procedure-ending decision was observed at all", async () => {

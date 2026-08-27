@@ -17,7 +17,7 @@ export const DEADLINE = "2026-01-01 06:00:00";
 // [minimumDays, maximumDays], the plain not_triggered case.
 export const oneLotOrdinaryPeriod: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-31" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-31", sprendimoPriezastys: null }],
     reportedAt: "2026-01-31",
     isFramework: null,
 };
@@ -26,7 +26,7 @@ export const oneLotOrdinaryPeriod: ProcurementProcedureOutcome = {
 // short (0 days, below minimumDays: 3).
 export const oneLotDecidedSameDay: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
     isFramework: null,
 };
@@ -37,7 +37,7 @@ export const oneLotDecidedSameDay: ProcurementProcedureOutcome = {
 // README.md's 2026-08 measurement).
 export const oneLotDecidedBeforeDeadline: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2025-12-20" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2025-12-20", sprendimoPriezastys: null }],
     reportedAt: "2025-12-20",
     isFramework: null,
 };
@@ -46,7 +46,7 @@ export const oneLotDecidedBeforeDeadline: ProcurementProcedureOutcome = {
 // "strictly below" minimumDays, so this is not_triggered.
 export const oneLotAtMinimumBoundary: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-04" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-04", sprendimoPriezastys: null }],
     reportedAt: "2026-01-04",
     isFramework: null,
 };
@@ -55,7 +55,7 @@ export const oneLotAtMinimumBoundary: ProcurementProcedureOutcome = {
 // (above maximumDays: 120).
 export const oneLotDecidedLate: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-05-02" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-05-02", sprendimoPriezastys: null }],
     reportedAt: "2026-05-02",
     isFramework: null,
 };
@@ -64,7 +64,7 @@ export const oneLotDecidedLate: ProcurementProcedureOutcome = {
 // "strictly above" maximumDays, so this is not_triggered.
 export const oneLotAtMaximumBoundary: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-05-01" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-05-01", sprendimoPriezastys: null }],
     reportedAt: "2026-05-01",
     isFramework: null,
 };
@@ -75,8 +75,8 @@ export const oneLotAtMaximumBoundary: ProcurementProcedureOutcome = {
 export const mixedLotsOneAnomalous: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [
-        { daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-31" },
-        { daliesNumeris: "1", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-06-01" },
+        { daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-31", sprendimoPriezastys: null },
+        { daliesNumeris: "1", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-06-01", sprendimoPriezastys: null },
     ],
     reportedAt: "2026-06-01",
     isFramework: null,
@@ -88,7 +88,7 @@ export const mixedLotsOneAnomalous: ProcurementProcedureOutcome = {
 // measure (see definition.ts's limitationLt).
 export const onlyTerminatedBeforeDeadline: ProcurementProcedureOutcome = {
     lotOutcomes: ["Nutraukus pirkimo ar projekto konkurso procedūras"],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2025-12-15" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2025-12-15", sprendimoPriezastys: null }],
     reportedAt: "2025-12-15",
     isFramework: null,
 };
@@ -97,7 +97,7 @@ export const onlyTerminatedBeforeDeadline: ProcurementProcedureOutcome = {
 // insufficient_data, the same as no procedure-ending decision at all.
 export const oneLotConcludedNoDate: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: null }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: null, sprendimoPriezastys: null }],
     reportedAt: null,
     isFramework: null,
 };

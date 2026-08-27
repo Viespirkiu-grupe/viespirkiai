@@ -135,10 +135,11 @@ const LOT_BIDS_SQL = `
 // indicator actually needs to test membership against.
 //
 // "lots" carries the same rows at their natural per-lot grain instead —
-// (daliesNumeris, proceduruPabaiga, sprendimoPriemimoData) triples, one per
-// procedure-ending row observed — for LT-OTH-03, which needs a lot's own
-// decision date paired with its own outcome label rather than the collapsed
-// cross-lot set lotOutcomes/reportedAt provide. json_agg is never null here:
+// (daliesNumeris, proceduruPabaiga, sprendimoPriemimoData, sprendimoPriezastys)
+// tuples, one per procedure-ending row observed — for LT-OTH-03, which needs
+// a lot's own decision date paired with its own outcome label rather than the
+// collapsed cross-lot set lotOutcomes/reportedAt provide, and for LT-TRA-06,
+// which needs a lot's own stated reason text. json_agg is never null here:
 // the JOIN in v_pirkimo_pabaiga_v2 guarantees at least one row per group.
 //
 // "isFramework" (LT-PRI-06) is xlsxPPAataskaitos.preliminariSutartis,
@@ -153,7 +154,8 @@ const PROCEDURE_OUTCOME_SQL = `
            json_agg(json_build_object(
                'daliesNumeris', po."daliesNumeris",
                'proceduruPabaiga', po."proceduruPabaiga",
-               'sprendimoPriemimoData', to_char(po."sprendimoPriemimoData", 'YYYY-MM-DD')
+               'sprendimoPriemimoData', to_char(po."sprendimoPriemimoData", 'YYYY-MM-DD'),
+               'sprendimoPriezastys', po."sprendimoPriezastys"
            ))                                                                              AS "lots",
            to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt",
            bool_or(po."preliminariSutartis")                                               AS "isFramework"

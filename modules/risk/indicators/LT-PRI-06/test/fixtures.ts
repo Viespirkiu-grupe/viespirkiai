@@ -28,7 +28,7 @@ export const veryHighValue = 24_341_864;
 export function procedureOutcome(isFramework: boolean | null): ProcurementProcedureOutcome {
     return {
         lotOutcomes: ["Sudarius pirkimo sutartį"],
-        lots: [{ daliesNumeris: "0", proceduruPabaiga: "Sudarius pirkimo sutartį", sprendimoPriemimoData: "2026-01-01" }],
+        lots: [{ daliesNumeris: "0", proceduruPabaiga: "Sudarius pirkimo sutartį", sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
         reportedAt: "2026-01-01",
         isFramework,
     };

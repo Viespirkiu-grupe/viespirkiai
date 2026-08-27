@@ -30,7 +30,9 @@
 -- free-text pattern. "preliminariSutartis" (LT-PRI-06) is a procurement-level
 -- fact on the report itself, not per-lot — carried on every row of this view
 -- so the reader's GROUP BY pirkimoNumeris can bool_or() it across every lot
--- and every report revision.
+-- and every report revision. "sprendimoPriezastys" (LT-TRA-06) is the
+-- report's free-text statement of why the lot's procedure ended the way it
+-- did.
 
 CREATE OR REPLACE VIEW v_pirkimo_pabaiga_v2 AS
 SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
@@ -38,6 +40,7 @@ SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
        a."sukurtaAt"                         AS "ataskaitosData",
        pb."proceduruPabaiga"                 AS "proceduruPabaiga",
        pb."sprendimoPriemimoData"            AS "sprendimoPriemimoData",
+       pb."sprendimoPriezastys"              AS "sprendimoPriezastys",
        a."preliminariSutartis"               AS "preliminariSutartis"
 FROM "xlsxPPAataskaitos" a
          JOIN "xlsxPPAproceduruPabaiga" pb ON pb."ataskaitaId" = a.id

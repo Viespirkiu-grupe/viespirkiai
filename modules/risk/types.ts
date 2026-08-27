@@ -178,10 +178,15 @@ export type ProcurementParticipation = Readonly<{
 // the per-lot outcome label and decision date LT-OTH-03 needs to compute a
 // per-lot evaluation period, which the collapsed lotOutcomes/reportedAt
 // aggregates below cannot carry (they lose the label-to-date correlation).
+// sprendimoPriezastys (xlsxPPAproceduruPabaiga.sprendimoPriezastys) is the
+// report's free-text statement of why the lot's procedure ended the way it
+// did — LT-TRA-06 reads this per lot; it is carried alongside the outcome
+// label rather than collapsed, for the same reason sprendimoPriemimoData is.
 export type ProcedureOutcomeLot = Readonly<{
     daliesNumeris: string;
     proceduruPabaiga: string;
     sprendimoPriemimoData: string | null;
+    sprendimoPriezastys: string | null;
 }>;
 
 // Procedure-ending outcomes from public.v_pirkimo_pabaiga_v2, merged onto a

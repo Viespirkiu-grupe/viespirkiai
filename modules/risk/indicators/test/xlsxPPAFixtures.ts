@@ -93,17 +93,25 @@ export async function insertAtmestasPasiulymas(params: {
     );
 }
 
-/** A procedure-ending decision for one (ataskaita, dalis) — LT-OTH-05 reads this. */
+/** A procedure-ending decision for one (ataskaita, dalis) — LT-OTH-05/LT-TRA-06 read this. */
 export async function insertProceduruPabaiga(params: {
     ataskaitaId: number;
     daliesNumeris: string | null;
     proceduruPabaiga: string;
     sprendimoPriemimoData?: string;
+    /** xlsxPPAproceduruPabaiga.sprendimoPriezastys — LT-TRA-06 reads this. Defaults to null (not reported). */
+    sprendimoPriezastys?: string | null;
 }): Promise<void> {
     await riskDb.query(
-        `INSERT INTO public."xlsxPPAproceduruPabaiga" ("ataskaitaId", "daliesNumeris", "proceduruPabaiga", "sprendimoPriemimoData")
-         VALUES ($1, $2, $3, $4)`,
-        [params.ataskaitaId, params.daliesNumeris, params.proceduruPabaiga, params.sprendimoPriemimoData ?? null],
+        `INSERT INTO public."xlsxPPAproceduruPabaiga" ("ataskaitaId", "daliesNumeris", "proceduruPabaiga", "sprendimoPriemimoData", "sprendimoPriezastys")
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+            params.ataskaitaId,
+            params.daliesNumeris,
+            params.proceduruPabaiga,
+            params.sprendimoPriemimoData ?? null,
+            params.sprendimoPriezastys ?? null,
+        ],
     );
 }
 

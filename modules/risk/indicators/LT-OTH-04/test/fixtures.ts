@@ -15,7 +15,7 @@ const CONCLUDED = "Sudarius pirkimo sutartį";
 // not_triggered case.
 export const oneLotOrdinaryPeriod: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
     isFramework: null,
 };
@@ -25,7 +25,7 @@ export const oneLotOrdinaryPeriodSignatures: readonly string[] = ["2026-01-12"];
 // same day — 0 days, not_triggered.
 export const oneLotSignedSameDay: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
     isFramework: null,
 };
@@ -36,7 +36,7 @@ export const oneLotSignedSameDaySignatures: readonly string[] = ["2026-01-01"];
 // maximumDays: 36, so not_triggered.
 export const oneLotAtMaximumBoundary: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
     isFramework: null,
 };
@@ -46,7 +46,7 @@ export const oneLotAtMaximumBoundarySignatures: readonly string[] = ["2026-02-06
 // days later — anomalously long (above maximumDays: 36).
 export const oneLotSignedLate: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
     isFramework: null,
 };
@@ -63,8 +63,8 @@ export const oneLotSignedLateSignatures: readonly string[] = ["2026-02-07"];
 export const mixedLotsOneAnomalous: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [
-        { daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" },
-        { daliesNumeris: "1", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-13" },
+        { daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null },
+        { daliesNumeris: "1", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-13", sprendimoPriezastys: null },
     ],
     reportedAt: "2026-01-13",
     isFramework: null,
@@ -75,7 +75,7 @@ export const mixedLotsOneAnomalousSignatures: readonly string[] = ["2026-01-12",
 // lot at all — insufficient_data, mirroring LT-OTH-03/LT-OTH-05.
 export const onlyTerminated: ProcurementProcedureOutcome = {
     lotOutcomes: ["Nutraukus pirkimo ar projekto konkurso procedūras"],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2025-12-15" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2025-12-15", sprendimoPriezastys: null }],
     reportedAt: "2025-12-15",
     isFramework: null,
 };
@@ -89,7 +89,7 @@ export const onlyTerminated: ProcurementProcedureOutcome = {
 // lot pairs successfully either.
 export const onlyContractPredatesDecision: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01", sprendimoPriezastys: null }],
     reportedAt: "2026-01-01",
     isFramework: null,
 };
@@ -99,7 +99,7 @@ export const onlyContractPredatesDecisionSignatures: readonly string[] = ["2020-
 // insufficient_data, the same as no procedure-ending decision at all.
 export const oneLotConcludedNoDate: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
-    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: null }],
+    lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: null, sprendimoPriezastys: null }],
     reportedAt: null,
     isFramework: null,
 };

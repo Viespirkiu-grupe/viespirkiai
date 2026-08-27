@@ -139,7 +139,8 @@ CREATE TABLE IF NOT EXISTS public."xlsxPPAproceduruPabaiga" (
     "ataskaitaId"            bigint NOT NULL REFERENCES "xlsxPPAataskaitos" (id) ON DELETE CASCADE,
     "daliesNumeris"          text,
     "proceduruPabaiga"       text,
-    "sprendimoPriemimoData"  date
+    "sprendimoPriemimoData"  date,
+    "sprendimoPriezastys"    text
 );
 
 CREATE TABLE IF NOT EXISTS public."jarAsmenys" (
