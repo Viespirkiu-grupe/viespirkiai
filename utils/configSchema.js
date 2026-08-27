@@ -24,6 +24,9 @@ const configSchema = z.object({
     port: z.number().int().positive().default(9019),
     appEnv: z.enum(["dev", "prod"]).optional(),
     logRequests: z.boolean().default(false),
+    // TaskRunner darbų išjungimas be kodo keitimo: vardų sąrašas, kuriame
+    // leidžiami `*` pakaitos simboliai, pvz. `eSeimas*,tedScrape`.
+    taskRunnerDisabledTasks: z.array(z.string()).default([]),
     enableAtn1: z.boolean().default(false),
     enableBotChallenge: z.boolean().default(false),
 

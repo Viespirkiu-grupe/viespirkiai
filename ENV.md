@@ -355,6 +355,12 @@ Kiekvienas nerastas raktas išvedamas kaip `TRŪKSTA <hash>`. Galimi
 
 _(naudoja tik taskrunneris)_
 
+### TaskRunner
+
+| Kintamasis | Numatyta | Paaiškinimas |
+| --- | --- | --- |
+| `TASKRUNNER_DISABLED_TASKS` | `""` | Kableliais atskirtas darbų vardų sąrašas, kurių TaskRunner neregistruoja (nei `asap` workerių, nei cron'o). Leidžiamas `*` pakaitos simbolis, raidžių dydis nesvarbus, pvz. `eSeimas*,tedScrapeNotices`. Skirta laikinai išjungti scraperį nekeičiant kodo. |
+
 ### Tor / proxy scrapinimui
 
 | Kintamasis | Numatyta | Paaiškinimas |

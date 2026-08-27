@@ -15,6 +15,8 @@ export interface Config {
     port: number;
     /** Į stderr rašyti struktūrizuotą kiekvienos HTTP užklausos žurnalą. */
     logRequests: boolean;
+    /** TaskRunner darbų vardai, kurių neregistruoti; leidžiami `*` pakaitos simboliai. */
+    taskRunnerDisabledTasks: string[];
     /** Rodyti CVPP / ATN-1 archyvo puslapius ir navigacijos nuorodą. */
     enableAtn1: boolean;
     /** Saugoti brangius paieškos maršrutus paprastu JavaScript slapuko patikrinimu. */

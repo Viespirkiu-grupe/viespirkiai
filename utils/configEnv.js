@@ -13,7 +13,7 @@ import path from "path";
 
 /**
  * Kiekvienas įrašas: [ENV_VARDAS, configRaktas, tipas].
- * tipas: "string" | "number" | "boolean" | "json"
+ * tipas: "string" | "number" | "boolean" | "json" | "csv"
  */
 const ENV_MAP = [
     ["CUSTOM_HEAD", "customHead", "string"],
@@ -21,6 +21,7 @@ const ENV_MAP = [
     ["ONION_ADDRESS", "onionAddress", "string"],
 
     ["PORT", "port", "number"],
+    ["TASKRUNNER_DISABLED_TASKS", "taskRunnerDisabledTasks", "csv"],
     ["APP_ENV", "appEnv", "string"],
     ["LOG_REQUESTS", "logRequests", "boolean"],
     ["ENABLE_ATN1", "enableAtn1", "boolean"],
@@ -150,6 +151,13 @@ function coerce(value, type) {
             if (["1", "true", "yes", "on"].includes(v)) return true;
             if (["0", "false", "no", "off", ""].includes(v)) return false;
             return undefined;
+        }
+        case "csv": {
+            const items = String(value)
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+            return items.length ? items : undefined;
         }
         case "json": {
             try {
