@@ -195,11 +195,16 @@ export type ProcedureOutcomeLot = Readonly<{
 // already uses. lots is the same evidence at its natural per-lot grain (one
 // entry per procedure-ending row observed, duplicates included), for an
 // indicator that needs a specific lot's outcome paired with its own decision
-// date rather than the collapsed cross-lot set.
+// date rather than the collapsed cross-lot set. isFramework is
+// xlsxPPAataskaitos.preliminariSutartis (LT-PRI-06) — a procurement-level
+// fact, not per-lot, aggregated across every report revision filed under
+// this pirkimoNumeris with bool_or (true if any revision said so, false if
+// every revision said no, null if no revision ever populated the field).
 export type ProcurementProcedureOutcome = Readonly<{
     lotOutcomes: readonly string[];
     lots: readonly ProcedureOutcomeLot[];
     reportedAt: string | null;
+    isFramework: boolean | null;
 }>;
 
 // Distinct contract signature ("sudarymoData") dates from

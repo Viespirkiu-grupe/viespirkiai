@@ -140,6 +140,12 @@ const LOT_BIDS_SQL = `
 // decision date paired with its own outcome label rather than the collapsed
 // cross-lot set lotOutcomes/reportedAt provide. json_agg is never null here:
 // the JOIN in v_pirkimo_pabaiga_v2 guarantees at least one row per group.
+//
+// "isFramework" (LT-PRI-06) is xlsxPPAataskaitos.preliminariSutartis,
+// bool_or'd across every lot and every report revision under this
+// pirkimoNumeris: true if any revision ever said so, false if every revision
+// said no, null if no revision ever populated the field (bool_or ignores
+// NULL inputs, matching that semantics exactly).
 const PROCEDURE_OUTCOME_SQL = `
     ${PUBLIC_VIEWS_CTE}
     SELECT po."pirkimoNumeris"                                                            AS "pirkimoNumeris",
@@ -149,7 +155,8 @@ const PROCEDURE_OUTCOME_SQL = `
                'proceduruPabaiga', po."proceduruPabaiga",
                'sprendimoPriemimoData', to_char(po."sprendimoPriemimoData", 'YYYY-MM-DD')
            ))                                                                              AS "lots",
-           to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt"
+           to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt",
+           bool_or(po."preliminariSutartis")                                               AS "isFramework"
     FROM v_pirkimo_pabaiga_v2 po
     WHERE po."ataskaitosData" <= $1::timestamptz
       AND ($2::text[] IS NULL OR po."pirkimoNumeris" = ANY ($2::text[]))
@@ -334,7 +341,7 @@ export class ProcurementReader {
         this.procedureOutcomeByNumber = new Map(
             procedureOutcomeRows.map((row) => [
                 row.pirkimoNumeris,
-                { lotOutcomes: row.lotOutcomes, lots: row.lots, reportedAt: row.reportedAt },
+                { lotOutcomes: row.lotOutcomes, lots: row.lots, reportedAt: row.reportedAt, isFramework: row.isFramework },
             ]),
         );
         this.contractSignatureDatesByNumber = new Map(

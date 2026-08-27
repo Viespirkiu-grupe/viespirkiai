@@ -26,6 +26,7 @@ export const oneLotConcluded: ProcurementProcedureOutcome = {
         },
     ],
     reportedAt: REPORTED_AT,
+    isFramework: null,
 };
 
 // One lot, no bids received within the deadline — the plain triggered case.
@@ -39,6 +40,7 @@ export const oneLotNoBids: ProcurementProcedureOutcome = {
         },
     ],
     reportedAt: REPORTED_AT,
+    isFramework: null,
 };
 
 // One lot, all submitted tenders rejected — another triggered case, distinct
@@ -53,6 +55,7 @@ export const oneLotAllRejected: ProcurementProcedureOutcome = {
         },
     ],
     reportedAt: REPORTED_AT,
+    isFramework: null,
 };
 
 // Two lots: one concluded, one not — not_triggered, since at least one lot
@@ -73,6 +76,7 @@ export const mixedLotsOneConcluded: ProcurementProcedureOutcome = {
         { daliesNumeris: "1", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: REPORTED_AT },
     ],
     reportedAt: REPORTED_AT,
+    isFramework: null,
 };
 
 // Two lots, both unsuccessful, different reasons — still triggered.
@@ -90,6 +94,7 @@ export const twoLotsBothUnsuccessful: ProcurementProcedureOutcome = {
         },
     ],
     reportedAt: REPORTED_AT,
+    isFramework: null,
 };
 
 // The near-duplicate "concluded" phrasing real data also carries
@@ -104,4 +109,5 @@ export const oneLotConcludedVariant: ProcurementProcedureOutcome = {
         },
     ],
     reportedAt: REPORTED_AT,
+    isFramework: null,
 };

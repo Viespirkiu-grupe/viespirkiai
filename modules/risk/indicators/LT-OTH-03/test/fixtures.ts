@@ -19,6 +19,7 @@ export const oneLotOrdinaryPeriod: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-31" }],
     reportedAt: "2026-01-31",
+    isFramework: null,
 };
 
 // One concluded lot, decided the same day as the deadline — anomalously
@@ -27,6 +28,7 @@ export const oneLotDecidedSameDay: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
     reportedAt: "2026-01-01",
+    isFramework: null,
 };
 
 // One concluded lot, decided before the deadline — an even more extreme
@@ -37,6 +39,7 @@ export const oneLotDecidedBeforeDeadline: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2025-12-20" }],
     reportedAt: "2025-12-20",
+    isFramework: null,
 };
 
 // One concluded lot, decided exactly at the boundary — 3 days is not
@@ -45,6 +48,7 @@ export const oneLotAtMinimumBoundary: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-04" }],
     reportedAt: "2026-01-04",
+    isFramework: null,
 };
 
 // One concluded lot, decided 121 days after the deadline — anomalously long
@@ -53,6 +57,7 @@ export const oneLotDecidedLate: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-05-02" }],
     reportedAt: "2026-05-02",
+    isFramework: null,
 };
 
 // One concluded lot, decided exactly at the boundary — 120 days is not
@@ -61,6 +66,7 @@ export const oneLotAtMaximumBoundary: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-05-01" }],
     reportedAt: "2026-05-01",
+    isFramework: null,
 };
 
 // Two lots: one ordinary, one anomalously long — triggers, since only one
@@ -73,6 +79,7 @@ export const mixedLotsOneAnomalous: ProcurementProcedureOutcome = {
         { daliesNumeris: "1", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-06-01" },
     ],
     reportedAt: "2026-06-01",
+    isFramework: null,
 };
 
 // One lot terminated before the deadline (a common, benign pattern — the
@@ -83,6 +90,7 @@ export const onlyTerminatedBeforeDeadline: ProcurementProcedureOutcome = {
     lotOutcomes: ["Nutraukus pirkimo ar projekto konkurso procedūras"],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2025-12-15" }],
     reportedAt: "2025-12-15",
+    isFramework: null,
 };
 
 // One concluded lot, but its decision date was never recorded — still
@@ -91,4 +99,5 @@ export const oneLotConcludedNoDate: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: null }],
     reportedAt: null,
+    isFramework: null,
 };

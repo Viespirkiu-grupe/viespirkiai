@@ -421,6 +421,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
                 },
             ],
             reportedAt: "2026-05-10",
+            isFramework: null,
         });
     });
 
@@ -520,6 +521,93 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         expect(afterCutoff.procedureOutcome!.lotOutcomes).toEqual([
             "Atmetus visas paraiškas, pasiūlymus, projekto konkurso planus ar projektus",
         ]);
+    });
+
+    it("carries isFramework: true (LT-PRI-06) from xlsxPPAataskaitos.preliminariSutartis", async () => {
+        await insertViesiejiPirkimai(970006);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970006",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            preliminariSutartis: true,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+        });
+
+        const [procurement] = await loadAll(reader(["970006"]));
+        expect(procurement.procedureOutcome!.isFramework).toBe(true);
+    });
+
+    it("carries isFramework: false when the report positively says this is not a framework agreement", async () => {
+        await insertViesiejiPirkimai(970007);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970007",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            preliminariSutartis: false,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970007"]));
+        expect(procurement.procedureOutcome!.isFramework).toBe(false);
+    });
+
+    it("isFramework is true if any report revision under the same pirkimoNumeris says so (bool_or)", async () => {
+        await insertViesiejiPirkimai(970008);
+        const falseAtaskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970008",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            preliminariSutartis: false,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId: falseAtaskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+        const trueAtaskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970008",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-06-01T09:30:00Z",
+            preliminariSutartis: true,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId: trueAtaskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį (preliminariąją sutartį), sukūrus dinaminę pirkimų sistemą arba nustačius projekto konkurso laimėtoją",
+        });
+
+        const [procurement] = await loadAll(reader(["970008"]));
+        expect(procurement.procedureOutcome!.isFramework).toBe(true);
+    });
+
+    it("isFramework is null when no report revision ever populated the field", async () => {
+        await insertViesiejiPirkimai(970009);
+        const ataskaitaId = await insertAtaskaita({
+            pirkimoNumeris: "970009",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId,
+            daliesNumeris: null,
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+        });
+
+        const [procurement] = await loadAll(reader(["970009"]));
+        expect(procurement.procedureOutcome!.isFramework).toBeNull();
     });
 });
 

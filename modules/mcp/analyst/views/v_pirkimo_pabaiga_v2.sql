@@ -27,14 +27,18 @@
 -- contract, or one of several unsuccessful/terminated phrasings) — an
 -- indicator matches against a short list of known labels, the same
 -- convention v_dalyviai_v2's "atmetimoStatusas" already uses, never a
--- free-text pattern.
+-- free-text pattern. "preliminariSutartis" (LT-PRI-06) is a procurement-level
+-- fact on the report itself, not per-lot — carried on every row of this view
+-- so the reader's GROUP BY pirkimoNumeris can bool_or() it across every lot
+-- and every report revision.
 
 CREATE OR REPLACE VIEW v_pirkimo_pabaiga_v2 AS
 SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
        COALESCE(pb."daliesNumeris", '0')     AS "daliesNumeris",
        a."sukurtaAt"                         AS "ataskaitosData",
        pb."proceduruPabaiga"                 AS "proceduruPabaiga",
-       pb."sprendimoPriemimoData"            AS "sprendimoPriemimoData"
+       pb."sprendimoPriemimoData"            AS "sprendimoPriemimoData",
+       a."preliminariSutartis"               AS "preliminariSutartis"
 FROM "xlsxPPAataskaitos" a
          JOIN "xlsxPPAproceduruPabaiga" pb ON pb."ataskaitaId" = a.id
 WHERE pb."proceduruPabaiga" IS NOT NULL

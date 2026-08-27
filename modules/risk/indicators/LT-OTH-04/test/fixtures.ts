@@ -17,6 +17,7 @@ export const oneLotOrdinaryPeriod: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
     reportedAt: "2026-01-01",
+    isFramework: null,
 };
 export const oneLotOrdinaryPeriodSignatures: readonly string[] = ["2026-01-12"];
 
@@ -26,6 +27,7 @@ export const oneLotSignedSameDay: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
     reportedAt: "2026-01-01",
+    isFramework: null,
 };
 export const oneLotSignedSameDaySignatures: readonly string[] = ["2026-01-01"];
 
@@ -36,6 +38,7 @@ export const oneLotAtMaximumBoundary: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
     reportedAt: "2026-01-01",
+    isFramework: null,
 };
 export const oneLotAtMaximumBoundarySignatures: readonly string[] = ["2026-02-06"];
 
@@ -45,6 +48,7 @@ export const oneLotSignedLate: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
     reportedAt: "2026-01-01",
+    isFramework: null,
 };
 export const oneLotSignedLateSignatures: readonly string[] = ["2026-02-07"];
 
@@ -63,6 +67,7 @@ export const mixedLotsOneAnomalous: ProcurementProcedureOutcome = {
         { daliesNumeris: "1", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-13" },
     ],
     reportedAt: "2026-01-13",
+    isFramework: null,
 };
 export const mixedLotsOneAnomalousSignatures: readonly string[] = ["2026-01-12", "2026-03-01"];
 
@@ -72,6 +77,7 @@ export const onlyTerminated: ProcurementProcedureOutcome = {
     lotOutcomes: ["Nutraukus pirkimo ar projekto konkurso procedūras"],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras", sprendimoPriemimoData: "2025-12-15" }],
     reportedAt: "2025-12-15",
+    isFramework: null,
 };
 
 // One concluded lot with a real decision date, but every contract this
@@ -85,6 +91,7 @@ export const onlyContractPredatesDecision: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: "2026-01-01" }],
     reportedAt: "2026-01-01",
+    isFramework: null,
 };
 export const onlyContractPredatesDecisionSignatures: readonly string[] = ["2020-11-04"];
 
@@ -94,4 +101,5 @@ export const oneLotConcludedNoDate: ProcurementProcedureOutcome = {
     lotOutcomes: [CONCLUDED],
     lots: [{ daliesNumeris: "0", proceduruPabaiga: CONCLUDED, sprendimoPriemimoData: null }],
     reportedAt: null,
+    isFramework: null,
 };

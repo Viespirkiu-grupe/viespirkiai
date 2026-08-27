@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS public."xlsxPPAataskaitos" (
     "konkurencijosPriemones"            text,
     "pretenzijaPateikta"                boolean,
     "ieskinysTeismui"                   boolean,
+    "preliminariSutartis"               boolean,
     "sukurtaAt"                         timestamp with time zone DEFAULT now() NOT NULL
 );
 
