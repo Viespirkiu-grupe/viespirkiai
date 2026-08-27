@@ -641,10 +641,14 @@ export async function search(
   return {
     hits: liveHits,
     numHitsMax,
-    numHitsEstimate: clampHitsEstimate(
-      Math.round(numHitsMax * liveRatio),
-      liveHits.length,
-    ),
+    // `rawExhausted` reiškia, kad nuo 0 iki galo peržiūrėtos visos raw eilutės,
+    // tad gyvų atitikmenų suskaičiuota tiksliai — jokio spėjimo nebereikia.
+    // Kitaip vien iš liveRatio gaudavom „Rodomas 1 iš apie 8 rezultatų“, kai
+    // likę 7 raw hitai buvo antkapiai.
+    numHitsEstimate: rawExhausted
+      ? liveHits.length
+      : clampHitsEstimate(Math.round(numHitsMax * liveRatio), liveHits.length),
+    hitsExact: rawExhausted,
     rawExhausted,
     // True when the loop gave up with fewer than `minHits` live hits because
     // the scan budget ran out — the caller got a short page, not the end of
@@ -732,10 +736,14 @@ export async function searchAll(
   return {
     hits: Number.isFinite(limit) ? liveHits.slice(0, limit) : liveHits,
     numHitsMax,
-    numHitsEstimate: clampHitsEstimate(
-      numHitsMax == null ? null : Math.round(numHitsMax * (1 - deadRatio)),
-      liveHits.length,
-    ),
+    // Žr. `search`: išsemus raw eiles gyvų hitų skaičius yra tikslus.
+    numHitsEstimate: rawExhausted
+      ? liveHits.length
+      : clampHitsEstimate(
+          numHitsMax == null ? null : Math.round(numHitsMax * (1 - deadRatio)),
+          liveHits.length,
+        ),
+    hitsExact: rawExhausted,
     // Cursor callers must advance past the last raw hit, not the last live hit:
     // the tail of a page may consist entirely of tombstones.
     lastRawHit,

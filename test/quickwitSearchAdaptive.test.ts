@@ -119,6 +119,29 @@ describe("quickwit search — adaptive re-fetch", () => {
     expect(result.scanBudgetSpent).toBe(false);
   });
 
+  it("reports an exact total when the whole result set was scanned", async () => {
+    // 8 raw atitikmenys, iš jų gyvas vienas: anksčiau iš dead ratio išeidavo
+    // „Rodomas 1 iš apie 8 rezultatų“.
+    const { search } = await loadSearch({ total: 8, isLive: (i) => i === 3 });
+    const result = await search("juridiniai", { query: "*" }, { minHits: 50 });
+
+    expect(result.hits).toHaveLength(1);
+    expect(result.rawExhausted).toBe(true);
+    expect(result.hitsExact).toBe(true);
+    expect(result.numHitsEstimate).toBe(1);
+  });
+
+  it("keeps the estimate approximate when the scan stopped early", async () => {
+    const { search } = await loadSearch({
+      total: 100_000,
+      isLive: (i) => i % 2 === 0,
+    });
+    const result = await search("juridiniai", { query: "*" }, { minHits: 50 });
+
+    expect(result.hitsExact).toBe(false);
+    expect(result.numHitsEstimate).toBeGreaterThan(result.hits.length);
+  });
+
   it("never asks Quickwit for more than its max_hits / start_offset ceilings", async () => {
     const { search, requests } = await loadSearch({
       total: 500_000,

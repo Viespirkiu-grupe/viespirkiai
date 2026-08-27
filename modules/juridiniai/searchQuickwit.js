@@ -255,6 +255,8 @@ export async function searchJuridiniai(query = {}, { page = 1, limit = 50, inclu
     return {
         results: result.hits.slice(offset, offset + effectiveLimit),
         total: result.numHitsEstimate ?? result.hits.length,
+        // Kai Quickwit grąžino visą rezultatų aibę, `total` yra tikslus, ne spėjimas.
+        exact: result.hitsExact === true,
         facets,
         elapsed: performance.now() - started,
     };
