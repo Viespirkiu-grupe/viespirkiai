@@ -157,9 +157,9 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 | LT-PRI-05 | High estimated value                                  | Pricing            | OLAF-CN06                                                                                                                                                      | Accepted         |
 | LT-PRI-06 | High estimated framework value                        | Pricing            | OLAF-CN04                                                                                                                                                      | Accepted         |
 | LT-PRO-01 | Unjustified non-competitive procedure                 | Procedure design   | OCP-R010; OLAF-CN23; OT-I03; STT-I08; VPT-I15                                                                                                                  | Accepted         |
-| LT-PRO-02 | Direct award contrary to procurement plan             | Procedure design   | OCP-R012                                                                                                                                                       |                  |
-| LT-PRO-04 | Procedure without prior publication                   | Procedure design   | OLAF-CA01; OT-I02                                                                                                                                              |                  |
-| LT-PRO-05 | Accelerated procedure without adequate grounds        | Procedure design   | OLAF-CN22                                                                                                                                                      |                  |
+| LT-PRO-02 | Direct award contrary to procurement plan             | Procedure design   | OCP-R012                                                                                                                                                       | Cannot implement |
+| LT-PRO-04 | Procedure without prior publication                   | Procedure design   | OLAF-CA01; OT-I02                                                                                                                                              | Cannot implement |
+| LT-PRO-05 | Accelerated procedure without adequate grounds        | Procedure design   | OLAF-CN22                                                                                                                                                      | Accepted         |
 | LT-PRO-08 | Short submission/advertisement period                 | Procedure design   | OCP-R003; OCP-R014; OLAF-CN29; OT-I04                                                                                                                          |                  |
 | LT-PRO-09 | Unreasonable prequalification requirements            | Procedure design   | OCP-R006; OLAF-CN10; OLAF-CN11; OLAF-CN12; OLAF-CN14; OLAF-CN15; OLAF-CN16; OLAF-CN17; OLAF-CN18; OLAF-CN19; OLAF-CN20; OLAF-CN21; STT-I05; OT-I10; OECD-TD-02 |                  |
 | LT-PRO-10 | Tailored or restrictive technical specifications      | Procedure design   | OCP-R007; OLAF-CN20; STT-I04; OT-I10; OECD-TD-03                                                                                                               |                  |
@@ -303,6 +303,45 @@ line-item/unit-price data source is ever ingested.
 ingested source records a delivery location, distance, or transport-cost component for a bid — `pasiulymoKaina` is one
 undifferentiated total, and `v_company."adresas"` is the supplier's registered address, not a delivery site. Revisit if
 delivery-location or transport-cost data is ever ingested.
+
+**LT-PRO-02** — Direct award contrary to procurement plan: not implementable with currently ingested data. The
+concept requires linking a specific procurement to the specific plan entry it fulfilled, then comparing the plan's
+declared `pirkimoBudas` against the procedure the buyer actually ran. `v_pirkimo_planas` (`planuojamiPirkimai` +
+`planuojamiPirkimaiDuomenys`) carries no procurement number — the plan register and the notice register are two
+independent Public Procurement Office datasets that were never joined by key — so any link is a heuristic match over
+buyer, CPV code and a time window, "with its own confidence" per [domain-model.md](domain-model.md) §5.2
+(`v_pirkimo_planas` → `v_pirkimas`: "no key exists"). Sampling 20 real procurements and counting candidate plan rows
+sharing the same buyer, an overlapping CPV code, and a loose ±3/12-month window around the notice date shows the
+match is not resolvable to one row: candidate counts range from 0 (no plan found at all) to 109, with most non-zero
+cases landing at 2–14 plausible candidates and no field left to break the tie. Loosening or tightening the window
+does not fix this — it trades false negatives (0 candidates) for false positives (dozens of candidates), because
+CPV codes on the plan are broad and a buyer with hundreds of planned purchases in a year has many candidates in any
+reasonable window. `LT-PRO-01`'s implementation independently reached and documented the same conclusion about this
+link (see its README's "only *published* negotiated procedures are visible" section) when it needed the plan's
+`Neskelbiamos derybos` label for the same reason. Fabricating a single "most likely" match per procurement from an
+ambiguous candidate set would be an unsourced, un-auditable judgment call, not a reflection of the catalogue concept.
+Revisit if the Public Procurement Office ever publishes a key linking a plan entry to the procurement it became.
+
+**LT-PRO-04** — Procedure without prior publication: not implementable with currently ingested data. The concept
+needs to identify procurements actually run under a "negotiated without prior publication of a call for tenders"
+legal basis (Lithuanian `Neskelbiamos derybos` / `Neskelbiama apklausa`), the sub-threshold or sole-source mechanism
+that, by definition, does not produce the notice our `procurement` subject is built from. Checking every
+`pirkimoBudas` dictionary actually populated on an executed or reported procurement in the warehouse confirms this
+structurally, not just as a coverage gap: `viesiejiPirkimai."pirkimoBudas"` (the `cvpis` source, 50,893 rows with a
+method — [domain-model.md](domain-model.md) §5.1) carries 15 distinct labels and every one of them is a *published*
+("Skelbiama…"/"Atviras…"/"Ribotas…"/"Dinaminė…"/"Konkurencinis dialogas"/"Kvalifikacijos reikalavimų sistema")
+procedure type — no "Neskelbiama…" label appears at all. The `cvpp` fallback (213,522 rows, the majority of
+`v_pirkimas`) never carries `pirkimoBudas` at all (0%, per the same table), so it cannot help either way.
+`xlsxPPApirkimoBudai` (the PPA procedure-report method dictionary behind `v_dalyviai`) has only four values —
+`Skelbiamos derybos`, `Atviras konkursas`, `Ribotas konkursas`, `Atviras konkuras` — again all published types. The
+only warehouse table that names an unpublished method at all is the plan register
+(`planuojamiPirkimaiBudai`: `Neskelbiama apklausa` 24,830 rows, `Neskelbiamos derybos pagal VPĮ/GSPĮ` 2,026,
+`Neskelbiamos derybos pagal PĮ/KĮ` 528, `Vidaus sandoriai` 17, `Pirkimai iš susijusių įmonių` 4), and that register
+cannot be linked to the procurement it became with any confidence — see the `LT-PRO-02` explanation above for the
+measured ambiguity of that same link. `LT-PRO-01`'s README independently reached the same conclusion about the
+`cvpis` notice source for the same underlying reason ("only *published* negotiated procedures are visible"). Revisit
+if a source recording unpublished/negotiated-without-publication procedures at procurement grain — not just planning
+intent — is ever ingested.
 
 ### 4.2 Contract Risk Decision Service (17)
 
