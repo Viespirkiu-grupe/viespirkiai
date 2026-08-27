@@ -45,8 +45,6 @@ const meta = lentele.meta;
 const saltinis = meta?.saltinis ?? lentele.grupe.saltinis;
 const saltinioUrl = meta?.saltinioUrl ?? lentele.grupe.saltinioUrl;
 
-const schemosFailas = `dbSchema/${lentele.schema}.${lentele.vardas}.sql`;
-
 const pagrindas: Array<{ label: string; value?: unknown; html?: string }> = [
   { label: 'Grupė', html: `<a href="${grupesUrl(lentele.grupe.raktas)}">${lentele.grupe.pavadinimas}</a>` },
   { label: 'Schema', value: lentele.schema },
@@ -242,10 +240,5 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
         </ul>
       </section>
     )}
-
-    <p class="text-sm text-muted">
-      Pilnas DDL: <a href={kodoNuoroda(schemosFailas)} rel="noopener"><code>{schemosFailas}</code></a>
-      (generuojamas <code>npm run db:schema:dump</code>).
-    </p>
   </main>
 </Layout>
