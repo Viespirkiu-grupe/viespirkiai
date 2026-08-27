@@ -19,6 +19,7 @@ export const oneLotOrdinaryPeriod: ProcurementProcedureOutcome = {
     reportedAt: "2026-01-01",
     isFramework: null,
     complaintFiled: null,
+    courtChallenged: null,
 };
 export const oneLotOrdinaryPeriodSignatures: readonly string[] = ["2026-01-12"];
 
@@ -30,6 +31,7 @@ export const oneLotSignedSameDay: ProcurementProcedureOutcome = {
     reportedAt: "2026-01-01",
     isFramework: null,
     complaintFiled: null,
+    courtChallenged: null,
 };
 export const oneLotSignedSameDaySignatures: readonly string[] = ["2026-01-01"];
 
@@ -42,6 +44,7 @@ export const oneLotAtMaximumBoundary: ProcurementProcedureOutcome = {
     reportedAt: "2026-01-01",
     isFramework: null,
     complaintFiled: null,
+    courtChallenged: null,
 };
 export const oneLotAtMaximumBoundarySignatures: readonly string[] = ["2026-02-06"];
 
@@ -53,6 +56,7 @@ export const oneLotSignedLate: ProcurementProcedureOutcome = {
     reportedAt: "2026-01-01",
     isFramework: null,
     complaintFiled: null,
+    courtChallenged: null,
 };
 export const oneLotSignedLateSignatures: readonly string[] = ["2026-02-07"];
 
@@ -73,6 +77,7 @@ export const mixedLotsOneAnomalous: ProcurementProcedureOutcome = {
     reportedAt: "2026-01-13",
     isFramework: null,
     complaintFiled: null,
+    courtChallenged: null,
 };
 export const mixedLotsOneAnomalousSignatures: readonly string[] = ["2026-01-12", "2026-03-01"];
 
@@ -84,6 +89,7 @@ export const onlyTerminated: ProcurementProcedureOutcome = {
     reportedAt: "2025-12-15",
     isFramework: null,
     complaintFiled: null,
+    courtChallenged: null,
 };
 
 // One concluded lot with a real decision date, but every contract this
@@ -99,6 +105,7 @@ export const onlyContractPredatesDecision: ProcurementProcedureOutcome = {
     reportedAt: "2026-01-01",
     isFramework: null,
     complaintFiled: null,
+    courtChallenged: null,
 };
 export const onlyContractPredatesDecisionSignatures: readonly string[] = ["2020-11-04"];
 
@@ -110,4 +117,5 @@ export const oneLotConcludedNoDate: ProcurementProcedureOutcome = {
     reportedAt: null,
     isFramework: null,
     complaintFiled: null,
+    courtChallenged: null,
 };

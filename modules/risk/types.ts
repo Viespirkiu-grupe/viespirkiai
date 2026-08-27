@@ -207,13 +207,16 @@ export type ProcedureOutcomeLot = Readonly<{
 // every revision said no, null if no revision ever populated the field).
 // complaintFiled is xlsxPPAataskaitos.pretenzijaPateikta (LT-TRA-07) — the
 // same kind of procurement-level, self-reported, bool_or-aggregated fact as
-// isFramework.
+// isFramework. courtChallenged is xlsxPPAataskaitos.ieskinysTeismui
+// (LT-TRA-08) — the report's sibling field recording a lawsuit filed in
+// court, aggregated the same way.
 export type ProcurementProcedureOutcome = Readonly<{
     lotOutcomes: readonly string[];
     lots: readonly ProcedureOutcomeLot[];
     reportedAt: string | null;
     isFramework: boolean | null;
     complaintFiled: boolean | null;
+    courtChallenged: boolean | null;
 }>;
 
 // Distinct contract signature ("sudarymoData") dates from

@@ -142,8 +142,9 @@ const LOT_BIDS_SQL = `
 // which needs a lot's own stated reason text. json_agg is never null here:
 // the JOIN in v_pirkimo_pabaiga_v2 guarantees at least one row per group.
 //
-// "isFramework" (LT-PRI-06) is xlsxPPAataskaitos.preliminariSutartis, and
-// "complaintFiled" (LT-TRA-07) is xlsxPPAataskaitos.pretenzijaPateikta, each
+// "isFramework" (LT-PRI-06) is xlsxPPAataskaitos.preliminariSutartis,
+// "complaintFiled" (LT-TRA-07) is xlsxPPAataskaitos.pretenzijaPateikta, and
+// "courtChallenged" (LT-TRA-08) is xlsxPPAataskaitos.ieskinysTeismui, each
 // bool_or'd across every lot and every report revision under this
 // pirkimoNumeris: true if any revision ever said so, false if every revision
 // said no, null if no revision ever populated the field (bool_or ignores
@@ -160,7 +161,8 @@ const PROCEDURE_OUTCOME_SQL = `
            ))                                                                              AS "lots",
            to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt",
            bool_or(po."preliminariSutartis")                                               AS "isFramework",
-           bool_or(po."pretenzijaPateikta")                                                AS "complaintFiled"
+           bool_or(po."pretenzijaPateikta")                                                AS "complaintFiled",
+           bool_or(po."ieskinysTeismui")                                                   AS "courtChallenged"
     FROM v_pirkimo_pabaiga_v2 po
     WHERE po."ataskaitosData" <= $1::timestamptz
       AND ($2::text[] IS NULL OR po."pirkimoNumeris" = ANY ($2::text[]))
@@ -351,6 +353,7 @@ export class ProcurementReader {
                     reportedAt: row.reportedAt,
                     isFramework: row.isFramework,
                     complaintFiled: row.complaintFiled,
+                    courtChallenged: row.courtChallenged,
                 },
             ]),
         );

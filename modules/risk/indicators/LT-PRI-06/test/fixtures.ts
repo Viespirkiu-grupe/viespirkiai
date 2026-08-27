@@ -32,5 +32,6 @@ export function procedureOutcome(isFramework: boolean | null): ProcurementProced
         reportedAt: "2026-01-01",
         isFramework,
         complaintFiled: null,
+        courtChallenged: null,
     };
 }

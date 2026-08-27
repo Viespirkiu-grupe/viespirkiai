@@ -33,6 +33,9 @@
 -- pirkimoNumeris can bool_or() each across every lot and every report
 -- revision. "sprendimoPriezastys" (LT-TRA-06) is the report's free-text
 -- statement of why the lot's procedure ended the way it did.
+-- "ieskinysTeismui" (LT-TRA-08) is the report's sibling field to
+-- "pretenzijaPateikta", recording whether a lawsuit was filed in court —
+-- aggregated the same procurement-level way.
 
 CREATE OR REPLACE VIEW v_pirkimo_pabaiga_v2 AS
 SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
@@ -42,7 +45,8 @@ SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
        pb."sprendimoPriemimoData"            AS "sprendimoPriemimoData",
        pb."sprendimoPriezastys"              AS "sprendimoPriezastys",
        a."preliminariSutartis"               AS "preliminariSutartis",
-       a."pretenzijaPateikta"                AS "pretenzijaPateikta"
+       a."pretenzijaPateikta"                AS "pretenzijaPateikta",
+       a."ieskinysTeismui"                   AS "ieskinysTeismui"
 FROM "xlsxPPAataskaitos" a
          JOIN "xlsxPPAproceduruPabaiga" pb ON pb."ataskaitaId" = a.id
 WHERE pb."proceduruPabaiga" IS NOT NULL
