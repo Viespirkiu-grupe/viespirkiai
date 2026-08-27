@@ -183,7 +183,7 @@ carries the taxonomy the catalogue was originally grouped by; totals per categor
 | LT-AWD-01 | All bids except winner disqualified                           | Award              | OCP-R035; OT-I11                                           | Accepted |
 | LT-AWD-02 | Lowest bid disqualified                                       | Award              | OCP-R036                                                   | Accepted |
 | LT-AWD-03 | Poorly supported disqualification                             | Award              | OCP-R037; STT-I14                                          | Accepted |
-| LT-AWD-04 | Excessive share of disqualified bids                          | Award              | OCP-R038                                                   |          |
+| LT-AWD-04 | Excessive share of disqualified bids                          | Award              | OCP-R038                                                   | Accepted |
 | LT-AWD-07 | Evaluation criteria excessively discretionary                 | Award              | OCP-R021; STT-I13                                          |          |
 | LT-AWD-08 | Award criteria or scoring method incomplete                   | Award              | OLAF-CN26; OLAF-CN27; OLAF-CN28; OT-I10                    |          |
 | LT-COM-01 | Single valid bid                                              | Competition        | OCP-R018; OLAF-CA02; OT-I01; STT-I03; VPT-I01              | Accepted |

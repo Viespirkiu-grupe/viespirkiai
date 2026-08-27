@@ -3,6 +3,7 @@ import { RiskIndicatorRegistry } from "./registry.ts";
 import { LtAwd01Decision } from "./indicators/LT-AWD-01/decision.ts";
 import { LtAwd02Decision } from "./indicators/LT-AWD-02/decision.ts";
 import { LtAwd03Decision } from "./indicators/LT-AWD-03/decision.ts";
+import { LtAwd04Decision } from "./indicators/LT-AWD-04/decision.ts";
 import { LtCom01Decision } from "./indicators/LT-COM-01/decision.ts";
 import { LtCom02Decision } from "./indicators/LT-COM-02/decision.ts";
 import { LtCom03Decision } from "./indicators/LT-COM-03/decision.ts";
@@ -25,6 +26,7 @@ const deployedIndicatorClasses = [
     LtAwd01Decision,
     LtAwd02Decision,
     LtAwd03Decision,
+    LtAwd04Decision,
     LtCom01Decision,
     LtCom02Decision,
     LtCom03Decision,
