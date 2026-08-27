@@ -30,6 +30,7 @@ import { getEsInvesticijosByJar } from "../2014esinvesticijos/getEsInvesticijosB
 import { mvpAprasaiPagalJarKoda } from "../mvpTvarkosAprasai/getByJar.js";
 import { getVdiPazeidimai } from "../vdi/getPazeidimai.js";
 import { gautiJarPapildomusDuomenis } from "./jarPapildomiDuomenys.js";
+import { arBevardisAsmuo, spetiPavadinimaIsSutarciu } from "./spetiPavadinima.js";
 
 // Vienas asmens puslapis paleidžia ~40 lygiagrečių užklausų, o naršyklės
 // prefetch'as ar dvigubas užklausimas tą paketą pakartoja beveik tuo pačiu metu.
@@ -105,6 +106,18 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
 
     // 404 — not found in any main registry table
     if (isregistruotasAsmuo) {
+        // Išregistruotų individualių įmonių pavadinimo registre irgi nėra, o jų
+        // yra dauguma — spėjimą rodome ir šiame ribotame puslapyje.
+        if (arBevardisAsmuo(isregistruotasAsmuo)) {
+            timings.start("spetasPavadinimas");
+            isregistruotasAsmuo.spetasPavadinimas =
+                await spetiPavadinimaIsSutarciu(
+                    jarKodas,
+                    isregistruotasAsmuo.pavadinimas,
+                ).catch(() => null);
+            timings.end("spetasPavadinimas");
+        }
+
         return {
             isregistruotas: true,
             isregistruotasAsmuo,
@@ -198,6 +211,13 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
             return rows[0]?.turiViesujuPirkimu === true;
         },
     };
+
+    // Individualių įmonių ir ūkinių bendrijų pavadinimo registre nėra — jį
+    // spėjame iš sutarčių, tad užklausa nereikalinga visiems kitiems asmenims.
+    if (arBevardisAsmuo(jar)) {
+        taskMap.spetasPavadinimas = async () =>
+            spetiPavadinimaIsSutarciu(jarKodas, jar.pavadinimas);
+    }
 
     // Run all tasks in parallel with timings
     const timedTasks = Object.fromEntries(

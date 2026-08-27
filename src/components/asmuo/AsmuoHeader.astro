@@ -2,6 +2,7 @@
 import Button from '@design-system/components/Button.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
 import config from '../../lib/config.ts';
+import SpetasPavadinimas from './SpetasPavadinimas.astro';
 
 interface Props {
   asmuo: any;
@@ -9,10 +10,17 @@ interface Props {
 
 const { asmuo } = Astro.props;
 const jarKodas = asmuo.jar.jarKodas;
+
+const spetasPavadinimas = asmuo.spetasPavadinimas;
 ---
 
 <PageHeader>
   {asmuo.jar.pavadinimas}
+  {spetasPavadinimas && (
+    <Fragment slot="titleNote">
+      <SpetasPavadinimas spetimas={spetasPavadinimas} />
+    </Fragment>
+  )}
   <Fragment slot="actions">
     <Button href={`/asmuo/${jarKodas}.json`} variant="outline" size="sm">↗ JSON</Button>
     {config.enableGraph && (

@@ -4,6 +4,11 @@ interface Props {
 }
 
 const hasSubtext = Astro.slots.has('subtext');
+// `Astro.slots.has` grąžina true ir tada, kai slot'o turinys sąlyginis ir
+// neišrenderinamas, todėl tikriname patį rezultatą — kitaip liktų tuščia <p>.
+const titleNote = Astro.slots.has('titleNote')
+  ? (await Astro.slots.render('titleNote')).trim()
+  : '';
 const hasActions = Astro.slots.has('actions');
 const { className = '' } = Astro.props;
 const classes = ['page-header', className].filter(Boolean).join(' ');
@@ -12,7 +17,8 @@ const classes = ['page-header', className].filter(Boolean).join(' ');
 <div class={classes}>
   <div class="page-header-copy">
     {hasSubtext && <p class="subtext"><slot name="subtext" /></p>}
-    <h1 class="mt-0"><slot /></h1>
+    <h1 class:list={['mt-0', titleNote && 'mb-0']}><slot /></h1>
+    {titleNote && <p class="title-note" set:html={titleNote} />}
   </div>
   {hasActions && (
     <div class="page-header-actions">
@@ -24,6 +30,12 @@ const classes = ['page-header', className].filter(Boolean).join(' ');
 <style>
   :global(.page-header) {
     flex-wrap: nowrap;
+  }
+
+  .title-note {
+    margin: 2px 0 0;
+    color: var(--gray);
+    font-size: var(--text-sm);
   }
 
   .page-header-copy {
