@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import config from '../utils/config.js';
 import { createSidecarStore } from '../utils/sidecarStore.js';
 import { closeCompressedSqliteStores } from '../utils/sqliteSidecarStore.js';
+import * as poolas from '../utils/sqliteSidecarPoolas.js';
 
 // Skaitymo gijų pool'as (`utils/sqliteSidecarPoolas.js`) yra tik greitaveikos
 // optimizacija, tad esminis reikalavimas — rezultatas nesiskiria nuo skaitymo
@@ -28,6 +29,8 @@ beforeEach(() => {
 
 afterEach(() => {
   closeCompressedSqliteStores();
+  poolas.atstatytiGijas();
+  vi.restoreAllMocks();
   if (originalSidecarDir === undefined) delete config.sidecarDir;
   else config.sidecarDir = originalSidecarDir;
   config.sidecarReadThreads = originalThreads;
@@ -68,6 +71,31 @@ describe('sidecar skaitymo gijos', () => {
     const found = await subject.readManyRaw([key(1), key(2)]);
     expect([...found.keys()]).toEqual([key(1)]);
     expect(await subject.readRaw(key(2))).toBeNull();
+  });
+
+  // Produkcijoje gijos krito su MODULE_NOT_FOUND (Astro build'as darbininko
+  // failo nesubundlina), o klaidą pagaudavo `readLocalManyRaw` ir grąžindavo
+  // TUŠČIĄ Map — dokumentai atrodė neegzistuojantys, lūžo aprašymai ir paieška.
+  // Nulūžęs pool'as privalo virsti skaitymu pagrindinėje gijoje, ne tyla.
+  it('pool\'ui lūžtant nusileidžia į pagrindinę giją, o ne grąžina tuščią', async () => {
+    config.sidecarReadThreads = 4;
+    const subject = store();
+    const keys = Array.from({ length: 5 }, (_, i) => key(i));
+    for (const [i, k] of keys.entries()) await subject.save(k, { nr: i });
+    closeCompressedSqliteStores();
+
+    vi.spyOn(poolas, 'gautiPoola').mockReturnValue({
+      gijos: 4,
+      readManyRaw: async () => { throw new Error('MODULE_NOT_FOUND (imituota)'); },
+      close: () => {},
+    } as never);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const found = await store().readManyRaw(keys);
+    expect(poolas.gautiPoola).toHaveBeenCalled();          // tikrai ėjom per pool'ą
+    expect(console.error).toHaveBeenCalled();              // ir tikrai jį išjungėm
+    expect(found.size).toBe(keys.length);
+    expect(await store().read(keys[0])).toEqual({ nr: 0 });
   });
 
   it('vienas raktas per gijas grąžina turinį, ne null', async () => {

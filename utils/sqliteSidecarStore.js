@@ -3,7 +3,7 @@ import zlib from "node:zlib";
 import fs from "node:fs";
 import { inTransaction, openSqlite } from "./sqlite.js";
 import { sidecarDbPath, sidecarKeyColumn, sidecarTable } from "./sidecarPaths.js";
-import { gautiPoola, uzdarytiPoolus } from "./sqliteSidecarPoolas.js";
+import { gautiPoola, isjungtiGijas, uzdarytiPoolus } from "./sqliteSidecarPoolas.js";
 
 const zstdCompress = promisify(zlib.zstdCompress);
 const zstdDecompress = promisify(zlib.zstdDecompress);
@@ -147,6 +147,27 @@ export function createCompressedSqliteStore({ sidecar }) {
     const tableName = sidecarTable(sidecar);
     const keyColumn = sidecarKeyColumn(sidecar);
 
+    /**
+     * Skaitymas per gijų pool'ą arba `null`, jei gijų nėra. Pool'ui nulūžus
+     * gijos išjungiamos visam procesui ir grįžtam į pagrindinę giją: lėtas
+     * skaitymas priimtinas, o tylus tuščias rezultatas – ne (dėl to buvo
+     * pradingę dokumentų aprašymai ir paieška).
+     */
+    async function skaitytiPerGijas(dbPath, keys) {
+        const poolas = gautiPoola({
+            dbPath,
+            table: quoteIdentifier(tableName),
+            keyColumn: quoteIdentifier(keyColumn),
+        });
+        if (!poolas) return null;
+        try {
+            return await poolas.readManyRaw(keys);
+        } catch (error) {
+            isjungtiGijas(error);
+            return null;
+        }
+    }
+
     return {
         configured() {
             return Boolean(sidecarDbPath(sidecar));
@@ -158,8 +179,8 @@ export function createCompressedSqliteStore({ sidecar }) {
 
             // Ir vieną raktą verta atiduoti gijai: skaitymas iš 66 GB bazės yra
             // disko kelionė, o pagrindinė gija tuo metu blokuota.
-            const poolas = gautiPoola({ dbPath, table: tableName, keyColumn });
-            if (poolas) return (await poolas.readManyRaw([key])).get(key) ?? null;
+            const perGijas = await skaitytiPerGijas(dbPath, [key]);
+            if (perGijas) return perGijas.get(key) ?? null;
 
             const row = getReadConnection(dbPath, tableName, keyColumn)?.read.get(key);
             if (!row) return null;
@@ -182,8 +203,8 @@ export function createCompressedSqliteStore({ sidecar }) {
             // Gijos turi atskiras readonly jungtis, bet WAL joms rodo visus
             // commit'intus įrašus – įskaitant šio proceso rašymus (jie
             // commit'inami `enqueueWrite` flush'e, prieš `save()` rezoliuciją).
-            const poolas = gautiPoola({ dbPath, table: tableName, keyColumn });
-            if (poolas) return poolas.readManyRaw(keys);
+            const perGijas = await skaitytiPerGijas(dbPath, keys);
+            if (perGijas) return perGijas;
 
             const connection = getReadConnection(dbPath, tableName, keyColumn);
             if (!connection) return found;
