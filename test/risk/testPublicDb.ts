@@ -52,11 +52,21 @@ const TEST_TABLES = [
     '"jarAsmenys"',
 ] as const;
 
+const VIEW_NAMES = VIEW_FILES.map((viewFile) => path.basename(viewFile, ".sql"));
+
 let ensured = false;
 
 export async function ensurePublicTestSchema(): Promise<void> {
     if (ensured) return;
     await riskDb.query(fs.readFileSync(TEST_TABLES_SQL, "utf8"));
+    // Dropped, not just replaced. CREATE OR REPLACE VIEW can only append
+    // columns to an existing view, so a definition that inserts or renames one
+    // fails against whatever this local database happens to be carrying from
+    // an earlier checkout — an error about the view's shape rather than about
+    // the test. Dropping first makes the files, not the leftover state, decide
+    // what these views are. CASCADE because v_pirkimo_dalis_v2 reads
+    // v_dalyviai_v2.
+    await riskDb.query(`DROP VIEW IF EXISTS ${VIEW_NAMES.join(", ")} CASCADE`);
     for (const viewFile of VIEW_FILES) {
         await riskDb.query(fs.readFileSync(viewFile, "utf8"));
     }

@@ -27,7 +27,7 @@ import config from "../../utils/config.js";
 import { postgres } from "../../postgres/postgres.js";
 import { riskDb } from "../../postgres/riskDb.js";
 import { runEvaluation } from "../../services/procurement-risk/runJob.ts";
-import { PUBLIC_VIEWS_CTE } from "../../modules/risk/procurementPublicViews.ts";
+import { publicViewsCte } from "../../modules/risk/procurementPublicViews.ts";
 
 const PIRKIMO_NUMERIAI_ENV = "RISK_IT_PIRKIMO_NUMERIAI";
 const SUBJECT_COUNT = 3;
@@ -71,7 +71,7 @@ async function resolvePirkimoNumeriai(): Promise<readonly string[]> {
     // flaky.
     const { rows } = await postgres.query<{ pirkimoNumeris: string }>(
         `
-        ${PUBLIC_VIEWS_CTE}
+        ${publicViewsCte(["v_pirkimas_v2"])}
         SELECT DISTINCT a."pirkimoNumeris"
         FROM "xlsxPPAataskaitos" a
         JOIN v_pirkimas_v2 p ON p."pirkimoNumeris" = a."pirkimoNumeris"

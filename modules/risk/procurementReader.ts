@@ -1,7 +1,7 @@
 import { log } from "../../utils/log.js";
 import type { Bid, Lot, LotParticipation, Procurement, ProcurementParticipation, ProcurementProcedureOutcome } from "./types.ts";
 import type { RiskDataSource } from "./riskDataSource.ts";
-import { PUBLIC_VIEWS_CTE } from "./procurementPublicViews.ts";
+import { publicViewsCte } from "./procurementPublicViews.ts";
 
 // The Procurement Reader (docs/indicators-story/risk-service-architecture-v2.md
 // §1.2): loads the subject universe page by page, so a run's working set stays
@@ -13,44 +13,73 @@ import { PUBLIC_VIEWS_CTE } from "./procurementPublicViews.ts";
 // v_pirkimas_v2.sql, v_pirkimo_dalis_v2.sql, v_dalyviai_v2.sql) rather than
 // the shared analyst views — isolates the Procurement Reader from drift in
 // the shared views' column shape (see v_pirkimas_v2.sql's header comment).
-// Every query below carries PUBLIC_VIEWS_CTE — that module's header explains
-// why these are inlined as a WITH prefix rather than queried as persisted
-// views.
+// Every query below opens with publicViewsCte(...) — that module's header
+// explains why these are inlined as a WITH prefix rather than queried as
+// persisted views, and why each query must name only the views it actually
+// reads.
 
-// DISTINCT ON (saltinis, "pirkimoNumeris") guards against a duplicate notice
-// on the cvpp side: cvppViesiejiPirkimai is keyed by skelbimoKodas, not
-// pirkimoNumeris, so nothing stops two announcements naming the same
-// pirkimoNumeris from both surviving the view's UNION ALL. Keeping the most
-// recently published of any such pair (ORDER BY ... "paskelbimoData" DESC)
-// also gives the keyset cursor below a genuinely unique, stable key to page
-// on — a plain (saltinis, pirkimoNumeris) > (cursor) predicate would
-// otherwise risk skipping or repeating a row across a page boundary if a
-// duplicate ever appears.
-const PROCUREMENT_SQL = `
-    ${PUBLIC_VIEWS_CTE}
+// Scopes a read of v_pirkimas_v2 to a set of procurements without ever making
+// Postgres seq-scan viesiejiPirkimai. The view's "pirkimoNumeris" is
+// p."pirkimoId"::text, and no index can serve a predicate on a cast
+// expression, so the obvious `"pirkimoNumeris" = ANY ($subjects)` left the
+// planner scanning all 2.6 GB of that table — ~15 s, and ~62 s when the run
+// is unscoped. Naming the CVP IS branch's own integer key instead (see
+// v_pirkimas_v2.sql's comment on "cvpisPirkimoId") lets this disjunction be
+// pushed into both UNION ALL branches, where the half that does not address a
+// branch folds to a constant there and the other half becomes a real index
+// condition on viesiejiPirkimai_pirkimoId_key / the cvpp pirkimoNumeris
+// index.
+//
+// `intParam` carries the numeric subset of the scope (procurementIdsToInts
+// below), `textParam` the whole scope as the view spells it.
+function pirkimasScopePredicate(intParam: string, textParam: string): string {
+    return `("cvpisPirkimoId" = ANY (${intParam}::int[])
+             OR (saltinis = 'cvpp' AND "pirkimoNumeris" = ANY (${textParam}::text[])))`;
+}
+
+// The run's subject universe as an ordered, deduplicated key list, loaded
+// once. Two things depend on it: which (saltinis, pirkimoNumeris) pairs each
+// page covers, and — as the set of their pirkimoNumeris values — whether a
+// lot is an orphan (see ensureLotUniverseLoaded below).
+//
+// DISTINCT guards against a duplicate notice on the cvpp side:
+// cvppViesiejiPirkimai is keyed by skelbimoKodas, not pirkimoNumeris, so
+// nothing stops two announcements naming the same pirkimoNumeris from both
+// surviving the view's UNION ALL. ORDER BY here, not in JavaScript, so the
+// page order stays the database's own collation order for these two columns.
+const PROCUREMENT_KEYS_SQL = `
+    ${publicViewsCte(["v_pirkimas_v2"])}
+    SELECT DISTINCT saltinis, "pirkimoNumeris"
+    FROM v_pirkimas_v2
+    WHERE ($2::text[] IS NULL OR ${pirkimasScopePredicate("$1", "$2")})
+    ORDER BY saltinis, "pirkimoNumeris"
+`;
+
+// One page's procurement rows, fetched by the keys PROCUREMENT_KEYS_SQL
+// already settled on rather than by re-deriving the page from the whole
+// universe. The query this replaced paged with a keyset predicate over
+// v_pirkimas_v2 directly, which meant its `ORDER BY ... LIMIT` had to sort
+// all ~265k rows of the view on every page — 38 MB spilled to disk and ~8.7 GB
+// of I/O per page, work that grew with the population rather than with the
+// page, making a full run quadratic. Here the sort input is one page.
+//
+// DISTINCT ON collapses the duplicate-cvpp-notice case DISTINCT handles in the
+// keys query, keeping the most recently published of any such pair. Both
+// duplicates always land in the same page, since a page is a set of
+// (saltinis, pirkimoNumeris) keys.
+const PROCUREMENT_PAGE_SQL = `
+    ${publicViewsCte(["v_pirkimas_v2"])}
     SELECT DISTINCT ON (saltinis, "pirkimoNumeris")
            saltinis, "pirkimoNumeris", pavadinimas, "jarKodas", "pirkimoBudas", statusas,
            "pirkimoObjektoTipas", "numatomaVerteEUR", "paskelbimoData", "pasiulymuPateikimoTerminas",
            "bvpzKodai", "esFinansavimas"
     FROM v_pirkimas_v2
-    WHERE ($1::text[] IS NULL OR "pirkimoNumeris" = ANY ($1::text[]))
-      AND ($2::text IS NULL OR (saltinis, "pirkimoNumeris") > ($2::text, $3::text))
+    WHERE ${pirkimasScopePredicate("$1", "$2")}
     ORDER BY saltinis, "pirkimoNumeris", "paskelbimoData" DESC NULLS LAST
-    LIMIT $4
-`;
-
-// The full set of valid pirkimoNumeris values within the run's subjects
-// scope, used once (not per page) to tell an orphan lot from a real one —
-// see loadLotUniverse() below.
-const PROCUREMENT_IDS_SQL = `
-    ${PUBLIC_VIEWS_CTE}
-    SELECT DISTINCT "pirkimoNumeris"
-    FROM v_pirkimas_v2
-    WHERE ($1::text[] IS NULL OR "pirkimoNumeris" = ANY ($1::text[]))
 `;
 
 const LOT_SQL = `
-    ${PUBLIC_VIEWS_CTE}
+    ${publicViewsCte(["v_pirkimo_dalis_v2"])}
     SELECT "subjektoRaktas", saltinis, "pirkimoNumeris", "daliesNumeris", "daliesPavadinimas",
            deklaruota, stebeta, "dalyviuSkaicius", "kainuSkaicius", "atmestuSkaicius"
     FROM v_pirkimo_dalis_v2
@@ -62,7 +91,7 @@ const LOT_SQL = `
 // (pirkimoNumeris, daliesNumeris) with at least one participant recorded in
 // v_dalyviai_v2 at or before the cutoff.
 const LOT_PARTICIPATION_SQL = `
-    ${PUBLIC_VIEWS_CTE}
+    ${publicViewsCte(["v_dalyviai_v2"])}
     SELECT d."pirkimoNumeris"                                                            AS "pirkimoNumeris",
            COALESCE(d."daliesNumeris", '0')                                              AS "daliesNumeris",
            count(DISTINCT d."tiekejoKodas")::int                                         AS "totalBids",
@@ -81,7 +110,7 @@ const LOT_PARTICIPATION_SQL = `
 // "method" column here — a lot's (and a procurement's) method is
 // Procurement.pirkimoBudas, never derived from the ATN-1 report itself.
 const PROCUREMENT_PARTICIPATION_SQL = `
-    ${PUBLIC_VIEWS_CTE}
+    ${publicViewsCte(["v_dalyviai_v2"])}
     SELECT d."pirkimoNumeris"                                                            AS "pirkimoNumeris",
            count(DISTINCT d."tiekejoKodas")::int                                         AS "totalSuppliers",
            to_char(max(d."ataskaitosData") AT TIME ZONE 'UTC',
@@ -106,8 +135,18 @@ const PROCUREMENT_PARTICIPATION_SQL = `
 // entered twice with an identical ataskaitosData) down to one, preferring
 // whichever duplicate actually carries an outcome (a ranking or a rejection
 // status) over a duplicate that carries neither.
+//
+// The last two ORDER BY terms are the tie-break, and they are load-bearing:
+// without them the ranking above leaves genuinely tied duplicates — same
+// bidder, same lot, same ataskaitosData, both carrying an outcome, but
+// different eileNumeris and pasiulymoKaina — to be broken by whatever order
+// the plan happened to produce, so a bid's price and rank could change from
+// run to run with no change in the data. That case is real and not rare: a
+// multi-lot report whose daliesNumeris never parsed contributes every lot's
+// ranking row under the '0' fallback. Preferring the best rank, then the
+// lowest price, makes the choice deterministic and states it.
 const LOT_BIDS_SQL = `
-    ${PUBLIC_VIEWS_CTE}
+    ${publicViewsCte(["v_dalyviai_v2"])}
     SELECT DISTINCT ON (d."pirkimoNumeris", COALESCE(d."daliesNumeris", '0'), d."tiekejoKodas")
            d."pirkimoNumeris"                                                          AS "pirkimoNumeris",
            COALESCE(d."daliesNumeris", '0')                                            AS "daliesNumeris",
@@ -125,7 +164,9 @@ const LOT_BIDS_SQL = `
       AND ($2::text[] IS NULL OR d."pirkimoNumeris" = ANY ($2::text[]))
     ORDER BY d."pirkimoNumeris", COALESCE(d."daliesNumeris", '0'), d."tiekejoKodas",
              (d."eileNumeris" IS NOT NULL OR d."atmetimoStatusas" IS NOT NULL OR d."atmetimoPriezastis" IS NOT NULL) DESC,
-             d."ataskaitosData" DESC
+             d."ataskaitosData" DESC,
+             d."eileNumeris" ASC NULLS LAST,
+             d."pasiulymoKaina" ASC NULLS LAST
 `;
 
 // Procurement-grain procedure-ending outcomes — every distinct
@@ -151,7 +192,7 @@ const LOT_BIDS_SQL = `
 // said no, null if no revision ever populated the field (bool_or ignores
 // NULL inputs, matching that semantics exactly).
 const PROCEDURE_OUTCOME_SQL = `
-    ${PUBLIC_VIEWS_CTE}
+    ${publicViewsCte(["v_pirkimo_pabaiga_v2"])}
     SELECT po."pirkimoNumeris"                                                            AS "pirkimoNumeris",
            array_agg(DISTINCT po."proceduruPabaiga")                                       AS "proceduruPabaigos",
            json_agg(json_build_object(
@@ -180,7 +221,7 @@ const PROCEDURE_OUTCOME_SQL = `
 // v_pirkimo_sutartys_v2 guarantees at least one row per group, so json_agg
 // is never null here.
 const CONTRACT_SIGNATURES_SQL = `
-    ${PUBLIC_VIEWS_CTE}
+    ${publicViewsCte(["v_pirkimo_sutartys_v2"])}
     SELECT cs."pirkimoNumeris"                                             AS "pirkimoNumeris",
            array_agg(DISTINCT to_char(cs."sudarymoData", 'YYYY-MM-DD'))    AS "signatureDates"
     FROM v_pirkimo_sutartys_v2 cs
@@ -199,14 +240,29 @@ type ProcurementParticipationRow = Readonly<{ pirkimoNumeris: string }> & Procur
 type ProcedureOutcomeRow = Readonly<{ pirkimoNumeris: string }> & ProcurementProcedureOutcome;
 type BidRow = Readonly<{ pirkimoNumeris: string; daliesNumeris: string }> & Bid;
 type ContractSignaturesRow = Readonly<{ pirkimoNumeris: string; signatureDates: readonly string[] }>;
+type ProcurementKey = Readonly<{ saltinis: string; pirkimoNumeris: string }>;
 
 function encodeCursor(saltinis: string, pirkimoNumeris: string): string {
     return `${saltinis}\u0000${pirkimoNumeris}`;
 }
 
-function decodeCursor(cursor: string): readonly [string, string] {
-    const [saltinis, pirkimoNumeris] = cursor.split("\u0000");
-    return [saltinis, pirkimoNumeris];
+/**
+ * The subset of a pirkimoNumeris scope that could name a CVP IS procurement,
+ * as the int4 values viesiejiPirkimai."pirkimoId" is indexed on. A value that
+ * is not a positive int4 is dropped rather than passed through: it could never
+ * have equalled a "pirkimoId"::text either, so dropping it changes no result —
+ * only how much Postgres has to look at. Anything dropped here is still
+ * carried by the text half of pirkimasScopePredicate, which is what the CVPP
+ * branch matches on.
+ */
+function procurementIdsToInts(pirkimoNumeriai: readonly string[]): number[] {
+    const ids: number[] = [];
+    for (const pirkimoNumeris of pirkimoNumeriai) {
+        if (!/^[1-9][0-9]{0,9}$/.test(pirkimoNumeris)) continue;
+        const id = Number(pirkimoNumeris);
+        if (id <= 2147483647) ids.push(id);
+    }
+    return ids;
 }
 
 /**
@@ -223,6 +279,8 @@ export class ProcurementReader {
 
     // Built once, lazily, on the first loadProcurements() call — see
     // ensureLotUniverseLoaded().
+    private procurementKeys: readonly ProcurementKey[] | null = null;
+    private keyIndexByCursor: Map<string, number> | null = null;
     private lotsByNumber: Map<string, Lot[]> | null = null;
     private procurementParticipationByNumber: Map<string, ProcurementParticipation> | null = null;
     private procedureOutcomeByNumber: Map<string, ProcurementProcedureOutcome> | null = null;
@@ -249,8 +307,11 @@ export class ProcurementReader {
         const timeSpent = Date.now() - startedAt;
         const timeSpentLabel =  `${timeSpent}ms`.padEnd(10);
         const rowsLabel = `${rows.length} rows`.padEnd(16);
-        const timePerRow = Math.round(timeSpent / rows.length);
-        log(`procurementReader: ${label.padEnd(32)} ${timeSpentLabel} ${rowsLabel} ${timePerRow}s/r`);
+        // Blank rather than "Infinity" for an empty result: a per-row cost is
+        // meaningless there, and the unit is ms, which the old "s/r" suffix
+        // misstated by three orders of magnitude.
+        const perRow = rows.length === 0 ? "" : `${Math.round(timeSpent / rows.length)}ms/row`;
+        log(`procurementReader: ${label.padEnd(32)} ${timeSpentLabel} ${rowsLabel} ${perRow}`);
         return rows;
     }
 
@@ -264,15 +325,43 @@ export class ProcurementReader {
         return this.orphanLotCount;
     }
 
+    /**
+     * One page of the universe. The cursor is still an opaque
+     * `saltinis pirkimoNumeris` string and still means "resume after this
+     * key", but it now indexes into the key list loaded once per run rather
+     * than seeding a keyset predicate over v_pirkimas_v2 — see
+     * PROCUREMENT_PAGE_SQL on why that predicate could not stay.
+     */
     async loadProcurements(cursor: string | null, pageSize: number): Promise<Page<Procurement>> {
         await this.ensureLotUniverseLoaded();
 
         this.pageNumber++;
         const startedAt = Date.now();
-        const [cursorSaltinis, cursorPirkimoNumeris] = cursor === null ? [null, null] : decodeCursor(cursor);
-        const rows = await this.data.query<
-            Omit<Procurement, "lots" | "participation" | "procedureOutcome" | "contractSignatureDates">
-        >(PROCUREMENT_SQL, [this.subjects, cursorSaltinis, cursorPirkimoNumeris, pageSize]);
+
+        const keys = this.procurementKeys!;
+        // A cursor names the last key of the page before this one. Keys are in
+        // the database's own ordering of (saltinis, pirkimoNumeris) — see
+        // PROCUREMENT_KEYS_SQL — so resuming is a lookup, not a comparison.
+        // An unknown cursor is rejected rather than tolerated: silently
+        // treating it as "start over" would loop the run forever.
+        const resumeAfter = cursor === null ? -1 : this.keyIndexByCursor!.get(cursor) ?? null;
+        if (resumeAfter === null) {
+            throw new Error(`procurementReader: cursor names no procurement in this run's universe`);
+        }
+        const from = resumeAfter + 1;
+        const pageKeys = keys.slice(from, from + pageSize);
+
+        const rows =
+            pageKeys.length === 0
+                ? []
+                : await this.data.query<
+                      Omit<Procurement, "lots" | "participation" | "procedureOutcome" | "contractSignatureDates">
+                  >(PROCUREMENT_PAGE_SQL, [
+                      procurementIdsToInts(
+                          pageKeys.filter((key) => key.saltinis === "cvpis").map((key) => key.pirkimoNumeris),
+                      ),
+                      pageKeys.filter((key) => key.saltinis === "cvpp").map((key) => key.pirkimoNumeris),
+                  ]);
 
         const items: Procurement[] = rows.map((row) => ({
             ...row,
@@ -282,12 +371,15 @@ export class ProcurementReader {
             contractSignatureDates: this.contractSignatureDatesByNumber!.get(row.pirkimoNumeris) ?? null,
         }));
 
-        // last.saltinis is asserted non-null: v_pirkimas_v2's saltinis is
-        // always the literal 'cvpis' or 'cvpp' (see its own SQL), the
-        // Procurement type's `string | null` only reflects a downstream
-        // orphan-lot case that never applies to a Procurement row itself.
-        const last = rows[rows.length - 1];
-        const nextCursor = rows.length === pageSize && last ? encodeCursor(last.saltinis!, last.pirkimoNumeris) : null;
+        // Taken from the key list rather than from the rows: the two agree on
+        // every key that still resolves, and taking it from the keys keeps
+        // paging advancing even if a row vanished between the key load and
+        // this fetch.
+        const lastKey = pageKeys[pageKeys.length - 1];
+        const nextCursor =
+            from + pageKeys.length < keys.length && lastKey
+                ? encodeCursor(lastKey.saltinis, lastKey.pirkimoNumeris)
+                : null;
 
         log(
             `procurementReader: page ${this.pageNumber} loaded ${rows.length} procurement(s) in ${Date.now() - startedAt}ms` +
@@ -298,22 +390,25 @@ export class ProcurementReader {
     }
 
     /**
-     * Runs LOT_SQL and both participation queries exactly once per instance,
-     * scoped by the same subjects/dataAsOf every page shares, and caches the
-     * merged result. A page-scoped lot query (bound to only that page's
-     * pirkimoNumeris values) could never observe a mismatch against
-     * PROCUREMENT_SQL, so orphan-lot detection needs the full universe up
-     * front, not a per-page slice.
+     * Runs the key list, LOT_SQL and both participation queries exactly once
+     * per instance, scoped by the same subjects/dataAsOf every page shares,
+     * and caches the merged result. A page-scoped lot query (bound to only
+     * that page's pirkimoNumeris values) could never observe a mismatch
+     * against the procurement key list, so orphan-lot detection needs the full
+     * universe up front, not a per-page slice.
      */
     private async ensureLotUniverseLoaded(): Promise<void> {
         if (this.lotsByNumber !== null) return;
 
-        log("procurementReader: loading lot universe (lots, participation, bids, procedure outcomes, contract signatures)...");
+        log("procurementReader: loading lot universe (procurement keys, lots, participation, bids, procedure outcomes, contract signatures)...");
         const startedAt = Date.now();
 
-        const [procurementIds, lotRows, lotParticipationRows, procurementParticipationRows, bidRows, procedureOutcomeRows, contractSignatureRows] =
+        const [procurementKeys, lotRows, lotParticipationRows, procurementParticipationRows, bidRows, procedureOutcomeRows, contractSignatureRows] =
             await Promise.all([
-                this.timedQuery<{ pirkimoNumeris: string }>("PROCUREMENT_IDS_SQL", PROCUREMENT_IDS_SQL, [this.subjects]),
+                this.timedQuery<ProcurementKey>("PROCUREMENT_KEYS_SQL", PROCUREMENT_KEYS_SQL, [
+                    this.subjects === null ? null : procurementIdsToInts(this.subjects),
+                    this.subjects,
+                ]),
                 this.timedQuery<LotRow>("LOT_SQL", LOT_SQL, [this.subjects]),
                 this.timedQuery<LotParticipationRow>("LOT_PARTICIPATION_SQL", LOT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
                 this.timedQuery<ProcurementParticipationRow>("PROCUREMENT_PARTICIPATION_SQL", PROCUREMENT_PARTICIPATION_SQL, [
@@ -325,7 +420,11 @@ export class ProcurementReader {
                 this.timedQuery<ContractSignaturesRow>("CONTRACT_SIGNATURES_SQL", CONTRACT_SIGNATURES_SQL, [this.subjects]),
             ]);
 
-        const validIds = new Set(procurementIds.map((row) => row.pirkimoNumeris));
+        this.procurementKeys = procurementKeys;
+        this.keyIndexByCursor = new Map(
+            procurementKeys.map((key, index) => [encodeCursor(key.saltinis, key.pirkimoNumeris), index]),
+        );
+        const validIds = new Set(procurementKeys.map((key) => key.pirkimoNumeris));
 
         const lotParticipationByKey = new Map<string, LotParticipation>(
             lotParticipationRows.map((row) => [

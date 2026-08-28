@@ -34,36 +34,71 @@ function loadViewBody(fileName: string): string {
     return sql.slice(header.index + header[0].length).trim();
 }
 
-const PIRKIMAS_BODY = loadViewBody("v_pirkimas_v2.sql");
-const DALYVIAI_BODY = loadViewBody("v_dalyviai_v2.sql");
-// v_pirkimo_dalis_v2.sql's "stebetos" CTE reads public.v_dalyviai_v2 as a
-// persisted view; here it must resolve to the sibling CTE below instead, so
-// the schema qualifier — meaningless for a CTE name — is dropped.
-const PIRKIMO_DALIS_BODY = loadViewBody("v_pirkimo_dalis_v2.sql").replaceAll("public.v_dalyviai_v2", "v_dalyviai_v2");
-// v_pirkimo_pabaiga_v2.sql has no dependency on any other view — it reads
-// xlsxPPAataskaitos/xlsxPPAproceduruPabaiga directly.
-const PIRKIMO_PABAIGA_BODY = loadViewBody("v_pirkimo_pabaiga_v2.sql");
-// v_pirkimo_sutartys_v2.sql likewise has no dependency on any other view —
-// it reads vpmSutartys directly.
-const PIRKIMO_SUTARTYS_BODY = loadViewBody("v_pirkimo_sutartys_v2.sql");
+export type PublicViewName =
+    | "v_pirkimas_v2"
+    | "v_dalyviai_v2"
+    | "v_pirkimo_dalis_v2"
+    | "v_pirkimo_pabaiga_v2"
+    | "v_pirkimo_sutartys_v2";
 
-// Prepended verbatim to every Procurement Reader query. An unreferenced CTE
-// costs nothing — Postgres never plans or executes one that the outer query
-// doesn't name — so every query can carry all four regardless of which it
-// actually uses.
-export const PUBLIC_VIEWS_CTE = `WITH
-v_pirkimas_v2 AS (
-${PIRKIMAS_BODY}
-),
-v_dalyviai_v2 AS (
-${DALYVIAI_BODY}
-),
-v_pirkimo_dalis_v2 AS (
-${PIRKIMO_DALIS_BODY}
-),
-v_pirkimo_pabaiga_v2 AS (
-${PIRKIMO_PABAIGA_BODY}
-),
-v_pirkimo_sutartys_v2 AS (
-${PIRKIMO_SUTARTYS_BODY}
-)`;
+// Each view's body plus the sibling views it reads. Order matters only in
+// that a CTE may reference one defined before it, which VIEW_ORDER below
+// fixes once for every caller.
+const VIEWS: Readonly<Record<PublicViewName, { body: string; dependsOn: readonly PublicViewName[] }>> = {
+    v_pirkimas_v2: { body: loadViewBody("v_pirkimas_v2.sql"), dependsOn: [] },
+    v_dalyviai_v2: { body: loadViewBody("v_dalyviai_v2.sql"), dependsOn: [] },
+    // v_pirkimo_dalis_v2.sql's "stebetos" CTE reads public.v_dalyviai_v2 as a
+    // persisted view; here it must resolve to the sibling CTE instead, so the
+    // schema qualifier — meaningless for a CTE name — is dropped.
+    v_pirkimo_dalis_v2: {
+        body: loadViewBody("v_pirkimo_dalis_v2.sql").replaceAll("public.v_dalyviai_v2", "v_dalyviai_v2"),
+        dependsOn: ["v_dalyviai_v2"],
+    },
+    // v_pirkimo_pabaiga_v2.sql has no dependency on any other view — it reads
+    // xlsxPPAataskaitos/xlsxPPAproceduruPabaiga directly.
+    v_pirkimo_pabaiga_v2: { body: loadViewBody("v_pirkimo_pabaiga_v2.sql"), dependsOn: [] },
+    // v_pirkimo_sutartys_v2.sql likewise has no dependency on any other view —
+    // it reads vpmSutartys directly.
+    v_pirkimo_sutartys_v2: { body: loadViewBody("v_pirkimo_sutartys_v2.sql"), dependsOn: [] },
+};
+
+// Definition order for the emitted WITH list: a view may only reference one
+// that appears earlier.
+const VIEW_ORDER: readonly PublicViewName[] = [
+    "v_pirkimas_v2",
+    "v_dalyviai_v2",
+    "v_pirkimo_dalis_v2",
+    "v_pirkimo_pabaiga_v2",
+    "v_pirkimo_sutartys_v2",
+];
+
+/**
+ * The WITH prefix defining exactly `names` and whatever those transitively
+ * read — nothing more.
+ *
+ * Emitting all five unconditionally, as this module used to, is not free the
+ * way an unused CTE normally is. Postgres inlines a non-recursive CTE only
+ * when the query references it exactly once, and it counts references from
+ * *every* CTE in the query, including ones the outer query never names. So
+ * shipping v_pirkimo_dalis_v2 alongside a query that reads v_dalyviai_v2
+ * directly pushed v_dalyviai_v2's reference count to two and forced it to be
+ * materialised: the whole participation universe was built and spilled to
+ * disk, then filtered, because no predicate could be pushed through a
+ * materialised CTE. Naming only what a query reads restores inlining, and
+ * with it pushdown of both the dataAsOf cutoff and the subjects scope down to
+ * xlsxPPAataskaitos' own pirkimoNumeris index.
+ */
+export function publicViewsCte(names: readonly PublicViewName[]): string {
+    const required = new Set<PublicViewName>();
+    const visit = (name: PublicViewName): void => {
+        if (required.has(name)) return;
+        required.add(name);
+        for (const dependency of VIEWS[name].dependsOn) visit(dependency);
+    };
+    for (const name of names) visit(name);
+
+    const defined = VIEW_ORDER.filter((name) => required.has(name));
+    if (defined.length === 0) throw new Error("publicViewsCte: at least one view is required");
+
+    return `WITH\n${defined.map((name) => `${name} AS (\n${VIEWS[name].body}\n)`).join(",\n")}`;
+}

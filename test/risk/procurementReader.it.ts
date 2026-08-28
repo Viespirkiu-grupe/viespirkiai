@@ -174,13 +174,15 @@ describe("ProcurementReader orphan lots", () => {
         expect(vi.mocked(log)).toHaveBeenCalled();
     });
 
-    it("never calls log when a run has no orphan lots", async () => {
+    it("says nothing about orphan lots when a run has none", async () => {
         await insertViesiejiPirkimai(930003);
         await insertDeclaredLot(930003, 1, "Dalis 1");
 
         await loadAll(reader());
 
-        expect(vi.mocked(log)).not.toHaveBeenCalled();
+        // Not "never logs": the Reader narrates every run — per-query timings,
+        // page progress. What must not appear is the orphan line itself.
+        expect(vi.mocked(log).mock.calls.flat().join("\n")).not.toContain("orphan");
     });
 });
 

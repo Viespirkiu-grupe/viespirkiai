@@ -7,6 +7,23 @@
 CREATE OR REPLACE VIEW v_pirkimas_v2 AS
 SELECT 'cvpis' AS saltinis,
        p."pirkimoId"::text AS "pirkimoNumeris",
+       -- The CVP IS branch's own integer key, carried alongside the unified
+       -- text "pirkimoNumeris" (NULL on the CVPP branch). It exists purely so
+       -- a caller can scope this view by the key viesiejiPirkimai is actually
+       -- indexed on. "pirkimoNumeris" is a cast expression, and no index can
+       -- serve a predicate on one, so every scoped read of this view used to
+       -- seq-scan viesiejiPirkimai in full — 2.6 GB, ~15 s a time. A caller
+       -- writing
+       --
+       --     WHERE "cvpisPirkimoId" = ANY ($1::int[])
+       --        OR (saltinis = 'cvpp' AND "pirkimoNumeris" = ANY ($2::text[]))
+       --
+       -- gets that disjunction pushed into both UNION ALL branches, where each
+       -- half folds to a constant in the branch it does not address and the
+       -- other half becomes a real index condition: ~10 ms for the same rows.
+       -- Read it as a physical access path, never as procurement identity —
+       -- "pirkimoNumeris" remains the identity every consumer keys on.
+       p."pirkimoId" AS "cvpisPirkimoId",
        p.pavadinimas,
        p."jarKodas",
        NULL::text AS "jarKodasSaltinis",
@@ -28,6 +45,7 @@ FROM "viesiejiPirkimai" p
 UNION ALL
 SELECT 'cvpp' AS saltinis,
        c."pirkimoNumeris" AS "pirkimoNumeris",
+       NULL::int AS "cvpisPirkimoId",
        c.pavadinimas,
        sj."perkanciosiosOrganizacijosKodas" AS "jarKodas",
        CASE WHEN sj."perkanciosiosOrganizacijosKodas" IS NOT NULL THEN 'sutartys-join' END AS "jarKodasSaltinis",

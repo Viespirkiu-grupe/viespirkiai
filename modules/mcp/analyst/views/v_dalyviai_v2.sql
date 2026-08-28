@@ -63,4 +63,19 @@ FROM "xlsxPPAataskaitos" a
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas
          ) p ON true
-         LEFT JOIN "jarAsmenys" j ON j."jarKodas"::text = d.kodas
+         -- Matched on jarAsmenys' own integer key rather than on "jarKodas"::text:
+         -- a cast on the indexed side makes jarAsmenys_pkey unusable, so the
+         -- planner had no choice but to seq-scan all ~548k rows and sort them
+         -- externally on every query that touches this view — several seconds,
+         -- paid even by the Procurement Reader's queries, none of which select
+         -- "tiekejas" at all. Comparing the raw column instead both enables the
+         -- pkey lookup and lets Postgres prove the join is one-to-one, so it
+         -- drops the join outright when "tiekejas" is not selected.
+         --
+         -- The guard is equivalent, not merely conservative: "jarKodas" is an
+         -- integer, so a d.kodas that is non-numeric, zero-padded, or wider than
+         -- a 9-digit registry code (an 11-digit personal code, say) could never
+         -- have matched the old text comparison either. Verified against the
+         -- warehouse: zero rows resolve to a different jarAsmenys row.
+         LEFT JOIN "jarAsmenys" j
+                   ON j."jarKodas" = CASE WHEN d.kodas ~ '^[1-9][0-9]{0,8}$' THEN d.kodas::int END

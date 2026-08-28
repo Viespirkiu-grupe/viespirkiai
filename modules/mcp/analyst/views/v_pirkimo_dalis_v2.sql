@@ -85,26 +85,33 @@ SELECT (COALESCE(l.saltinis, 'unknown') || ':' || l."pirkimoNumeris" || ':' ||
        l."kainuSkaicius",
        l."atmestuSkaicius"
 FROM (
+    -- 'cvpis' if pirkimoNumeris matches a viesiejiPirkimai.pirkimoId; else
+    -- 'cvpp' if it matches a cvppViesiejiPirkimai contract notice; else NULL.
+    -- Mirrors the precedence in v_pirkimas_v2.sql. Compared as text, not cast
+    -- to integer: real pirkimoNumeris values (e.g. 3782102904) overflow int4.
+    --
+    -- LEFT JOIN to a DISTINCT key set rather than two EXISTS inside a CASE.
+    -- Both spellings mean the same thing, but the CASE form is evaluated once
+    -- per output column that reads it — "saltinis" and "subjektoRaktas" both
+    -- do — and the planner emits a separate hashed SubPlan per evaluation, so
+    -- cvppViesiejiPirkimai (121 MB) was seq-scanned twice per query and
+    -- viesiejiPirkimai's key index scanned twice. As joins, each key set is
+    -- built once. DISTINCT is what keeps this a join and not a row multiplier:
+    -- cvppViesiejiPirkimai is keyed by skelbimoKodas, so one pirkimoNumeris
+    -- can match more than one row there.
     SELECT s.*,
-           -- 'cvpis' if pirkimoNumeris matches a viesiejiPirkimai.pirkimoId;
-           -- else 'cvpp' if it matches a cvppViesiejiPirkimai contract notice;
-           -- else NULL. Mirrors the precedence in v_pirkimas_v2.sql.
-           -- Compared as text, not cast to integer: real pirkimoNumeris values
-           -- (e.g. 3782102904) overflow int4.
            CASE
-               WHEN s."pirkimoNumeris" ~ '^[0-9]+$'
-                   AND EXISTS (SELECT 1
-                               FROM "viesiejiPirkimai" vp
-                               WHERE vp."pirkimoId"::text = s."pirkimoNumeris")
+               WHEN s."pirkimoNumeris" ~ '^[0-9]+$' AND cvpis."pirkimoNumeris" IS NOT NULL
                    THEN 'cvpis'
-               -- EXISTS rather than a join: cvppViesiejiPirkimai is keyed by
-               -- skelbimoKodas, so one pirkimoNumeris can match more than one
-               -- row there.
-               WHEN EXISTS (SELECT 1
-                            FROM "cvppViesiejiPirkimai" c
-                            WHERE c."pirkimoNumeris" = s."pirkimoNumeris"
-                              AND c."skelbimoTipas" = 'Skelbimas apie pirkimą')
+               WHEN cvpp."pirkimoNumeris" IS NOT NULL
                    THEN 'cvpp'
            END AS saltinis
     FROM sujungta s
+             LEFT JOIN (SELECT DISTINCT vp."pirkimoId"::text AS "pirkimoNumeris"
+                        FROM "viesiejiPirkimai" vp) cvpis
+                       ON cvpis."pirkimoNumeris" = s."pirkimoNumeris"
+             LEFT JOIN (SELECT DISTINCT c."pirkimoNumeris"
+                        FROM "cvppViesiejiPirkimai" c
+                        WHERE c."skelbimoTipas" = 'Skelbimas apie pirkimą') cvpp
+                       ON cvpp."pirkimoNumeris" = s."pirkimoNumeris"
 ) l
