@@ -228,11 +228,30 @@ export class ProcurementReader {
     private procedureOutcomeByNumber: Map<string, ProcurementProcedureOutcome> | null = null;
     private contractSignatureDatesByNumber: Map<string, readonly string[]> | null = null;
     private orphanLotCount = 0;
+    private pageNumber = 0;
 
     constructor(data: RiskDataSource, subjects: readonly string[] | null, dataAsOf: string) {
         this.data = data;
         this.subjects = subjects;
         this.dataAsOf = dataAsOf;
+    }
+
+    /**
+     * Runs one query and logs how long it took, so a slow query in the
+     * ensureLotUniverseLoaded() Promise.all can be told from the rest — the
+     * batch's own total says only how long the slowest one took. Timings are
+     * per-query wall clock; because the batch runs concurrently they overlap
+     * and will not sum to the batch total.
+     */
+    private async timedQuery<T>(label: string, sqlText: string, params: readonly unknown[]): Promise<readonly T[]> {
+        const startedAt = Date.now();
+        const rows = await this.data.query<T>(sqlText, params);
+        const timeSpent = Date.now() - startedAt;
+        const timeSpentLabel =  `${timeSpent}ms`.padEnd(10);
+        const rowsLabel = `${rows.length} rows`.padEnd(16);
+        const timePerRow = Math.round(timeSpent / rows.length);
+        log(`procurementReader: ${label.padEnd(32)} ${timeSpentLabel} ${rowsLabel} ${timePerRow}s/r`);
+        return rows;
     }
 
     /**
@@ -248,6 +267,8 @@ export class ProcurementReader {
     async loadProcurements(cursor: string | null, pageSize: number): Promise<Page<Procurement>> {
         await this.ensureLotUniverseLoaded();
 
+        this.pageNumber++;
+        const startedAt = Date.now();
         const [cursorSaltinis, cursorPirkimoNumeris] = cursor === null ? [null, null] : decodeCursor(cursor);
         const rows = await this.data.query<
             Omit<Procurement, "lots" | "participation" | "procedureOutcome" | "contractSignatureDates">
@@ -268,6 +289,11 @@ export class ProcurementReader {
         const last = rows[rows.length - 1];
         const nextCursor = rows.length === pageSize && last ? encodeCursor(last.saltinis!, last.pirkimoNumeris) : null;
 
+        log(
+            `procurementReader: page ${this.pageNumber} loaded ${rows.length} procurement(s) in ${Date.now() - startedAt}ms` +
+                (nextCursor ? " (more pages pending)" : " (last page)"),
+        );
+
         return { items, nextCursor };
     }
 
@@ -282,15 +308,21 @@ export class ProcurementReader {
     private async ensureLotUniverseLoaded(): Promise<void> {
         if (this.lotsByNumber !== null) return;
 
+        log("procurementReader: loading lot universe (lots, participation, bids, procedure outcomes, contract signatures)...");
+        const startedAt = Date.now();
+
         const [procurementIds, lotRows, lotParticipationRows, procurementParticipationRows, bidRows, procedureOutcomeRows, contractSignatureRows] =
             await Promise.all([
-                this.data.query<{ pirkimoNumeris: string }>(PROCUREMENT_IDS_SQL, [this.subjects]),
-                this.data.query<LotRow>(LOT_SQL, [this.subjects]),
-                this.data.query<LotParticipationRow>(LOT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
-                this.data.query<ProcurementParticipationRow>(PROCUREMENT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
-                this.data.query<BidRow>(LOT_BIDS_SQL, [this.dataAsOf, this.subjects]),
-                this.data.query<ProcedureOutcomeRow>(PROCEDURE_OUTCOME_SQL, [this.dataAsOf, this.subjects]),
-                this.data.query<ContractSignaturesRow>(CONTRACT_SIGNATURES_SQL, [this.subjects]),
+                this.timedQuery<{ pirkimoNumeris: string }>("PROCUREMENT_IDS_SQL", PROCUREMENT_IDS_SQL, [this.subjects]),
+                this.timedQuery<LotRow>("LOT_SQL", LOT_SQL, [this.subjects]),
+                this.timedQuery<LotParticipationRow>("LOT_PARTICIPATION_SQL", LOT_PARTICIPATION_SQL, [this.dataAsOf, this.subjects]),
+                this.timedQuery<ProcurementParticipationRow>("PROCUREMENT_PARTICIPATION_SQL", PROCUREMENT_PARTICIPATION_SQL, [
+                    this.dataAsOf,
+                    this.subjects,
+                ]),
+                this.timedQuery<BidRow>("LOT_BIDS_SQL", LOT_BIDS_SQL, [this.dataAsOf, this.subjects]),
+                this.timedQuery<ProcedureOutcomeRow>("PROCEDURE_OUTCOME_SQL", PROCEDURE_OUTCOME_SQL, [this.dataAsOf, this.subjects]),
+                this.timedQuery<ContractSignaturesRow>("CONTRACT_SIGNATURES_SQL", CONTRACT_SIGNATURES_SQL, [this.subjects]),
             ]);
 
         const validIds = new Set(procurementIds.map((row) => row.pirkimoNumeris));
@@ -339,6 +371,10 @@ export class ProcurementReader {
             log(`procurementReader: dropped ${orphanCount} orphan lot(s) with no matching procurement`);
         }
         this.orphanLotCount = orphanCount;
+        log(
+            `procurementReader: lot universe loaded in ${Date.now() - startedAt}ms ` +
+                `(${lotRows.length} lot(s), ${bidRows.length} bid(s))`,
+        );
 
         this.lotsByNumber = lotsByNumber;
         this.procurementParticipationByNumber = new Map(

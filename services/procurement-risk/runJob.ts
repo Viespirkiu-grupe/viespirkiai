@@ -158,6 +158,10 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
     });
     const evaluationContext = new EvaluationContext({ runId: openedRun.runId, dataAsOf });
     const engine = new RiskDecisionEngine(riskIndicatorRegistry.createAllIndicators(evaluationContext), evaluationContext);
+    log(
+        `procurement-risk: run ${openedRun.runId} starting — dataAsOf=${dataAsOf}, pageSize=${pageSize}, ` +
+            `subjects=${subjects ? subjects.length : "all"}`,
+    );
 
     const indicatorStats: Record<string, IndicatorStats> = {};
     let procurementsEvaluated = 0;
@@ -197,6 +201,11 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
             durationSec: elapsedSec(startedAt),
         });
         await writer.updateEvaluationRun({ statistics });
+        log(
+            `procurement-risk: page ${pagesProcessed} done — ${procurementsEvaluated} procurement(s) evaluated, ` +
+                `${decisionsWritten} decision(s) written, ${pagesFailed} page write failure(s), ` +
+                `${statistics.totals.durationSec}s elapsed so far`,
+        );
         cursor = page.nextCursor;
     } while (cursor !== null);
 
