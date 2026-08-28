@@ -294,6 +294,7 @@ kuris rašo sidecar'us; be jo write baigiasi klaida.
 | --- | --- |
 | `SIDECAR_DIR` | Katalogas su visomis sidecar SQLite bazėmis. Būtinas rašymui. |
 | `SIDECAR_REMOTE` | Mazgo su lokaliomis bazėmis bazinis URL — nuotolinis read fallback mazgams be `SIDECAR_DIR`. |
+| `SIDECAR_READ_THREADS` | Kiek gijų aptarnauja skaitymus iš lokalaus SQLite. Numatyta – `4`; `1` gijas išjungia. Žr. žemiau. |
 | `INTERNAL_FILE_BASE` | Vidinio failų CDN bazinis URL — preview nuorodoms sudaryti. Numatyta: `https://failai.viespirkiai.org`. |
 
 Skaitymo tvarka: lokalus SQLite, tada `SIDECAR_REMOTE`. Endpoint'ą aptarnaujantis
@@ -325,6 +326,33 @@ nuotoliniame mazge kainuoja vieną kelionę, ne N.
 Sekvenciniams srautams, kur per tick'ą ateina po vieną raktą, grupavimas
 nepadeda — jiems yra `store.readMany(keys)` (žr. `modules/ocr/eksportuotiRezultatus.js`,
 kuris kaupia srautą į 500 eilučių langus).
+
+#### Skaitymo gijos (`SIDECAR_READ_THREADS`)
+
+`node:sqlite` yra sinchroninis, tad N atsitiktinių raktų vienoje gijoje virsta N
+nuosekliai laukiamų disko kelionių — ir tiek pat laiko blokuoja event loop'ą.
+Bazės į RAM netelpa (`dokumentai` ~66 GB), bet flash diskas tuos I/O aptarnauja
+lygiagrečiai, jei tik yra kam jų paprašyti. Todėl skaitymai atiduodami gijų
+pool'ui (`utils/sqliteSidecarPoolas.js`): kiekviena gija turi savo readonly
+jungtį — SQLite WAL leidžia vieną rašytoją ir daug skaitytojų — ir atlieka tiek
+`json_each` ieškojimą, tiek zstd dekompresiją.
+
+50 atsitiktinių `dokumentai` raktų vienu ypu, 25 raundų medianos
+(`node benchmarks/sidecarSkaitymas.js`):
+
+| Gijos | 1 | 2 | 4 | 8 | 16 | 32 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Šalta | 90 ms | 69 ms | 33 ms | 25 ms | 17 ms | 19 ms |
+| Šilta (cache) | 18 ms | 26 ms | 15 ms | 10 ms | 16 ms | 10 ms |
+
+Skalė beveik tiesinė iki 4 gijų, ties 8 pradeda sotintis, toliau matuojamas jau
+tik triukšmas. Numatyta `4`; serveriui ar taskrunneriui su greitu disku verta
+`8`. `1` pool'ą išjungia visiškai (skaitoma pagrindinėje gijoje) — tinka
+trumpaamžiams CLI procesams, kur vienos gijos starto kaina didesnė už naudą.
+
+Kiekviena gija turi savo puslapių cache, tad jos atidaromos su mažesniu
+(32 MB) — kitaip aštuonios pasiimtų ~2 GB. Nuotoliniam (`SIDECAR_REMOTE`)
+skaitymui gijos neturi įtakos: ten kliūtis yra tinklas, ne diskas.
 
 #### Trūkstamų įrašų patikra
 

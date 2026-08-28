@@ -75,6 +75,7 @@ const ENV_MAP = [
     // Visos sidecar bazės — viename kataloge, po vieną failą; žr. utils/sidecarPaths.js.
     ["SIDECAR_DIR", "sidecarDir", "string"],
     ["SIDECAR_REMOTE", "sidecarRemote", "string"],
+    ["SIDECAR_READ_THREADS", "sidecarReadThreads", "number"],
 
     ["ENABLE_GRAPH", "enableGraph", "boolean"],
 

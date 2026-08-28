@@ -89,6 +89,9 @@ const configSchema = z.object({
     // mazgai be lokalių failų skaito per vieną nuotolinį bazinį URL.
     sidecarDir: z.string().optional(),
     sidecarRemote: z.string().optional(),
+    // Kiek gijų aptarnauja sidecar'ų skaitymus. `1` — jokių gijų, skaitoma
+    // pagrindinėje gijoje (žr. utils/sqliteSidecarPoolas.js).
+    sidecarReadThreads: z.number().int().min(1).default(4),
 
     enableGraph: z.boolean().default(false),
 

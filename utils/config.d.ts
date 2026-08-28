@@ -76,6 +76,8 @@ export interface Config {
      * `/api/v1/sidecar/<vardas>`. Naudojamas tik skaitymui.
      */
     sidecarRemote?: string;
+    /** Sidecar'ų skaitymo gijų skaičius; `1` – be gijų. Numatyta – 4. */
+    sidecarReadThreads: number;
 
     /** Stateless e-TAR HTML→JSON adapterio bazinis URL (`modules/eTar`). */
     eTarApiUrl: string;
