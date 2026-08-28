@@ -350,12 +350,21 @@ const PIPELINE_LOG_EVERY = 50;
  * pusvalandis, bet elementas nesikartoja iškart tuo pačiu ryšiu. Ilgesnį poilsį
  * po visų bandymų toliau skiria DB (`failureCount`/`retryAfter`).
  *
- * 404 čia irgi kartojamas: būtent tai ir tikrinam — ar akto tikrai nėra, ar
- * e-Seimas kartais atsako 404 į tą pačią užklausą.
+ * 404 nekartojamas: tai galutinis paties e-Seimas atsakymas „tokio dokumento
+ * nėra", o ne ryšio triktis — kartojimas tik atitolintų neišvengiamą klaidą.
  */
 const DEFAULT_ATTEMPTS = 3;
 /** Pauzės tarp bandymų (ms), po vieną kiekvienam pakartojimui. */
 const RETRY_DELAYS_MS = [2_000, 5_000];
+
+/**
+ * Klaida, kurios kartoti nėra prasmės: 404 ateina iš paties e-Seimas ir reiškia
+ * „tokio dokumento nėra". Ta pati užklausa duos tą patį atsakymą, tad einam
+ * tiesiai prie galutinės klaidos (o suvestinių etape 404 apskritai apdorojamas
+ * kaip normalus atsakymas, žr. `scrapeConsolidated`).
+ */
+const galutinė = (error) => error instanceof ESeimasNotFoundError;
+
 /** Pauzė prieš kartojant nepavykusią `pick` užklausą. */
 const REFILL_RETRY_MS = 5_000;
 /** Po tiek `pick` klaidų iš eilės pasiduodam — su klaida, o ne tyliai „baigta". */
@@ -534,7 +543,7 @@ export async function runPipeline(specs, { concurrency, limit = Infinity, attemp
             try {
                 return await stage.work(item, attempt);
             } catch (error) {
-                if (attempt >= attempts) {
+                if (attempt >= attempts || galutinė(error)) {
                     if (error instanceof Error) error.bandymai = attempt;
                     throw error;
                 }
@@ -645,7 +654,7 @@ async function searchSuBandymais(api, params, attempts = DEFAULT_ATTEMPTS) {
         try {
             return await api.searchLegalActs(params);
         } catch (error) {
-            if (attempt >= attempts) throw error;
+            if (attempt >= attempts || galutinė(error)) throw error;
             const pauzė = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
             log(`paieška ${params.to} psl. ${params.page} bandymas ${attempt}/${attempts}`
                 + ` nepavyko (${error.message}) — kartojam po ${Math.round(pauzė / 1000)} s`);
