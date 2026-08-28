@@ -34,6 +34,8 @@ export function aprasymoIrankiai() {
  * @param {object[]} p.tools - `aprasymoIrankiai()`
  * @param {string} p.apiKey
  * @param {() => Promise<void>} [p.beforeRequest] - RPS ribotuvas
+ * @param {(event: object) => void} [p.onEvent] - harness'o įvykiai (užklausų
+ *   žurnalui; žr. `modules/viesiejiPirkimai/uzklausuZurnalas.js`)
  * @returns {Promise<"issaugota"|"neaprasoma"|"jauBuvo">}
  */
 export async function aprasytiPirkima({
@@ -43,6 +45,7 @@ export async function aprasytiPirkima({
     tools,
     apiKey,
     beforeRequest,
+    onEvent,
 }) {
     const aprasymas = await runPirkimoAprasas({
         pirkimoId: String(pirkimoId),
@@ -55,6 +58,7 @@ export async function aprasytiPirkima({
         topP: variant.topP,
         topK: variant.topK,
         beforeRequest,
+        onEvent,
     });
 
     const success = !isFailureResult(aprasymas);

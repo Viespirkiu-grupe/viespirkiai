@@ -13,6 +13,11 @@ import {
     aprasymoIrankiai,
     aprasytiPirkima,
 } from "./aprasymoGeneravimas.js";
+import {
+    kaina,
+    sukurtiSuvestine,
+    uzklausuZurnalas,
+} from "./uzklausuZurnalas.js";
 
 /*
 AI aprašymų generavimo eilė — `viesiejiPirkimaiAprasymaiQueue`.
@@ -45,6 +50,15 @@ const RPS = 12.5;
 const MAX_BANDYMAI = 5;
 /** Po tiek laiko kritusio darbininko rezervacija laikoma pakibusia. */
 const LOCK_TIMEOUT = "30 minutes";
+/*
+Kiek atidedama eilutė po APLINKOS klaidos (`AprasoKlaida.infrastrukturine`).
+
+Fiksuotas, o ne eksponentinis atsitraukimas: `attempts` tokiu atveju nedidinamas,
+tad eksponentei nebūtų nuo ko atsispirti. Modelio dingimas ar pasibaigę kreditai
+patys savaime nieko nekainuoja (404 / 402 grąžinami nemokamai), tad kartoti kas
+15 min. saugu ir eilė atsistato savaime, kai aplinka susitvarko.
+*/
+const INFRA_ATSITRAUKIMAS = "15 minutes";
 
 /*
 Ar pirkimo failai jau paruošti skaitymui?
@@ -181,11 +195,117 @@ export async function paimtiAprasymus(
 }
 
 /**
+ * Kiek eilučių ŠIUO METU tiktų paimti (ta pati sąlyga kaip `paimtiAprasymus`).
+ *
+ * @param {number} modelioVariantasId
+ * @returns {Promise<number>}
+ */
+export async function suskaiciuotiLaukiancius(modelioVariantasId, klientas = postgres) {
+    const { rows } = await klientas.query(
+        `SELECT count(*)::int AS kiek
+         FROM public."viesiejiPirkimaiAprasymaiQueue" q
+         WHERE q."lockedBy" IS NULL
+           AND q.attempts < $2
+           AND (q."nextAttempt" IS NULL OR q."nextAttempt" <= NOW())
+           AND NOT EXISTS (
+               SELECT 1 FROM public."viesiejiPirkimaiAprasymai" a
+               WHERE a."pirkimoId" = q."pirkimoId"
+                 AND a."modelioVariantasId" = $1
+           )
+           AND ${FAILAI_PARUOSTI_SQL}`,
+        [modelioVariantasId, MAX_BANDYMAI],
+    );
+    return rows[0].kiek;
+}
+
+/**
+ * Eilės būsenos išskaidymas — kodėl likusios eilutės NEIMAMOS.
+ *
+ * Be šito „eilėje 130, o dirbti nėra ko" atrodo kaip gedimas. Kiekviena
+ * kategorija yra atskira priežastis ir taisoma skirtingai: `mirusios` laukia
+ * rankinio sprendimo, `failaiNeparuosti` – failų konvejerio, `atidetos` –
+ * tiesiog laiko.
+ *
+ * @param {number} modelioVariantasId
+ */
+export async function eilesBusena(modelioVariantasId, klientas = postgres) {
+    const { rows } = await klientas.query(
+        `SELECT
+            count(*)::int AS viso,
+            count(*) FILTER (WHERE q."lockedBy" IS NOT NULL)::int AS uzrakintos,
+            count(*) FILTER (WHERE q."lockedBy" IS NULL
+                             AND q.attempts >= $2)::int AS mirusios,
+            count(*) FILTER (WHERE q."lockedBy" IS NULL
+                             AND q.attempts < $2
+                             AND q."nextAttempt" > NOW())::int AS atidetos,
+            count(*) FILTER (WHERE q."lockedBy" IS NULL
+                             AND q.attempts < $2
+                             AND (q."nextAttempt" IS NULL OR q."nextAttempt" <= NOW())
+                             AND NOT ${FAILAI_PARUOSTI_SQL})::int AS "failaiNeparuosti",
+            count(*) FILTER (WHERE EXISTS (
+                SELECT 1 FROM public."viesiejiPirkimaiAprasymai" a
+                WHERE a."pirkimoId" = q."pirkimoId"
+                  AND a."modelioVariantasId" = $1
+            ))::int AS "jauAprasyti"
+         FROM public."viesiejiPirkimaiAprasymaiQueue" q`,
+        [modelioVariantasId, MAX_BANDYMAI],
+    );
+    return { ...rows[0], laukia: await suskaiciuotiLaukiancius(modelioVariantasId, klientas) };
+}
+
+/**
+ * Įdeda į eilę pirkimus, kurie šiuo variantu dar neaprašyti.
+ *
+ * Backfill'as per eilę, o ne aplinkkeliu: taip visi aprašymai eina pro tą pačią
+ * rezervaciją, tuos pačius failų paruoštumo vartus ir tą patį bandymų
+ * skaitiklį, o eilės ilgis lieka tikras likusio darbo matas.
+ *
+ * @param {number} modelioVariantasId
+ * @param {number} [limit]
+ * @returns {Promise<number>} kiek eilučių pridėta
+ */
+export async function papildytiEileTrukstamais(
+    modelioVariantasId,
+    limit = Infinity,
+    klientas = postgres,
+) {
+    const limitSql = Number.isFinite(limit) ? "LIMIT $2" : "";
+    const params = Number.isFinite(limit)
+        ? [modelioVariantasId, limit]
+        : [modelioVariantasId];
+    const res = await klientas.query(
+        `INSERT INTO public."viesiejiPirkimaiAprasymaiQueue" ("pirkimoId")
+         SELECT p."pirkimoId"
+         FROM public."viesiejiPirkimai" p
+         WHERE NOT EXISTS (
+             SELECT 1 FROM public."viesiejiPirkimaiAprasymai" a
+             WHERE a."pirkimoId" = p."pirkimoId"
+               AND a."modelioVariantasId" = $1
+         )
+         ORDER BY p."paskelbimoData" DESC NULLS LAST, p."pirkimoId" DESC
+         ${limitSql}
+         ON CONFLICT ("pirkimoId") DO NOTHING`,
+        params,
+    );
+    return res.rowCount;
+}
+
+/**
  * Pažymi aprašymo rezultatą.
  *
  * Sėkmė IR „nepakanka duomenų" (`success = false`) yra galutiniai atsakymai —
- * eilutė iš eilės dingsta. Tik išimtis (tinklas, modelis, DB) grąžina eilutę su
- * padidintu `attempts` ir eksponentiniu atsitraukimu.
+ * eilutė iš eilės dingsta.
+ *
+ * Klaidos skirstomos į dvi rūšis:
+ *
+ * - APLINKOS (`AprasoKlaida.infrastrukturine`): modelio nebėra, pasibaigė
+ *   kreditai, blogas raktas, nukrito tinklas. Ne šio pirkimo kaltė, tad
+ *   `attempts` NEDIDINAMAS — eilutė tik atidedama `INFRA_ATSITRAUKIMAS`.
+ *   Būtent šito trūko 2026-08-26: `stealth/ox-alpha` dingo iš OpenRouter, visos
+ *   eilutės penkis kartus gavo 404 ir negrįžtamai užstrigo ties
+ *   `attempts = MAX_BANDYMAI`, nors pačiuose pirkimuose nieko blogo nebuvo.
+ * - PIRKIMO: viskas kita. `attempts` didinamas, atsitraukimas eksponentinis, po
+ *   `MAX_BANDYMAI` eilutė lieka apžiūrai.
  *
  * @param {number} pirkimoId
  * @param {Error|null} klaida
@@ -199,6 +319,21 @@ export async function pazymetiAprasymoRezultata(pirkimoId, klaida, klientas = po
         return;
     }
 
+    const tekstas = klaida.message.replace(/\s+/g, " ").slice(0, 500);
+
+    if (klaida.infrastrukturine) {
+        await klientas.query(
+            `UPDATE public."viesiejiPirkimaiAprasymaiQueue"
+             SET "lockedBy"    = NULL,
+                 "lockedAt"    = NULL,
+                 "lastError"   = $2,
+                 "nextAttempt" = NOW() + INTERVAL '${INFRA_ATSITRAUKIMAS}'
+             WHERE "pirkimoId" = $1`,
+            [pirkimoId, tekstas],
+        );
+        return;
+    }
+
     await klientas.query(
         `UPDATE public."viesiejiPirkimaiAprasymaiQueue"
          SET attempts      = attempts + 1,
@@ -207,7 +342,7 @@ export async function pazymetiAprasymoRezultata(pirkimoId, klaida, klientas = po
              "lastError"   = $2,
              "nextAttempt" = NOW() + (INTERVAL '5 minutes' * POWER(2, LEAST(attempts, 5)))
          WHERE "pirkimoId" = $1`,
-        [pirkimoId, klaida.message.replace(/\s+/g, " ").slice(0, 500)],
+        [pirkimoId, tekstas],
     );
 }
 
@@ -252,6 +387,18 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
     // `jauBuvo` po aukščiau esančio atsijojimo turėtų likti 0; nenulinė reikšmė
     // reiškia lenktynes su rankiniu `npm run pirkimai:aprasyti`.
     const stats = { issaugota: 0, neaprasoma: 0, jauBuvo: 0, klaidos: 0 };
+    /*
+    Eilė užklausų po vieną nelogina – tam yra `npm run pirkimai:aprasyti --log`.
+    Bet sąskaita kaupiama ir čia: be jos runner'io loge matyti tik „išsaugota",
+    ir neaišku, ar aprašymas kainavo centą, ar dvidešimt.
+    */
+    const suvestine = sukurtiSuvestine();
+    // Aplinkos klaida (modelio nebėra, nėra kreditų, blogas raktas) galios ir
+    // kitam pirkimui, tad porcija nutraukiama ir grąžinamas `false`. Kitaip
+    // worker'is, gavęs `true`, iškart imtų kitą eilutę ir sistemine bėda
+    // pervarytų per visą eilę — būtent taip 2026-08-26 buvo iššvaistyti
+    // bandymai. Su `false` įsijungia taskRunner'io cooldown'as.
+    let infra = null;
 
     logger.log(`aprasymuEile: paimta ${eile.length} pirkimų · ${model}`);
 
@@ -264,6 +411,11 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
                 tools,
                 apiKey: process.env.OPENROUTER_API_KEY,
                 beforeRequest: () => rateLimiter.acquire(),
+                onEvent: uzklausuZurnalas({
+                    zyme: pirkimoId,
+                    tylus: true,
+                    suvestine,
+                }).onEvent,
             });
             stats[rezultatas]++;
             await pazymetiAprasymoRezultata(pirkimoId, null);
@@ -271,12 +423,17 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
             stats.klaidos++;
             logger.log(`aprasymuEile: #${pirkimoId} klaida: ${error.message}`);
             await pazymetiAprasymoRezultata(pirkimoId, error);
+            if (error.infrastrukturine) {
+                infra = error;
+                break;
+            }
         }
     }
 
     logger.log(
         `aprasymuEile: ${stats.issaugota} išsaugota · ${stats.neaprasoma} neaprašomi`
-        + ` · ${stats.jauBuvo} jau buvo · ${stats.klaidos} klaidų`,
+        + ` · ${stats.jauBuvo} jau buvo · ${stats.klaidos} klaidų`
+        + ` · ${suvestine.viso.uzklausu} užklausų · ${kaina(suvestine.viso.kaina)}`,
     );
 
     // Trigeris jau pridėjo 'patch' eilutes į viesiejiPirkimaiIndexQueue —
@@ -286,6 +443,14 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
             source: "viesiejiPirkimaiAprasymaiQueue",
             count: stats.issaugota,
         });
+    }
+
+    if (infra) {
+        logger.log(
+            `aprasymuEile: aplinkos klaida — porcija nutraukiama, kartosim po`
+            + ` ${INFRA_ATSITRAUKIMAS}: ${infra.message}`,
+        );
+        return false;
     }
 
     return eile.length === BATCH_SIZE;

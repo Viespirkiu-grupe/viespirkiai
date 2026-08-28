@@ -3,8 +3,13 @@ import { pathToFileURL } from "node:url";
 import { loadEnvFile } from "../utils/configEnv.js";
 import { parseArgs, positiveInteger } from "../utils/cliArgs.js";
 import { postgres } from "../postgres/postgres.js";
-import { streamQuery } from "../postgres/streamQuery.js";
 import { FifoRateLimiter } from "../modules/openrouter/fifoRateLimiter.js";
+import {
+    eilesBusena,
+    paimtiAprasymus,
+    papildytiEileTrukstamais,
+    pazymetiAprasymoRezultata,
+} from "../modules/viesiejiPirkimai/aprasymuEile.js";
 import {
     apiModel,
     getPaskirtis,
@@ -19,6 +24,11 @@ import {
     runAdaptiveSlots,
     runWithSlots,
 } from "../modules/viesiejiPirkimai/runWithSlots.js";
+import {
+    kaina,
+    sukurtiSuvestine,
+    uzklausuZurnalas,
+} from "../modules/viesiejiPirkimai/uzklausuZurnalas.js";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_RPS = 12.5;
@@ -28,11 +38,23 @@ function usage() {
     return [
         "Naudojimas: npm run pirkimai:aprasyti -- [parametrai]",
         "",
-        "  --limit N          aprašyti daugiausia N pirkimų (numatyta: visus)",
+        "  --limit N          aprašyti daugiausia N pirkimų (numatyta: visą eilę)",
+        "  --papildyti [N]    prieš pradedant įdėti į eilę dar neaprašytus pirkimus",
+        "                     (naujausius pirmiau; be N – visus)",
         "  --rps N            OpenRouter užklausų per sekundę (numatyta: 12.5)",
         "  --concurrency N    fiksuotas darbų skaičius (numatyta: automatinis)",
         "  --variant N        naudoti esamą aiModelVariants.id (numatyta: pagal aiModelPaskirtys)",
         "  --force            aprašyti net kai aiModelPaskirtys.aktyvus = false",
+        "  --log              loginti kiekvieną OpenRouter užklausą (dydžiai ir",
+        "                     kaina, be turinio) – matyti, kur suka tokenus",
+        "",
+        "Sąskaita (užklausų skaičius, tokenai, kaina) rodoma visada, nepriklausomai",
+        "nuo --log: pabaigoje ir kas sekundę progreso eilutėje.",
+        "",
+        "Darbas imamas IŠ `viesiejiPirkimaiAprasymaiQueue` – tos pačios eilės, kurią",
+        "suka taskRunner'is, su ta pačia rezervacija (FOR UPDATE SKIP LOCKED), tais",
+        "pačiais failų paruoštumo vartais ir tuo pačiu bandymų skaitikliu. Abu gali",
+        "suktis vienu metu ir vienas kitam ant kojų neužlips.",
     ].join("\n");
 }
 
@@ -44,38 +66,29 @@ function positiveNumber(value, option) {
     return number;
 }
 
-async function missingPurchases(variantId, limit) {
-    const limitSql = Number.isFinite(limit) ? "LIMIT $2" : "";
-    const params = Number.isFinite(limit) ? [variantId, limit] : [variantId];
-    return streamQuery(
-        `SELECT p."pirkimoId"
-         FROM public."viesiejiPirkimai" p
-         WHERE NOT EXISTS (
-             SELECT 1
-             FROM public."viesiejiPirkimaiAprasymai" a
-             WHERE a."pirkimoId" = p."pirkimoId"
-               AND a."modelioVariantasId" = $1
-         )
-         ORDER BY p."paskelbimoData" DESC NULLS LAST, p."pirkimoId" DESC
-         ${limitSql}`,
-        params,
-        { batchSize: 50 },
-    );
-}
+/*
+Rezervuoja eilutes iš eilės tokiu tempu, kokiu jos apdorojamos.
 
-async function missingPurchaseCount(variantId, limit) {
-    const { rows } = await postgres.query(
-        `SELECT COUNT(*)::int AS "count"
-         FROM public."viesiejiPirkimai" p
-         WHERE NOT EXISTS (
-             SELECT 1
-             FROM public."viesiejiPirkimaiAprasymai" a
-             WHERE a."pirkimoId" = p."pirkimoId"
-               AND a."modelioVariantasId" = $1
-         )`,
-        [variantId],
-    );
-    return Number.isFinite(limit) ? Math.min(rows[0].count, limit) : rows[0].count;
+`runWithSlots` traukia po vieną ir sustoja, kai slotai pilni, tad generatorius
+niekada nelaiko rezervuotų daugiau nei vieną porciją į priekį. Tai svarbu: kritus
+scriptui rezervacijos kabo iki `LOCK_TIMEOUT` (30 min.), tad jų nelaikom
+atsargai.
+
+Porcija imama pagal slotų kiekį – vienas `paimtiAprasymus` kreipinys su
+`LIMIT 8` pigesnis nei aštuoni po vieną, o `FOR UPDATE SKIP LOCKED` reiškia, kad
+lygiagretus taskRunner'is tiesiog pasiims kitas eilutes.
+*/
+async function* eilesPirkimai(variantId, limit, porcijosDydis) {
+    let paimta = 0;
+    while (paimta < limit) {
+        const kiek = Math.min(porcijosDydis, limit - paimta);
+        const porcija = await paimtiAprasymus(variantId, kiek);
+        if (!porcija.length) return;
+        for (const eilute of porcija) {
+            yield eilute;
+            paimta++;
+        }
+    }
 }
 
 function duration(seconds) {
@@ -110,6 +123,13 @@ export async function main(argv = process.argv.slice(2)) {
     const variantId = args.variant == null
         ? null
         : positiveInteger(args.variant, "--variant");
+    /*
+    Sąskaita kaupiama VISADA – `--log` tik įjungia eilutes po kiekvieną
+    užklausą. Suvestinė nieko nekainuoja, o be jos masinis paleidimas vėl būtų
+    „prasuko pinigus ir nesuprantu kur".
+    */
+    const logintiUzklausas = argv.includes("--log");
+    const suvestine = sukurtiSuvestine();
     // Modelis imamas iš DB (`aiModelPaskirtys`), nebent nurodytas `--variant`.
     // Ta pati vėliava, kuri stabdo eilę, stabdo ir šį backfill'ą — kad
     // sustabdytas darbas nepasileistų per rankinį paleidimą netyčia.
@@ -126,7 +146,22 @@ export async function main(argv = process.argv.slice(2)) {
     const tools = aprasymoIrankiai();
     const rateLimiter = new FifoRateLimiter(rps);
     const stats = { pradeta: 0, issaugota: 0, neaprasoma: 0, klaidos: 0, jauBuvo: 0 };
-    const total = await missingPurchaseCount(variant.id, limit);
+
+    if (args.papildyti) {
+        const kiek = args.papildyti === true
+            ? Infinity
+            : positiveInteger(args.papildyti, "--papildyti");
+        const prideta = await papildytiEileTrukstamais(variant.id, kiek);
+        process.stderr.write(`Į eilę pridėta ${prideta} dar neaprašytų pirkimų.\n`);
+    }
+
+    /*
+    Eilės ilgis NĖRA darbo kiekis: dalis eilučių laukia failų konvejerio, dalis
+    atidėta po klaidos, dalis mirusi ties MAX_BANDYMAI. Rodom išskaidymą, kad
+    „eilėje 130, o dirbti nėra ko" nebeatrodytų kaip gedimas.
+    */
+    const busena = await eilesBusena(variant.id);
+    const total = Math.min(busena.laukia, limit);
     const startedAt = performance.now();
     let completed = 0;
     let activeJobs = 0;
@@ -135,9 +170,24 @@ export async function main(argv = process.argv.slice(2)) {
     process.stderr.write(
         `Modelis: ${model} · variantas #${variant.id} · ${rps} RPS · `+
         `${concurrency == null ? `automatiniai slotai (pradžia ${DEFAULT_CONCURRENCY})` : `${concurrency} slotai`}`+
-        ` · ${total} pirkimų${Number.isFinite(limit) ? ` · limitas ${limit}` : ""}\n\n`,
+        ` · ${total} pirkimų${Number.isFinite(limit) ? ` · limitas ${limit}` : ""}\n`,
     );
-    const rows = await missingPurchases(variant.id, limit);
+    process.stderr.write(
+        `Eilėje ${busena.viso}: ${busena.laukia} paruošta darbui`+
+        ` · ${busena.failaiNeparuosti} laukia failų konvejerio`+
+        ` · ${busena.atidetos} atidėtos po klaidos`+
+        ` · ${busena.mirusios} mirusios (attempts riba)`+
+        ` · ${busena.uzrakintos} rezervuotos kitų`+
+        `${busena.jauAprasyti ? ` · ${busena.jauAprasyti} jau aprašyti (bus išvalyti)` : ""}\n\n`,
+    );
+    if (!total) {
+        process.stderr.write(
+            "Nėra ko dirbti. Jei eilėje dar yra eilučių, žr. skaidinį aukščiau –"
+            + " mirusias atlaisvina tik rankinis attempts nulinimas.\n",
+        );
+        return;
+    }
+    const rows = eilesPirkimai(variant.id, limit, concurrency ?? DEFAULT_CONCURRENCY);
 
     const progressLine = () => {
         const elapsedSeconds = Math.max(0.001, (performance.now() - startedAt) / 1000);
@@ -152,10 +202,19 @@ export async function main(argv = process.argv.slice(2)) {
             ` · ${rateLimiter.averageRps.toFixed(1)}/${rps} RPS`+
             ` · ${activeJobs}/${currentConcurrency} darbai`+
             ` · ${rateLimiter.waitingCount} užklausų eilėje (${queuePercent.toFixed(0)}%)`+
-            ` · ETA ${duration(eta)}\n`,
+            ` · ETA ${duration(eta)}`+
+            ` · ${suvestine.viso.uzklausu} užkl. ${kaina(suvestine.viso.kaina)}\n`,
         );
     };
-    const progressTimer = setInterval(progressLine, 1000);
+    /*
+    Su `--log` periodinės progreso eilutės nerodomos: tą patį (ir tiksliau)
+    pasako pačios užklausų eilutės, o įsiterpdamos kas sekundę jos tik ardo
+    vieno pirkimo seką. Be `--log` progreso eilutė lieka vienintelis gyvybės
+    ženklas, tad ten ji būtina.
+    */
+    const progressTimer = logintiUzklausas
+        ? null
+        : setInterval(progressLine, 1000);
 
     const logCompleted = (pirkimoId, symbol, outcome) => {
         completed++;
@@ -167,6 +226,13 @@ export async function main(argv = process.argv.slice(2)) {
         activeJobs++;
         let symbol = "✓";
         let outcome = "išsaugota";
+        // Kiekvienas pirkimas turi savo žurnalą (žymė eilutėse – nes lygiagretūs
+        // darbai rašo į tą patį srautą), bet sąskaita bendra.
+        const { onEvent, savi } = uzklausuZurnalas({
+            zyme: pirkimoId,
+            tylus: !logintiUzklausas,
+            suvestine,
+        });
         try {
             const rezultatas = await aprasytiPirkima({
                 pirkimoId,
@@ -175,6 +241,7 @@ export async function main(argv = process.argv.slice(2)) {
                 tools,
                 apiKey: process.env.OPENROUTER_API_KEY,
                 beforeRequest: () => rateLimiter.acquire(),
+                onEvent,
             });
             stats[rezultatas]++;
             if (rezultatas === "neaprasoma") {
@@ -184,12 +251,22 @@ export async function main(argv = process.argv.slice(2)) {
                 symbol = "○";
                 outcome = "jau buvo";
             }
+            // Sėkmė ir „nepakanka duomenų" – galutiniai atsakymai: eilutė iš
+            // eilės dingsta. Būtent to trūko, kai šis scriptas dirbo su savo
+            // atskiru sąrašu ir eilė nuo jo darbo netrumpėjo.
+            await pazymetiAprasymoRezultata(pirkimoId, null);
         } catch (error) {
             stats.klaidos++;
             symbol = "✗";
             outcome = `klaida: ${error.message.replace(/\s+/g, " ").slice(0, 160)}`;
+            // Aplinkos klaida bandymų nedegina – tik atideda (žr. aprasymuEile.js).
+            await pazymetiAprasymoRezultata(pirkimoId, error);
         } finally {
-            logCompleted(pirkimoId, symbol, outcome);
+            logCompleted(
+                pirkimoId,
+                symbol,
+                `${outcome} · ${savi.uzklausu} užkl. · ${kaina(savi.kaina)}`,
+            );
             activeJobs--;
         }
     };
@@ -206,16 +283,30 @@ export async function main(argv = process.argv.slice(2)) {
             await runWithSlots(rows, describePurchase, concurrency);
         }
     } finally {
-        clearInterval(progressTimer);
+        if (progressTimer) clearInterval(progressTimer);
     }
 
-    progressLine();
+    if (!logintiUzklausas) progressLine();
 
     process.stderr.write(
         `\nBaigta · ${stats.issaugota} išsaugota · ${stats.klaidos} klaidų`+
         `${stats.neaprasoma ? ` · ${stats.neaprasoma} neaprašomi` : ""}`+
         `${stats.jauBuvo ? ` · ${stats.jauBuvo} jau buvo` : ""}\n`,
     );
+    process.stderr.write(`Sąskaita · ${suvestine.eilute()}\n`);
+    const pabaiga = await eilesBusena(variant.id);
+    process.stderr.write(
+        `Eilėje liko ${pabaiga.viso} (${pabaiga.laukia} paruošta darbui`+
+        ` · ${pabaiga.failaiNeparuosti} laukia failų`+
+        ` · ${pabaiga.atidetos} atidėtos · ${pabaiga.mirusios} mirusios)\n`,
+    );
+    if (stats.issaugota) {
+        process.stderr.write(
+            `Vidutiniškai vienam aprašymui:`
+            + ` ${kaina(suvestine.viso.kaina / stats.issaugota)}`
+            + ` · ${Math.round(suvestine.viso.uzklausu / stats.issaugota)} užklausos\n`,
+        );
+    }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

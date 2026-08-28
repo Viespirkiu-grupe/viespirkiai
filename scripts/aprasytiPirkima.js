@@ -158,19 +158,40 @@ export async function main(argv = process.argv.slice(2)) {
 
     // Importuojami tik pirkimo ir jo failų MCP įrankiai. Analitikos
     // get_schema / execute_query šiame eksperimente sąmoningai nėra.
-    const [getViesasisPirkimas, getFailas, getFailasTekstas, { postgres }] = await Promise.all([
+    const [
+        getViesasisPirkimas,
+        getFailas,
+        getFailasTekstas,
+        { postgres },
+        { apiModel, getPaskirtis, PASKIRTYS },
+    ] = await Promise.all([
         import("../modules/mcp/tools/getViesasisPirkimas.js"),
         import("../modules/mcp/tools/getFailas.js"),
         import("../modules/mcp/tools/getFailasTekstas.js"),
         import("../postgres/postgres.js"),
+        import("../modules/openrouter/modelioVariantai.js"),
     ]);
 
     try {
+        // Modelis imamas iš to paties DB šaltinio kaip eilėje. Anksčiau čia
+        // nebuvo perduodama nieko ir harness'as kliaudavosi savo numatytuoju
+        // `stealth/ox-alpha` — kai tas alias'as dingo, scriptas ėmė tyliai
+        // kviesti nebeegzistuojantį modelį, nors DB jau rodė į naują.
+        const { variant } = await getPaskirtis(PASKIRTYS.VIESUJU_PIRKIMU_APRASYMAS);
+        const model = apiModel(variant);
+        process.stderr.write(`Modelis: ${model} · variantas #${variant.id}\n`);
+
         const onEvent = progressRenderer(pirkimoId);
         const answer = await runPirkimoAprasas({
             pirkimoId,
             apiKey: process.env.OPENROUTER_API_KEY,
             tools: [getViesasisPirkimas, getFailas, getFailasTekstas].map(mcpAdapter),
+            model,
+            reasoningEffort: variant.reasoningEffort,
+            maxOutputTokens: variant.maxOutputTokens ?? 4000,
+            temperature: variant.temperatura,
+            topP: variant.topP,
+            topK: variant.topK,
             onEvent,
         });
         onEvent({ type: "complete" });
