@@ -8,6 +8,13 @@
 # Reikia BuildKit (numatytas moderniame Docker; CI nustatyti DOCKER_BUILDKIT=1)
 # dėl `--mount=type=cache` npm cache mount'ų.
 
+# `npm ci` lūžta su „Missing: tokenizers-* from lock file", jei package-lock.json
+# neturi tuščių optional stub'ų `node_modules/tokenizers/node_modules/*`.
+# Priežastis: `tokenizers@0.13.3` deklaruoja 13 platforminių optionalDependencies,
+# kurių tokia versija registre neišleista (404) — `npm install` jas tyliai
+# praleidžia, o `npm ci` reikalauja įrašo kiekvienai. Stub'ai laikomi lock faile
+# rankomis; paleidus `npm install`/`npm uninstall` juos reikia grąžinti.
+
 # ---- deps: TIK produkcinės priklausomybės (be devDependencies) ----
 FROM node:24-slim AS deps
 WORKDIR /app
