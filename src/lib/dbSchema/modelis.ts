@@ -70,7 +70,7 @@ function pagalLentele<T extends { schema: string; lentele: string }>(rows: T[]):
 }
 
 async function kraunamaSchema(): Promise<SchemosModelis> {
-  const [lentelesRows, stulpeliaiRows, ribojimaiRows, indeksaiRows, trigeriaiRows, dydziaiRows, quickwitRows, meta] =
+  const [lentelesRows, stulpeliaiRows, ribojimaiRows, indeksaiRows, trigeriaiRows, dydziaiRows, meta] =
     await Promise.all([
       uzklausos.lenteles(),
       uzklausos.stulpeliai(),
@@ -78,7 +78,6 @@ async function kraunamaSchema(): Promise<SchemosModelis> {
       uzklausos.indeksai(),
       uzklausos.trigeriai(),
       uzklausos.dydziai(),
-      uzklausos.quickwitIndeksai().catch(() => []),
       gautiMeta(),
     ]);
 
@@ -89,12 +88,6 @@ async function kraunamaSchema(): Promise<SchemosModelis> {
 
   const dydziai = new Map<string, any>();
   for (const row of dydziaiRows) dydziai.set(raktas(row.schemaName, row.tableName), row);
-
-  const quickwit = new Map<string, string[]>();
-  for (const row of quickwitRows as any[]) {
-    const key = raktas('public', row.lentele);
-    quickwit.set(key, [...(quickwit.get(key) ?? []), row.indeksas]);
-  }
 
   const grupesPagalRakta = new Map<string, Grupe>(meta.grupes.map((g) => [g.raktas, g]));
   const rysiai: Rysys[] = [];
@@ -176,7 +169,6 @@ async function kraunamaSchema(): Promise<SchemosModelis> {
       grupe,
       grupePriskirtaRankomis: rankomis,
       meta: lentelesMeta,
-      quickwitIndeksai: quickwit.get(key) ?? [],
     });
   }
 

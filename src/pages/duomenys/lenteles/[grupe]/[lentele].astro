@@ -63,10 +63,6 @@ const pagrindas: Array<{ label: string; value?: unknown; html?: string }> = [
   { label: 'Iš viso', value: dydis(lentele.bendrasDydis) },
 ];
 
-if (lentele.quickwitIndeksai.length) {
-  pagrindas.push({ label: 'Quickwit indeksai', value: lentele.quickwitIndeksai.join(', ') });
-}
-
 Astro.response.headers.set('Cache-Control', 'public, max-age=60');
 ---
 <Layout

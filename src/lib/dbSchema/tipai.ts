@@ -85,8 +85,6 @@ export interface Lentele {
   /** Ar grupė priskirta rankiniu būdu (ne pagal prefiksą). */
   grupePriskirtaRankomis: boolean;
   meta: LentelesMeta | null;
-  /** Quickwit indeksai, į kuriuos ši lentelė keliauja toliau. */
-  quickwitIndeksai: string[];
 }
 
 export interface Rysys {

@@ -131,17 +131,3 @@ export async function trigeriai() {
 }
 
 export { gautiLenteliuDydzius as dydziai };
-
-/**
- * Quickwit indeksai pagal lentelę – „kur duomenys keliauja toliau“ be jokio
- * rankinio darbo.
- */
-export async function quickwitIndeksai() {
-    const { rows } = await postgres.query(`
-        SELECT "lentele", "indeksas"
-        FROM public."quickwitIndeksai"
-        WHERE "current"
-        ORDER BY "lentele", "seq"
-    `);
-    return rows;
-}

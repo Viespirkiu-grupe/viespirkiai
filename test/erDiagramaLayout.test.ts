@@ -29,7 +29,6 @@ function lentele(vardas: string, stulpeliai: Array<[string, 'pk' | 'fk' | null]>
     grupe: { raktas: 'g', pavadinimas: 'G', aprasymas: null, saltinis: null, saltinioUrl: null, tvarka: 1 },
     grupePriskirtaRankomis: false,
     meta: null,
-    quickwitIndeksai: [],
   };
 }
 
