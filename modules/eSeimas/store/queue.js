@@ -201,14 +201,23 @@ export async function pickActsToScrape(stage, { limit = 100, maxFailures = 5, ex
     if (!column) throw new Error(`Nežinomas etapas: ${stage}`);
 
     const { rows } = await postgres.query(
-        `SELECT "category", "legalActId" FROM "eSeimasLegalActScrape"
-         WHERE "${column}" IS NULL
-           AND "failureCount" < $2
-           AND ("retryAfter" IS NULL OR "retryAfter" <= now())
-           AND ("category", "legalActId") NOT IN (SELECT * FROM unnest($3::text[], $4::text[]))
+        // `NOT EXISTS`, o ne `NOT IN`: `NOT IN (SELECT ... unnest)` planuoklis
+        // paverčia hash'uotu subplanu tik kol jis telpa į work_mem. Ilgame
+        // paleidime `exclude` išauga iki dešimčių tūkstančių, hash'as nebetelpa
+        // ir subplanas perskaitomas IŠ NAUJO kiekvienai lentelės eilutei —
+        // užklausa iš ~1 s virsta pusantros valandos. `NOT EXISTS` duoda hash
+        // anti join'ą, kuris prireikus išsilieja į diską ir lieka tiesinis.
+        `SELECT s."category", s."legalActId" FROM "eSeimasLegalActScrape" s
+         WHERE s."${column}" IS NULL
+           AND s."failureCount" < $2
+           AND (s."retryAfter" IS NULL OR s."retryAfter" <= now())
+           AND NOT EXISTS (
+               SELECT 1 FROM unnest($3::text[], $4::text[]) AS x(category, "legalActId")
+               WHERE x.category = s."category" AND x."legalActId" = s."legalActId"
+           )
          -- "legalActId" kaip antrinis raktas: visa dienos porcija turi vienodą
          -- "discoveredAt", tad be jo eilė tarp paleidimų būtų nedeterministinė.
-         ORDER BY "discoveredAt", "category", "legalActId"
+         ORDER BY s."discoveredAt", s."category", s."legalActId"
          LIMIT $1`,
         [limit, maxFailures, exclude.map(act => act.category), exclude.map(act => act.legalActId)],
     );
@@ -224,14 +233,20 @@ export async function pickEditionsToScrape({
     exclude = [],
 } = {}) {
     const { rows } = await postgres.query(
-        `SELECT "category", "legalActId", "editionToken" FROM "eSeimasEdition"
-         WHERE "scrapedAt" IS NULL
-           AND ($2::text IS NULL OR "category" = $2)
-           AND ($3::text IS NULL OR "legalActId" = $3)
-           AND ($5 OR ("failureCount" < $4 AND ("retryAfter" IS NULL OR "retryAfter" <= now())))
-           AND ("category", "legalActId", "editionToken")
-               NOT IN (SELECT * FROM unnest($6::text[], $7::text[], $8::text[]))
-         ORDER BY "category", "legalActId", "ordinal"
+        // Dėl `NOT EXISTS` vietoj `NOT IN` žr. `pickActsToScrape`.
+        `SELECT e."category", e."legalActId", e."editionToken" FROM "eSeimasEdition" e
+         WHERE e."scrapedAt" IS NULL
+           AND ($2::text IS NULL OR e."category" = $2)
+           AND ($3::text IS NULL OR e."legalActId" = $3)
+           AND ($5 OR (e."failureCount" < $4 AND (e."retryAfter" IS NULL OR e."retryAfter" <= now())))
+           AND NOT EXISTS (
+               SELECT 1 FROM unnest($6::text[], $7::text[], $8::text[])
+                   AS x(category, "legalActId", "editionToken")
+               WHERE x.category = e."category"
+                 AND x."legalActId" = e."legalActId"
+                 AND x."editionToken" = e."editionToken"
+           )
+         ORDER BY e."category", e."legalActId", e."ordinal"
          LIMIT $1`,
         [
             limit, category, legalActId, maxFailures, ignoreBackoff,
