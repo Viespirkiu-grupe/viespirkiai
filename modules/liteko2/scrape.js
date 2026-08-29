@@ -205,10 +205,13 @@ export async function pazymetiAtsauktus() {
     );
 
     // Atšauktas sprendimas nebeturi likti bendroje dokumentų paieškoje.
-    // dokumentai DELETE trigeris pats suformuoja Quickwit ištrynimo eilę.
+    // documents DELETE trigeris pats suformuoja Quickwit ištrynimo eilę.
     const deleted = await postgres.query(
-        `DELETE FROM public.dokumentai
-         WHERE source = 'liteko2' AND "saltinioId2" = ANY($1::text[])`,
+        `DELETE FROM documents.documents d
+         USING documents."sourceIds" si
+         WHERE si."documentId" = d.id
+           AND si."sourceId" = documents.source_id('liteko2')
+           AND si.id2 = ANY($1::text[])`,
         [liteko2Ids],
     );
     if (deleted.rowCount > 0) {

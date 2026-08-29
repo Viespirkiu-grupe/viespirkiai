@@ -7,7 +7,7 @@ vi.mock("../postgres/postgres.js", () => ({
 }));
 
 import { postgres } from "../postgres/postgres.js";
-import { fetchFailaiByIds } from "../modules/dokumentai/upsertFromFailai.js";
+import { fetchFailaiByIds } from "../modules/documents/upsertFromFiles.js";
 
 describe("fetchFailaiByIds", () => {
     beforeEach(() => {

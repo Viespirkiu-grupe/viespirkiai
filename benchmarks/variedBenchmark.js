@@ -25,7 +25,7 @@
 import { postgres } from "../postgres/postgres.js";
 
 // Kiek maždaug MB heap'o skenuoti per užklausą. Didelės lentelės (sutartys ~9 GB,
-// dokumentai ~2.6 GB…) ribojamos nuosekliu puslapių ruožu (ctid < '(N,0)'), kad
+// documents ~1.7 GB…) ribojamos nuosekliu puslapių ruožu (ctid < '(N,0)'), kad
 // kiekvienas žingsnis nuskaitytų ~TARGET_MB ir truktų apie ~10 s. Šitos DB diskas
 // greitas tik nuosekliai skaitant, tad ~300 MB ≈ 10 s. Didink → sunkiau/ilgiau.
 const TARGET_MB = Number(process.env.TARGET_MB || 300);
@@ -233,19 +233,27 @@ const QUERIES = [
     },
     {
         id: "Q10",
-        desc: "dokumentai: apimčių agregacija pagal domeną/savivaldybę",
+        desc: "documents: apimčių agregacija pagal domeną/tipą",
+        // Skenuojama fizinė documents.documents (vaizdas documentsFull ctid neturi).
+        // Apimtis failais paremtose eilutėse yra NULL – paveldima iš
+        // public."filesDataExtraction" per "fileId", kaip daro pats vaizdas.
+        // Grupuojama pagal domeną ir tipą: savivaldybė iš schemos išmesta (buvo 100 % NULL).
         sql: `
             SELECT
-                coalesce(domain, '—')           AS domenas,
-                coalesce(savivaldybe, '—')      AS savivaldybe,
-                count(*)                        AS dok_kiekis,
-                sum("wordCount")                AS zodziu_viso,
-                sum("characterCount")           AS simboliu_viso,
-                avg("pageCount")::numeric(10,2) AS psl_vid
+                coalesce(dm.domain, '—')                            AS domenas,
+                coalesce(t.name, '—')                               AS tipas,
+                count(*)                                            AS dok_kiekis,
+                sum(coalesce(d."wordCount", fd."wordCount"))         AS zodziu_viso,
+                sum(coalesce(d."characterCount", fd."characterCount")) AS simboliu_viso,
+                avg(coalesce(d."pageCount", fd."pageCount"))::numeric(10,2) AS psl_vid
             FROM (
-                SELECT domain, savivaldybe, "wordCount", "characterCount", "pageCount"
-                FROM dokumentai WHERE ctid < '(:PAGES,0)'::tid
-            ) dokumentai
+                SELECT "hostId", "typeId", "fileId", "wordCount", "characterCount", "pageCount"
+                FROM documents.documents WHERE ctid < '(:PAGES,0)'::tid
+            ) d
+            JOIN documents.types   t  ON t.id = d."typeId"
+            JOIN documents.hosts   h  ON h.id = d."hostId"
+            JOIN documents.domains dm ON dm.id = h."domainId"
+            LEFT JOIN public."filesDataExtraction" fd ON fd.id = d."fileId"
             GROUP BY 1, 2
             ORDER BY zodziu_viso DESC NULLS LAST
             LIMIT 200`,

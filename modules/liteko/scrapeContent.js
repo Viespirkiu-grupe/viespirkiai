@@ -3,7 +3,7 @@ Nuskaito teismo nuosprendžio turinį iš Liteko sistemos:
   * dalyvius (šalis)            -> teismoNuosprendziaiDalyviai (counts trigeris pats seka)
   * kategorijas (kodus+vardus)  -> teismoNuosprendziaiKategorijos
   * papildomus laukus           -> teismoNuosprendziai (teisminisProcesoNr, instancija, skyrius)
-  * pilną tekstą + metadata     -> dokumentų paieška (sidecar + public.dokumentai)
+  * pilną tekstą + metadata     -> dokumentų paieška (sidecar + documents.documents)
 
 Tekstas DB NESAUGOMAS — jis keliauja tik į dokumentų sidecar.
 */
@@ -13,7 +13,7 @@ const scrapeFetch = createScraperFetch("liteko", { operation: "scrapeContent" })
 import { parseHTML } from "linkedom";
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
-import { upsertNuosprendisToDokumentai } from "../dokumentai/upsertFromTeismoNuosprendziai.js";
+import { upsertNuosprendisToDocuments } from "../documents/upsertFromCourtDecisions.js";
 
 const LITEKO_BASE = "https://liteko.teismai.lt/viesasprendimupaieska/";
 
@@ -282,7 +282,7 @@ async function nuskaitytiNuosprendi(n) {
         );
 
         // Tekstas + metadata į dokumentų paiešką (sidecar + dokumentai).
-        await upsertNuosprendisToDokumentai(
+        await upsertNuosprendisToDocuments(
             { ...n, teisminisProcesoNr: detail.teisminisProcesoNr, skyrius: detail.skyrius, instancija },
             detail,
         );

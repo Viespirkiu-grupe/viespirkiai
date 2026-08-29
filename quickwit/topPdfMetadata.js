@@ -8,7 +8,7 @@ import { searchIndexPattern } from "./qwHttp.js";
 const LIMIT = 1_000;
 const OUTPUT_DIR = path.resolve("tmp");
 
-const result = await searchIndexPattern("dokumentai_*", {
+const result = await searchIndexPattern("documents_*", {
     query: "extension:pdf",
     max_hits: 0,
     aggs: {

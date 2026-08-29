@@ -2,15 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     query: vi.fn(),
-    readDokumentasFs: vi.fn(),
+    readDocumentFs: vi.fn(),
 }));
 
 vi.mock("../../postgres/postgres.js", () => ({
     postgres: { query: mocks.query },
 }));
 
-vi.mock("../../modules/dokumentai/dokumentaiFs.js", () => ({
-    readDokumentasFs: mocks.readDokumentasFs,
+vi.mock("../../modules/documents/documentsFs.js", () => ({
+    readDocumentFs: mocks.readDocumentFs,
 }));
 
 import {
@@ -40,7 +40,7 @@ describe("get_dokumentas_tekstas", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.query.mockResolvedValue({ rows: [row()] });
-        mocks.readDokumentasFs.mockResolvedValue({ text: "Pirmas antras trečias ketvirtas" });
+        mocks.readDocumentFs.mockResolvedValue({ text: "Pirmas antras trečias ketvirtas" });
     });
 
     it("grąžina paprastą tekstą dalimis ir tęsinio poziciją", async () => {
@@ -62,7 +62,7 @@ describe("get_dokumentas_tekstas", () => {
 
     it("normalizuoja failo JSON puslapių masyvą", async () => {
         mocks.query.mockResolvedValue({ rows: [row({ type: "failas", failasId: 77 })] });
-        mocks.readDokumentasFs.mockResolvedValue({ text: '["Pirmas puslapis","Antras puslapis"]' });
+        mocks.readDocumentFs.mockResolvedValue({ text: '["Pirmas puslapis","Antras puslapis"]' });
 
         const result = payload(await handler({ id: 42, pozicija: 0, kiekis: 100 }));
 
@@ -71,7 +71,7 @@ describe("get_dokumentas_tekstas", () => {
     });
 
     it("grąžina aiškią tuščio teksto būseną", async () => {
-        mocks.readDokumentasFs.mockResolvedValue({ text: null });
+        mocks.readDocumentFs.mockResolvedValue({ text: null });
 
         const result = payload(await handler({ id: 42, pozicija: 0, kiekis: 100 }));
 
@@ -91,16 +91,16 @@ describe("get_dokumentas_tekstas", () => {
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain(message);
-        expect(mocks.readDokumentasFs).not.toHaveBeenCalled();
+        expect(mocks.readDocumentFs).not.toHaveBeenCalled();
     });
 
     it("atskiria nerastą sidecar ir poziciją už teksto pabaigos", async () => {
-        mocks.readDokumentasFs.mockResolvedValueOnce(null);
+        mocks.readDocumentFs.mockResolvedValueOnce(null);
         const missing = await handler({ id: 42, pozicija: 0, kiekis: 100 });
         expect(missing.isError).toBe(true);
         expect(missing.content[0].text).toContain("saugykloje nerastas");
 
-        mocks.readDokumentasFs.mockResolvedValueOnce({ text: "trumpas" });
+        mocks.readDocumentFs.mockResolvedValueOnce({ text: "trumpas" });
         const pastEnd = await handler({ id: 42, pozicija: 9, kiekis: 100 });
         expect(pastEnd.isError).toBe(true);
         expect(pastEnd.content[0].text).toContain("už dokumento teksto pabaigos");

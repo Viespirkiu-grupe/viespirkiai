@@ -8,7 +8,7 @@ LITEKO2 sprendimo turinys:
   * pilnas API atsakymas + HTML + tekstas -> sidecar (modules/liteko2/sidecar.js)
 
 Tekstas ir HTML į DB NEPATENKA — tik į sidecar. Sidecar'o forma tokia pati kaip
-`public.dokumentai` sidecar'ų, kad propagavimas į dokumentus būtų plonas sluoksnis.
+`documents.documents` sidecar'ų, kad propagavimas į dokumentus būtų plonas sluoksnis.
 
     npm run liteko2:turinys
     node modules/liteko2/scrapeContent.js --limit 50
@@ -22,7 +22,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { limitArg, numArg, parseArgs } from "../../utils/cliArgs.js";
 import { runPool } from "../../utils/workerPool.js";
-import { upsertLiteko2ToDokumentai } from "../dokumentai/upsertFromLiteko2.js";
+import { upsertLiteko2ToDocuments } from "../documents/upsertFromLiteko2.js";
 
 // Turinio nuskaitymo versija (kaip liteko1 teismoNuosprendziai.turinioNuskaitymas).
 // 0/NULL = nenuskaityta; >0 = sėkmingo nuskaitymo versija; -1 = klaida; -2 = vykdoma.
@@ -234,8 +234,8 @@ async function irasytiFailus(sprendimoId, failai) {
 }
 
 /**
- * Suformuoja sidecar'ą tokios pat formos, kokią naudoja `public.dokumentai`
- * sidecar'ai (žr. modules/dokumentai/upsertFromTeismoNuosprendziai.js).
+ * Suformuoja sidecar'ą tokios pat formos, kokią naudoja `documents.documents`
+ * sidecar'ai (žr. modules/documents/upsertFromCourtDecisions.js).
  */
 export function sudarytiSidecar(sprendimas, detail, { tekstas, html }) {
     const dalyviai = detail.caseParties ?? [];
@@ -398,9 +398,9 @@ async function nuskaitytiSprendima(sprendimas) {
             ],
         );
 
-        // Sidecar + public.dokumentai. Lentelės trigeris pats įdeda pakeitimą į
-        // dokumentaiIndexQueue, iš kurios jį pasiima Quickwit darbininkas.
-        await upsertLiteko2ToDokumentai(
+        // Sidecar + documents.documents. Lentelės trigeris pats įdeda pakeitimą į
+        // documents."indexQueue", iš kurios jį pasiima Quickwit darbininkas.
+        await upsertLiteko2ToDocuments(
             {
                 ...sprendimas,
                 md5: sidecar.md5,

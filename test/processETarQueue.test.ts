@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   readETarSidecarMany: vi.fn(),
   buildETarDokumentas: vi.fn(),
   upsertETarBatch: vi.fn(),
-  deleteETarDokumentai: vi.fn(),
+  deleteETarDocuments: vi.fn(),
   signalWork: vi.fn(),
 }));
 
@@ -20,13 +20,13 @@ vi.mock('../utils/taskSignals.js', () => ({
 vi.mock('../modules/eTar/eTarSidecar.js', () => ({
   readETarSidecarMany: mocks.readETarSidecarMany,
 }));
-vi.mock('../modules/dokumentai/upsertFromETar.js', () => ({
+vi.mock('../modules/documents/upsertFromETar.js', () => ({
   buildETarDokumentas: mocks.buildETarDokumentas,
   upsertETarBatch: mocks.upsertETarBatch,
-  deleteETarDokumentai: mocks.deleteETarDokumentai,
+  deleteETarDocuments: mocks.deleteETarDocuments,
 }));
 
-import { processETarDocumentsQueue } from '../modules/dokumentai/processETarDocumentsQueue.js';
+import { processETarDocumentsQueue } from '../modules/documents/processETarQueue.js';
 
 describe('processETarDocumentsQueue', () => {
   beforeEach(() => {
@@ -48,7 +48,7 @@ describe('processETarDocumentsQueue', () => {
     );
     mocks.buildETarDokumentas.mockReturnValue({ row: { documentId: '42', md5: 'abc' }, sidecar: {} });
     mocks.upsertETarBatch.mockResolvedValue({ upserted: 1, skipped: 0 });
-    mocks.deleteETarDokumentai.mockResolvedValue(0);
+    mocks.deleteETarDocuments.mockResolvedValue(0);
   });
 
   it('deduplikuoja porciją ir ištrina eilės įrašus tik po upsert', async () => {

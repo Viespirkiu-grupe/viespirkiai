@@ -3,7 +3,7 @@ import { readETarSidecarMany } from "../eTar/eTarSidecar.js";
 import { Logger } from "../../utils/log.js";
 import {
     buildETarDokumentas,
-    deleteETarDokumentai,
+    deleteETarDocuments,
     upsertETarBatch,
 } from "./upsertFromETar.js";
 import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
@@ -40,7 +40,7 @@ export async function processETarDocumentsQueue() {
         const toDelete = [...deduped].filter(([, change]) => change === "delete").map(([id]) => id);
         const toUpsert = [...deduped].filter(([, change]) => change !== "delete").map(([id]) => id);
 
-        let deleted = await deleteETarDokumentai(toDelete, client);
+        let deleted = await deleteETarDocuments(toDelete, client);
         let upserted = 0;
         let skipped = 0;
 
@@ -58,7 +58,7 @@ export async function processETarDocumentsQueue() {
             );
             const found = new Set(rows.map((row) => String(row.documentId)));
             const vanished = toUpsert.filter((id) => !found.has(String(id)));
-            deleted += await deleteETarDokumentai(vanished, client);
+            deleted += await deleteETarDocuments(vanished, client);
 
             // Visa partija vienu skaitymu: eilučių čia iki BATCH_SIZE, o ciklas
             // sukasi atviroje tranzakcijoje su FOR UPDATE SKIP LOCKED — kuo

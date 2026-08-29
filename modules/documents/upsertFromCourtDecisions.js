@@ -1,14 +1,15 @@
 /*
 Įkelia LITEKO teismo nuosprendį į dokumentų paiešką: parašo sidecar JSON (tekstas +
-metadata) ir upsert'ina eilutę į public.dokumentai. DB trigeris (dokumentai_index_queue)
-pats įdeda į indeksavimo eilę, o quickwitProcessIndexQueue.js įkelia į Quickwit.
+metadata) ir upsert'ina eilutę į documents.documents. DB trigeris
+(documents_index_queue) pats įdeda į indeksavimo eilę, o
+quickwitProcessIndexQueue.js įkelia į Quickwit.
 
-Veidrodis modules/dokumentai/upsertFromFailai.js, bet šaltinis – teismoNuosprendziai,
+Veidrodis modules/documents/upsertFromFiles.js, bet šaltinis – teismoNuosprendziai,
 o ne failai. Tekstas niekur į DB nepatenka, tik į sidecar.
 */
 
-import { postgres } from "../../postgres/postgres.js";
-import { saveDokumentasFs } from "./dokumentaiFs.js";
+import { saveDocumentFs } from "./documentsFs.js";
+import { upsertDocument } from "./upsertDocument.js";
 import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 // Sidecar JSON payload schemos versija (ne nuskaitymo versija — tą seka
@@ -24,9 +25,9 @@ const SOURCE = "liteko";
  * @param {object} detail - nuskaitytas turinys: { tekstas, salys[], kategorijos[],
  *   kategorijuKodai[], teisejai[], teisminisProcesoNr, instancija, skyrius, vieta }.
  */
-export async function upsertNuosprendisToDokumentai(nuosprendis, detail = {}) {
+export async function upsertNuosprendisToDocuments(nuosprendis, detail = {}) {
     if (!nuosprendis?.md5) {
-        throw new Error("upsertNuosprendisToDokumentai: trūksta md5");
+        throw new Error("upsertNuosprendisToDocuments: trūksta md5");
     }
 
     const salys = detail.salys || [];
@@ -93,33 +94,26 @@ export async function upsertNuosprendisToDokumentai(nuosprendis, detail = {}) {
         metadata,
     };
 
-    await saveDokumentasFs(nuosprendis.md5, sidecar);
+    await saveDocumentFs(nuosprendis.md5, sidecar);
 
-    await postgres.query(
-        `INSERT INTO public.dokumentai (
-            md5, class, type, source, url,
-            "saltinioId0", "saltinioId1", "saltinioId2",
-            pavadinimas, language, "wordCount", "characterCount", "happenedAt"
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-         ON CONFLICT (md5) WHERE source = 'liteko' DO UPDATE SET
-            class            = EXCLUDED.class,
-            type             = EXCLUDED.type,
-            source           = EXCLUDED.source,
-            url              = EXCLUDED.url,
-            "saltinioId0"    = EXCLUDED."saltinioId0",
-            "saltinioId1"    = EXCLUDED."saltinioId1",
-            "saltinioId2"    = EXCLUDED."saltinioId2",
-            pavadinimas      = EXCLUDED.pavadinimas,
-            language         = EXCLUDED.language,
-            "wordCount"      = EXCLUDED."wordCount",
-            "characterCount" = EXCLUDED."characterCount",
-            "happenedAt"     = EXCLUDED."happenedAt"`,
-        [
-            nuosprendis.md5, CLASS, TYPE, SOURCE, nuosprendis.url ?? null,
-            sidecar.saltinioId0, sidecar.saltinioId1, sidecar.saltinioId2,
-            title, "lt", wordCount, characterCount, nuosprendis.data ?? null,
-        ],
-    );
+    // LITEKO adresas visada išvedamas iš sprendimo id, tad jei šaltinio eilutė
+    // url neturi, jį susidedam patys – documents.documents kelio neleidžia tuščio.
+    const url = nuosprendis.url
+        ?? `https://liteko.teismai.lt/viesasprendimupaieska/tekstas.aspx?id=${sidecar.saltinioId2}`;
+
+    await upsertDocument({
+        class: CLASS,
+        type: TYPE,
+        source: SOURCE,
+        url,
+        md5: nuosprendis.md5,
+        title,
+        language: "lt",
+        wordCount,
+        characterCount,
+        happenedAt: nuosprendis.data ?? null,
+        sourceIds: [sidecar.saltinioId0, sidecar.saltinioId1, sidecar.saltinioId2, null],
+    });
     signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
         source: "liteko",
         count: 1,

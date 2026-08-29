@@ -7,7 +7,7 @@ import { closeNats } from "../utils/natsHub.js";
 import tedTasks from "./ted.js";
 import sutartysTasks from "./sutartys.js";
 import failaiTasks from "./failai.js";
-import dokumentaiTasks from "./dokumentai.js";
+import documentsTasks from "./documents.js";
 import viesiejiPirkimaiTasks from "./viesiejiPirkimai.js";
 import adpTasks from "./adp.js";
 import miscTasks from "./misc.js";
@@ -26,7 +26,7 @@ runner.registerAll([
     ...tedTasks,
     ...sutartysTasks,
     ...failaiTasks,
-    ...dokumentaiTasks,
+    ...documentsTasks,
     ...viesiejiPirkimaiTasks,
     ...adpTasks,
     ...miscTasks,

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
     fetchFailaiByIds: vi.fn(),
     upsertBatch: vi.fn(),
-    deleteDokumentaiByFailasIds: vi.fn(),
+    deleteDocumentsByFileIds: vi.fn(),
     signalWork: vi.fn(),
     client: {
         query: vi.fn(),
@@ -23,15 +23,15 @@ vi.mock("../utils/taskSignals.js", () => ({
     signalWork: mocks.signalWork,
 }));
 
-vi.mock("../modules/dokumentai/upsertFromFailai.js", () => ({
+vi.mock("../modules/documents/upsertFromFiles.js", () => ({
     fetchFailaiByIds: mocks.fetchFailaiByIds,
     upsertBatch: mocks.upsertBatch,
-    deleteDokumentaiByFailasIds: mocks.deleteDokumentaiByFailasIds,
+    deleteDocumentsByFileIds: mocks.deleteDocumentsByFileIds,
 }));
 
-import { processFailaiDokumentaiQueue } from "../modules/dokumentai/processFailaiDokumentaiQueue.js";
+import { processFilesDocumentsQueue } from "../modules/documents/processFilesQueue.js";
 
-describe("processFailaiDokumentaiQueue", () => {
+describe("processFilesDocumentsQueue", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.client.query.mockImplementation(async (sql: string) => {
@@ -45,7 +45,7 @@ describe("processFailaiDokumentaiQueue", () => {
     });
 
     it("deletes claimed rows only after processing succeeds", async () => {
-        await expect(processFailaiDokumentaiQueue()).resolves.toBe(true);
+        await expect(processFilesDocumentsQueue()).resolves.toBe(true);
 
         expect(mocks.fetchFailaiByIds).toHaveBeenCalledWith([42], mocks.client);
         expect(mocks.upsertBatch).toHaveBeenCalledWith([{ id: 42 }], mocks.client);
@@ -66,7 +66,7 @@ describe("processFailaiDokumentaiQueue", () => {
     it("rolls back and retains claimed rows when processing fails", async () => {
         mocks.fetchFailaiByIds.mockRejectedValue(new Error("invalid source id"));
 
-        await expect(processFailaiDokumentaiQueue()).rejects.toThrow("invalid source id");
+        await expect(processFilesDocumentsQueue()).rejects.toThrow("invalid source id");
 
         const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
         expect(sqlCalls).toContain("ROLLBACK");

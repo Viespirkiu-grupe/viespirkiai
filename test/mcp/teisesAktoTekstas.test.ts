@@ -177,8 +177,8 @@ describe("teisės akto MCP ištrauka", () => {
         expect(result.teisesAktoId).toBe("TAR.TEST");
         expect(result.versijosId).toBe("version-1");
         const [sql, params] = mocks.query.mock.calls[0];
-        expect(sql).toContain('d."saltinioId0" = $1');
-        expect(sql).toContain('d."saltinioId3" = $2 OR d."saltinioId1" = $2');
+        expect(sql).toContain('d."sourceId0" = $1');
+        expect(sql).toContain('d."sourceId3" = $2 OR d."sourceId1" = $2');
         expect(params).toEqual(["TAR.TEST", "version-1"]);
     });
 });

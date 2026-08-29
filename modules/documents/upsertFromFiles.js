@@ -1,10 +1,12 @@
 import { postgres } from "../../postgres/postgres.js";
-import { saveDokumentasFs } from "./dokumentaiFs.js";
+import { saveDocumentFs } from "./documentsFs.js";
 import { readFailaiFs } from "../failai/failaiFs.js";
 
 const SIDECAR_VERSION = "1";
 const CLASS = "viesiejiPirkimai";
 const TYPE = "failas";
+const PROTOCOL = "https";
+const HOST = "viespirkiai.org";
 const FS_CONCURRENCY = 32;
 
 // NULL and 'sutartis' both mean the legacy CVP IS archive (sutartys) source.
@@ -15,8 +17,8 @@ export function normalizeSource(saltinis) {
 
 // `files` jau laiko šaltinio ID išskaidytą po stulpelius (žr. failuIrasymas.js
 // SALTINIAI), tad čia nieko nebedalinam — tik suvienodinam vieną skirtumą:
-// senoje cvpp formoje be `pid` dokumentai.saltinioId0 buvo NULL, o `files` toje
-// pozicijoje laiko `-1`. Grąžinam NULL, kad indekso reikšmės nepasikeistų.
+// senoje cvpp formoje be `pid` saltinioId0 buvo NULL, o `files` toje pozicijoje
+// laiko `-1`. Grąžinam NULL, kad sidecar reikšmės nepasikeistų.
 export function saltinioIdPozicijos(row) {
     const s0 = row.saltinis === "cvpp" && row.sourceId0 === "-1" ? null : row.sourceId0 ?? null;
     return [s0, row.sourceId1 ?? null, row.sourceId2 ?? null];
@@ -65,7 +67,9 @@ async function buildPayload(row, caches) {
 // Stulpeliai, kurių upsertBatch reikia iš `files`. Naudoja ir backfill (id > $1),
 // ir eilės vartotojas (id = ANY).
 //
-// Šaltinio ID nebedalinamas užklausoje — `files` jau turi sourceId0..2.
+// Dauguma jų keliauja tik į sidecar: pati documents.documents eilutė turinio
+// metaduomenų nedubliuoja – md5, pavadinimą, autorių, plėtinį, šaltinio ID ir
+// apimtis ji paveldi iš public.files per "fileId" (žr. documents."documentsFull").
 //
 // "istaigaJar" — perkančiosios / paskelbusios organizacijos JAR kodas, paimtas
 // pagal šaltinį iš susijusios lentelės (žr. FILES_ISTAIGA_JOINS). cvpp neturi
@@ -82,7 +86,6 @@ export const FAILAI_SELECT_COLUMNS = `
     d."pageCount" AS "puslapiuSkaicius",
     d."characterCount" AS "simboliuSkaicius",
     i."fileHash" AS "failasHash",
-    ST_AsEWKT(loc.location) AS location_ewkt,
     COALESCE(
         vp."jarKodas",
         s."perkanciosiosOrganizacijosKodas",
@@ -94,12 +97,14 @@ export const FAILAI_SELECT_COLUMNS = `
     ) AS "istaigaJar"
 `;
 
-// LEFT JOIN'ai: žodynai, turinio hash'as, koordinatės ir šaltinių lentelės
-// "istaigaJar" apskaičiavimui. Raktai remiasi tik į atrenkamus stulpelius, todėl
-// tinka ir backfill'ui, ir eilės vartotojui.
+// LEFT JOIN'ai: žodynai, turinio hash'as ir šaltinių lentelės "istaigaJar"
+// apskaičiavimui. Raktai remiasi tik į atrenkamus stulpelius, todėl tinka ir
+// backfill'ui, ir eilės vartotojui.
 // viesiejiPirkimai.pirkimoId UNIQUE, vpmSutartys.unikalusId PK — eilučių nedaugina.
 // neskelbiamosDerybos link NEunikalus (PK = hash), todėl jis imamas skaliariniu
 // subquery (LIMIT 1) FAILAI_SELECT_COLUMNS viduje, ne JOIN'u.
+//
+// filesLocations čia nebejungiamas: koordinates dokumentas paveldi iš failo.
 export const FAILAI_ISTAIGA_JOINS = `
     LEFT JOIN public."filesMd5"            m   ON m.id   = f."md5Id"
     LEFT JOIN public."filesFilenames"      fn  ON fn.id  = f."filenameId"
@@ -108,7 +113,6 @@ export const FAILAI_ISTAIGA_JOINS = `
     LEFT JOIN public."filesSourceTitles"   st  ON st.id  = f."sourceTitleId"
     LEFT JOIN public."filesDataExtraction" d   ON d.id   = f.id
     LEFT JOIN public."filesInfoFiles"      i   ON i.id   = f.id
-    LEFT JOIN public."filesLocations"      loc ON loc.id = f.id
     LEFT JOIN public."viesiejiPirkimai" vp
         ON vp."pirkimoId" = CASE
             WHEN st.title = 'cvpIs' AND f."sourceId0" ~ '^[0-9]+$'
@@ -122,7 +126,6 @@ export const FAILAI_ISTAIGA_JOINS = `
             ELSE NULL
         END
 `;
-
 
 export async function upsertBatch(rows, db = postgres) {
     const fsStart = Date.now();
@@ -143,7 +146,7 @@ export async function upsertBatch(rows, db = postgres) {
         while (cursor < ready.length) {
             const row = ready[cursor++];
             const b = await buildPayload(row, caches);
-            await saveDokumentasFs(row.md5, b.sidecar);
+            await saveDocumentFs(row.md5, b.sidecar);
             built.push(b);
         }
     }
@@ -154,75 +157,36 @@ export async function upsertBatch(rows, db = postgres) {
 
     if (built.length === 0) return { inserted: 0, skipped, fsMs, insertMs: 0 };
 
-    const failasIds = built.map((b) => b.row.id);
-    const md5s = built.map((b) => b.row.md5);
+    const fileIds = built.map((b) => b.row.id);
     const sources = built.map((b) => normalizeSource(b.row.saltinis));
-    const s0s = built.map((b) => b.s0);
-    const s1s = built.map((b) => b.s1);
-    const s2s = built.map((b) => b.s2);
-    const autoriai = built.map((b) => b.row.autorius);
-    const pavadinimai = built.map((b) => b.row.pavadinimas);
-    const extensions = built.map((b) => b.row.extension);
-    const wordCounts = built.map((b) => b.row.zodziuSkaicius);
-    const pageCounts = built.map((b) => b.row.puslapiuSkaicius);
-    const charCounts = built.map((b) => b.row.simboliuSkaicius);
-    const locEwkts = built.map((b) => b.row.location_ewkt);
     const istaigaJars = built.map((b) => b.row.istaigaJar);
 
+    // Failais paremta eilutė laiko tik tai, ko `files` neturi: tapatybę,
+    // adresą, klasifikaciją ir įstaigos kodą. Žodynų raktus išsprendžia DB.
     const insertStart = Date.now();
     await db.query(
-        `INSERT INTO public.dokumentai (
-            "failasId", md5, class, type, source,
-            "saltinioId0", "saltinioId1", "saltinioId2",
-            autorius, pavadinimas, extension,
-            "wordCount", "pageCount", "characterCount",
-            location, host, domain, url, "istaigaJar"
+        `INSERT INTO documents.documents (
+            "fileId", "typeId", "sourceId", "protocolId", "hostId",
+            path, "institutionJarCode"
          )
          SELECT
-            t."failasId", t.md5, $13::text, $14::text, t.source,
-            t.s0, t.s1, t.s2,
-            t.autorius, t.pavadinimas, t.extension,
-            t."wordCount", t."pageCount", t."charCount",
-            CASE WHEN t.loc IS NULL THEN NULL ELSE ST_GeogFromText(t.loc) END,
-            'viespirkiai.org', 'viespirkiai.org',
-            'https://viespirkiai.org/failas/' || t."failasId"::text,
-            t."istaigaJar"
-         FROM unnest(
-            $1::bigint[], $2::text[], $3::text[],
-            $4::text[], $5::text[], $6::text[],
-            $7::text[], $8::text[], $9::text[],
-            $10::int[], $11::int[], $12::int[],
-            $15::text[], $16::text[]
-         ) AS t("failasId", md5, source, s0, s1, s2,
-                autorius, pavadinimas, extension,
-                "wordCount", "pageCount", "charCount", loc, "istaigaJar")
-         ON CONFLICT ("failasId") WHERE "failasId" IS NOT NULL DO UPDATE SET
-            md5             = EXCLUDED.md5,
-            class           = EXCLUDED.class,
-            type            = EXCLUDED.type,
-            source          = EXCLUDED.source,
-            "saltinioId0"   = EXCLUDED."saltinioId0",
-            "saltinioId1"   = EXCLUDED."saltinioId1",
-            "saltinioId2"   = EXCLUDED."saltinioId2",
-            autorius        = EXCLUDED.autorius,
-            pavadinimas     = EXCLUDED.pavadinimas,
-            extension       = EXCLUDED.extension,
-            "wordCount"     = EXCLUDED."wordCount",
-            "pageCount"     = EXCLUDED."pageCount",
-            "characterCount" = EXCLUDED."characterCount",
-            location        = EXCLUDED.location,
-            host            = EXCLUDED.host,
-            domain          = EXCLUDED.domain,
-            url             = EXCLUDED.url,
-            "istaigaJar"    = EXCLUDED."istaigaJar"`,
-        [
-            failasIds, md5s, sources,
-            s0s, s1s, s2s,
-            autoriai, pavadinimai, extensions,
-            wordCounts, pageCounts, charCounts,
-            CLASS, TYPE,
-            locEwkts, istaigaJars,
-        ],
+            t."fileId",
+            documents.type_id($4, $5),
+            documents.source_id(t.source),
+            documents.protocol_id($6),
+            documents.host_id($7),
+            '/failas/' || t."fileId"::text,
+            CASE WHEN t."istaigaJar" ~ '^[0-9]{9}$' THEN t."istaigaJar"::integer END
+         FROM unnest($1::int[], $2::text[], $3::text[])
+              AS t("fileId", source, "istaigaJar")
+         ON CONFLICT ("fileId") WHERE "fileId" IS NOT NULL DO UPDATE SET
+            "typeId"             = EXCLUDED."typeId",
+            "sourceId"           = EXCLUDED."sourceId",
+            "protocolId"         = EXCLUDED."protocolId",
+            "hostId"             = EXCLUDED."hostId",
+            path                 = EXCLUDED.path,
+            "institutionJarCode" = EXCLUDED."institutionJarCode"`,
+        [fileIds, sources, istaigaJars, CLASS, TYPE, PROTOCOL, HOST],
     );
     const insertMs = Date.now() - insertStart;
 
@@ -256,17 +220,26 @@ export async function fetchFailaiByIds(ids, db = postgres) {
     return rows;
 }
 
-// Remove dokumentai rows whose failai source was deleted. Returns the md5s
-// that were removed (caller may want to GC sidecar files, though those may
-// be shared across multiple dokumentai with the same md5 — leave them alone
-// by default).
-export async function deleteDokumentaiByFailasIds(failasIds, db = postgres) {
-    if (!failasIds.length) return [];
+// Remove documents rows whose files source was deleted. Returns the md5s that
+// were removed (caller may want to GC sidecar files, though those may be shared
+// across multiple documents with the same md5 — leave them alone by default).
+//
+// md5 pačioje eilutėje nebesaugomas, tad jis imamas iš failo prieš trynimą.
+export async function deleteDocumentsByFileIds(fileIds, db = postgres) {
+    if (!fileIds.length) return [];
     const { rows } = await db.query(
-        `DELETE FROM public.dokumentai
-         WHERE "failasId" = ANY($1)
-         RETURNING md5`,
-        [failasIds],
+        `WITH doomed AS (
+            SELECT d.id, m.md5
+            FROM documents.documents d
+            JOIN public.files f    ON f.id = d."fileId"
+            LEFT JOIN public."filesMd5" m ON m.id = f."md5Id"
+            WHERE d."fileId" = ANY($1)
+         ), removed AS (
+            DELETE FROM documents.documents
+            WHERE id IN (SELECT id FROM doomed)
+         )
+         SELECT md5 FROM doomed`,
+        [fileIds],
     );
     return rows.map((r) => r.md5).filter(Boolean);
 }

@@ -19,15 +19,15 @@ import {
 import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 const indexes = [
-  { lentele: "dokumentai", indeksas: "dokumentai_1", gyvosEilutes: 900, mirusiosEilutes: 100, deadRatio: 10, current: true },
-  { lentele: "dokumentai", indeksas: "dokumentai_2", gyvosEilutes: 5, mirusiosEilutes: 50, deadRatio: 90, current: false },
-  { lentele: "dokumentai", indeksas: "dokumentai_3", gyvosEilutes: 300, mirusiosEilutes: 200, deadRatio: 40, current: true },
+  { lentele: "documents", indeksas: "documents_1", gyvosEilutes: 900, mirusiosEilutes: 100, deadRatio: 10, current: true },
+  { lentele: "documents", indeksas: "documents_2", gyvosEilutes: 5, mirusiosEilutes: 50, deadRatio: 90, current: false },
+  { lentele: "documents", indeksas: "documents_3", gyvosEilutes: 300, mirusiosEilutes: 200, deadRatio: 40, current: true },
 ] as any[];
 
 describe("requeueLiveRows CLI", () => {
   it("parses explicit indexes and filters", () => {
-    expect(parseArgs(["dokumentai_2", "dokumentai_3", "--min-dead", "25", "--dry-run"])).toMatchObject({
-      dryRun: true, indexes: ["dokumentai_2", "dokumentai_3"], minDead: 25,
+    expect(parseArgs(["documents_2", "documents_3", "--min-dead", "25", "--dry-run"])).toMatchObject({
+      dryRun: true, indexes: ["documents_2", "documents_3"], minDead: 25,
     });
   });
 
@@ -50,16 +50,16 @@ describe("requeueLiveRows CLI", () => {
   });
 
   it("rejects conflicting selectors", () => {
-    expect(() => parseArgs(["dokumentai_2", "--top", "2"])).toThrow(/tik vieną pasirinkimo būdą/);
+    expect(() => parseArgs(["documents_2", "--top", "2"])).toThrow(/tik vieną pasirinkimo būdą/);
   });
 
   it("explains that a positional number is not a database ID or interactive row number", () => {
-    expect(() => parseArgs(["32"])).toThrow(/quickwit_indeksas.*dokumentai_32.*interaktyviame/s);
+    expect(() => parseArgs(["32"])).toThrow(/quickwit_indeksas.*documents_32.*interaktyviame/s);
   });
 
   it("parses interactive ranges", () => {
     expect(parseInteractiveSelection("1,3-3", indexes).map((index: any) => index.indeksas))
-      .toEqual(["dokumentai_1", "dokumentai_3"]);
+      .toEqual(["documents_1", "documents_3"]);
   });
 
   it("names the selection column in interactive errors", () => {
@@ -70,16 +70,16 @@ describe("requeueLiveRows CLI", () => {
     const table = formatIndexesTable(indexes);
     expect(table).toContain("pasirinkimo_nr  lentele");
     expect(table).toContain("quickwit_indeksas");
-    expect(table).toMatch(/\n\s*1\s+dokumentai\s+dokumentai_1/);
+    expect(table).toMatch(/\n\s*1\s+documents\s+documents_1/);
     expect(table).not.toContain("(index)");
     expect(table).not.toMatch(/\bid\b/i);
   });
 
   it("selects interactive top dead rows or ratio", () => {
     expect(parseInteractiveSelection("top 2", indexes).map((index: any) => index.indeksas))
-      .toEqual(["dokumentai_3", "dokumentai_1"]);
+      .toEqual(["documents_3", "documents_1"]);
     expect(parseInteractiveSelection("ratio 2", indexes).map((index: any) => index.indeksas))
-      .toEqual(["dokumentai_2", "dokumentai_3"]);
+      .toEqual(["documents_2", "documents_3"]);
   });
 });
 
@@ -132,11 +132,11 @@ describe("requeueLiveRows transaction", () => {
     } as any;
 
     const result = await requeueSelectedIndexes([
-      { id: 1, lentele: "dokumentai", indeksas: "dokumentai_1" },
+      { id: 1, lentele: "documents", indeksas: "documents_1" },
       { id: 2, lentele: "sutartys", indeksas: "sutartys_2" },
     ], { dryRun: true, lentele: null }, db);
 
-    expect(connectedTables).toEqual(["dokumentai", "sutartys"]);
+    expect(connectedTables).toEqual(["documents", "sutartys"]);
     expect(result.total).toBe(2);
   });
 
@@ -188,7 +188,7 @@ describe("requeueLiveRows transaction", () => {
       release() {},
     };
     const db = { async connect() { return client; } } as any;
-    await requeueIndexes([{ id: 1, indeksas: "dokumentai_1" }], { dryRun: true, lentele: "dokumentai" }, db);
+    await requeueIndexes([{ id: 1, indeksas: "documents_1" }], { dryRun: true, lentele: "documents" }, db);
     expect(signals).toEqual([]);
   });
 

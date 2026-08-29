@@ -1,12 +1,14 @@
-import { processFailaiDokumentaiQueue } from "../modules/dokumentai/processFailaiDokumentaiQueue.js";
-import { processETarDocumentsQueue } from "../modules/dokumentai/processETarDocumentsQueue.js";
-import { processDokumentaiIndexQueue } from "../modules/dokumentai/quickwitProcessIndexQueue.js";
+import { processFilesDocumentsQueue } from "../modules/documents/processFilesQueue.js";
+import { processETarDocumentsQueue } from "../modules/documents/processETarQueue.js";
+import { processDocumentsIndexQueue } from "../modules/documents/quickwitProcessIndexQueue.js";
 import { auditTeisekuraCoverage } from "../modules/teisekura/audit.js";
 import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
+// Užduočių `name` reikšmės sąmoningai nepervadintos: jomis remiasi TaskRunner
+// būsena ir dba.lenteles."uzduotys". Pasikeitė tik importuojami moduliai.
 export default [
     {
-        // eTarLegalActDocument -> dokumentai (per eTarDocumentsQueue)
+        // eTarLegalActDocument -> documents (per eTarDocumentsQueue)
         name: "processETarDocumentsQueue",
         mode: "asap",
         priority: 5,
@@ -16,17 +18,17 @@ export default [
         job: processETarDocumentsQueue,
     },
     {
-        // failai -> dokumentai (upsert iš failaiDokumentaiQueue)
+        // files -> documents (upsert iš filesDocumentsQueue)
         name: "processFailaiDokumentaiQueue",
         mode: "asap",
         priority: 5,
         cooldown: 30,
         errorCooldown: 30,
         wakeOn: [WORK_SIGNALS.FILES_DOCUMENTS_READY],
-        job: processFailaiDokumentaiQueue,
+        job: processFilesDocumentsQueue,
     },
     {
-        // dokumentai -> quickwit (indeksavimas iš dokumentaiIndexQueue)
+        // documents -> quickwit (indeksavimas iš documents."indexQueue")
         name: "dokumentaiQuickwitProcessIndexQueue",
         mode: "asap",
         priority: 5,
@@ -34,7 +36,7 @@ export default [
         cooldown: 30,
         errorCooldown: 30,
         wakeOn: [WORK_SIGNALS.DOCUMENTS_INDEX_READY],
-        job: processDokumentaiIndexQueue,
+        job: processDocumentsIndexQueue,
     },
     {
         name: "auditTeisekuraCoverage",

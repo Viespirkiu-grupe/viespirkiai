@@ -66,7 +66,7 @@ export function redakcijaPagalData(rows, data) {
 
 /**
  * Redakcijos tekstas. Sąmoningai NE per `loadLegalActDocument`: ten paieška eina
- * per `public.dokumentai` be `source`, o tam indekso nėra – 2,7 mln. eilučių
+ * per `documents.documents` be `sourceId`, o tam indekso nėra – 2,7 mln. eilučių
  * seq scan'as ir ~13 s vienai redakcijai. Čia raktas `legalActId` yra indeksuotas.
  *
  * @returns `{ok: true, pavadinimas, text, structure, index}` arba

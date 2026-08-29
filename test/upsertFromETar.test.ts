@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../modules/dokumentai/dokumentaiFs.js', () => ({
-  saveDokumentasFs: vi.fn(),
+vi.mock('../modules/documents/documentsFs.js', () => ({
+  saveDocumentFs: vi.fn(),
 }));
 
-import { saveDokumentasFs } from '../modules/dokumentai/dokumentaiFs.js';
-import { buildETarDokumentas, upsertETarBatch } from '../modules/dokumentai/upsertFromETar.js';
+import { saveDocumentFs } from '../modules/documents/documentsFs.js';
+import { buildETarDokumentas, upsertETarBatch } from '../modules/documents/upsertFromETar.js';
 
 const row = {
   documentId: 42,
@@ -59,10 +59,17 @@ describe('e-TAR propagavimas į dokumentai', () => {
     const db = { query: vi.fn().mockResolvedValue({ rowCount: 1 }) };
     const built = buildETarDokumentas(row, payload);
     await expect(upsertETarBatch([built], db)).resolves.toEqual({ upserted: 1, skipped: 0 });
-    expect(saveDokumentasFs).toHaveBeenCalledWith('abc123', built.sidecar);
+    expect(saveDocumentFs).toHaveBeenCalledWith('abc123', built.sidecar);
     const [sql, params] = db.query.mock.calls[0];
-    expect(sql).toContain("ON CONFLICT (source, \"saltinioId2\") WHERE class = 'teisekura'");
-    expect(params).toHaveLength(15);
-    expect(params.slice(12)).toEqual(['teisekura', 'teisesAktas', 'etar']);
+    // Tapatybė gyvena documents."sourceIds", tad vietoj vieno ON CONFLICT
+    // dabar rašomos esamos, naujos ir tik tada tapatybės.
+    expect(sql).toContain('documents."sourceIds"');
+    expect(sql).toContain('documents.source_id($18)');
+    // URL suskaidytas į protokolą, hostą ir kelią.
+    expect(params[11]).toEqual(['https']);
+    expect(params[12]).toEqual(['www.e-tar.lt']);
+    expect(params[14]).toEqual(['/portal/lt/legalAct/TAR.ABC/asr']);
+    expect(params).toHaveLength(19);
+    expect(params.slice(15)).toEqual(['teisekura', 'teisesAktas', 'etar', 'lt']);
   });
 });

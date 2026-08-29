@@ -5,7 +5,7 @@ import DetailsSection from '@design-system/components/DetailsSection.astro';
 import DataTable from '@design-system/components/DataTable.astro';
 import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import { postgres } from '@/postgres/postgres.js';
-import { readDokumentasFs } from '@/modules/dokumentai/dokumentaiFs.js';
+import { readDocumentFs } from '@/modules/documents/documentsFs.js';
 import { readLiteko2Sidecar } from '@/modules/liteko2/sidecar.js';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
 import config from '../../lib/config.ts';
@@ -105,7 +105,7 @@ const kategorijos = (kategorijosRes.rows as any[]).filter((k) => k.pavadinimas);
 let sidecar: any = null;
 try {
   sidecar = n.md5
-    ? await (saltinis === 'liteko2' ? readLiteko2Sidecar(n.md5) : readDokumentasFs(n.md5))
+    ? await (saltinis === 'liteko2' ? readLiteko2Sidecar(n.md5) : readDocumentFs(n.md5))
     : null;
 } catch { sidecar = null; }
 // Nuvalom tekstą: pašalinam eilučių pradžios tarpus, sutraukiam >1 tuščią eilutę iki vienos.

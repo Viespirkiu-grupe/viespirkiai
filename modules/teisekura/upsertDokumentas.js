@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { postgres } from "../../postgres/postgres.js";
-import { saveDokumentasFs } from "../dokumentai/dokumentaiFs.js";
+import { saveDocumentFs } from "../documents/documentsFs.js";
+import { upsertDocument } from "../documents/upsertDocument.js";
 import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 export const TEISEKURA_CLASS = "teisekura";
@@ -37,47 +37,41 @@ export async function upsertTeisekuraDokumentas(input) {
         metadata: input.metadata ?? {},
     };
 
-    await saveDokumentasFs(md5, sidecar);
+    await saveDocumentFs(md5, sidecar);
 
-    const { rows } = await postgres.query(
-        `INSERT INTO public.dokumentai (
-            md5, class, type, host, domain, url, source,
-            "saltinioId0", "saltinioId1", "saltinioId2", "saltinioId3",
-            autorius, pavadinimas, language, "pageCount", "wordCount",
-            "characterCount", "discoveredAt", "createdAt", "happenedAt", parent
-         ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-            COALESCE($18, now()),$19,$20,
-            (SELECT id FROM public.dokumentai
-             WHERE class = 'teisekura' AND source = $7 AND "saltinioId2" = $9 LIMIT 1)
-         )
-         ON CONFLICT (source, "saltinioId2") WHERE class = 'teisekura' DO UPDATE SET
-            md5 = EXCLUDED.md5, type = EXCLUDED.type, host = EXCLUDED.host,
-            domain = EXCLUDED.domain, url = EXCLUDED.url,
-            "saltinioId0" = EXCLUDED."saltinioId0",
-            "saltinioId1" = EXCLUDED."saltinioId1",
-            "saltinioId3" = EXCLUDED."saltinioId3",
-            autorius = EXCLUDED.autorius, pavadinimas = EXCLUDED.pavadinimas,
-            language = EXCLUDED.language, "pageCount" = EXCLUDED."pageCount",
-            "wordCount" = EXCLUDED."wordCount",
-            "characterCount" = EXCLUDED."characterCount",
-            "createdAt" = EXCLUDED."createdAt", "happenedAt" = EXCLUDED."happenedAt",
-            parent = COALESCE(EXCLUDED.parent, public.dokumentai.parent)
-         RETURNING *`,
-        [
-            md5, TEISEKURA_CLASS, input.type, input.host, input.domain, input.url,
-            input.source, input.rootSourceId, input.parentSourceId ?? null,
-            input.sourceId, input.registracijosNr ?? null, input.author ?? null,
-            input.title ?? null, input.language ?? "lt", text ? 1 : null,
-            wordCount, characterCount, input.discoveredAt ?? null,
-            input.createdAt ?? null, input.happenedAt ?? null,
+    // Tapatybė nepakito: md5 čia stabilus (md5(source:sourceId)), tad konfliktas
+    // pagal (šaltinis, md5) yra tas pats, kas senasis (source, saltinioId2).
+    // Tėvas randamas pagal tėvinio dokumento stabilų md5 tame pačiame šaltinyje.
+    const id = await upsertDocument({
+        class: TEISEKURA_CLASS,
+        type: input.type,
+        source: input.source,
+        url: input.url,
+        md5,
+        title: input.title ?? null,
+        author: input.author ?? null,
+        language: input.language ?? "lt",
+        pageCount: text ? 1 : null,
+        wordCount,
+        characterCount,
+        discoveredAt: input.discoveredAt ?? new Date(),
+        createdAt: input.createdAt ?? null,
+        happenedAt: input.happenedAt ?? null,
+        sourceIds: [
+            input.rootSourceId,
+            input.parentSourceId ?? null,
+            input.sourceId,
+            input.registracijosNr ?? null,
         ],
-    );
+        parentMd5: input.parentSourceId
+            ? stableMd5(input.source, input.parentSourceId)
+            : null,
+    });
 
     signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
         source: input.source,
-        count: rows.length,
+        count: 1,
     });
 
-    return { row: rows[0], sidecar, md5, contentHash: contentHash(sidecar) };
+    return { id, sidecar, md5, contentHash: contentHash(sidecar) };
 }

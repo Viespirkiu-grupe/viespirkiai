@@ -1,4 +1,4 @@
-import { postgres } from '@/postgres/postgres.js';
+import { documentTileCells } from '@/modules/documents/quickwitMap.js';
 
 // Heatmap tile data source. The client renders these cells into a <canvas>
 // identically to the old server-side PNG worker (see git history:
@@ -12,35 +12,23 @@ export const SCALE = 2 ** OVERSAMPLE; // 16 sub-cells per axis
 // (0..SCALE-1) within the requested tile.
 export type TileCell = [number, number, number];
 
-// Allowed table names — kept as a whitelist so the interpolated identifier can
-// never come from user input.
-const TILE_TABLES = {
-  dokumentai: 'dokumentaiLocationTiles',
-} as const;
+export type TileTableKey = 'dokumentai';
 
-export type TileTableKey = keyof typeof TILE_TABLES;
-
+/**
+ * Langelius skaičiuoja Quickwit `terms` agregacija per Morton raktus
+ * (`geo.zN`), kaip juridiniams. Anksčiau tam buvo iš anksto sudaroma
+ * `dokumentaiLocationTiles` lentelė, kurią atnaujindavo trigeris prie kiekvieno
+ * iš 8,3 mln. įrašų — nors koordinates turi mažiau nei 0,1 % dokumentų.
+ *
+ * Svarbiausia nauda ne greitis, o tai, kad agregacija paklūsta paieškos
+ * užklausai: žemėlapis rodo filtruotą rinkinį, o ne visada visus dokumentus.
+ */
 export async function fetchTileCells(
-  table: TileTableKey,
+  _table: TileTableKey,
   z: number,
   x: number,
   y: number,
+  query = '*',
 ): Promise<TileCell[]> {
-  const minTileX = x * SCALE;
-  const maxTileX = minTileX + SCALE - 1;
-  const minTileY = y * SCALE;
-  const maxTileY = minTileY + SCALE - 1;
-
-  const { rows } = await postgres.query(
-    `SELECT "tileX", "tileY", "pointCount"
-     FROM public."${TILE_TABLES[table]}"
-     WHERE "zoom" = $1 AND "tileX" BETWEEN $2 AND $3 AND "tileY" BETWEEN $4 AND $5`,
-    [z + OVERSAMPLE, minTileX, maxTileX, minTileY, maxTileY],
-  );
-
-  return rows.map((r): TileCell => [
-    r.tileX - minTileX,
-    r.tileY - minTileY,
-    r.pointCount,
-  ]);
+  return documentTileCells(query, z, x, y) as Promise<TileCell[]>;
 }

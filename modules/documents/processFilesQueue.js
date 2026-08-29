@@ -4,13 +4,13 @@ const logger = new Logger();
 import {
     fetchFailaiByIds,
     upsertBatch,
-    deleteDokumentaiByFailasIds,
-} from "./upsertFromFailai.js";
+    deleteDocumentsByFileIds,
+} from "./upsertFromFiles.js";
 import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const BATCH_SIZE = 500;
 
-export async function processFailaiDokumentaiQueue() {
+export async function processFilesDocumentsQueue() {
     const client = await postgres.connect();
     try {
         await client.query("BEGIN");
@@ -54,10 +54,10 @@ export async function processFailaiDokumentaiQueue() {
         let skipped = 0;
 
         if (toDelete.length) {
-            const removed = await deleteDokumentaiByFailasIds(toDelete, client);
+            const removed = await deleteDocumentsByFileIds(toDelete, client);
             deleted = removed.length;
             // NOTE: sidecar JSON files keyed by md5 are NOT removed — same md5 may
-            // be shared by other dokumentai. A separate GC job can sweep orphans.
+            // be shared by other documents. A separate GC job can sweep orphans.
         }
 
         if (toUpsert.length) {
@@ -98,7 +98,7 @@ if (
     import.meta.url === process.argv[1] ||
     import.meta.url === `file://${process.argv[1]}`
 ) {
-    while (await processFailaiDokumentaiQueue()) {}
+    while (await processFilesDocumentsQueue()) {}
     await postgres.end();
     process.exit(0);
 }

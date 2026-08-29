@@ -17,7 +17,7 @@ import {
   readFailaiFs,
   savePreparedFailaiFs,
 } from '../modules/failai/failaiFs.js';
-import { readDokumentasFs, saveDokumentasFs } from '../modules/dokumentai/dokumentaiFs.js';
+import { readDocumentFs, saveDocumentFs } from '../modules/documents/documentsFs.js';
 import { readRezultatasFs, saveRezultatasFs } from '../modules/ocr/rezultataiFs.js';
 
 const KEY = '0123456789abcdef0123456789abcdef';
@@ -195,11 +195,11 @@ describe('SQLite sidecar backend', () => {
 
     const failai = prepareFailaiFs({ tekstas: 'failas', metaduomenys: { author: 'A' } });
     await savePreparedFailaiFs(failai.hash, failai.json);
-    await saveDokumentasFs(KEY, { md5: KEY, text: 'dokumentas' });
+    await saveDocumentFs(KEY, { md5: KEY, text: 'dokumentas' });
     await saveRezultatasFs({ md5: KEY, tekstas: ['ocr'] });
 
     expect(await readFailaiFs(failai.hash)).toEqual({ tekstas: 'failas', metaduomenys: { author: 'A' } });
-    expect(await readDokumentasFs(KEY)).toEqual({ md5: KEY, text: 'dokumentas' });
+    expect(await readDocumentFs(KEY)).toEqual({ md5: KEY, text: 'dokumentas' });
     expect(await readRezultatasFs(KEY)).toEqual({ md5: KEY, tekstas: ['ocr'] });
 
     // Kiekvienas store'as – atskiras failas, kad rašytojai nesirikiuotų prie vieno WAL.

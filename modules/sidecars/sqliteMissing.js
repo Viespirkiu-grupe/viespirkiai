@@ -15,7 +15,9 @@ const SIDECAR_SALTINIAI = {
         keySql: `"fileHash"`,
     },
     dokumentai: {
-        fromSql: `FROM public.dokumentai WHERE md5 IS NOT NULL`,
+        // Sidecar saugyklos vardas lieka „dokumentai"; md5 dabar gali ateiti ir
+        // iš dokumento eilutės, ir iš failo, tad imam jį iš vaizdo.
+        fromSql: `FROM documents."documentsFull" WHERE md5 IS NOT NULL`,
         keySql: `md5`,
     },
     ocrRezultatai: {

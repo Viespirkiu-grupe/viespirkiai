@@ -54,7 +54,7 @@
         "eseimas:scrape": "node modules/eSeimas/eSeimasScrape.js",
         "etar:dokumentai:backfill": "node modules/eTar/backfillDokumentai.js",
         "etar:dokumentai:audit": "node modules/eTar/backfillDokumentai.js --audit",
-        "etar:dokumentai:process": "node modules/dokumentai/processETarDocumentsQueue.js",
+        "etar:dokumentai:process": "node modules/documents/processETarQueue.js",
         "teisekura:remove-legacy-eseimas": "node scripts/removeLegacyEseimas.js",
         "teisekura:audit": "node modules/teisekura/audit.js",
         "export:sutartys": "node modules/sutartys/eksportuotiJsonl.js",

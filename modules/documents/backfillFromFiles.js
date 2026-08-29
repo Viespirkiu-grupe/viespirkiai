@@ -1,7 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
-import { fetchFailaiSlice, upsertBatch } from "./upsertFromFailai.js";
+import { fetchFailaiSlice, upsertBatch } from "./upsertFromFiles.js";
 
 const BATCH_SIZE = 1_000;
 
@@ -22,8 +22,8 @@ async function run() {
         const {
             rows: [{ max }],
         } = await postgres.query(
-            `SELECT COALESCE(MAX("failasId"), 0) AS max
-             FROM public.dokumentai WHERE "failasId" IS NOT NULL`,
+            `SELECT COALESCE(MAX("fileId"), 0) AS max
+             FROM documents.documents WHERE "fileId" IS NOT NULL`,
         );
         lastId = Number(max);
         logger.log(`Pradedame nuo failai.id > ${lastId} (--refresh peržiūrėti visus, --from <id> nuo konkretaus)`);
@@ -68,7 +68,7 @@ async function run() {
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.log(
-        `Baigta. Sukurta dokumentai: ${totalInserted.toLocaleString()} | praleista: ${totalSkipped.toLocaleString()} per ${elapsed}s`,
+        `Baigta. Sukurta dokumentų: ${totalInserted.toLocaleString()} | praleista: ${totalSkipped.toLocaleString()} per ${elapsed}s`,
     );
     logger.log(`Pastaba: 'parent' nuoroda dar neišspręsta — paleisti pass 2 atskirai.`);
 }
