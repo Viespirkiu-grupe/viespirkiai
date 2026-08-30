@@ -12,14 +12,14 @@ export async function gautiTeismoNuosprendzius(jarKodas, options = {}) {
     const [countResult, rowsResult] = await Promise.all([
         postgres.query(
             `SELECT "count" AS total
-                 FROM "teismoNuosprendziaiDalyviaiCounts"
+                 FROM liteko."dalyviuCounts"
                  WHERE "jarKodas" = $1::text;`,
             [jarKodas],
         ),
         postgres.query(
             `SELECT n.*, d.*
-             FROM "teismoNuosprendziai" n
-             JOIN "teismoNuosprendziaiDalyviai" d ON d."nuosprendzioId" = n.id
+             FROM liteko."nuosprendziaiPilni" n
+             JOIN liteko."dalyviaiPilni" d ON d."nuosprendzioId" = n.id
              WHERE d."kodas" = $1::text
              ORDER BY d."data" DESC
              ${useLimit ? "LIMIT $2" : ""}`,

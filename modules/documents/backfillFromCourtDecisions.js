@@ -21,20 +21,21 @@ async function run() {
 
     if (refresh) {
         const { rowCount } = await postgres.query(
-            `UPDATE "teismoNuosprendziai" SET "turinioNuskaitymas" = 0`,
+            `UPDATE liteko.nuosprendziai SET "turinioNuskaitymas" = 0`,
         );
         logger.log(`--refresh: atstatyta ${rowCount} eilučių pakartotiniam nuskaitymui`);
     } else {
         // Tik tie, kurių dar nėra documents (source='liteko') ir kurie nebuvo
         // pažymėti klaida (-1). Klaidingus galima perleisti su --refresh.
         const { rowCount } = await postgres.query(
-            `UPDATE "teismoNuosprendziai" tn
+            // md5 nebesaugomas — jis yra md5(litekoId), tad skaičiuojamas vietoje.
+            `UPDATE liteko.nuosprendziai tn
              SET "turinioNuskaitymas" = 0
-             WHERE COALESCE(tn."turinioNuskaitymas", 0) NOT IN (-1)
+             WHERE COALESCE(tn."turinioNuskaitymas", 0::smallint) NOT IN (-1)
                AND NOT EXISTS (
                  SELECT 1 FROM documents.documents d
                  WHERE d."sourceId" = documents.source_id('liteko')
-                   AND d.md5 = decode(tn.md5, 'hex')
+                   AND d.md5 = decode(md5(tn."litekoId"::text), 'hex')
                )`,
         );
         logger.log(`Pažymėta ${rowCount} dar neįkeltų nuosprendžių nuskaitymui`);

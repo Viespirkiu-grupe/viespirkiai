@@ -30,7 +30,9 @@ export const TABLE_WHITELIST: Set<string> = new Set([
 
     "neskelbiamosDerybos",
     "vdiPazeidimai",
-    "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
+    // LITEKO lentelės iškeltos į `liteko` schemą; senąją stulpelių formą
+    // atkuria view'ai, pasiekiami nekvalifikuotai per analyst search_path.
+    "nuosprendziaiPilni", "dalyviaiPilni",
     "mokesciai",
 
     "xlsxPPAataskaitos", "xlsxPPAdalyviai", "xlsxPPAsutartys",

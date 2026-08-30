@@ -21,7 +21,7 @@ if (!uuid) return Astro.redirect('/404');
 const { rows: litekoRows } = await postgres.query(
   `SELECT id, md5, "litekoId", "bylosNumeris", "teisminisProcesoNr", "bylosRusis",
           teismas, "teismoRumai", skyrius, instancija, data, "fileHref"
-     FROM public."teismoNuosprendziai" WHERE "litekoId" = $1`,
+     FROM liteko."nuosprendziaiPilni" WHERE "litekoId" = $1`,
   [uuid],
 );
 let n: any = litekoRows[0];
@@ -53,7 +53,7 @@ const [dalyviaiRes, kategorijosRes] = await Promise.all([
   saltinis === 'liteko'
     ? postgres.query(
         `SELECT pavadinimas, kodas, "bylojeKaip"
-           FROM public."teismoNuosprendziaiDalyviai"
+           FROM liteko."dalyviaiPilni"
           WHERE "nuosprendzioId" = $1
           ORDER BY "bylojeKaip" NULLS LAST, pavadinimas`,
         [n.id],
@@ -69,9 +69,10 @@ const [dalyviaiRes, kategorijosRes] = await Promise.all([
   saltinis === 'liteko'
     ? postgres.query(
         `SELECT k.kodas, p.pavadinimas
-           FROM public."teismoNuosprendziaiKategorijos" k
-           LEFT JOIN public."teismoNuosprendziaiKategorijuPavadinimai" p ON p.id = k."pavadinimoId"
-          WHERE k."nuosprendzioId" = $1
+           FROM liteko."nuosprendziuKategorijos" nk
+           JOIN liteko.kategorijos k ON k.id = nk."kategorijaId"
+           LEFT JOIN liteko."kategorijuPavadinimai" p ON p.id = k."pavadinimoId"
+          WHERE nk."nuosprendzioId" = $1
           ORDER BY p.pavadinimas NULLS LAST`,
         [n.id],
       )

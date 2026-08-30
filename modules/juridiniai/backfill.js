@@ -167,7 +167,7 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
         ) kapitalas ON true
         LEFT JOIN public."vpmSutartysSumos" sutartys
             ON sutartys."saliesKodas" = j."jarKodas"::text
-        LEFT JOIN public."teismoNuosprendziaiDalyviaiCounts" bylos
+        LEFT JOIN liteko."dalyviuCounts" bylos
             ON bylos."jarKodas" = j."jarKodas"::text
         LEFT JOIN LATERAL (
             SELECT count(*) AS "count"
