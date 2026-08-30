@@ -22,7 +22,8 @@ if (
 
 export async function nuskaitytiInformaciniLeidini() {
     let response = await postgres.query(`
-    SELECT * FROM "rcInformaciniaiLeidiniai" WHERE nuskaitymas IS NULL OR nuskaitymas = 0 ORDER BY data DESC LIMIT 1;
+    SELECT * FROM "rcInformaciniaiPranesimai"."leidiniai"
+     WHERE nuskaitymas IS NULL OR nuskaitymas = 0 ORDER BY data DESC LIMIT 1;
     `);
 
     const rows = response.rows;
@@ -37,19 +38,10 @@ export async function nuskaitytiInformaciniLeidini() {
     );
 
     let parsed = await parseInformacinisLeidinys(leidinys.nuoroda);
-    // For each row add
-    // leidinioOid: leidinys.oid
-    // leidinioLink: leidinys.nuoroda
-    // leidinioData: leidinys.data
-    // leidinioAtnaujinimas: leidinys.atnaujintas
-    // leidinioNumeris: leidinys.numeris
-
+    // Leidinio data, numeris ir nuoroda pranešime nebedubliuojami — jie
+    // pasiekiami per `leidinioOid` (žr. rcInformaciniaiPranesimaiSchema.sql).
     for (const item of parsed) {
         item.leidinioOid = leidinys.oid;
-        item.leidinioLink = leidinys.nuoroda;
-        item.leidinioData = leidinys.data;
-        item.leidinioAtnaujinimas = leidinys.atnaujintas;
-        item.leidinioNumeris = leidinys.numeris;
         if (item.children) {
             delete item.children;
         }
@@ -94,7 +86,7 @@ export async function nuskaitytiInformaciniLeidini() {
     // Update nuskaitymas to 1
     await postgres.query(
         `
-    UPDATE "rcInformaciniaiLeidiniai"
+    UPDATE "rcInformaciniaiPranesimai"."leidiniai"
     SET nuskaitymas = 1
     WHERE oid = $1;
     `,
@@ -104,59 +96,99 @@ export async function nuskaitytiInformaciniLeidini() {
     return true;
 }
 
+// Vienas sakinys: žodynų upsert'ai CTE viduje + faktų eilutės. Taip porcijai
+// lieka vienas round-trip, o „jau buvo" / „ką tik įrašėm" atvejus sutvarko
+// UNION ALL prieš žodyno lentelę (tas pats šablonas kaip mcpLogger.js).
+const INSERT_SQL = `
+WITH incoming AS (
+    SELECT * FROM jsonb_to_recordset($1::jsonb) AS x(
+        "pranesimoNr" integer, "leidinioOid" text, "jarKodas" integer,
+        "jarPavadinimas" text, "title" text, "subtitle" text,
+        "teisineForma" text, "teisinisStatusas" text,
+        "buveinesAdresas" text, "text" text
+    )
+), ins_antrastes AS (
+    INSERT INTO "rcInformaciniaiPranesimai"."antrastes" ("pavadinimas")
+    SELECT DISTINCT "title" FROM incoming WHERE "title" IS NOT NULL
+    ON CONFLICT ("pavadinimas") DO NOTHING RETURNING "id", "pavadinimas"
+), ins_paantrastes AS (
+    INSERT INTO "rcInformaciniaiPranesimai"."paantrastes" ("pavadinimas")
+    SELECT DISTINCT "subtitle" FROM incoming WHERE "subtitle" IS NOT NULL
+    ON CONFLICT ("pavadinimas") DO NOTHING RETURNING "id", "pavadinimas"
+), ins_formos AS (
+    INSERT INTO "rcInformaciniaiPranesimai"."teisinesFormos" ("pavadinimas")
+    SELECT DISTINCT "teisineForma" FROM incoming WHERE "teisineForma" IS NOT NULL
+    ON CONFLICT ("pavadinimas") DO NOTHING RETURNING "id", "pavadinimas"
+), ins_statusai AS (
+    INSERT INTO "rcInformaciniaiPranesimai"."teisiniaiStatusai" ("pavadinimas")
+    SELECT DISTINCT "teisinisStatusas" FROM incoming WHERE "teisinisStatusas" IS NOT NULL
+    ON CONFLICT ("pavadinimas") DO NOTHING RETURNING "id", "pavadinimas"
+), ins_adresai AS (
+    INSERT INTO "rcInformaciniaiPranesimai"."adresai" ("adresas")
+    SELECT DISTINCT "buveinesAdresas" FROM incoming WHERE "buveinesAdresas" IS NOT NULL
+    ON CONFLICT ("adresas") DO NOTHING RETURNING "id", "adresas"
+), ins_tekstai AS (
+    INSERT INTO "rcInformaciniaiPranesimai"."tekstai" ("md5", "tekstas")
+    SELECT DISTINCT ON (md5("text")::uuid) md5("text")::uuid, "text"
+    FROM incoming WHERE "text" IS NOT NULL
+    ON CONFLICT ("md5") DO NOTHING RETURNING "id", "md5"
+), ins_pavadinimai AS (
+    INSERT INTO "rcInformaciniaiPranesimai"."juridiniuPavadinimai" ("jarKodas", "pavadinimas")
+    SELECT DISTINCT "jarKodas", "jarPavadinimas" FROM incoming WHERE "jarPavadinimas" IS NOT NULL
+    ON CONFLICT ("jarKodas", "pavadinimas") DO NOTHING
+    RETURNING "id", "jarKodas", "pavadinimas"
+)
+INSERT INTO "rcInformaciniaiPranesimai"."pranesimai" (
+    "pranesimoNr", "leidinioOid", "jarKodas", "pavadinimoId",
+    "antrasteId", "paantrasteId", "teisinesFormosId", "teisinioStatusoId",
+    "adresoId", "tekstoId"
+)
+SELECT i."pranesimoNr", i."leidinioOid", i."jarKodas",
+       (SELECT "id" FROM "rcInformaciniaiPranesimai"."juridiniuPavadinimai"
+         WHERE "jarKodas" = i."jarKodas" AND "pavadinimas" = i."jarPavadinimas"
+         UNION ALL
+        SELECT "id" FROM ins_pavadinimai
+         WHERE "jarKodas" = i."jarKodas" AND "pavadinimas" = i."jarPavadinimas"
+         LIMIT 1),
+       (SELECT "id" FROM "rcInformaciniaiPranesimai"."antrastes" WHERE "pavadinimas" = i."title"
+         UNION ALL SELECT "id" FROM ins_antrastes WHERE "pavadinimas" = i."title" LIMIT 1),
+       (SELECT "id" FROM "rcInformaciniaiPranesimai"."paantrastes" WHERE "pavadinimas" = i."subtitle"
+         UNION ALL SELECT "id" FROM ins_paantrastes WHERE "pavadinimas" = i."subtitle" LIMIT 1),
+       (SELECT "id" FROM "rcInformaciniaiPranesimai"."teisinesFormos" WHERE "pavadinimas" = i."teisineForma"
+         UNION ALL SELECT "id" FROM ins_formos WHERE "pavadinimas" = i."teisineForma" LIMIT 1),
+       (SELECT "id" FROM "rcInformaciniaiPranesimai"."teisiniaiStatusai" WHERE "pavadinimas" = i."teisinisStatusas"
+         UNION ALL SELECT "id" FROM ins_statusai WHERE "pavadinimas" = i."teisinisStatusas" LIMIT 1),
+       (SELECT "id" FROM "rcInformaciniaiPranesimai"."adresai" WHERE "adresas" = i."buveinesAdresas"
+         UNION ALL SELECT "id" FROM ins_adresai WHERE "adresas" = i."buveinesAdresas" LIMIT 1),
+       (SELECT "id" FROM "rcInformaciniaiPranesimai"."tekstai" WHERE "md5" = md5(i."text")::uuid
+         UNION ALL SELECT "id" FROM ins_tekstai WHERE "md5" = md5(i."text")::uuid LIMIT 1)
+FROM incoming i
+ON CONFLICT ("pranesimoNr") DO UPDATE SET
+    "leidinioOid"       = EXCLUDED."leidinioOid",
+    "jarKodas"          = EXCLUDED."jarKodas",
+    "pavadinimoId"      = EXCLUDED."pavadinimoId",
+    "antrasteId"        = EXCLUDED."antrasteId",
+    "paantrasteId"      = EXCLUDED."paantrasteId",
+    "teisinesFormosId"  = EXCLUDED."teisinesFormosId",
+    "teisinioStatusoId" = EXCLUDED."teisinioStatusoId",
+    "adresoId"          = EXCLUDED."adresoId",
+    "tekstoId"          = EXCLUDED."tekstoId"`;
+
 async function insertRows(parsed) {
-    const query = `
-      INSERT INTO "rcInformaciniaiLeidiniaiPranesimai"(
-        "leidinioOid","title","subtitle","jarPavadinimas","jarKodas",
-        "teisineForma","teisinisStatusas","buveinesAdresas","pranesimoNr","text",
-        "leidinioLink","leidinioData","leidinioAtnaujinimas","leidinioNumeris"
-      )
-      VALUES
-      ${parsed
-          .map((_, i) => {
-              const offset = i * 14;
-              return Array.from(
-                  { length: 14 },
-                  (_, j) => `$${offset + j + 1}`,
-              ).join(",");
-          })
-          .map((p) => `(${p})`)
-          .join(",")}
-      ON CONFLICT("pranesimoNr") DO UPDATE
-      SET
-        "title" = EXCLUDED."title",
-        "subtitle" = EXCLUDED."subtitle",
-        "jarPavadinimas" = EXCLUDED."jarPavadinimas",
-        "jarKodas" = EXCLUDED."jarKodas",
-        "teisineForma" = EXCLUDED."teisineForma",
-        "teisinisStatusas" = EXCLUDED."teisinisStatusas",
-        "buveinesAdresas" = EXCLUDED."buveinesAdresas",
-        "text" = EXCLUDED."text",
-        "leidinioLink" = EXCLUDED."leidinioLink",
-        "leidinioData" = EXCLUDED."leidinioData",
-        "leidinioAtnaujinimas" = EXCLUDED."leidinioAtnaujinimas",
-        "leidinioNumeris" = EXCLUDED."leidinioNumeris";
-      `;
+    const rows = parsed.map((p) => ({
+        pranesimoNr: Number(p.pranesimoNr),
+        leidinioOid: p.leidinioOid,
+        jarKodas: Number(p.jarKodas),
+        jarPavadinimas: p.jarPavadinimas ?? null,
+        title: p.title ?? null,
+        subtitle: p.subtitle ?? null,
+        teisineForma: p.teisineForma ?? null,
+        teisinisStatusas: p.teisinisStatusas ?? null,
+        buveinesAdresas: p.buveinesAdresas ?? null,
+        text: p.text ?? null,
+    }));
 
-    // Flatten values for placeholders
-    const values = parsed.flatMap((p) => [
-        p.leidinioOid,
-        p.title,
-        p.subtitle,
-        p.jarPavadinimas,
-        p.jarKodas,
-        p.teisineForma,
-        p.teisinisStatusas,
-        p.buveinesAdresas,
-        p.pranesimoNr,
-        p.text,
-        p.leidinioLink,
-        p.leidinioData,
-        p.leidinioAtnaujinimas || null,
-        p.leidinioNumeris,
-    ]);
-
-    await postgres.query(query, values);
+    await postgres.query(INSERT_SQL, [JSON.stringify(rows)]);
 }
 
 async function parseInformacinisLeidinys(url) {

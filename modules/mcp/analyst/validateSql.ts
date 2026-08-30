@@ -32,7 +32,11 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "priemoniuTipai", "matymai", "atnaujinimai",
     "nepatikimiTiekejai", "melagingiTiekejai",
     "jadisDalyviuSkaiciai", "jadisDalyviuSarasai", "jadisValstybesDalyviai",
-    "rcInformaciniaiLeidiniaiPranesimai",
+    // RC informaciniai pranešimai iškelti į "rcInformaciniaiPranesimai" schemą ir
+    // normalizuoti; `pranesimaiPilni` yra suderinamumo view su senąja plokščia
+    // forma, o `juridiniuPavadinimai` – (jarKodas, pavadinimas) poros su matymo
+    // datomis, patogios ankstesniems pavadinimams nustatyti.
+    "pranesimai", "pranesimaiPilni", "juridiniuPavadinimai", "leidiniai",
     // `domenai` dabar yra normalizuota lentelė be savininko laukų;
     // `domenaiPilni` yra suderinamumo view su senąja forma. Abu
     // pasiekiami nekvalifikuotai per analyst rolės search_path.

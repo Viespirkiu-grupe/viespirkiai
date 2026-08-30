@@ -50,7 +50,7 @@ export async function nuskaitytiInformaciniusLeidinius() {
             .join(",");
 
         const query = `
-        INSERT INTO "rcInformaciniaiLeidiniai"("oid","data","numeris","nuoroda","atnaujintas")
+        INSERT INTO "rcInformaciniaiPranesimai"."leidiniai"("oid","data","numeris","nuoroda","atnaujintas")
         VALUES ${values}
         ON CONFLICT("oid") DO UPDATE
         SET
