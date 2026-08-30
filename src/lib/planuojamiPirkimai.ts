@@ -17,7 +17,7 @@ export const PIRKEJAS_PARAM = 'pirkejoKodas';
 export const FACET_PARAMS = [PIRKEJAS_PARAM, 'tipas', 'budas', 'direktyva', BVPZ_PARAM] as const;
 export const sepFor = (param: string) => (param === BVPZ_PARAM ? BVPZ_SEP : undefined);
 
-export const DATA_JOIN = 'JOIN public."planuojamiPirkimaiDuomenys" d ON d."pirkimoId" = p.id';
+export const DATA_JOIN = 'JOIN "eppsPlanuojamiPirkimai"."duomenys" d ON d."pirkimoId" = p.id';
 
 type Dim = { id: number; pavadinimas: string };
 
@@ -58,12 +58,12 @@ export async function planuojamiContext(url: URL): Promise<PlanuojamiContext> {
   const pradziaIki = (query.pradziaIki || '').trim();
 
   const [tipaiRes, budaiRes, direktyvosRes, pirkejaiRes] = await Promise.all([
-    postgres.query('SELECT id, pavadinimas FROM public."planuojamiPirkimaiTipai"'),
-    postgres.query('SELECT id, pavadinimas FROM public."planuojamiPirkimaiBudai"'),
-    postgres.query('SELECT id, pavadinimas FROM public."planuojamiPirkimaiDirektyvos"'),
+    postgres.query('SELECT id, pavadinimas FROM "eppsPlanuojamiPirkimai"."tipai"'),
+    postgres.query('SELECT id, pavadinimas FROM "eppsPlanuojamiPirkimai"."budai"'),
+    postgres.query('SELECT id, pavadinimas FROM "eppsPlanuojamiPirkimai"."direktyvos"'),
     selected[PIRKEJAS_PARAM].length
       ? postgres.query(
-          'SELECT id FROM public."planuojamiPirkimaiVykdytojai" WHERE "jarKodas" = ANY($1)',
+          'SELECT id FROM "eppsPlanuojamiPirkimai"."vykdytojai" WHERE "jarKodas" = ANY($1)',
           [selected[PIRKEJAS_PARAM]],
         )
       : Promise.resolve({ rows: [] as { id: number }[] }),
@@ -106,7 +106,7 @@ export async function planuojamiContext(url: URL): Promise<PlanuojamiContext> {
     const conditions: string[] = [];
     if (cleanSearch) {
       conditions.push(`EXISTS (
-        SELECT 1 FROM public."planuojamiPirkimaiSearch" s
+        SELECT 1 FROM "eppsPlanuojamiPirkimai"."search" s
         WHERE s."pirkimoId" = p.id AND s."searchTsv" @@ ${tsQueryFunc}('simple', ${params.add(cleanSearch)}))`);
     }
     if (skipFacet !== PIRKEJAS_PARAM && selectedIds[PIRKEJAS_PARAM].length) {
@@ -123,7 +123,7 @@ export async function planuojamiContext(url: URL): Promise<PlanuojamiContext> {
     }
     if (skipFacet !== BVPZ_PARAM && selected[BVPZ_PARAM].length) {
       conditions.push(`EXISTS (
-        SELECT 1 FROM public."planuojamiPirkimaiBvpzKodai" bk
+        SELECT 1 FROM "eppsPlanuojamiPirkimai"."bvpzKodai" bk
         WHERE bk."pirkimoId" = p.id
           AND bk."bvpzKodas" LIKE ANY(${params.add(selected[BVPZ_PARAM].map((code) => `${code}%`))}::text[]))`);
     }
@@ -179,7 +179,7 @@ export async function pirkejasFacetOptions(
     `SELECT v."jarKodas" AS value, SUM(x.count)::int AS count, MIN(v.pavadinimas) AS label
      FROM (
        SELECT p."vykdytojoId" AS vid, COUNT(*)::int AS count
-       FROM public."planuojamiPirkimai" p
+       FROM "eppsPlanuojamiPirkimai"."pirkimai" p
        ${ctx.needsData(PIRKEJAS_PARAM) ? DATA_JOIN : ''}
        ${where}
        GROUP BY 1
@@ -187,7 +187,7 @@ export async function pirkejasFacetOptions(
        ORDER BY ${pinned}count DESC, 1
        LIMIT ${Math.max(size, 500)}
      ) x
-     JOIN public."planuojamiPirkimaiVykdytojai" v ON v.id = x.vid
+     JOIN "eppsPlanuojamiPirkimai"."vykdytojai" v ON v.id = x.vid
      WHERE COALESCE(v."jarKodas", '') <> '' ${needle}
      GROUP BY 1
      ORDER BY count DESC, label
@@ -220,8 +220,8 @@ export async function bvpzFacetOptions(
     `SELECT x.code AS value, x.count, b.pavadinimas AS label
      FROM (
        SELECT bk."bvpzKodas" AS code, COUNT(*)::int AS count
-       FROM public."planuojamiPirkimaiBvpzKodai" bk
-       JOIN public."planuojamiPirkimai" p ON p.id = bk."pirkimoId"
+       FROM "eppsPlanuojamiPirkimai"."bvpzKodai" bk
+       JOIN "eppsPlanuojamiPirkimai"."pirkimai" p ON p.id = bk."pirkimoId"
        ${ctx.needsData(BVPZ_PARAM) ? DATA_JOIN : ''}
        ${where}
        GROUP BY 1

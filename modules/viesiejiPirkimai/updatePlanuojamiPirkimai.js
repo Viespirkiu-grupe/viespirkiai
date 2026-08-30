@@ -9,16 +9,16 @@ const TIME_ZONE = "Europe/Vilnius";
 const DEFAULT_DAYS = 7;
 const defaultLogger = { log };
 const SCHEMA_TABLES = [
-    'public."planuojamiPirkimai"',
-    'public."planuojamiPirkimaiDuomenys"',
-    'public."planuojamiPirkimaiBvpzKodai"',
-    'public."planuojamiPirkimaiAtnaujinimai"',
-    'public."planuojamiPirkimaiSearch"',
-    'public."planuojamiPirkimaiVykdytojai"',
-    'public."planuojamiPirkimaiVykdytojaiAtnaujinimai"',
-    'public."planuojamiPirkimaiTipai"',
-    'public."planuojamiPirkimaiDirektyvos"',
-    'public."planuojamiPirkimaiBudai"',
+    '"eppsPlanuojamiPirkimai"."pirkimai"',
+    '"eppsPlanuojamiPirkimai"."duomenys"',
+    '"eppsPlanuojamiPirkimai"."bvpzKodai"',
+    '"eppsPlanuojamiPirkimai"."atnaujinimai"',
+    '"eppsPlanuojamiPirkimai"."search"',
+    '"eppsPlanuojamiPirkimai"."vykdytojai"',
+    '"eppsPlanuojamiPirkimai"."vykdytojaiAtnaujinimai"',
+    '"eppsPlanuojamiPirkimai"."tipai"',
+    '"eppsPlanuojamiPirkimai"."direktyvos"',
+    '"eppsPlanuojamiPirkimai"."budai"',
 ];
 
 /** @typedef {{ query: (...args: any[]) => Promise<any> }} Queryable */
@@ -109,7 +109,7 @@ export async function upsertPlanuojamiPirkimai(records, db = postgres) {
           )
         ),
         inserted_organizations AS (
-          INSERT INTO public."planuojamiPirkimaiVykdytojai" (pavadinimas)
+          INSERT INTO "eppsPlanuojamiPirkimai"."vykdytojai" (pavadinimas)
           SELECT DISTINCT "pirkimoVykdytojas"
           FROM incoming
           WHERE NULLIF("pirkimoVykdytojas", '') IS NOT NULL
@@ -118,7 +118,7 @@ export async function upsertPlanuojamiPirkimai(records, db = postgres) {
         ),
         all_organizations AS MATERIALIZED (
           SELECT id, pavadinimas, "jarKodas"
-          FROM public."planuojamiPirkimaiVykdytojai"
+          FROM "eppsPlanuojamiPirkimai"."vykdytojai"
           WHERE pavadinimas IN (
             SELECT "pirkimoVykdytojas" FROM incoming
           )
@@ -126,49 +126,49 @@ export async function upsertPlanuojamiPirkimai(records, db = postgres) {
           SELECT id, pavadinimas, "jarKodas" FROM inserted_organizations
         ),
         organization_tracking AS (
-          INSERT INTO public."planuojamiPirkimaiVykdytojaiAtnaujinimai" ("vykdytojoId")
+          INSERT INTO "eppsPlanuojamiPirkimai"."vykdytojaiAtnaujinimai" ("vykdytojoId")
           SELECT DISTINCT id FROM all_organizations
           ON CONFLICT ("vykdytojoId") DO NOTHING
           RETURNING "vykdytojoId"
         ),
         inserted_types AS (
-          INSERT INTO public."planuojamiPirkimaiTipai" (pavadinimas)
+          INSERT INTO "eppsPlanuojamiPirkimai"."tipai" (pavadinimas)
           SELECT DISTINCT "pirkimoTipas" FROM incoming
           WHERE NULLIF("pirkimoTipas", '') IS NOT NULL
           ON CONFLICT (pavadinimas) DO NOTHING
           RETURNING id, pavadinimas
         ),
         all_types AS MATERIALIZED (
-          SELECT id, pavadinimas FROM public."planuojamiPirkimaiTipai"
+          SELECT id, pavadinimas FROM "eppsPlanuojamiPirkimai"."tipai"
           WHERE pavadinimas IN (SELECT "pirkimoTipas" FROM incoming)
           UNION ALL SELECT id, pavadinimas FROM inserted_types
         ),
         inserted_directives AS (
-          INSERT INTO public."planuojamiPirkimaiDirektyvos" (pavadinimas)
+          INSERT INTO "eppsPlanuojamiPirkimai"."direktyvos" (pavadinimas)
           SELECT DISTINCT direktyva FROM incoming
           WHERE NULLIF(direktyva, '') IS NOT NULL
           ON CONFLICT (pavadinimas) DO NOTHING
           RETURNING id, pavadinimas
         ),
         all_directives AS MATERIALIZED (
-          SELECT id, pavadinimas FROM public."planuojamiPirkimaiDirektyvos"
+          SELECT id, pavadinimas FROM "eppsPlanuojamiPirkimai"."direktyvos"
           WHERE pavadinimas IN (SELECT direktyva FROM incoming)
           UNION ALL SELECT id, pavadinimas FROM inserted_directives
         ),
         inserted_methods AS (
-          INSERT INTO public."planuojamiPirkimaiBudai" (pavadinimas)
+          INSERT INTO "eppsPlanuojamiPirkimai"."budai" (pavadinimas)
           SELECT DISTINCT "pirkimoBudas" FROM incoming
           WHERE NULLIF("pirkimoBudas", '') IS NOT NULL
           ON CONFLICT (pavadinimas) DO NOTHING
           RETURNING id, pavadinimas
         ),
         all_methods AS MATERIALIZED (
-          SELECT id, pavadinimas FROM public."planuojamiPirkimaiBudai"
+          SELECT id, pavadinimas FROM "eppsPlanuojamiPirkimai"."budai"
           WHERE pavadinimas IN (SELECT "pirkimoBudas" FROM incoming)
           UNION ALL SELECT id, pavadinimas FROM inserted_methods
         ),
         inserted_plans AS (
-          INSERT INTO public."planuojamiPirkimai" (
+          INSERT INTO "eppsPlanuojamiPirkimai"."pirkimai" (
             md5, "vykdytojoId", "pirkimoPavadinimas", "pirkimoTipoId",
             "direktyvosId", "pirkimoBudoId", "bvpzKoduSkaicius"
           )
@@ -188,11 +188,11 @@ export async function upsertPlanuojamiPirkimai(records, db = postgres) {
           SELECT id, md5 FROM inserted_plans
           UNION ALL
           SELECT p.id, p.md5
-          FROM public."planuojamiPirkimai" p
+          FROM "eppsPlanuojamiPirkimai"."pirkimai" p
           JOIN incoming i ON i.md5 = p.md5
         ),
         inserted_details AS (
-          INSERT INTO public."planuojamiPirkimaiDuomenys" (
+          INSERT INTO "eppsPlanuojamiPirkimai"."duomenys" (
             "pirkimoId", aprasymas, "bvpzKodaiRaw", "apskaiciuotaKaina",
             kiekiai, "pirkimoPradziosData", "pasiulymuTeikimoData",
             "numatomaSutartiesTrukmeMenesiais",
@@ -209,7 +209,7 @@ export async function upsertPlanuojamiPirkimai(records, db = postgres) {
           RETURNING "pirkimoId"
         ),
         inserted_cpv AS (
-          INSERT INTO public."planuojamiPirkimaiBvpzKodai" ("pirkimoId", "bvpzKodas")
+          INSERT INTO "eppsPlanuojamiPirkimai"."bvpzKodai" ("pirkimoId", "bvpzKodas")
           SELECT p.id, code
           FROM inserted_plans p
           JOIN incoming i USING (md5)
@@ -218,7 +218,7 @@ export async function upsertPlanuojamiPirkimai(records, db = postgres) {
           RETURNING "pirkimoId"
         ),
         inserted_search AS (
-          INSERT INTO public."planuojamiPirkimaiSearch" ("pirkimoId", "searchTsv")
+          INSERT INTO "eppsPlanuojamiPirkimai"."search" ("pirkimoId", "searchTsv")
           SELECT p.id,
             setweight(to_tsvector('simple', COALESCE(i."pirkimoPavadinimas", '')), 'A') ||
             setweight(to_tsvector('simple', concat_ws(' ', i."pirkimoVykdytojas", org."jarKodas")), 'B') ||
@@ -231,7 +231,7 @@ export async function upsertPlanuojamiPirkimai(records, db = postgres) {
           RETURNING "pirkimoId"
         ),
         tracking AS (
-          INSERT INTO public."planuojamiPirkimaiAtnaujinimai" ("pirkimoId")
+          INSERT INTO "eppsPlanuojamiPirkimai"."atnaujinimai" ("pirkimoId")
           SELECT id FROM target_plans
           ON CONFLICT ("pirkimoId") DO UPDATE SET
             "paskutinioAptikimoData" =

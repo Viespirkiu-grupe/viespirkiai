@@ -80,7 +80,7 @@ function dimFacetQuery(param: string, column: string, max = 50) {
   const pinned = ids.length ? `(p."${column}" = ANY(${params.add(ids)}::bigint[])) DESC, ` : '';
   return postgres.query(
     `SELECT p."${column}" AS value, COUNT(*)::int AS count
-     FROM public."planuojamiPirkimai" p
+     FROM "eppsPlanuojamiPirkimai"."pirkimai" p
      ${needsData(param) ? DATA_JOIN : ''}
      ${where}
      GROUP BY 1
@@ -126,17 +126,17 @@ const [resultsRes, totalRes, pirkejasRes, tipasRes, budasRes, direktyvaRes, bvpz
               d."numatomaSutartiesTrukmeMenesiais" AS trukme,
               d."sutartiesTrukmesMatavimoVienetas" AS "trukmesVienetas",
               (SELECT array_agg(bk."bvpzKodas" ORDER BY bk."bvpzKodas")
-               FROM public."planuojamiPirkimaiBvpzKodai" bk WHERE bk."pirkimoId" = p.id) AS "bvpzKodai"
-       FROM public."planuojamiPirkimai" p
+               FROM "eppsPlanuojamiPirkimai"."bvpzKodai" bk WHERE bk."pirkimoId" = p.id) AS "bvpzKodai"
+       FROM "eppsPlanuojamiPirkimai"."pirkimai" p
        ${DATA_JOIN}
-       LEFT JOIN public."planuojamiPirkimaiVykdytojai" v ON v.id = p."vykdytojoId"
+       LEFT JOIN "eppsPlanuojamiPirkimai"."vykdytojai" v ON v.id = p."vykdytojoId"
        ${resultWhere}
        ORDER BY ${SORTS[sort]}
        LIMIT ${limitPh} OFFSET ${offsetPh}`,
       resultParams.values,
     )),
     timed(postgres.query(
-      `SELECT COUNT(*)::int AS count FROM public."planuojamiPirkimai" p
+      `SELECT COUNT(*)::int AS count FROM "eppsPlanuojamiPirkimai"."pirkimai" p
        ${needsData() ? DATA_JOIN : ''} ${countWhere}`,
       countParams.values,
     )),
@@ -147,14 +147,14 @@ const [resultsRes, totalRes, pirkejasRes, tipasRes, budasRes, direktyvaRes, bvpz
     timed(bvpzFacetOptions(ctx)),
     timed(postgres.query(
       `SELECT width_bucket(d."apskaiciuotaKaina", ${edgesPh}::numeric[]) AS idx, COUNT(*)::int AS count
-       FROM public."planuojamiPirkimai" p ${DATA_JOIN}
+       FROM "eppsPlanuojamiPirkimai"."pirkimai" p ${DATA_JOIN}
        ${kainaWhere}${kainaWhere ? ' AND' : 'WHERE'} d."apskaiciuotaKaina" > 0
        GROUP BY 1`,
       kainaParams.values,
     )),
     timed(postgres.query(
       `SELECT date_trunc('month', d."pirkimoPradziosData")::date AS bucket, COUNT(*)::int AS count
-       FROM public."planuojamiPirkimai" p ${DATA_JOIN}
+       FROM "eppsPlanuojamiPirkimai"."pirkimai" p ${DATA_JOIN}
        ${pradziaWhere}${pradziaWhere ? ' AND' : 'WHERE'} d."pirkimoPradziosData" >= ${boundMinPh}::date
          AND d."pirkimoPradziosData" < ${boundMaxPh}::date
        GROUP BY 1 ORDER BY 1`,
