@@ -41,7 +41,7 @@ describe('loadSutartis', () => {
 
     expect(sutartis?.pirkimoNumeris).toBe('BTGS027138');
     const sql = pgQuery.mock.calls.map(([query]) => String(query)).join('\n');
-    expect(sql).not.toContain('cvppViesiejiPirkimai');
+    expect(sql).not.toContain('cvpp."archyvoSkelbimai"');
     expect(sql).not.toContain('viesiejiPirkimai');
     expect(sql).not.toContain('cpvaProjektuSutartys');
   });

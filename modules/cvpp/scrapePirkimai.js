@@ -1,17 +1,17 @@
 // CVPP pirkimų (PublicPurchase) detalės skreiperis.
 // https://pirkimai.eviesiejipirkimai.lt/ctm/Supplier/PublicPurchase/{PID}?B=PPO
 //
-// PID (= pirkimoId) paimamas iš cvppViesiejiPirkimai — iš "dokumentaiLink"
+// PID (= pirkimoId) paimamas iš cvpp."archyvoSkelbimai" — iš "dokumentaiLink"
 // (…?PID=NNN) arba iš tiesioginio "link" (…/PublicPurchase/NNN). Vienam PID
-// atitinka daug skelbimų, tad pirkimo lygio duomenys saugomi cvppPirkimai.
+// atitinka daug skelbimų, tad pirkimo lygio duomenys saugomi cvpp."pirkimai".
 //
 // Puslapis iš to paties PublicPurchase parsina:
-//   • cvppPirkimai  — aprašymas, terminas, BVPŽ kodai, perkančioji org.,
+//   • cvpp."pirkimai"  — aprašymas, terminas, BVPŽ kodai, perkančioji org.,
 //                     kontaktas, paketai (su dokumentų LID);
-//   • cvppSkelbimai — „Paskelbti skelbimai" (#notices-table): kiekvienas
+//   • cvpp."skelbimai" — „Paskelbti skelbimai" (#notices-table): kiekvienas
 //                     ViewNotice/{id} skelbimas (tipas, išsiuntimo data).
 //
-// Būsena valdoma cvppPirkimai."nuskaitymas" (kaip scrapeNotice.js):
+// Būsena valdoma cvpp."pirkimai"."nuskaitymas" (kaip scrapeNotice.js):
 //   null -> dar nesuparsinta, >= 1 -> suparsinta ta versija, -1 -> klaida.
 import { createScraperFetch } from "../../utils/scrapeFetch.js";
 const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapePirkimai" });
@@ -28,7 +28,7 @@ const LANGUAGE_ID = 8;
 // v2: pridėtas turinysHtml įrašymas (anksčiau trūko PIRKIMAS_COLUMNS sąraše),
 // tad v1 eilutės perskaitomos iš naujo, kad užsipildytų turinysHtml.
 // v3: pridėtas pirkimoNumeris (iš antraštės), tad eilutės perskaitomos iš naujo.
-// v4: pridėtas failų (cvppFailai) nuskaitymas iš paketų dokumentų puslapių.
+// v4: pridėtas failų (cvpp."failai") nuskaitymas iš paketų dokumentų puslapių.
 const NUSKAITYMO_VERSIJA = 4;
 const KLAIDOS_BUSENA = -1;
 
@@ -441,18 +441,18 @@ const FAILAS_COLUMNS = [
     "atsisiuntimoLink",
 ];
 
-// Iš cvppViesiejiPirkimai išrenka trūkstamus PID ir įterpia į cvppPirkimai
+// Iš cvpp."archyvoSkelbimai" išrenka trūkstamus PID ir įterpia į cvpp."pirkimai"
 // (be turinio, nuskaitymas = null). Grąžina įterptų eilučių skaičių.
 export async function seedPirkimai() {
     const { rowCount } = await postgres.query(`
-        INSERT INTO public."cvppPirkimai" ("pirkimoId")
+        INSERT INTO cvpp."pirkimai" ("pirkimoId")
         SELECT DISTINCT pid::int
         FROM (
             SELECT COALESCE(
                 substring("dokumentaiLink" from 'PID=(\\d+)'),
                 substring("link" from '/PublicPurchase/(\\d+)')
             ) AS pid
-            FROM public."cvppViesiejiPirkimai"
+            FROM cvpp."archyvoSkelbimai"
         ) s
         WHERE pid IS NOT NULL
         ON CONFLICT ("pirkimoId") DO NOTHING`);
@@ -461,7 +461,7 @@ export async function seedPirkimai() {
 
 async function setStatus(pirkimoId, status) {
     await postgres.query(
-        `UPDATE public."cvppPirkimai" SET nuskaitymas = $1 WHERE "pirkimoId" = $2`,
+        `UPDATE cvpp."pirkimai" SET nuskaitymas = $1 WHERE "pirkimoId" = $2`,
         [status, pirkimoId],
     );
 }
@@ -480,7 +480,7 @@ async function issaugoti(pirkimas, skelbimai, failai) {
     values.push(NUSKAITYMO_VERSIJA, pirkimas.pirkimoId);
 
     await postgres.query(
-        `UPDATE public."cvppPirkimai"
+        `UPDATE cvpp."pirkimai"
          SET ${setSql}, nuskaitymas = $${values.length - 1}
          WHERE "pirkimoId" = $${values.length}`,
         values,
@@ -508,7 +508,7 @@ async function upsertFailai(failai) {
         .join(", ");
 
     await postgres.query(
-        `INSERT INTO public."cvppFailai" (${FAILAS_COLUMNS.map(
+        `INSERT INTO cvpp."failai" (${FAILAS_COLUMNS.map(
             (c) => `"${c}"`,
         ).join(", ")})
          VALUES ${placeholders}
@@ -537,7 +537,7 @@ async function upsertSkelbimai(skelbimai) {
         .join(", ");
 
     await postgres.query(
-        `INSERT INTO public."cvppSkelbimai" (${SKELBIMAS_COLUMNS.map(
+        `INSERT INTO cvpp."skelbimai" (${SKELBIMAS_COLUMNS.map(
             (c) => `"${c}"`,
         ).join(", ")})
          VALUES ${placeholders}
@@ -566,13 +566,13 @@ async function surinktiFailus(pirkimas) {
     return failai.filter((f, i, arr) => arr.findIndex((x) => x.dvid === f.dvid) === i);
 }
 
-// Paima vieną dar nesuparsintą (ar senesnės versijos / null) cvppPirkimai eilutę,
+// Paima vieną dar nesuparsintą (ar senesnės versijos / null) cvpp."pirkimai" eilutę,
 // nuskaito PublicPurchase puslapį, įrašo pirkimą + skelbimus + failus. Grąžina
 // false, kai eilučių nebeliko.
 export async function scrapeVienaPirkima() {
     const { rows } = await postgres.query(
         `SELECT "pirkimoId"
-         FROM public."cvppPirkimai"
+         FROM cvpp."pirkimai"
          WHERE (nuskaitymas < $1 AND nuskaitymas >= 0) OR nuskaitymas IS NULL
          LIMIT 1`,
         [NUSKAITYMO_VERSIJA],
@@ -604,7 +604,7 @@ export async function scrapeVienaPirkima() {
 }
 
 // CLI
-//   Be argumentų: seed'ina PID iš cvppViesiejiPirkimai ir nuskaito visus pagal
+//   Be argumentų: seed'ina PID iš cvpp."archyvoSkelbimai" ir nuskaito visus pagal
 //                 nuskaitymo būseną.
 //   Dry run (be DB): node scrapePirkimai.js <PID>
 if (

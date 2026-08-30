@@ -10,8 +10,8 @@ import { linksniuoti } from '@/utils/linksniai.js';
  *
  *   • „nauja"  — viesiejipirkimai.lt (EPPS), lentelė `viesiejiPirkimai`,
  *                raktas `pirkimoId`;
- *   • „cvpp"   — cvpp.eviesiejipirkimai.lt skelbimai (`cvppViesiejiPirkimai`)
- *                ir pirkimai.eviesiejipirkimai.lt pirkimai (`cvppPirkimai`),
+ *   • „cvpp"   — cvpp.eviesiejipirkimai.lt skelbimai (`cvpp."archyvoSkelbimai"`)
+ *                ir pirkimai.eviesiejipirkimai.lt pirkimai (`cvpp."pirkimai"`),
  *                raktas — skelbime nurodytas `pirkimoNumeris`.
  *
  * Todėl tas pats numeris dažnai randamas abiejose sistemose ir tik viena iš
@@ -172,8 +172,8 @@ async function loadNaujosSistemosKandidatas(pirkimoId: number) {
 async function loadCvppKandidatai(pirkimoNumeris: string) {
   const skelbimai = await postgres.query(
     `SELECT c.*, o."imonesKodas" AS "organizacijosJarKodas", o.pavadinimas AS "organizacijosPavadinimas"
-     FROM "cvppViesiejiPirkimai" c
-     LEFT JOIN "cvppOrganizacijos" o ON o."organizacijosId" = c."perkanciosiosOrganizacijosId"
+     FROM cvpp."archyvoSkelbimai" c
+     LEFT JOIN cvpp."organizacijos" o ON o."organizacijosId" = c."perkanciosiosOrganizacijosId"
      WHERE c."pirkimoNumeris" = $1
      ORDER BY c."paskelbimoData" ASC NULLS LAST`,
     [pirkimoNumeris],
@@ -203,7 +203,7 @@ async function loadCvppKandidatai(pirkimoNumeris: string) {
 
   const pidai = [...grupes.keys()].filter((k) => k !== 'be-pid').map(Number);
   const pirkimai = pidai.length > 0
-    ? await postgres.query(`SELECT * FROM "cvppPirkimai" WHERE "pirkimoId" = ANY($1::int[])`, [pidai]).then((r: any) => r.rows)
+    ? await postgres.query(`SELECT * FROM cvpp."pirkimai" WHERE "pirkimoId" = ANY($1::int[])`, [pidai]).then((r: any) => r.rows)
     : [];
   const pirkimasPagalPid = new Map<number, any>(pirkimai.map((p: any) => [p.pirkimoId, p]));
 

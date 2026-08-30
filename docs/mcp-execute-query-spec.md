@@ -388,7 +388,7 @@ pinregJuridiniaiRysiai, pinreg
 failai
 sabisSutartys, sabisSutarciuSalys, sabisSaskaitos, sabisSaskaituSalys
 cpvaProjektuSutartys, cpvaProjektuSarasas
-cvppViesiejiPirkimai
+cvpp: archyvoSkelbimai (CVPP archyvas)
 eiluciuSkaiciai, bvpzKodai
 sodra, regitra
 nepatikimiTiekejai, melagingiTiekejai
@@ -526,6 +526,7 @@ GRANT CONNECT, TEMPORARY ON DATABASE viespirkiai TO analyst;
 GRANT USAGE ON SCHEMA public TO analyst;
 GRANT USAGE ON SCHEMA sodra TO analyst;   -- kaip ir domenai/liteko/vdi
 GRANT USAGE ON SCHEMA ppa TO analyst;
+GRANT USAGE ON SCHEMA cvpp TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -533,7 +534,7 @@ GRANT SELECT ON
     "jar", "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai", "pinregJuridiniaiRysiai",
     "pinreg", "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos",
     "sabisSaskaituSalys", "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
-    "cpvaProjektuSutartys", "cpvaProjektuSarasas", "cvppViesiejiPirkimai",
+    "cpvaProjektuSutartys", "cpvaProjektuSarasas", cvpp."archyvoSkelbimai",
     "eiluciuSkaiciai", "bvpzKodai",
     sodra."menesiniai", sodra."evrk", sodra."importai",
     sodra."pavadinimai", sodra."savivaldybes",
@@ -561,5 +562,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, liteko, vdi, sodra;
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, liteko, vdi, sodra, cvpp;
 ```

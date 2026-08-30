@@ -144,7 +144,7 @@ export async function handler({ id }) {
 
     // CVPP ir CVPIS pirkimai
     const cvppRes = await postgres.query(
-        `SELECT * FROM "cvppViesiejiPirkimai" WHERE "pirkimoNumeris" = $1`,
+        `SELECT * FROM cvpp."archyvoSkelbimai" WHERE "pirkimoNumeris" = $1`,
         [sutartis.pirkimoNumeris],
     );
     if (cvppRes.rowCount > 0) sutartis.cvppPirkimas = cvppRes.rows[0];

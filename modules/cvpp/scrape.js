@@ -164,7 +164,7 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
     });
 
     await postgres.query(
-        `INSERT INTO "cvppViesiejiPirkimai"
+        `INSERT INTO cvpp."archyvoSkelbimai"
         ("skelbimoKodas", pavadinimas, "pirkimoVykdytojas", "pirkimoVykdytojoLink", "skelbimoTipas", "pirkimoNumeris", "pasiulymuPateikimoTerminas", "paskelbimoData", zenkliukas, link, "dokumentaiLink", "ataskaitosLink", "ataskaitosKodas", "ataskaitosTipoId", "perkanciosiosOrganizacijosId")
         VALUES ${placeholders.join(", ")}
         ON CONFLICT ("skelbimoKodas") DO UPDATE SET

@@ -38,7 +38,7 @@ SELECT 'cvpp' AS saltinis,
        NULL AS "esFinansavimas",
        NULL AS "bvpzKodai",
        c.link AS informacija
-FROM "cvppViesiejiPirkimai" c
+FROM cvpp."archyvoSkelbimai" c
          LEFT JOIN LATERAL (
              SELECT s."perkanciosiosOrganizacijosKodas"
              FROM "vpmSutartys" s

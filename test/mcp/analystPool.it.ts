@@ -210,7 +210,7 @@ describe("v_pirkimas", () => {
             SELECT count(*) AS cnt FROM v_pirkimas v
             WHERE v.saltinis = 'cvpp'
               AND v."pirkimoId" NOT IN (
-                  SELECT "pirkimoNumeris" FROM "cvppViesiejiPirkimai" WHERE "skelbimoTipas" = 'Skelbimas apie pirkimą'
+                  SELECT "pirkimoNumeris" FROM cvpp."archyvoSkelbimai" WHERE "skelbimoTipas" = 'Skelbimas apie pirkimą'
               )
         `);
         expect(Number(rows[0].cnt)).toBe(0);

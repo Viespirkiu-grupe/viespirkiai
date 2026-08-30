@@ -23,7 +23,7 @@ const PLANUOJAMI_COLUMNS = [
     "numatomosPirkimoPradziosData",
 ];
 
-// Upsertina į public."cvppPlanuojamiPirkimai" pagal "planuojamoPirkimoId".
+// Upsertina į cvpp."planuojamiPirkimai" pagal "planuojamoPirkimoId".
 // Grąžina upsertintų eilučių skaičių.
 export async function upsertPlanuojamiPirkimai(pirkimai) {
     const rows = pirkimai.filter((p) => p?.planuojamoPirkimoId != null);
@@ -49,7 +49,7 @@ export async function upsertPlanuojamiPirkimai(pirkimai) {
         .join(", ");
 
     await postgres.query(
-        `INSERT INTO public."cvppPlanuojamiPirkimai" (${PLANUOJAMI_COLUMNS.map(
+        `INSERT INTO cvpp."planuojamiPirkimai" (${PLANUOJAMI_COLUMNS.map(
             (col) => `"${col}"`,
         ).join(", ")})
          VALUES ${placeholders}

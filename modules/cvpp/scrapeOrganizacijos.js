@@ -241,15 +241,15 @@ export function parseCompany(html) {
 // ─── DB ─────────────────────────────────────────────────────────────────────
 
 // Iš cvpp lentelių išrenka trūkstamus perkanciosiosOrganizacijosId ir įterpia
-// į cvppOrganizacijos (be turinio). Grąžina įterptų eilučių skaičių.
+// į cvpp."organizacijos" (be turinio). Grąžina įterptų eilučių skaičių.
 export async function seedOrganizacijos() {
     const { rowCount } = await postgres.query(`
-        INSERT INTO public."cvppOrganizacijos" ("organizacijosId")
+        INSERT INTO cvpp."organizacijos" ("organizacijosId")
         SELECT DISTINCT id FROM (
-            SELECT "perkanciosiosOrganizacijosId" AS id FROM public."cvppViesiejiPirkimai"
-            UNION SELECT "perkanciosiosOrganizacijosId" FROM public."cvppPirkimai"
-            UNION SELECT "perkanciosiosOrganizacijosId" FROM public."cvppPlanuojamiPirkimai"
-            UNION SELECT "perkanciosiosOrganizacijosId" FROM public."cvppSkelbimai"
+            SELECT "perkanciosiosOrganizacijosId" AS id FROM cvpp."archyvoSkelbimai"
+            UNION SELECT "perkanciosiosOrganizacijosId" FROM cvpp."pirkimai"
+            UNION SELECT "perkanciosiosOrganizacijosId" FROM cvpp."planuojamiPirkimai"
+            UNION SELECT "perkanciosiosOrganizacijosId" FROM cvpp."skelbimai"
         ) s
         WHERE id IS NOT NULL
         ON CONFLICT ("organizacijosId") DO NOTHING`);
@@ -258,7 +258,7 @@ export async function seedOrganizacijos() {
 
 async function setStatus(organizacijosId, status) {
     await postgres.query(
-        `UPDATE "cvppOrganizacijos" SET nuskaitymas = $1 WHERE "organizacijosId" = $2;`,
+        `UPDATE cvpp."organizacijos" SET nuskaitymas = $1 WHERE "organizacijosId" = $2;`,
         [status, organizacijosId],
     );
 }
@@ -275,7 +275,7 @@ async function issaugoti(organizacijosId, content) {
     values.push(NUSKAITYMO_VERSIJA, organizacijosId);
 
     await postgres.query(
-        `UPDATE "cvppOrganizacijos"
+        `UPDATE cvpp."organizacijos"
          SET ${setSql}, nuskaitymas = $${CONTENT_COLUMNS.length + 1}
          WHERE "organizacijosId" = $${CONTENT_COLUMNS.length + 2}`,
         values,
@@ -285,7 +285,7 @@ async function issaugoti(organizacijosId, content) {
 export async function scrapeVienaOrganizacija() {
     const { rows } = await postgres.query(
         `SELECT "organizacijosId"
-         FROM "cvppOrganizacijos"
+         FROM cvpp."organizacijos"
          WHERE (nuskaitymas < $1 AND nuskaitymas >= 0) OR nuskaitymas IS NULL
          LIMIT 1;`,
         [NUSKAITYMO_VERSIJA],
@@ -300,7 +300,7 @@ export async function scrapeVienaOrganizacija() {
         // stulpeliu, o eilutę laikom apdorota (nuskaitymas = versija).
         if (/Prieiga nesuteikta|neturite teisės peržiūrėti/i.test(html)) {
             await postgres.query(
-                `UPDATE "cvppOrganizacijos"
+                `UPDATE cvpp."organizacijos"
                  SET "prieigaNesuteikta" = true, nuskaitymas = $1
                  WHERE "organizacijosId" = $2;`,
                 [NUSKAITYMO_VERSIJA, organizacijosId],

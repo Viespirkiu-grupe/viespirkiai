@@ -21,7 +21,7 @@ const ATASKAITOS_COLUMNS = [
     "redagavimoData",
 ];
 
-// Upsertina ataskaitas į public."cvppAtaskaitos" pagal "ataskaitosNumeris".
+// Upsertina ataskaitas į cvpp."ataskaitos" pagal "ataskaitosNumeris".
 // Grąžina upsertintų eilučių skaičių.
 export async function upsertAtaskaitos(ataskaitos) {
     const rows = ataskaitos.filter((a) => a?.ataskaitosNumeris);
@@ -47,7 +47,7 @@ export async function upsertAtaskaitos(ataskaitos) {
         .join(", ");
 
     await postgres.query(
-        `INSERT INTO public."cvppAtaskaitos" (${ATASKAITOS_COLUMNS.map(
+        `INSERT INTO cvpp."ataskaitos" (${ATASKAITOS_COLUMNS.map(
             (col) => `"${col}"`,
         ).join(", ")})
          VALUES ${placeholders}

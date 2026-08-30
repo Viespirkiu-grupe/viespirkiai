@@ -172,7 +172,7 @@ export async function searchCvppDumpAtn1(
     postgres.query(
       `WITH page AS MATERIALIZED (
         SELECT c."ataskaitosNumeris"
-        FROM "public"."cvppAtaskaitos" c
+        FROM cvpp."ataskaitos" c
         ${whereSql}
         ORDER BY ${orderSql}
         LIMIT ${addParam(limit)}
@@ -207,14 +207,14 @@ export async function searchCvppDumpAtn1(
         0::integer AS "contractsCount",
         0::integer AS "tenderersCount"
       FROM page
-      JOIN "public"."cvppAtaskaitos" c
+      JOIN cvpp."ataskaitos" c
         ON c."ataskaitosNumeris" = page."ataskaitosNumeris"
       ORDER BY ${orderSql}`,
       params,
     ),
     postgres.query(
       `SELECT COUNT(*)::integer AS total
-       FROM "public"."cvppAtaskaitos" c
+       FROM cvpp."ataskaitos" c
        ${whereSql}`,
       params.slice(0, params.length - 2),
     ),
@@ -252,7 +252,7 @@ export async function loadCvppArchiveReport(
        c.turinys,
        (c."turinysHtml" IS NOT NULL) AS "hasHtml",
        a.id AS "dumpId"
-     FROM "public"."cvppAtaskaitos" c
+     FROM cvpp."ataskaitos" c
      LEFT JOIN "cvppDump"."atn1" a
        ON c."formTypeId" = 1
       AND a."epsRefNr" = c."ataskaitosNumeris"

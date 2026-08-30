@@ -4,18 +4,18 @@ import { KLAIDOS_BUSENA, NUSKAITYMO_VERSIJA } from "./primitives.js";
 
 async function setStatus(ataskaitosNumeris, status) {
     await postgres.query(
-        `UPDATE public."cvppAtaskaitos" SET nuskaitymas = $1 WHERE "ataskaitosNumeris" = $2`,
+        `UPDATE cvpp."ataskaitos" SET nuskaitymas = $1 WHERE "ataskaitosNumeris" = $2`,
         [status, ataskaitosNumeris],
     );
 }
 
-// Paima vieną dar nesuparsintą (ar senesnės versijos / null) cvppAtaskaitos eilutę,
+// Paima vieną dar nesuparsintą (ar senesnės versijos / null) cvpp."ataskaitos" eilutę,
 // suparsina ir įrašo "turinys" (jsonb) + "turinysHtml", nuskaitymas = versija.
 // Klaidas pažymi nuskaitymas = -1. Grąžina false, kai eilučių nebeliko.
 export async function scrapeVienaAtaskaita() {
     const { rows } = await postgres.query(
         `SELECT "ataskaitosNumeris", "formTypeId"
-         FROM public."cvppAtaskaitos"
+         FROM cvpp."ataskaitos"
          WHERE (nuskaitymas < $1 AND nuskaitymas >= 0) OR nuskaitymas IS NULL
          LIMIT 1`,
         [NUSKAITYMO_VERSIJA],
@@ -28,7 +28,7 @@ export async function scrapeVienaAtaskaita() {
         const res = await scrapeAtaskaitosContent(ataskaitosNumeris, formTypeId);
         if (!res) throw new Error("nėra #notice");
         await postgres.query(
-            `UPDATE public."cvppAtaskaitos"
+            `UPDATE cvpp."ataskaitos"
              SET "turinys" = $1, "turinysHtml" = $2, "pirkimoObjektoRusis" = $3, nuskaitymas = $4
              WHERE "ataskaitosNumeris" = $5`,
             [

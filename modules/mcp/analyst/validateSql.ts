@@ -13,7 +13,10 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
     "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas",
-    "cvppViesiejiPirkimai",
+    // CVPP archyvo skelbimai (buvęs public."cvppViesiejiPirkimai") — `cvpp`
+    // schemoje; nukirptas vardas `viesiejiPirkimai` būtų sutapęs su public
+    // lentele, tad lentelė pervadinta į `archyvoSkelbimai`.
+    "archyvoSkelbimai",
     "eiluciuSkaiciai", "bvpzKodai",
     // SODRA lentelės iškeltos į `sodra` schemą; analyst search_path jas mato
     // nekvalifikuotai (menesiniai = buvęs sodraMonthly).
