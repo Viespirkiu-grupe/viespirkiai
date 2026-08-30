@@ -33,9 +33,10 @@ Atšaukimas: `DROP SCHEMA dba CASCADE;` — `public` neliečiamas.
 4. Nieko — pseudo-grupė „Nesugrupuota“, matoma puslapyje kaip TODO.
 
 **camelCase riba** (`grieztaRiba = true`, numatytoji): po prefikso privalo eiti
-didžioji raidė arba skaitmuo. Be jos trumpas prefiksas `ar` (Adresų registras)
-gaudytų `archyvas` ir panašius. Išimtis — `xlsxPPA`, nes `xlsxPPAataskaitos`
-turi mažąją raidę; tokioms taisyklėms `grieztaRiba = false`.
+didžioji raidė arba skaitmuo. Be jos trumpas prefiksas kaip `jar` gaudytų
+`jarCsv` giminės nesusijusius vardus, o dar trumpesnis — bet kokį žodį, kuris
+atsitiktinai prasideda tomis pačiomis raidėmis. Išimtis — `xlsxPPA`, nes
+`xlsxPPAataskaitos` turi mažąją raidę; tokioms taisyklėms `grieztaRiba = false`.
 
 Logika yra `src/lib/dbSchema/grupes.ts` (ne SQL'e), kad būtų padengta testais —
 žr. `test/dbSchemaGrupes.test.ts`.
@@ -44,7 +45,11 @@ Logika yra `src/lib/dbSchema/grupes.ts` (ne SQL'e), kad būtų padengta testais 
 
 - **Taisyklė lygina tik lentelės vardą, ne schemą.** Todėl pačios `dba` schemos
   lentelės (`grupes`, `lenteles`, `busenos`…) jokio prefikso neatitinka ir buvo
-  priskirtos rankiniais įrašais (`dbaSchemaSeed2.sql`).
+  priskirtos rankiniais įrašais (`dbaSchemaSeed2.sql`). Tas pats galioja
+  `adresuRegistras` schemai: kai vardo prefiksą pakeičia schema, prefikso
+  taisyklė nebeturi ko gaudyti, ir grupė nurodoma rankiniais įrašais. Tai
+  numatytas mainas — schema yra tikslesnis namespace nei prefiksas, o grupavimas
+  atsiperka viena eilute lentelei.
 - **Prefiksas nieko nesako apie turinį.** `kotis` iš pradžių pateko į „Sistemos
   infrastruktūrą“ vien dėl trumpo, nedalykiškai atrodančio vardo — iš tikrųjų tai
   Konkurencijos tarybos valstybės pagalbos registras (`dbaSchemaSeed3.sql`).
@@ -136,6 +141,11 @@ npm run db:schema:rasytojai     # aptinka rašantį kodą -> UPSERT SQL į stdou
 `COPY`, `DELETE FROM`) prie literalinio lentelės vardo; `SELECT` ignoruojamas,
 kitaip pasirodytų, kad į `jar` rašo pusė projekto. Sugeneruotas `UPSERT` turi
 `WHERE "aptiktaAutomatiskai"`, tad rankinio darbo niekada neperrašo.
+
+Skenuojamos **visos nesisteminės schemos**, ne tik `public`. `public` lentelėms
+schemos prefiksas užklausoje neprivalomas, kitoms — privalomas: nekvalifikuotas
+`INSERT INTO "adresai"` iš tikrųjų taikytųsi į `public."adresai"`, o ne į
+`adresuRegistras."adresai"`.
 
 Ko neaptinka (rašoma ranka): dinaminiai vardai `INSERT INTO "${lentele}"`
 (išvardijami stderr'e), vienkartinių importų dažnis, ir, savaime suprantama,

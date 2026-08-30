@@ -48,21 +48,36 @@ async function failai(katalogas) {
     return rezultatas;
 }
 
-async function lenteliuVardai() {
+/** Ne-sisteminės schemos – tas pats filtras kaip src/lib/dbSchema/uzklausos.ts. */
+async function lentelesSuSchemomis() {
     const { rows } = await postgres.query(`
-        SELECT c.relname AS vardas
+        SELECT n.nspname AS schema, c.relname AS vardas
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE c.relkind IN ('r', 'p') AND n.nspname = 'public'
+        WHERE c.relkind IN ('r', 'p')
+          AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+          AND n.nspname NOT LIKE 'pg_toast%'
     `);
-    return rows.map((row) => row.vardas);
+    return rows;
 }
 
-/** `INSERT INTO "x"`, `UPDATE "x"`, `COPY "x"`, `DELETE FROM "x"` – su kabutėmis ar be. */
-function rasytojoRegexp(lentele) {
-    const vardas = lentele.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function ekranuoti(tekstas) {
+    return tekstas.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * `INSERT INTO "x"`, `UPDATE "x"`, `COPY "x"`, `DELETE FROM "x"` – su kabutėmis ar be.
+ *
+ * `public` lentelėms schemos prefiksas neprivalomas (kode dažniausiai jo nėra),
+ * o kitoms – privalomas: nekvalifikuotas vardas tokioje schemoje reikštų, kad
+ * užklausa iš tikrųjų taikosi į to paties vardo `public` lentelę.
+ */
+function rasytojoRegexp(schema, lentele) {
+    const vardas = ekranuoti(lentele);
+    const schemosDalis = `"?${ekranuoti(schema)}"?\\s*\\.\\s*`;
+    const prefiksas = schema === "public" ? `(?:${schemosDalis})?` : schemosDalis;
     return new RegExp(
-        `(?:INSERT\\s+INTO|UPDATE|COPY|DELETE\\s+FROM)\\s+(?:public\\s*\\.\\s*)?"?${vardas}"?\\b`,
+        `(?:INSERT\\s+INTO|UPDATE|COPY|DELETE\\s+FROM)\\s+${prefiksas}"?${vardas}"?\\b`,
         "i",
     );
 }
@@ -76,7 +91,7 @@ function sqlMasyvas(reiksmes) {
 }
 
 async function main() {
-    const lenteles = await lenteliuVardai();
+    const lenteles = await lentelesSuSchemomis();
     const keliai = (await Promise.all(KATALOGAI.map(failai))).flat();
 
     const turinys = new Map();
@@ -88,15 +103,15 @@ async function main() {
     }
 
     const rasta = new Map();
-    for (const lentele of lenteles) {
-        const regexp = rasytojoRegexp(lentele);
+    for (const { schema, vardas } of lenteles) {
+        const regexp = rasytojoRegexp(schema, vardas);
         const moduliai = [];
         for (const [kelias, tekstas] of turinys) {
             // Greitas atmetimas prieš brangų regexp'ą.
-            if (!tekstas.includes(lentele)) continue;
+            if (!tekstas.includes(vardas)) continue;
             if (regexp.test(tekstas)) moduliai.push(kelias);
         }
-        if (moduliai.length) rasta.set(lentele, moduliai.sort());
+        if (moduliai.length) rasta.set(`${schema}\t${vardas}`, moduliai.sort());
     }
 
     const eilutes = [
@@ -108,10 +123,11 @@ async function main() {
         "",
     ];
 
-    for (const [lentele, moduliai] of [...rasta].sort()) {
+    for (const [raktas, moduliai] of [...rasta].sort()) {
+        const [schema, lentele] = raktas.split("\t");
         eilutes.push(
             `INSERT INTO dba."lenteles" ("schema","lentele","moduliai","aptiktaAutomatiskai")`,
-            `VALUES ('public', '${lentele.replace(/'/g, "''")}', ${sqlMasyvas(moduliai)}, true)`,
+            `VALUES ('${schema.replace(/'/g, "''")}', '${lentele.replace(/'/g, "''")}', ${sqlMasyvas(moduliai)}, true)`,
             `ON CONFLICT ("schema","lentele") DO UPDATE`,
             `   SET "moduliai" = EXCLUDED."moduliai", "atnaujinta" = now()`,
             ` WHERE dba."lenteles"."aptiktaAutomatiskai";`,
@@ -128,7 +144,12 @@ async function main() {
             `\nFailai su dinaminiais lentelių vardais (priskirti reikia rankomis):\n  ${dinaminiai.join("\n  ")}`,
         );
     }
-    const beRasytojo = lenteles.filter((l) => !rasta.has(l)).sort();
+    const beRasytojo = lenteles
+        .filter(({ schema, vardas }) => !rasta.has(`${schema}\t${vardas}`))
+        .map(({ schema, vardas }) =>
+            schema === "public" ? vardas : `${schema}.${vardas}`,
+        )
+        .sort();
     console.error(`\nBe aptikto rašytojo (${beRasytojo.length}):\n  ${beRasytojo.join(", ")}`);
 }
 

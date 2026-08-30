@@ -17,11 +17,11 @@ import { pick } from "stream-json/filters/pick.js";
 import { enqueueAddressLinkedJuridiniai } from "../juridiniai/enqueueRefresh.js";
 
 const BATCH_SIZE = 1000;
-const TMP_ZIP = join(tmpdir(), "arAdresai.zip");
+const TMP_ZIP = join(tmpdir(), "adresuRegistrasAdresai.zip");
 const TMP_JSON = join(tmpdir(), "adr_gra_adresai_LT.json");
 
-async function updateAdresai() {
-    await postgres.query(`TRUNCATE "arAdresai"`);
+export async function updateAdresai() {
+    await postgres.query(`TRUNCATE "adresuRegistras"."adresai"`);
 
     const sources = await getArDataSources();
     const entry = sources.addressPoints[0];
@@ -62,9 +62,11 @@ async function updateAdresai() {
                 `($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, ST_SetSRID(ST_MakePoint($${p++}, $${p++}), 4326))`,
             );
             params.push(
-                String(AOB_KODAS),
-                String(GYV_KODAS),
-                String(GAT_KODAS),
+                AOB_KODAS,
+                GYV_KODAS,
+                // GeoJSON'e trūkstamą gatvės kodą žymi 0; laikom NULL, kaip
+                // ir importPastataiSklypai.js.
+                GAT_KODAS || null,
                 PASTO_KODA,
                 AOB_R,
                 AOB_RK,
@@ -75,7 +77,7 @@ async function updateAdresai() {
         }
 
         await postgres.query(
-            `INSERT INTO "arAdresai" ("kodas", "gyvKodas", "gatKodas", "pastoKodas", "aobR", "aobRk", "aobAtrKo", "geometrija")
+            `INSERT INTO "adresuRegistras"."adresai" ("kodas", "gyvKodas", "gatKodas", "pastoKodas", "aobR", "aobRk", "aobAtrKo", "geometrija")
        VALUES ${values.join(", ")}`,
             params,
         );

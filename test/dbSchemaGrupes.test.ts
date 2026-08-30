@@ -17,7 +17,6 @@ function grupe(raktas: string): Grupe {
 }
 
 const TAISYKLES = [
-  taisykle('ar', 'adresai'),
   taisykle('jar', 'juridiniai'),
   taisykle('jarCsv', 'jarCsv'),
   taisykle('eTar', 'etar'),
@@ -27,13 +26,14 @@ const TAISYKLES = [
 
 describe('grupeIsTaisykliu', () => {
   it('taiko prefiksą ties camelCase riba', () => {
-    expect(grupeIsTaisykliu('arAdresai', TAISYKLES)).toBe('adresai');
+    expect(grupeIsTaisykliu('jarZymuStatusai', TAISYKLES)).toBe('juridiniai');
     expect(grupeIsTaisykliu('eTarLegalAct', TAISYKLES)).toBe('etar');
   });
 
   it('nesugriebia nesusijusio vardo, prasidedančio tuo pačiu prefiksu', () => {
-    // Būtent dėl to ir reikia camelCase ribos: `ar` yra labai trumpas prefiksas.
-    expect(grupeIsTaisykliu('archyvas', TAISYKLES)).toBeNull();
+    // Būtent dėl to ir reikia camelCase ribos: `jar` yra labai trumpas prefiksas,
+    // o po jo einanti mažoji raidė reiškia visai kitą žodį, ne šeimos narį.
+    expect(grupeIsTaisykliu('jargonas', TAISYKLES)).toBeNull();
     expect(grupeIsTaisykliu('apiRaktai', TAISYKLES)).toBeNull();
   });
 
@@ -58,17 +58,17 @@ describe('grupeIsTaisykliu', () => {
 });
 
 describe('priskirtiGrupe', () => {
-  const grupes = new Map([['adresai', grupe('adresai')], ['etar', grupe('etar')]]);
+  const grupes = new Map([['juridiniai', grupe('juridiniai')], ['etar', grupe('etar')]]);
 
   it('rankinis priskyrimas nugali taisyklę', () => {
-    const { grupe: rasta, rankomis } = priskirtiGrupe('arAdresai', 'etar', TAISYKLES, grupes);
+    const { grupe: rasta, rankomis } = priskirtiGrupe('jarZymuStatusai', 'etar', TAISYKLES, grupes);
     expect(rasta.raktas).toBe('etar');
     expect(rankomis).toBe(true);
   });
 
   it('be rankinio įrašo taiko taisyklę', () => {
-    const { grupe: rasta, rankomis } = priskirtiGrupe('arAdresai', null, TAISYKLES, grupes);
-    expect(rasta.raktas).toBe('adresai');
+    const { grupe: rasta, rankomis } = priskirtiGrupe('jarZymuStatusai', null, TAISYKLES, grupes);
+    expect(rasta.raktas).toBe('juridiniai');
     expect(rankomis).toBe(false);
   });
 
@@ -78,8 +78,8 @@ describe('priskirtiGrupe', () => {
   });
 
   it('nurodytas, bet neegzistuojantis grupės raktas krenta į taisyklę', () => {
-    const { grupe: rasta, rankomis } = priskirtiGrupe('arAdresai', 'nera', TAISYKLES, grupes);
-    expect(rasta.raktas).toBe('adresai');
+    const { grupe: rasta, rankomis } = priskirtiGrupe('jarZymuStatusai', 'nera', TAISYKLES, grupes);
+    expect(rasta.raktas).toBe('juridiniai');
     expect(rankomis).toBe(false);
   });
 });

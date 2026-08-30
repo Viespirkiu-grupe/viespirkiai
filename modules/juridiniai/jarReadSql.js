@@ -1,21 +1,34 @@
 // Bendras normalizuoto JAR adreso projekcijos SQL. Aliasai sąmoningai fiksuoti,
 // kad visos serverio užklausos vienodai apdorotų pastatų ir patalpų AOB kodus.
-export const JAR_ADDRESS_JOINS = `
+
+// Minimalus rinkinys, kurio pakanka JAR_LOCATION_SQL — patalpa, kad iš jos
+// gautume pastato AOB kodą, ir pats adreso taškas. Atskirai, nes dalis užklausų
+// nori tik koordinačių ir joms likę penki JOIN'ai yra tuščias darbas.
+// `adresuRegistras` kodai yra integer, o public."jarAsmenuAdresai"."aobKodas"
+// tebėra text — be aiškaus cast'o JOIN'as kristų su „operator does not exist:
+// integer = text“. Duomenys tai leidžia: visos 217 738 nenulinės reikšmės yra
+// vien skaitmenys. Cast'as yra ant mažosios (229 tūkst. eilučių) lentelės pusės,
+// tad adresų registro indeksai lieka naudojami.
+const AOB_KODAS = `jar_address."aobKodas"::int`;
+
+export const JAR_LOCATION_JOINS = `
 LEFT JOIN public."jarAsmenuAdresai" jar_address
     ON jar_address."jarKodas" = jar_person."jarKodas"
-LEFT JOIN public."arPatalposAdresai" jar_room
-    ON jar_room."patKodas" = jar_address."aobKodas"
-LEFT JOIN public."arAdresai" jar_ar
-    ON jar_ar."kodas" = COALESCE(jar_room."aobKodas", jar_address."aobKodas")
-LEFT JOIN public."arPastataiSklypaiAdresai" jar_building
-    ON jar_building."kodas" = COALESCE(jar_room."aobKodas", jar_address."aobKodas")
-LEFT JOIN public."arGatves" jar_street
+LEFT JOIN "adresuRegistras"."patalposAdresai" jar_room
+    ON jar_room."patKodas" = ${AOB_KODAS}
+LEFT JOIN "adresuRegistras"."adresai" jar_ar
+    ON jar_ar."kodas" = COALESCE(jar_room."aobKodas", ${AOB_KODAS})`;
+
+export const JAR_ADDRESS_JOINS = `${JAR_LOCATION_JOINS}
+LEFT JOIN "adresuRegistras"."pastataiSklypaiAdresai" jar_building
+    ON jar_building."kodas" = COALESCE(jar_room."aobKodas", ${AOB_KODAS})
+LEFT JOIN "adresuRegistras"."gatves" jar_street
     ON jar_street."kodas" = jar_building."gatKodas"
-LEFT JOIN public."arGyvenvietesRibos" jar_place
+LEFT JOIN "adresuRegistras"."gyvenvietesRibos" jar_place
     ON jar_place."kodas" = jar_building."gyvKodas"
-LEFT JOIN public."arSavivaldybes" jar_municipality
+LEFT JOIN "adresuRegistras"."savivaldybes" jar_municipality
     ON jar_municipality."kodas" = COALESCE(jar_building."savKodas", jar_place."savivaldybesKodas")
-LEFT JOIN public."arApskritys" jar_county
+LEFT JOIN "adresuRegistras"."apskritys" jar_county
     ON jar_county."kodas" = jar_municipality."apskritiesKodas"`;
 
 export const JAR_ADDRESS_SQL = `COALESCE(

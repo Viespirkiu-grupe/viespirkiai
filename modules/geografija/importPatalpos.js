@@ -9,8 +9,8 @@ import { Readable } from "stream";
 
 const BATCH_SIZE = 1000;
 
-async function updatePatalposAdresai() {
-    await postgres.query(`TRUNCATE "arPatalposAdresai"`);
+export async function updatePatalposAdresai() {
+    await postgres.query(`TRUNCATE "adresuRegistras"."patalposAdresai"`);
 
     const sources = await getArDataSources();
     const entry = sources.premiseAddresses.find(
@@ -48,7 +48,7 @@ async function updatePatalposAdresai() {
             );
         }
         await postgres.query(
-            `INSERT INTO "arPatalposAdresai" ("savKodas", "patKodas", "aobKodas", "patalpaNr", "patNuo")
+            `INSERT INTO "adresuRegistras"."patalposAdresai" ("savKodas", "patKodas", "aobKodas", "patalpaNr", "patNuo")
        VALUES ${values.join(", ")}`,
             params,
         );

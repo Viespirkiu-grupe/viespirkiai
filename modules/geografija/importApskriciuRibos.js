@@ -17,8 +17,8 @@ const convertCoords = (coords) => {
     return coords.map(convertCoords);
 };
 
-async function updateApskritys() {
-    await postgres.query(`TRUNCATE "arApskritys"`);
+export async function updateApskritys() {
+    await postgres.query(`TRUNCATE "adresuRegistras"."apskritys"`);
 
     const sources = await getArDataSources();
     const entry = sources.adminUnits.find((r) => r.name === "Apskričių ribos");
@@ -35,7 +35,7 @@ async function updateApskritys() {
         };
 
         await postgres.query(
-            `INSERT INTO "arApskritys" (kodas, pavadinimas, plotas, geometrija)
+            `INSERT INTO "adresuRegistras"."apskritys" (kodas, pavadinimas, plotas, geometrija)
        VALUES ($1, $2, $3, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($4), 4326)))`,
             [APS_KODAS, APS_PAV, APS_PLOTAS, JSON.stringify(geojson)],
         );

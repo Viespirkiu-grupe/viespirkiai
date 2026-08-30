@@ -21,8 +21,8 @@ export interface Taisykle {
 }
 
 /**
- * camelCase šeimos riba. Be jos trumpas prefiksas `ar` (Adresų registras)
- * gaudytų `archyvas`, `arbitrazas` ir panašius nesusijusius vardus.
+ * camelCase šeimos riba. Be jos trumpas prefiksas kaip `jar` gaudytų bet kokį
+ * vardą, kuris atsitiktinai prasideda tomis pačiomis raidėmis.
  * `xlsxPPAataskaitos` yra išimtis – tokioms taisyklėms `grieztaRiba = false`.
  */
 function arSutampa(vardas: string, taisykle: Taisykle): boolean {

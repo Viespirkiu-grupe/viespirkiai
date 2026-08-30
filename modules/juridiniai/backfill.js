@@ -27,14 +27,14 @@ export async function upsertDictionaries(client) {
     await client.query(`
         INSERT INTO public."juridiniaiSavivaldybesPavadinimai" ("pavadinimas")
         SELECT DISTINCT "pavadinimas"
-        FROM public."arSavivaldybes"
+        FROM "adresuRegistras"."savivaldybes"
         ON CONFLICT ("pavadinimas") DO NOTHING
     `);
 
     await client.query(`
         INSERT INTO public."juridiniaiApskritysPavadinimai" ("pavadinimas")
         SELECT DISTINCT "pavadinimas"
-        FROM public."arApskritys"
+        FROM "adresuRegistras"."apskritys"
         ON CONFLICT ("pavadinimas") DO NOTHING
     `);
 

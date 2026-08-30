@@ -51,12 +51,12 @@ FROM "jarAsmenys" j
          LEFT JOIN "jarFormos" forma ON forma."kodas" = j."formosKodas"
          LEFT JOIN "jarStatusai" statusas ON statusas."kodas" = j."statusoKodas"
          LEFT JOIN "jarAsmenuAdresai" ja ON ja."jarKodas" = j."jarKodas"
-         LEFT JOIN "arPatalposAdresai" patalpa ON patalpa."patKodas" = ja."aobKodas"
-         LEFT JOIN "arPastataiSklypaiAdresai" pastatas
-                   ON pastatas."kodas" = COALESCE(patalpa."aobKodas", ja."aobKodas")
-         LEFT JOIN "arGatves" gatve ON gatve."kodas" = pastatas."gatKodas"
-         LEFT JOIN "arGyvenvietesRibos" gyv ON gyv."kodas" = pastatas."gyvKodas"
-         LEFT JOIN "arSavivaldybes" sav
+         LEFT JOIN "adresuRegistras"."patalposAdresai" patalpa ON patalpa."patKodas" = ja."aobKodas"::int
+         LEFT JOIN "adresuRegistras"."pastataiSklypaiAdresai" pastatas
+                   ON pastatas."kodas" = COALESCE(patalpa."aobKodas", ja."aobKodas"::int)
+         LEFT JOIN "adresuRegistras"."gatves" gatve ON gatve."kodas" = pastatas."gatKodas"
+         LEFT JOIN "adresuRegistras"."gyvenvietesRibos" gyv ON gyv."kodas" = pastatas."gyvKodas"
+         LEFT JOIN "adresuRegistras"."savivaldybes" sav
                    ON sav."kodas" = COALESCE(pastatas."savKodas", gyv."savivaldybesKodas")
          LEFT JOIN LATERAL (
     SELECT draustieji, draustieji2, "vidutinisAtlyginimas", "imokuSuma", data
