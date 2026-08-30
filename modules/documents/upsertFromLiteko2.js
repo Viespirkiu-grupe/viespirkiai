@@ -12,7 +12,7 @@ import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 const SOURCE = "liteko2";
 
 /**
- * @param {object} sprendimas - liteko2Sprendimai eilutė.
+ * @param {object} sprendimas - liteko2.sprendimai eilutė.
  * @param {object} sidecar - sudarytiSidecar() rezultatas.
  * @param {object} [db]
  */

@@ -35,11 +35,11 @@ if (!n) {
             NULL::text AS skyrius, NULL::text AS instancija,
             s."sprendimoData" AS data, s."bylosAprasymas", s."bylaGauta",
             dt.pavadinimas AS "sprendimoTipas", s.busena
-       FROM public."liteko2Sprendimai" s
-       LEFT JOIN public."liteko2Teismai" t ON t."liteko2Id" = s."teismoId"
-       LEFT JOIN public."liteko2Teismai" r ON r."liteko2Id" = s."rumuId"
-       LEFT JOIN public."liteko2ByluRusys" br ON br."liteko2Id" = s."bylosRusiesId"
-       LEFT JOIN public."liteko2DokumentuTipai" dt ON dt."liteko2Id" = s."sprendimoTipoId"
+       FROM liteko2."sprendimai" s
+       LEFT JOIN liteko2."teismai" t ON t."liteko2Id" = s."teismoId"
+       LEFT JOIN liteko2."teismai" r ON r."liteko2Id" = s."rumuId"
+       LEFT JOIN liteko2."byluRusys" br ON br."liteko2Id" = s."bylosRusiesId"
+       LEFT JOIN liteko2."dokumentuTipai" dt ON dt."liteko2Id" = s."sprendimoTipoId"
       WHERE s."liteko2Id" = $1`,
     [uuid],
   );
@@ -60,8 +60,8 @@ const [dalyviaiRes, kategorijosRes] = await Promise.all([
       )
     : postgres.query(
         `SELECT d.pavadinimas, d.kodas, v.pavadinimas AS "bylojeKaip"
-           FROM public."liteko2SprendimuDalyviai" d
-           LEFT JOIN public."liteko2Vaidmenys" v ON v.id = d."vaidmuoId"
+           FROM liteko2."sprendimuDalyviai" d
+           LEFT JOIN liteko2."vaidmenys" v ON v.id = d."vaidmuoId"
           WHERE d."sprendimoId" = $1
           ORDER BY v.pavadinimas NULLS LAST, d.pavadinimas`,
         [n.id],
@@ -77,8 +77,8 @@ const [dalyviaiRes, kategorijosRes] = await Promise.all([
       )
     : postgres.query(
         `SELECT k."kategorijosId" AS kodas, p.pavadinimas
-           FROM public."liteko2SprendimuKategorijos" k
-           LEFT JOIN public."liteko2Kategorijos" p ON p."liteko2Id" = k."kategorijosId"
+           FROM liteko2."sprendimuKategorijos" k
+           LEFT JOIN liteko2."kategorijos" p ON p."liteko2Id" = k."kategorijosId"
           WHERE k."sprendimoId" = $1
           ORDER BY p.pavadinimas NULLS LAST`,
         [n.id],

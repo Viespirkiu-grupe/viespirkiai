@@ -22,7 +22,7 @@ function nullIfEmpty(value) {
 
 /**
  * Vienas upsert paketas: eilutės su tuo pačiu stulpelių rinkiniu.
- * @param {string} table - lentelės vardas (be schemos).
+ * @param {string} table - lentelės vardas `liteko2` schemoje (be schemos prefikso).
  * @param {string[]} columns - stulpeliai; pirmasis privalo būti „liteko2Id".
  * @param {Array<Array<unknown>>} rows
  */
@@ -43,7 +43,7 @@ async function upsertBatch(table, columns, rows) {
         .join(", ");
 
     await postgres.query(
-        `INSERT INTO public."${table}" (${columnList})
+        `INSERT INTO liteko2."${table}" (${columnList})
          VALUES ${values}
          ON CONFLICT ("liteko2Id") DO UPDATE SET ${updates}`,
         rows.flat(),
@@ -70,7 +70,7 @@ async function syncTeismai() {
         ]);
 
     return upsertBatch(
-        "liteko2Teismai",
+        "teismai",
         ["liteko2Id", "saltinioId", "kodas", "pavadinimas", "tevinisId", "tipas", "aktyvus", "aktyvusNuo", "neaktyvusNuo"],
         rows,
     );
@@ -101,7 +101,7 @@ async function syncKategorijos() {
         ]);
 
     return upsertBatch(
-        "liteko2Kategorijos",
+        "kategorijos",
         ["liteko2Id", "saltinioId", "kodas", "pavadinimas", "tevineKategorija", "bylosRusiesId"],
         rows,
     );
@@ -110,8 +110,8 @@ async function syncKategorijos() {
 /** Nuskaito visus keturis klasifikatorius. */
 export async function sinchronizuotiKlasifikatorius() {
     const teismai = await syncTeismai();
-    const rusys = await syncPaprastas("case-types", "liteko2ByluRusys", "typeName");
-    const tipai = await syncPaprastas("document-types", "liteko2DokumentuTipai", "docTypeName");
+    const rusys = await syncPaprastas("case-types", "byluRusys", "typeName");
+    const tipai = await syncPaprastas("document-types", "dokumentuTipai", "docTypeName");
     const kategorijos = await syncKategorijos();
 
     log(

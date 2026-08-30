@@ -25,7 +25,7 @@ const SIDECAR_SALTINIAI = {
         keySql: `"resultHash"`,
     },
     liteko2: {
-        fromSql: `FROM public."liteko2Sprendimai" WHERE md5 IS NOT NULL`,
+        fromSql: `FROM liteko2."sprendimai" WHERE md5 IS NOT NULL`,
         keySql: `md5`,
     },
     eTar: {

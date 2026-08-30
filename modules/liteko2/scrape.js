@@ -1,6 +1,6 @@
 /*
 LITEKO2 sprendimų inventorius: puslapiuoja /v1/decisions ir sudeda santraukas į
-`liteko2Sprendimai`. Turinio (šalių, teisėjų, kategorijų, teksto) čia neimam —
+`liteko2.sprendimai`. Turinio (šalių, teisėjų, kategorijų, teksto) čia neimam —
 tuo užsiima scrapeContent.js pagal `turinioNuskaitymas` eilę.
 
 Papildomai pasiimam /v1/decisions/canceled ir pažymim atšauktus sprendimus.
@@ -60,16 +60,16 @@ async function upsertSantraukas(rows) {
         .map((_, i) => {
             const p = (n) => `$${i * STULPELIU + n}`;
             return `(${p(1)}, ${p(2)}, ${p(3)},
-                (SELECT "liteko2Id" FROM public."liteko2Teismai" WHERE "pavadinimas" = ${p(4)}),
-                (SELECT "liteko2Id" FROM public."liteko2Teismai" WHERE "pavadinimas" = ${p(5)}),
-                (SELECT "liteko2Id" FROM public."liteko2ByluRusys" WHERE "pavadinimas" = ${p(6)}),
+                (SELECT "liteko2Id" FROM liteko2."teismai" WHERE "pavadinimas" = ${p(4)}),
+                (SELECT "liteko2Id" FROM liteko2."teismai" WHERE "pavadinimas" = ${p(5)}),
+                (SELECT "liteko2Id" FROM liteko2."byluRusys" WHERE "pavadinimas" = ${p(6)}),
                 ${p(7)}, ${p(8)}::timestamptz,
-                (SELECT "liteko2Id" FROM public."liteko2DokumentuTipai" WHERE "pavadinimas" = ${p(9)}))`;
+                (SELECT "liteko2Id" FROM liteko2."dokumentuTipai" WHERE "pavadinimas" = ${p(9)}))`;
         })
         .join(", ");
 
     await postgres.query(
-        `INSERT INTO public."liteko2Sprendimai" (
+        `INSERT INTO liteko2."sprendimai" (
             "liteko2Id", "saltinioId", "md5", "teismoId", "rumuId",
             "bylosRusiesId", "bylosNumeris", "sprendimoData", "sprendimoTipoId"
          )
@@ -77,20 +77,20 @@ async function upsertSantraukas(rows) {
          ON CONFLICT ("liteko2Id") DO UPDATE SET
             "saltinioId"      = EXCLUDED."saltinioId",
             -- COALESCE: nesinchronizuotas klasifikatorius neištrina jau žinomo id.
-            "teismoId"        = COALESCE(EXCLUDED."teismoId", public."liteko2Sprendimai"."teismoId"),
-            "rumuId"          = COALESCE(EXCLUDED."rumuId", public."liteko2Sprendimai"."rumuId"),
-            "bylosRusiesId"   = COALESCE(EXCLUDED."bylosRusiesId", public."liteko2Sprendimai"."bylosRusiesId"),
-            "sprendimoTipoId" = COALESCE(EXCLUDED."sprendimoTipoId", public."liteko2Sprendimai"."sprendimoTipoId"),
+            "teismoId"        = COALESCE(EXCLUDED."teismoId", liteko2."sprendimai"."teismoId"),
+            "rumuId"          = COALESCE(EXCLUDED."rumuId", liteko2."sprendimai"."rumuId"),
+            "bylosRusiesId"   = COALESCE(EXCLUDED."bylosRusiesId", liteko2."sprendimai"."bylosRusiesId"),
+            "sprendimoTipoId" = COALESCE(EXCLUDED."sprendimoTipoId", liteko2."sprendimai"."sprendimoTipoId"),
             "bylosNumeris"    = EXCLUDED."bylosNumeris",
             "sprendimoData"   = EXCLUDED."sprendimoData",
             "turinioNuskaitymas" = CASE
-                WHEN public."liteko2Sprendimai"."sprendimoData"
+                WHEN liteko2."sprendimai"."sprendimoData"
                         IS DISTINCT FROM EXCLUDED."sprendimoData"
                   OR (EXCLUDED."sprendimoTipoId" IS NOT NULL
-                      AND public."liteko2Sprendimai"."sprendimoTipoId"
+                      AND liteko2."sprendimai"."sprendimoTipoId"
                             IS DISTINCT FROM EXCLUDED."sprendimoTipoId")
                 THEN 0
-                ELSE public."liteko2Sprendimai"."turinioNuskaitymas"
+                ELSE liteko2."sprendimai"."turinioNuskaitymas"
             END`,
         rows.flatMap((byla) => [
             byla.liteko2Id,
@@ -197,7 +197,7 @@ export async function pazymetiAtsauktus() {
     }
 
     const { rowCount } = await postgres.query(
-        `UPDATE public."liteko2Sprendimai"
+        `UPDATE liteko2."sprendimai"
          SET "atsauktas" = true,
              "atsauktasAptiktas" = COALESCE("atsauktasAptiktas", now())
          WHERE "liteko2Id" = ANY($1::text[]) AND "atsauktas" = false`,
@@ -231,7 +231,7 @@ export async function pazymetiAtsauktus() {
  */
 export async function nuskaitytiNaujausius(persidengimasDienos = PERSIDENGIMAS_DIENOS) {
     const { rows } = await postgres.query(
-        `SELECT max("sprendimoData") AS "maxData" FROM public."liteko2Sprendimai"`,
+        `SELECT max("sprendimoData") AS "maxData" FROM liteko2."sprendimai"`,
     );
 
     let nuo = PRADZIA;

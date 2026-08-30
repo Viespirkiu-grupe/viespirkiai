@@ -7,7 +7,7 @@ ištrauktas tekstas. DB laikom tik struktūrizuotus laukus (žr. lenteles.sql),
 o didelį/laisvos formos turinį – čia, zstd suspaustoje SQLite saugykloje
 (kaip `dokumentai`, `failai`, `ocrRezultatai`).
 
-Raktas – tas pats `md5`, kuris guli `liteko2Sprendimai.md5`, todėl kai turinys
+Raktas – tas pats `md5`, kuris guli `liteko2.sprendimai.md5`, todėl kai turinys
 propaguosis į `documents.documents`, sidecar rakto keisti nereikės.
 */
 
