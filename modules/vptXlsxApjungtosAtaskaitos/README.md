@@ -7,7 +7,7 @@ schemos `"vptXlsxApjungtosAtaskaitos"` lenteles – tarpinio JSONB sluoksnio nė
 SQL failų vykdyti nereikia.
 
 Tai atskiras duomenų sluoksnis. `ppa.*` schema (modules/ppa – ATN-1 iš
-pavienių CVP IS failų) ir `public."cvppDumpAtn1*"` (ATN-1 CSV iškrova) lieka
+pavienių CVP IS failų) ir `cvppDump."atn1*"` (ATN-1 CSV iškrova) lieka
 nepaliesti, nors domenas persidengia.
 
 ## Naudojimas

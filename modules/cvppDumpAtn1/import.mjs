@@ -15,6 +15,17 @@ const MAX_POSTGRES_PARAMETERS = 65_535;
 
 const quote = (identifier) => `"${identifier.replaceAll('"', '""')}"`;
 
+// Lentelės gyvena `cvppDump` schemoje (DDL — cvppDumpSchema.sql), kur schemos
+// vardas iš lentelės vardo nukirptas: cvppDumpAtn1Contracts -> atn1Contracts.
+const SCHEMA = 'cvppDump';
+const lentelesVardas = (table) => {
+    const name = table.tableName;
+    if (!name.startsWith(SCHEMA)) return name;
+    const rest = name.slice(SCHEMA.length);
+    return rest[0].toLowerCase() + rest.slice(1);
+};
+const lentelesNuoroda = (table) => `${quote(SCHEMA)}.${quote(lentelesVardas(table))}`;
+
 function usage() {
     console.log(`
 Naudojimas:
@@ -338,7 +349,7 @@ function insertSql(table, rowCount) {
         .join(',\n    ');
 
     return `
-INSERT INTO "public".${quote(table.tableName)} (${columns})
+INSERT INTO ${lentelesNuoroda(table)} (${columns})
 VALUES ${placeholders}
 ON CONFLICT (id) DO UPDATE SET
     ${updates}
@@ -350,14 +361,14 @@ async function verifyTargetSchema(client, tables) {
         const result = await client.query(
             `SELECT column_name
              FROM information_schema.columns
-             WHERE table_schema = 'public' AND table_name = $1`,
-            [table.tableName],
+             WHERE table_schema = $1 AND table_name = $2`,
+            [SCHEMA, lentelesVardas(table)],
         );
         const existing = new Set(result.rows.map((row) => row.column_name));
 
         if (existing.size === 0) {
             throw new Error(
-                `DB lentelė public.${table.tableName} nerasta. Pirmiausia pritaikykite schema.sql.`,
+                `DB lentelė ${SCHEMA}.${lentelesVardas(table)} nerasta. Pirmiausia pritaikykite schema.sql.`,
             );
         }
 
@@ -366,7 +377,7 @@ async function verifyTargetSchema(client, tables) {
             .filter((column) => !existing.has(column));
         if (missing.length > 0) {
             throw new Error(
-                `DB lentelėje public.${table.tableName} trūksta stulpelių: ${missing.join(', ')}`,
+                `DB lentelėje ${SCHEMA}.${lentelesVardas(table)} trūksta stulpelių: ${missing.join(', ')}`,
             );
         }
     }
@@ -374,7 +385,7 @@ async function verifyTargetSchema(client, tables) {
 
 async function truncateTables(client, tables) {
     const targets = tables
-        .map((table) => `"public".${quote(table.tableName)}`)
+        .map((table) => lentelesNuoroda(table))
         .join(', ');
     await client.query(`TRUNCATE TABLE ${targets}`);
 }

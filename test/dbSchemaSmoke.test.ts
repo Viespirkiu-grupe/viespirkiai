@@ -17,9 +17,9 @@ describe('gautiSchemosModeli', () => {
     console.log('viesiejiPirkimai:', vp.stulpeliai.length, 'stulpeliu,', vp.indeksai.length, 'indeksu, grupe', vp.grupe.raktas);
     expect(vp.stulpeliai.length).toBeGreaterThan(5);
 
-    const cv = rasti(m, 'cvppDumpAtn1')!;
-    console.log('cvppDumpAtn1 aprasymas:', cv.aprasymas?.slice(0, 50));
-    console.log('cvppDumpAtn1 aprasytu stulpeliu:', cv.stulpeliai.filter((s) => s.aprasymas).length);
+    const cv = rasti(m, 'cvppDump.atn1')!;
+    console.log('cvppDump.atn1 aprasymas:', cv.aprasymas?.slice(0, 50));
+    console.log('cvppDump.atn1 aprasytu stulpeliu:', cv.stulpeliai.filter((s) => s.aprasymas).length);
     expect(cv.aprasymas).toBeTruthy();
 
     const k = kaimynyste(m, 'public.viesiejiPirkimai', 1);
