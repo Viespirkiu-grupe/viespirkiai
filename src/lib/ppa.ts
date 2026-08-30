@@ -9,7 +9,7 @@ export type Ppa = {
   pasiulymuEile: Record<string, any>[];
   proceduruPabaiga: Record<string, any>[];
   sutartys: Record<string, any>[];
-  /** `ppa."sutartys".id` → the matching `vpmSutartys` record, when one was found. */
+  /** `ppa."ataskaituSutartys".id` → the matching `vpmSutartys` record, when one was found. */
   sutarciuAtitikmenys: Record<string, PpaSutartiesAtitikmuo>;
 };
 
@@ -37,7 +37,7 @@ async function loadPpaSutarciuAtitikmenys(ataskaitaId: string | number): Promise
     `WITH ppa AS (
        SELECT s.id, s."tiekejosKodas", s."sutartiesVerte", s."sutartisSudarymoData",
               a."pirkimoNumeris", a."perkanciosiosOrganizacijosKodas"
-       FROM ppa."sutartys" s
+       FROM ppa."ataskaituSutartys" s
        JOIN ppa."ataskaitos" a ON a.id = s."ataskaitaId"
        WHERE s."ataskaitaId" = $1
      ), kand AS (
@@ -118,7 +118,7 @@ export async function loadPpaByFailasId(failasId: string | number): Promise<Ppa 
       postgres.query(`SELECT ap.*, st.pavadinimas AS statusas, tp.pavadinimas AS "atmetimoTeisinisPagrindas", pr.pavadinimas AS "atmetimoPriezastys", ki.pavadinimas AS "kainosIsraiska" FROM ppa."atmestiPasiulymai" ap LEFT JOIN ppa."atmestuPasiulymuStatusai" st ON st.id = ap."statusasId" LEFT JOIN ppa."atmetimoTeisiniaiPagrindai" tp ON tp.id = ap."atmetimoTeisinisPagrindasId" LEFT JOIN ppa."atmetimoPriezastys" pr ON pr.id = ap."atmetimoPriezastysId" LEFT JOIN ppa."kainosIsraiskos" ki ON ki.id = ap."kainosIsraiskaId" WHERE ap."ataskaitaId" = $1 ORDER BY ap.id`, [id]),
       postgres.query(`SELECT e.*, ki.pavadinimas AS "kainosIsraiska" FROM ppa."pasiulymuEile" e LEFT JOIN ppa."kainosIsraiskos" ki ON ki.id = e."kainosIsraiskaId" WHERE e."ataskaitaId" = $1 ORDER BY e.id`, [id]),
       postgres.query(`SELECT * FROM ppa."proceduruPabaiga" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
-      postgres.query(`SELECT s.*, ct.pavadinimas AS "centralizacijosTipas" FROM ppa."sutartys" s LEFT JOIN ppa."centralizacijosTipai" ct ON ct.id = s."centralizacijosTipasId" WHERE s."ataskaitaId" = $1 ORDER BY s.id`, [id]),
+      postgres.query(`SELECT s.*, ct.pavadinimas AS "centralizacijosTipas" FROM ppa."ataskaituSutartys" s LEFT JOIN ppa."centralizacijosTipai" ct ON ct.id = s."centralizacijosTipasId" WHERE s."ataskaitaId" = $1 ORDER BY s.id`, [id]),
       loadPpaSutarciuAtitikmenys(id),
     ]);
 

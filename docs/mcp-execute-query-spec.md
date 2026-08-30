@@ -386,7 +386,7 @@ rcJar: asmenys | public: jar
 eppsViesiejiPirkimai: pirkimai, vykdytojai
 pinregJuridiniaiRysiai, pinreg
 failai
-sabisSutartys, sabisSutarciuSalys, sabisSaskaitos, sabisSaskaituSalys
+sabis: sutartys, sutarciuSalys, saskaitos, saskaituSalys
 cpvaProjektuSutartys, cpvaProjektuSarasas
 cvpp: archyvoSkelbimai (CVPP archyvas)
 eiluciuSkaiciai, bvpzKodai
@@ -529,13 +529,14 @@ GRANT USAGE ON SCHEMA ppa TO analyst;
 GRANT USAGE ON SCHEMA cvpp TO analyst;
 GRANT USAGE ON SCHEMA "eppsViesiejiPirkimai" TO analyst;
 GRANT USAGE ON SCHEMA "rcJar" TO analyst;
+GRANT USAGE ON SCHEMA sabis TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
     "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp", "rcJar"."asmenys",
     "jar", "eppsViesiejiPirkimai"."pirkimai", "eppsViesiejiPirkimai"."vykdytojai", "pinregJuridiniaiRysiai",
-    "pinreg", "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos",
-    "sabisSaskaituSalys", "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
+    "pinreg", sabis."sutartys", sabis."sutarciuSalys", sabis."saskaitos",
+    sabis."saskaituSalys", sabis."saskaituSalysTipai", sabis."saskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas", cvpp."archyvoSkelbimai",
     "eiluciuSkaiciai", "bvpzKodai",
     sodra."menesiniai", sodra."evrk", sodra."importai",
@@ -548,7 +549,7 @@ GRANT SELECT ON
     "darboVieta", "istatinisKapitalas",
     "neskelbiamosDerybos", "vdiPazeidimai",
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai", "mokesciai",
-    ppa."ataskaitos", ppa."dalyviai", ppa."sutartys",
+    ppa."ataskaitos", ppa."dalyviai", ppa."ataskaituSutartys",
     ppa."pasiulymuEile", ppa."atmestiPasiulymai"
 TO analyst;
 
@@ -564,5 +565,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar";
 ```

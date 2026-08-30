@@ -156,17 +156,18 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
 const saskaituSalysTipaiCache = new Map();
 const saskaituSalysVeiklosVietaCache = new Map();
 
-async function ensureLookupId(postgres, { table, column, cache }, value) {
+async function ensureLookupId(postgres, { table, schema, column, cache }, value) {
     if (value == null) return null;
     if (cache.has(value)) return cache.get(value);
 
+    const lentele = schema ? `"${schema}"."${table}"` : `"${table}"`;
     await postgres.query(
-        `INSERT INTO "${table}" ("${column}")
+        `INSERT INTO ${lentele} ("${column}")
          VALUES ($1) ON CONFLICT ("${column}") DO NOTHING`,
         [value],
     );
     const { rows } = await postgres.query(
-        `SELECT id FROM "${table}" WHERE "${column}" = $1`,
+        `SELECT id FROM ${lentele} WHERE "${column}" = $1`,
         [value],
     );
     const id = rows[0]?.id ?? null;
@@ -175,12 +176,14 @@ async function ensureLookupId(postgres, { table, column, cache }, value) {
 }
 
 const SASKAITU_TIPAI = {
-    table: "sabisSaskaituSalysTipai",
+    table: "saskaituSalysTipai",
+    schema: "sabis",
     column: "tipas",
     cache: saskaituSalysTipaiCache,
 };
 const SASKAITU_VEIKLOS_VIETA = {
-    table: "sabisSaskaituSalysVeiklosVieta",
+    table: "saskaituSalysVeiklosVieta",
+    schema: "sabis",
     column: "veiklosVieta",
     cache: saskaituSalysVeiklosVietaCache,
 };
@@ -229,7 +232,7 @@ async function saskaituSalysBeforeApply({ inserts, patches, postgres }) {
         if (set.length) {
             values.push(patch._id);
             await postgres.query(
-                `UPDATE "sabisSaskaituSalys" SET ${set.join(", ")} WHERE "_id" = $${values.length}`,
+                `UPDATE sabis."saskaituSalys" SET ${set.join(", ")} WHERE "_id" = $${values.length}`,
                 values,
             );
         }
@@ -243,7 +246,8 @@ async function saskaituSalysBeforeApply({ inserts, patches, postgres }) {
 const ADP_DATASETS = [
     {
         name: "syncAdpSaskaitosSalys",
-        table: "sabisSaskaituSalys",
+        table: "saskaituSalys",
+        schema: "sabis",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SaskaituSalys",
         limit: 1000,
         columns: [
@@ -280,7 +284,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpSutartysSalys",
-        table: "sabisSutarciuSalys",
+        table: "sutarciuSalys",
+        schema: "sabis",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SutarciuSalys",
         limit: 1000,
         mapping: {
@@ -295,7 +300,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpSabisSaskaitos",
-        table: "sabisSaskaitos",
+        table: "saskaitos",
+        schema: "sabis",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Saskaitos",
         limit: 1000,
         mapping: {
@@ -314,7 +320,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpSabisSutartys",
-        table: "sabisSutartys",
+        table: "sutartys",
+        schema: "sabis",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Sutartys",
         limit: 500,
         mapping: {

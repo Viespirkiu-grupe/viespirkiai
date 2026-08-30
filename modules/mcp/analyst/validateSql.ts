@@ -14,8 +14,10 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // search_path juos mato nekvalifikuotai (pirkimai = buvęs viesiejiPirkimai).
     "pirkimai", "vykdytojai",
     "pinregJuridiniaiRysiai", "pinreg",
-    "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
-    "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
+    // SABIS iškeltas į `sabis` schemą; nekvalifikuotas `sutartys` reiškia būtent
+    // SABIS sutarčių registrą (PPA ataskaitų sutartys — `ataskaituSutartys`).
+    "sutartys", "sutarciuSalys", "saskaitos", "saskaituSalys",
+    "saskaituSalysTipai", "saskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas",
     // CVPP archyvo skelbimai (buvęs public."cvppViesiejiPirkimai") — `cvpp`
     // schemoje; nukirptas vardas `viesiejiPirkimai` būtų sutapęs su public
@@ -48,7 +50,7 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // PPA (ATN-1) XLSX ataskaitos iškeltos į `ppa` schemą. `dalyviai` yra ir
     // `liteko` schemoje, todėl analyst search_path'e `ppa` eina pirmiau —
     // nekvalifikuotas `dalyviai` čia reiškia PPA dalyvius.
-    "ataskaitos", "dalyviai", "sutartys",
+    "ataskaitos", "dalyviai", "ataskaituSutartys",
     "pasiulymuEile", "atmestiPasiulymai",
     "teisiniaiPagrindai", "ataskaitosTipai",
     "pirkimoVertes", "perkanciosiosOrganizacijosTipai",
