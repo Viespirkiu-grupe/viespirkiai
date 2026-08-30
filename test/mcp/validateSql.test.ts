@@ -65,7 +65,7 @@ describe("Layer 2 — table whitelist", () => {
     });
 
     it("accepts XLSX PPA tables and rejects the pre-xlsx name", () => {
-        expect(validateSql('SELECT * FROM "xlsxPPAataskaitos"')).toBeNull();
+        expect(validateSql('SELECT * FROM "ataskaitos"')).toBeNull();
         expect(validateSql('SELECT * FROM "atn1ataskaitos"')).toBeTypeOf("string");
     });
 

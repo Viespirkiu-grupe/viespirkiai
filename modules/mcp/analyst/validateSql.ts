@@ -38,14 +38,17 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "nuosprendziaiPilni", "dalyviaiPilni",
     "mokesciai",
 
-    "xlsxPPAataskaitos", "xlsxPPAdalyviai", "xlsxPPAsutartys",
-    "xlsxPPApasiulymuEile", "xlsxPPAatmestiPasiulymai",
-    "xlsxPPAteisiniaiPagrindai", "xlsxPPAataskaitosTipai",
-    "xlsxPPApirkimoVertes", "xlsxPPAperkanciosiosOrganizacijosTipai",
-    "xlsxPPAigaliotosiosTipai", "xlsxPPApirkimoBudai",
-    "xlsxPPAatmestuPasiulymuStatusai", "xlsxPPAatmetimoTeisiniaiPagrindai",
-    "xlsxPPAatmetimoPriezastys", "xlsxPPAkainosIsraiskos",
-    "xlsxPPAsalys", "xlsxPPAcentralizacijosTipai", "xlsxPPApirkimoObjektoRusys",
+    // PPA (ATN-1) XLSX ataskaitos iškeltos į `ppa` schemą. `dalyviai` yra ir
+    // `liteko` schemoje, todėl analyst search_path'e `ppa` eina pirmiau —
+    // nekvalifikuotas `dalyviai` čia reiškia PPA dalyvius.
+    "ataskaitos", "dalyviai", "sutartys",
+    "pasiulymuEile", "atmestiPasiulymai",
+    "teisiniaiPagrindai", "ataskaitosTipai",
+    "pirkimoVertes", "perkanciosiosOrganizacijosTipai",
+    "igaliotosiosTipai", "pirkimoBudai",
+    "atmestuPasiulymuStatusai", "atmetimoTeisiniaiPagrindai",
+    "atmetimoPriezastys", "kainosIsraiskos",
+    "salys", "centralizacijosTipai", "pirkimoObjektoRusys",
 ]);
 
 export const FUNCTION_WHITELIST: Set<string> = new Set([

@@ -6,7 +6,7 @@ projekto konkursus. Šis modulis tuos failus perskaito ir **rašo tiesiai** į
 schemos `"vptXlsxApjungtosAtaskaitos"` lenteles – tarpinio JSONB sluoksnio nėra,
 SQL failų vykdyti nereikia.
 
-Tai atskiras duomenų sluoksnis. `public."xlsxPPA*"` (modules/ppa – ATN-1 iš
+Tai atskiras duomenų sluoksnis. `ppa.*` schema (modules/ppa – ATN-1 iš
 pavienių CVP IS failų) ir `public."cvppDumpAtn1*"` (ATN-1 CSV iškrova) lieka
 nepaliesti, nors domenas persidengia.
 

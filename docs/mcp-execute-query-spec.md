@@ -185,7 +185,7 @@ fails fast rather than silently returning incomplete schema.
 ### Covered-table redirect
 
 Tables that are fully covered by a view (`jarAsmenys`, `sutartys`, `viesiejiPirkimai`, `pinregJuridiniaiRysiai`,
-`xlsxPPAataskaitos`, `bylosDalyviai`) return a redirect message instead of raw column data:
+`ppa."ataskaitos"`, `bylosDalyviai`) return a redirect message instead of raw column data:
 
 > *"Table 'jarAsmenys' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
 > and an example query."*
@@ -359,7 +359,7 @@ recursive graph traversal where full schema control is needed.
 | `v_sutartys`     | contracts, buyer-supplier, cpv, value, timing, frameworks | `sutartys`               | Buyer + seller names denormalized; `::text` cast on `jarKodas`      |
 | `v_pirkimas`     | procedures, criteria, lot-count, single-bidder            | `viesiejiPirkimai`       | Organizer name, municipality, short code                            |
 | `v_person_links` | conflict-of-interest, directors, beneficial-owners        | `pinregJuridiniaiRysiai` | Company name joined; `irasoTipas` distinguishes role type           |
-| `v_dalyviai`     | bid-ranking, rejections, co-bidding, single-bidder        | `xlsxPPAataskaitos`     | Full bidder list with rank, bid amount, rejection reason            |
+| `v_dalyviai`     | bid-ranking, rejections, co-bidding, single-bidder        | `ppa."ataskaitos"`      | Full bidder list with rank, bid amount, rejection reason            |
 | `v_bylos`        | court, litigation, enforcement                            | `bylosDalyviai`          | Case metadata joined; company name denormalized                     |
 
 `v_dalyviai` is the **only source of non-winner participants** in a procurement. `sutartys` records winners only;
@@ -396,7 +396,7 @@ jadis, rcInformaciniaiLeidiniaiPranesimai
 domenai, kotis
 balansoAtaskaitos, pelnoNuostoliuAtaskaitos
 darboVieta, istatinisKapitalas
-xlsxPPAataskaitos, xlsxPPAdalyviai, xlsxPPApasiulymuEile, xlsxPPAatmestiPasiulymai
+ppa: ataskaitos, dalyviai, pasiulymuEile, atmestiPasiulymai
 neskelbiamosDerybos
 vdiPazeidimai
 bylos, bylosDalyviai
@@ -525,6 +525,7 @@ REVOKE ALL ON SCHEMA public FROM analyst;
 GRANT CONNECT, TEMPORARY ON DATABASE viespirkiai TO analyst;
 GRANT USAGE ON SCHEMA public TO analyst;
 GRANT USAGE ON SCHEMA sodra TO analyst;   -- kaip ir domenai/liteko/vdi
+GRANT USAGE ON SCHEMA ppa TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -544,8 +545,8 @@ GRANT SELECT ON
     "darboVieta", "istatinisKapitalas",
     "neskelbiamosDerybos", "vdiPazeidimai",
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai", "mokesciai",
-    "xlsxPPAataskaitos", "xlsxPPAdalyviai", "xlsxPPAsutartys",
-    "xlsxPPApasiulymuEile", "xlsxPPAatmestiPasiulymai"
+    ppa."ataskaitos", ppa."dalyviai", ppa."sutartys",
+    ppa."pasiulymuEile", ppa."atmestiPasiulymai"
 TO analyst;
 
 -- v_* view'us sukuria ir SELECT teises jiems suteikia ensureViews.ts (admin pool'u).
@@ -560,5 +561,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, liteko, vdi, sodra;
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, liteko, vdi, sodra;
 ```

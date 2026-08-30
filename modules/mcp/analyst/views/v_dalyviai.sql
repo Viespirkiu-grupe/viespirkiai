@@ -23,21 +23,21 @@ SELECT a."pirkimoNumeris",
        p."eileNumeris",
        p."pasiulymoKaina",
        p."atmetimoPriezastis"
-FROM "xlsxPPAataskaitos" a
-         LEFT JOIN "xlsxPPApirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
-         JOIN "xlsxPPAdalyviai" d ON d."ataskaitaId" = a.id
-         LEFT JOIN "xlsxPPAsalys" salis ON salis.id = d."salisId"
+FROM ppa."ataskaitos" a
+         LEFT JOIN ppa."pirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
+         JOIN ppa."dalyviai" d ON d."ataskaitaId" = a.id
+         LEFT JOIN ppa."salys" salis ON salis.id = d."salisId"
          LEFT JOIN LATERAL (
              SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
                     e."eileNumeris"                                 AS "eileNumeris",
                     e.kaina::numeric                                AS "pasiulymoKaina",
                     apr.pavadinimas                                 AS "atmetimoPriezastis"
-             FROM "xlsxPPApasiulymuEile" e
-                      FULL OUTER JOIN "xlsxPPAatmestiPasiulymai" ap
+             FROM ppa."pasiulymuEile" e
+                      FULL OUTER JOIN ppa."atmestiPasiulymai" ap
                                       ON ap."ataskaitaId" = e."ataskaitaId"
                                           AND ap."dalyvioKodas" = e."dalyvioKodas"
                                           AND ap."daliesNumeris" = e."daliesNumeris"
-                      LEFT JOIN "xlsxPPAatmetimoPriezastys" apr
+                      LEFT JOIN ppa."atmetimoPriezastys" apr
                                 ON apr.id = ap."atmetimoPriezastysId"
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas

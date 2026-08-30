@@ -9,8 +9,8 @@ const COVERED_TABLES = new Set(Object.keys(COVERED_TABLES_BY_VIEWS));
 const TABLE_LIST = [...TABLE_WHITELIST].filter((t) => !COVERED_TABLES.has(t));
 const VIEW_LIST = [...VIEW_NAMES];
 // Analyst rolės search_path schemos — lentelės iškeltos iš `public` (domenai,
-// liteko, vdi, sodra) informacinėse schemose randamos tik pagal savo schemą.
-const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "liteko", "vdi", "sodra"];
+// ppa, liteko, vdi, sodra) informacinėse schemose randamos tik pagal savo schemą.
+const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "ppa", "liteko", "vdi", "sodra"];
 const SCHEMA_ARRAY = `ARRAY[${ANALYST_SCHEMAS.map((s) => `'${s}'`).join(", ")}]`;
 const IDENTIFIER_CANDIDATES = [
     "id",
