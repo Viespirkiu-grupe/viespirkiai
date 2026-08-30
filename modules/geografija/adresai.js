@@ -27,7 +27,7 @@ export async function getAddressCoords(raw) {
             `SELECT ST_Y(ST_Centroid("geometrija"::geometry)) AS lat,
                ST_X(ST_Centroid("geometrija"::geometry)) AS lon
         FROM "adresuRegistras"."gyvenvietesRibos" gyv
-        JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+        JOIN geografija."gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
         WHERE gv."pavadinimas" ILIKE $1
         LIMIT 1`,
             [`${name.trim()}%`],
@@ -110,7 +110,7 @@ export async function getAddressCoords(raw) {
           JOIN "adresuRegistras"."adresai" a ON a."kodas" = p."kodas"
           JOIN "adresuRegistras"."gatves" g ON g."kodas" = p."gatKodas"
           JOIN "adresuRegistras"."gyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
-          JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+          JOIN geografija."gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
           WHERE p."nr" = $1
             AND g."pavadinimas" ILIKE $2
             AND gv."pavadinimas" ILIKE $3
@@ -164,7 +164,7 @@ export async function getAddressCoords(raw) {
           JOIN "adresuRegistras"."adresai" a ON a."kodas" = p."kodas"
           JOIN "adresuRegistras"."gatves" g ON g."kodas" = p."gatKodas"
           JOIN "adresuRegistras"."gyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
-          JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+          JOIN geografija."gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
           WHERE p."nr" = $1
             AND g."pavadinimas" ILIKE $2
             AND gv."pavadinimas" ILIKE $3

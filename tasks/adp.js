@@ -375,6 +375,7 @@ const ADP_DATASETS = [
     {
         name: "syncAdpGyvenamojiVietove",
         table: "gyvenamosVietoves",
+        schema: "geografija",
         dataset: "datasets/gov/rc/ar/gyvenamojivietove/GyvenamojiVietove",
         limit: 1000,
         columns: ["_id", "gyvKodas", "tipas", "tipoSantrumpa", "pavadinimasK", "pavadinimas", "seniunija", "savivaldybe", "gyvNuo", "gyvIki"],
