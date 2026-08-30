@@ -25,8 +25,8 @@ import {
 
 // e-TAR scraper'is virš stateless e-TAR API adapterio.
 //
-// Penki etapai, kiekvienas su savo žyma DB (žr. "eTarScrapeDay",
-// "eTarLegalActScrape", "eTarEdition"."scrapedAt"), tad bet kurį galima nutraukti
+// Penki etapai, kiekvienas su savo žyma DB (žr. "eTar"."scrapeDay",
+// "eTar"."legalActScrape", "eTar"."edition"."scrapedAt"), tad bet kurį galima nutraukti
 // ir tęsti:
 //
 //   1 dienos   — paieška pagal priėmimo datą → atrandami aktų ID
@@ -251,7 +251,7 @@ function stageSpecs(runner, { rescrapeDays }) {
             label: "dienos",
             batchSize: 50,
             key: day => day,
-            // "eTarScrapeDay" klaidų skaitiklio neturi, tad nepavykusi diena
+            // "eTar"."scrapeDay" klaidų skaitiklio neturi, tad nepavykusi diena
             // lieka nepažymėta — pakartotinį ėmimą stabdo planuoklio `skipped`.
             pick: take => pickDaysToScrape({ limit: take, rescrapeOlderThanDays: rescrapeDays }),
             work: day => runner.scrapeDay(day),
@@ -479,7 +479,7 @@ function previousDay(date) {
  * kai tarp rezultatų pasirodo SENESNĖ diena, ji tampa nauja riba ir puslapiavimas
  * prasideda iš naujo nuo pirmo puslapio. Todėl niekada nenuklystam giliai į
  * puslapius (kur e-TAR ir taip neatiduotų), tuščios kalendorinės dienos
- * praleidžiamos be nė vienos užklausos, o į "eTarScrapeDay" patenka tik tos
+ * praleidžiamos be nė vienos užklausos, o į "eTar"."scrapeDay" patenka tik tos
  * dienos, kuriose aktų realiai buvo.
  *
  * Sustoja tik tada, kai užklausa nebegrąžina nieko — jokios metų ribos nėra.
@@ -618,7 +618,7 @@ function formatStatus(status, sidecar) {
     out.push(`  Aktų iš viso        ${nr(aktai)}`);
     if (status.suKlaidomis > 0) out.push(`  Su klaidomis        ${nr(status.suKlaidomis)}`);
     if (status.saltinioBrokas > 0) {
-        out.push(`  Šaltinio brokas     ${nr(status.saltinioBrokas)}  (SELECT * FROM "eTarSourceAnomaly")`);
+        out.push(`  Šaltinio brokas     ${nr(status.saltinioBrokas)}  (SELECT * FROM "eTar"."sourceAnomaly")`);
     }
     if (sidecar) {
         const ratio = sidecar.rawBytes > 0 ? (sidecar.rawBytes / sidecar.zstdBytes).toFixed(1) : "0";

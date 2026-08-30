@@ -1,4 +1,4 @@
-// Laikinas skriptas: kiek e-TAR aktų yra kiekvieną dieną iš "eTarScrapeDay".
+// Laikinas skriptas: kiek e-TAR aktų yra kiekvieną dieną iš "eTar"."scrapeDay".
 //
 // Kiekvienai dienai — viena užklausa į paiešką (from=to=diena, page=1); imam tik
 // `pagination.total_items`, puslapiuoti nereikia. Dienos tikrinamos lygiagrečiai;
@@ -28,7 +28,7 @@ function trukme(ms) {
 async function main() {
     process.stdout.write("Imamas dienų sąrašas iš SQL…\n");
     const { rows } = await postgres.query(
-        `SELECT "day"::text AS day FROM "eTarScrapeDay" ORDER BY "day" DESC`,
+        `SELECT "day"::text AS day FROM "eTar"."scrapeDay" ORDER BY "day" DESC`,
     );
     const viso = rows.length;
     process.stdout.write(`Dienų: ${formatuoti(viso)}\n\n`);

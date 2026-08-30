@@ -92,7 +92,7 @@ export async function loadPalyginimas(
   bKey?: string,
 ): Promise<PalyginimoDuomenys | null> {
   const { rows: actRows } = await postgres.query(
-    `SELECT "legalActId", "title" FROM "eTarLegalAct" WHERE "legalActId" = $1`,
+    `SELECT "legalActId", "title" FROM "eTar"."legalAct" WHERE "legalActId" = $1`,
     [legalActId],
   );
   const act = actRows[0];

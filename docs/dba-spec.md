@@ -46,8 +46,8 @@ Logika yra `src/lib/dbSchema/grupes.ts` (ne SQL'e), kad būtų padengta testais 
 - **Taisyklė lygina tik lentelės vardą, ne schemą.** Todėl pačios `dba` schemos
   lentelės (`grupes`, `lenteles`, `busenos`…) jokio prefikso neatitinka ir buvo
   priskirtos rankiniais įrašais (`dbaSchemaSeed2.sql`). Tas pats galioja
-  `adresuRegistras` schemai: kai vardo prefiksą pakeičia schema, prefikso
-  taisyklė nebeturi ko gaudyti, ir grupė nurodoma rankiniais įrašais. Tai
+  `adresuRegistras` ir `eTar` schemoms: kai vardo prefiksą pakeičia schema,
+  prefikso taisyklė nebeturi ko gaudyti, ir grupė nurodoma rankiniais įrašais. Tai
   numatytas mainas — schema yra tikslesnis namespace nei prefiksas, o grupavimas
   atsiperka viena eilute lentelei.
 - **Prefiksas nieko nesako apie turinį.** `kotis` iš pradžių pateko į „Sistemos

@@ -9,11 +9,11 @@ export async function ensureLegalActStubs(client, ids) {
     const unique = [...new Set(ids.filter(Boolean))];
     if (!unique.length) return;
     await client.query(
-        `INSERT INTO "eTarLegalAct" ("legalActId") SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`,
+        `INSERT INTO "eTar"."legalAct" ("legalActId") SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`,
         [unique],
     );
     await client.query(
-        `INSERT INTO "eTarLegalActScrape" ("legalActId") SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`,
+        `INSERT INTO "eTar"."legalActScrape" ("legalActId") SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`,
         [unique],
     );
 }
@@ -28,7 +28,7 @@ export async function markInTransaction(client, legalActId, mark) {
         }[mark.stage];
         if (!column) throw new Error(`Nežinomas etapas: ${mark.stage}`);
         await client.query(
-            `UPDATE "eTarLegalActScrape"
+            `UPDATE "eTar"."legalActScrape"
                 SET "${column}" = now(), "failureCount" = 0, "lastError" = NULL, "retryAfter" = NULL
               WHERE "legalActId" = $1`,
             [legalActId],
@@ -36,7 +36,7 @@ export async function markInTransaction(client, legalActId, mark) {
     }
     if (mark.editionToken) {
         await client.query(
-            `UPDATE "eTarEdition"
+            `UPDATE "eTar"."edition"
                 SET "scrapedAt" = now(), "failureCount" = 0, "lastError" = NULL, "retryAfter" = NULL
               WHERE "legalActId" = $1 AND "editionToken" = $2`,
             [legalActId, mark.editionToken],
@@ -53,7 +53,7 @@ export async function insertMetadata(client, owner, metadata, vocab, fixed) {
 
     const registration = metadata.fields?.registration_details?.value ?? {};
     const { rows: [{ metadataId }] } = await client.query(
-        `INSERT INTO "eTarDocumentMetadata" (
+        `INSERT INTO "eTar"."documentMetadata" (
             "documentId", "editionListId", "actStatusId", "statusPresenceId",
             "effectiveFrom", "effectiveTo", "effectiveNote", "effectiveUntilNote",
             "registrationText", "registrationDate", "registrationNumber"
@@ -77,7 +77,7 @@ export async function insertMetadata(client, owner, metadata, vocab, fixed) {
     await insertMetadataFields(client, metadataId, metadata.fields ?? {}, vocab, fixed);
 
     await insertRows(client, {
-        table: "eTarChronologyEvent",
+        table: "chronologyEvent",
         columns: ["metadataId", "ordinal", "eventDate", "event"],
         rows: (metadata.chronology ?? []).map((event, index) => ({
             metadataId,
@@ -105,7 +105,7 @@ async function insertMetadataFields(client, metadataId, fields, vocab, fixed) {
     if (!present.length) return;
 
     const returned = await insertRows(client, {
-        table: "eTarMetadataField",
+        table: "metadataField",
         columns: ["metadataId", "metadataFieldKeyId", "valueText"],
         rows: present.map(([code, field]) => {
             const key = requireLookup(fixed.metadataFieldKey, code, "metadataFieldKey");
@@ -143,12 +143,12 @@ async function insertMetadataFields(client, metadataId, fields, vocab, fixed) {
     }
 
     await insertRows(client, {
-        table: "eTarMetadataFieldLink",
+        table: "metadataFieldLink",
         columns: ["metadataFieldId", "ordinal", "linkText", "url"],
         rows: links,
     });
     await insertRows(client, {
-        table: "eTarMetadataFieldEurovocTerm",
+        table: "metadataFieldEurovocTerm",
         columns: ["metadataFieldId", "ordinal", "eurovocTermId"],
         rows: terms,
     });
@@ -164,7 +164,7 @@ export async function insertRelatedInformation(client, owner, related, vocab, fi
         const type = requireLookup(fixed.relatedSectionType, code, "related_information skiltis");
 
         const { rows: [{ relatedSectionId }] } = await client.query(
-            `INSERT INTO "eTarRelatedSection" ("documentId", "editionListId", "relatedSectionTypeId", "sourceLabel")
+            `INSERT INTO "eTar"."relatedSection" ("documentId", "editionListId", "relatedSectionTypeId", "sourceLabel")
              VALUES ($1,$2,$3,$4) RETURNING "relatedSectionId"`,
             [owner.documentId ?? null, owner.editionListId ?? null, type.id, section.source_label],
         );
@@ -179,7 +179,7 @@ export async function insertRelatedInformation(client, owner, related, vocab, fi
 
 async function insertAttachments(client, relatedSectionId, items, vocab) {
     const returned = await insertRows(client, {
-        table: "eTarAttachment",
+        table: "attachment",
         columns: ["relatedSectionId", "ordinal", "filename", "attachmentName"],
         rows: items.map((item, index) => ({
             relatedSectionId,
@@ -206,7 +206,7 @@ async function insertAttachments(client, relatedSectionId, items, vocab) {
     });
 
     await insertRows(client, {
-        table: "eTarAttachmentResource",
+        table: "attachmentResource",
         columns: ["attachmentId", "ordinal", "resourceFormatId", "url"],
         rows: resources,
     });
@@ -214,7 +214,7 @@ async function insertAttachments(client, relatedSectionId, items, vocab) {
 
 async function insertRelations(client, relatedSectionId, items, vocab) {
     const returned = await insertRows(client, {
-        table: "eTarLegalActRelation",
+        table: "legalActRelation",
         columns: [
             "relatedSectionId", "ordinal", "relationTypeId", "targetLegalActId",
             "actTypeId", "documentNumber", "adoptedAt", "title", "url",
@@ -247,7 +247,7 @@ async function insertRelations(client, relatedSectionId, items, vocab) {
     });
 
     await insertRows(client, {
-        table: "eTarLegalActRelationInstitution",
+        table: "legalActRelationInstitution",
         columns: ["relationId", "ordinal", "institutionId"],
         rows: institutions,
     });

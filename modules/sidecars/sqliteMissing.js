@@ -32,9 +32,9 @@ const SIDECAR_SALTINIAI = {
         // Aktų dokumentai ir redakcijų sąrašai rašo į tą pačią sidecar lentelę,
         // tad referencinė aibė yra jų md5 sąjunga.
         fromSql: `FROM (
-                      SELECT md5 FROM public."eTarLegalActDocument"
+                      SELECT md5 FROM "eTar"."legalActDocument"
                       UNION
-                      SELECT md5 FROM public."eTarEditionList"
+                      SELECT md5 FROM "eTar"."editionList"
                   ) t WHERE md5 IS NOT NULL`,
         keySql: `md5`,
     },

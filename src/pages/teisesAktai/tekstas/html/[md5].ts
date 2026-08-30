@@ -11,7 +11,7 @@ import { rewriteETarLegalActLinks } from '@/src/lib/teisesAktoHtml.ts';
 //
 // Turinys ateina iš e-TAR sidecar'o (`official_text.html`) — tai svetimas HTML,
 // tad atiduodam jį kuo sandaresniai:
-//   • `md5` privalo egzistuoti "eTarLegalActDocument" lentelėje (ne bet kas iš sidecar'o);
+//   • `md5` privalo egzistuoti "eTar"."legalActDocument" lentelėje (ne bet kas iš sidecar'o);
 //   • CSP uždraudžia skriptus, formas ir bet kokį išorinį krovimą;
 //   • `sandbox` ant paties <iframe> (žr. puslapį) papildomai nuima JS ir same-origin.
 
@@ -94,7 +94,7 @@ export const GET: APIRoute = async ({ params, url }) => {
   if (!/^[0-9a-f]{32}$/.test(md5)) return new Response('Blogas md5', { status: 400 });
 
   const { rows } = await postgres.query(
-    `SELECT 1 FROM "eTarLegalActDocument" WHERE "md5" = $1 LIMIT 1`,
+    `SELECT 1 FROM "eTar"."legalActDocument" WHERE "md5" = $1 LIMIT 1`,
     [md5],
   );
   if (!rows.length) return new Response('Nerasta', { status: 404 });

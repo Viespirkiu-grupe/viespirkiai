@@ -17,7 +17,7 @@ export async function processETarDocumentsQueue() {
         await client.query("BEGIN");
         const { rows: queue } = await client.query(
             `SELECT id, "documentId", change AS keitimas
-             FROM public."eTarDocumentsQueue"
+             FROM "eTar"."documentsQueue"
              ORDER BY id
              LIMIT $1
              FOR UPDATE SKIP LOCKED`,
@@ -49,9 +49,9 @@ export async function processETarDocumentsQueue() {
                 `SELECT d."documentId", d."legalActId", d.md5, d."sourceUrl", d.title,
                         d."editionToken", d."fetchedAt", v.code AS variantas,
                         p.code AS "turinioBusena"
-                 FROM public."eTarLegalActDocument" d
-                 JOIN public."eTarDocumentVariant" v USING ("documentVariantId")
-                 JOIN public."eTarPresenceState" p
+                 FROM "eTar"."legalActDocument" d
+                 JOIN "eTar"."documentVariant" v USING ("documentVariantId")
+                 JOIN "eTar"."presenceState" p
                    ON p."presenceStateId" = d."contentPresenceId"
                  WHERE d."documentId" = ANY($1::bigint[])`,
                 [toUpsert],
@@ -82,13 +82,13 @@ export async function processETarDocumentsQueue() {
         }
 
         await client.query(
-            `DELETE FROM public."eTarDocumentsQueue" WHERE id = ANY($1::bigint[])`,
+            `DELETE FROM "eTar"."documentsQueue" WHERE id = ANY($1::bigint[])`,
             [queue.map((row) => row.id)],
         );
         await client.query("COMMIT");
         if (upserted + deleted > 0) {
             signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
-                source: "eTarDocumentsQueue",
+                source: "eTar.documentsQueue",
                 count: upserted + deleted,
             });
         }

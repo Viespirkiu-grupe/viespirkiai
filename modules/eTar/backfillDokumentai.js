@@ -6,17 +6,17 @@ const DEFAULT_BATCH = 10_000;
 export async function auditETarDokumentai() {
     const { rows: [row] } = await postgres.query(
         `SELECT
-            (SELECT count(*) FROM public."eTarLegalActDocument") AS "eTarViso",
+            (SELECT count(*) FROM "eTar"."legalActDocument") AS "eTarViso",
             (SELECT count(*) FROM documents."sourceIds" si
               WHERE si."sourceId" = documents.source_id('etar')) AS "dokumentaiViso",
             (SELECT count(*)
-               FROM public."eTarLegalActDocument" e
+               FROM "eTar"."legalActDocument" e
                LEFT JOIN documents."sourceIds" si
                  ON si."sourceId" = documents.source_id('etar')
                 AND si.id2 = e."documentId"::text
               WHERE si."documentId" IS NULL) AS truksta,
             (SELECT count(*)
-               FROM public."eTarLegalActDocument" e
+               FROM "eTar"."legalActDocument" e
                JOIN documents."sourceIds" si
                  ON si."sourceId" = documents.source_id('etar')
                 AND si.id2 = e."documentId"::text
@@ -24,7 +24,7 @@ export async function auditETarDokumentai() {
               WHERE d.md5 IS DISTINCT FROM decode(e.md5, 'hex')) AS pasene,
             (SELECT count(*)
                FROM documents."sourceIds" si
-               LEFT JOIN public."eTarLegalActDocument" e
+               LEFT JOIN "eTar"."legalActDocument" e
                  ON e."documentId"::text = si.id2
               WHERE si."sourceId" = documents.source_id('etar')
                 AND e."documentId" IS NULL) AS naslaiciai`,
@@ -40,12 +40,12 @@ export async function enqueueETarDokumentai({ after = 0, limit = Infinity, batch
         const { rows } = await postgres.query(
             `WITH source AS (
                 SELECT "documentId"
-                FROM public."eTarLegalActDocument"
+                FROM "eTar"."legalActDocument"
                 WHERE "documentId" > $1
                 ORDER BY "documentId"
                 LIMIT $2
              ), queued AS (
-                INSERT INTO public."eTarDocumentsQueue" ("documentId", change)
+                INSERT INTO "eTar"."documentsQueue" ("documentId", change)
                 SELECT "documentId", 'insert' FROM source
                 RETURNING "documentId"
              )

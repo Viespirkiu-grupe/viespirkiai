@@ -45,7 +45,7 @@ export async function saveDocument(payload, { md5, mark = null, force = false } 
         // Senoji eilutė paimama PRIEŠ upsert'ą (ir užrakinama): iš `md5` skirtumo
         // matom, ar tai naujas dokumentas, ar pasikeitęs, ar visai nepakitęs.
         const { rows: [existing] } = await client.query(
-            `SELECT "documentId", "md5" FROM "eTarLegalActDocument"
+            `SELECT "documentId", "md5" FROM "eTar"."legalActDocument"
               WHERE "legalActId" = $1 AND "documentVariantId" = $2
                 AND COALESCE("editionToken", '') = COALESCE($3, '')
               FOR UPDATE`,
@@ -55,7 +55,7 @@ export async function saveDocument(payload, { md5, mark = null, force = false } 
 
         if (keitimas === null) {
             await client.query(
-                `UPDATE "eTarLegalActDocument" SET "fetchedAt" = $2 WHERE "documentId" = $1`,
+                `UPDATE "eTar"."legalActDocument" SET "fetchedAt" = $2 WHERE "documentId" = $1`,
                 [existing.documentId, payload.fetched_at ?? new Date().toISOString()],
             );
             await markInTransaction(client, payload.id, mark);
@@ -64,22 +64,22 @@ export async function saveDocument(payload, { md5, mark = null, force = false } 
         }
 
         await client.query(
-            `INSERT INTO "eTarLegalAct" ("legalActId", "title", "fetchedAt")
+            `INSERT INTO "eTar"."legalAct" ("legalActId", "title", "fetchedAt")
              VALUES ($1, $2, now())
              ON CONFLICT ("legalActId") DO UPDATE
-                SET "title" = COALESCE(EXCLUDED."title", "eTarLegalAct"."title"),
+                SET "title" = COALESCE(EXCLUDED."title", "eTar"."legalAct"."title"),
                     "fetchedAt" = now()`,
             [payload.id, payload.title ?? null],
         );
         await client.query(
-            `INSERT INTO "eTarLegalActScrape" ("legalActId") VALUES ($1) ON CONFLICT DO NOTHING`,
+            `INSERT INTO "eTar"."legalActScrape" ("legalActId") VALUES ($1) ON CONFLICT DO NOTHING`,
             [payload.id],
         );
         await ensureLegalActStubs(client, referencedActIds(payload));
 
         const officialText = payload.official_text ?? {};
         const { rows: [{ documentId }] } = await client.query(
-            `INSERT INTO "eTarLegalActDocument" (
+            `INSERT INTO "eTar"."legalActDocument" (
                 "legalActId", "documentVariantId", "editionToken", "sourceUrl", "title",
                 "contentPresenceId", "contentMessage", "fetchedAt", "md5"
              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
@@ -106,12 +106,12 @@ export async function saveDocument(payload, { md5, mark = null, force = false } 
         );
 
         // Vaikus perrašom, o ne bandom sulieti: šaltinis neturi stabilių vaikų id'ų.
-        await client.query(`DELETE FROM "eTarOfficialTextResource" WHERE "documentId" = $1`, [documentId]);
-        await client.query(`DELETE FROM "eTarDocumentMetadata" WHERE "documentId" = $1`, [documentId]);
-        await client.query(`DELETE FROM "eTarRelatedSection" WHERE "documentId" = $1`, [documentId]);
+        await client.query(`DELETE FROM "eTar"."officialTextResource" WHERE "documentId" = $1`, [documentId]);
+        await client.query(`DELETE FROM "eTar"."documentMetadata" WHERE "documentId" = $1`, [documentId]);
+        await client.query(`DELETE FROM "eTar"."relatedSection" WHERE "documentId" = $1`, [documentId]);
 
         await insertRows(client, {
-            table: "eTarOfficialTextResource",
+            table: "officialTextResource",
             columns: ["documentId", "ordinal", "resourceFormatId", "url"],
             rows: (officialText.resources ?? []).map((resource, index) => ({
                 documentId,
@@ -124,7 +124,7 @@ export async function saveDocument(payload, { md5, mark = null, force = false } 
         await insertMetadata(client, { documentId }, payload.metadata, vocab, fixed);
         await insertRelatedInformation(client, { documentId }, payload.related_information, vocab, fixed);
         await client.query(
-            `INSERT INTO public."eTarDocumentsQueue" ("documentId", change)
+            `INSERT INTO "eTar"."documentsQueue" ("documentId", change)
              VALUES ($1, $2)`,
             [documentId, keitimas],
         );
@@ -164,14 +164,14 @@ export async function saveEditionList(payload, { md5, mark = { stage: "editions"
         await client.query("BEGIN");
 
         const { rows: [existing] } = await client.query(
-            `SELECT "editionListId", "md5" FROM "eTarEditionList" WHERE "legalActId" = $1 FOR UPDATE`,
+            `SELECT "editionListId", "md5" FROM "eTar"."editionList" WHERE "legalActId" = $1 FOR UPDATE`,
             [payload.id],
         );
         const keitimas = existing ? (existing.md5 === md5 && !force ? null : "patch") : "insert";
 
         if (keitimas === null) {
             await client.query(
-                `UPDATE "eTarEditionList" SET "fetchedAt" = $2 WHERE "editionListId" = $1`,
+                `UPDATE "eTar"."editionList" SET "fetchedAt" = $2 WHERE "editionListId" = $1`,
                 [existing.editionListId, payload.fetched_at ?? new Date().toISOString()],
             );
             await markInTransaction(client, payload.id, mark);
@@ -180,21 +180,21 @@ export async function saveEditionList(payload, { md5, mark = { stage: "editions"
         }
 
         await client.query(
-            `INSERT INTO "eTarLegalAct" ("legalActId", "title", "fetchedAt")
+            `INSERT INTO "eTar"."legalAct" ("legalActId", "title", "fetchedAt")
              VALUES ($1, $2, now())
              ON CONFLICT ("legalActId") DO UPDATE
-                SET "title" = COALESCE(EXCLUDED."title", "eTarLegalAct"."title"),
+                SET "title" = COALESCE(EXCLUDED."title", "eTar"."legalAct"."title"),
                     "fetchedAt" = now()`,
             [payload.id, payload.title ?? null],
         );
         await client.query(
-            `INSERT INTO "eTarLegalActScrape" ("legalActId") VALUES ($1) ON CONFLICT DO NOTHING`,
+            `INSERT INTO "eTar"."legalActScrape" ("legalActId") VALUES ($1) ON CONFLICT DO NOTHING`,
             [payload.id],
         );
         await ensureLegalActStubs(client, referencedActIds(payload));
 
         const { rows: [{ editionListId }] } = await client.query(
-            `INSERT INTO "eTarEditionList" (
+            `INSERT INTO "eTar"."editionList" (
                 "legalActId", "sourceUrl", "title", "editionsPresenceId", "fetchedAt", "md5"
              ) VALUES ($1,$2,$3,$4,$5,$6)
              ON CONFLICT ("legalActId") DO UPDATE SET
@@ -214,25 +214,25 @@ export async function saveEditionList(payload, { md5, mark = { stage: "editions"
             ],
         );
 
-        // 4-o etapo progresas gyvena ant "eTarEdition"."scrapedAt", o eilutes perrašom —
+        // 4-o etapo progresas gyvena ant "eTar"."edition"."scrapedAt", o eilutes perrašom —
         // tad prieš trynimą pasiimam žymas ir grąžinam jas toms pačioms redakcijoms.
         // Kartu keliauja ir klaidų skaitiklis su `retryAfter`: kitaip redakcijų
         // sąrašo atnaujinimas nutrintų backoff'ą ir lūžtanti redakcija iškart
         // grįžtų į eilę.
         const { rows: previous } = await client.query(
             `SELECT "editionToken", "scrapedAt", "failureCount", "lastError", "retryAfter"
-               FROM "eTarEdition" WHERE "legalActId" = $1`,
+               FROM "eTar"."edition" WHERE "legalActId" = $1`,
             [payload.id],
         );
         const busenaByToken = new Map(previous.map(row => [row.editionToken, row]));
 
-        await client.query(`DELETE FROM "eTarEdition" WHERE "editionListId" = $1`, [editionListId]);
-        await client.query(`DELETE FROM "eTarDocumentMetadata" WHERE "editionListId" = $1`, [editionListId]);
-        await client.query(`DELETE FROM "eTarRelatedSection" WHERE "editionListId" = $1`, [editionListId]);
+        await client.query(`DELETE FROM "eTar"."edition" WHERE "editionListId" = $1`, [editionListId]);
+        await client.query(`DELETE FROM "eTar"."documentMetadata" WHERE "editionListId" = $1`, [editionListId]);
+        await client.query(`DELETE FROM "eTar"."relatedSection" WHERE "editionListId" = $1`, [editionListId]);
 
         const editions = payload.editions ?? [];
         const returned = await insertRows(client, {
-            table: "eTarEdition",
+            table: "edition",
             columns: ["editionListId", "legalActId", "ordinal", "editionToken", "effectiveFrom", "effectiveTo", "url",
                 "scrapedAt", "failureCount", "lastError", "retryAfter"],
             rows: editions.map((edition, index) => {
@@ -270,7 +270,7 @@ export async function saveEditionList(payload, { md5, mark = { stage: "editions"
             });
         });
         await insertRows(client, {
-            table: "eTarEditionChange",
+            table: "editionChange",
             columns: ["editionId", "ordinal", "amendingActId", "adoptedAt", "linkText", "url"],
             rows: changes,
         });

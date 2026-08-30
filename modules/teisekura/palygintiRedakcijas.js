@@ -1,8 +1,8 @@
 // Dviejų teisės akto suvestinių redakcijų palyginimas iš komandinės eilutės.
 //
-// Redakcija nurodoma DATA, ne tokenu: iš "eTarEdition" (arba "eSeimasEdition")
+// Redakcija nurodoma DATA, ne tokenu: iš "eTar"."edition" (arba "eSeimasEdition")
 // randam, kuri redakcija tą dieną galiojo, o tekstą — iš sidecar'o pagal
-// "eTarLegalActDocument"."md5".
+// "eTar"."legalActDocument"."md5".
 //
 // Paleisti:  npm run teisekura:palyginti -- TAR.XXXX 2020-01-01 2024-01-01
 //            npm run teisekura:palyginti -- TAR.XXXX     (redakcijas renkiesi sąraše)

@@ -32,13 +32,13 @@ describe('processETarDocumentsQueue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.client.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('FROM public."eTarDocumentsQueue"')) {
+      if (sql.includes('FROM "eTar"."documentsQueue"')) {
         return { rows: [
           { id: '1', documentId: '42', keitimas: 'insert' },
           { id: '2', documentId: '42', keitimas: 'patch' },
         ] };
       }
-      if (sql.includes('FROM public."eTarLegalActDocument"')) {
+      if (sql.includes('FROM "eTar"."legalActDocument"')) {
         return { rows: [{ documentId: '42', md5: 'abc', legalActId: 'TAR.X' }] };
       }
       return { rows: [] };
@@ -58,11 +58,11 @@ describe('processETarDocumentsQueue', () => {
     expect(mocks.readETarSidecarMany).toHaveBeenCalledWith(['abc']);
     expect(mocks.upsertETarBatch).toHaveBeenCalledOnce();
     const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
-    const deleteAt = sqlCalls.findIndex((sql) => sql.includes('DELETE FROM public."eTarDocumentsQueue"'));
+    const deleteAt = sqlCalls.findIndex((sql) => sql.includes('DELETE FROM "eTar"."documentsQueue"'));
     expect(deleteAt).toBeGreaterThan(0);
     expect(sqlCalls.indexOf('COMMIT')).toBeGreaterThan(deleteAt);
     expect(mocks.signalWork).toHaveBeenCalledWith('documents.index.ready', {
-      source: 'eTarDocumentsQueue',
+      source: 'eTar.documentsQueue',
       count: 1,
     });
     const commitCall = sqlCalls.indexOf('COMMIT');
@@ -75,7 +75,7 @@ describe('processETarDocumentsQueue', () => {
     await expect(processETarDocumentsQueue()).rejects.toThrow('sidecar write failed');
     const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
     expect(sqlCalls).toContain('ROLLBACK');
-    expect(sqlCalls.some((sql) => sql.includes('DELETE FROM public."eTarDocumentsQueue"'))).toBe(false);
+    expect(sqlCalls.some((sql) => sql.includes('DELETE FROM "eTar"."documentsQueue"'))).toBe(false);
     expect(mocks.signalWork).not.toHaveBeenCalled();
     expect(mocks.client.release).toHaveBeenCalledOnce();
   });

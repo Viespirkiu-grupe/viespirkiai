@@ -12,7 +12,7 @@ import { indexStructure, normalizeLegalActText } from "../mcp/tools/teisesAktoTu
 /** Kurio šaltinio lentelėse ieškoti redakcijų — e-TAR ar e-Seimo. */
 export async function lenteliuPriesagas(teisesAktoId, db = postgres) {
     const { rows } = await db.query(
-        `SELECT 1 FROM "eTarEdition" WHERE "legalActId" = $1 LIMIT 1`,
+        `SELECT 1 FROM "eTar"."edition" WHERE "legalActId" = $1 LIMIT 1`,
         [teisesAktoId],
     );
     return rows.length ? "eTar" : "eSeimas";

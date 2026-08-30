@@ -57,7 +57,7 @@ export { closeSqlite };
 
 export function ensureETarSidecarSchema(db) {
     // md5 = hex nuo `turinys` prieš suspaudimą; jis pat guli Postgres'e
-    // ("eTarLegalActDocument"."md5", "eTarEditionList"."md5").
+    // ("eTar"."legalActDocument"."md5", "eTar"."editionList"."md5").
     // dydis – originalaus JSON baitai, suspaustas – blob'o baitai (statistikai).
     db.exec(`
         CREATE TABLE IF NOT EXISTS "eTarAtsakymai" (

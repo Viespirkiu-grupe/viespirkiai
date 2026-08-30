@@ -26,7 +26,7 @@ describe("eTarTaskQueue", () => {
 
         const [sql, params] = mocks.query.mock.calls[0];
         expect(sql).toContain('s."editionsScrapedAt" IS NULL');
-        expect(sql).toContain('INSERT INTO public."eTarScrapeQueue"');
+        expect(sql).toContain('INSERT INTO "eTar"."scrapeQueue"');
         expect(params).toEqual(["editions", 25]);
     });
 
@@ -34,7 +34,7 @@ describe("eTarTaskQueue", () => {
         await enqueuePendingETarJobs("historical");
 
         const [sql] = mocks.query.mock.calls[0];
-        expect(sql).toContain('FROM public."eTarEdition" s');
+        expect(sql).toContain('FROM "eTar"."edition" s');
         expect(sql).toContain('s."editionToken"');
         expect(sql).toContain('s."scrapedAt" IS NULL');
     });

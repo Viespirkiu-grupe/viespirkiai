@@ -12,10 +12,10 @@ export async function loadFixedLookups() {
     if (fixedLookups) return fixedLookups;
 
     const [variants, presence, sectionTypes, fieldKeys] = await Promise.all([
-        postgres.query(`SELECT "code", "documentVariantId" AS id FROM "eTarDocumentVariant"`),
-        postgres.query(`SELECT "code", "presenceStateId" AS id FROM "eTarPresenceState"`),
-        postgres.query(`SELECT "code", "relatedSectionTypeId" AS id, "payloadKind" FROM "eTarRelatedSectionType"`),
-        postgres.query(`SELECT "code", "metadataFieldKeyId" AS id, "valueKind" FROM "eTarMetadataFieldKey"`),
+        postgres.query(`SELECT "code", "documentVariantId" AS id FROM "eTar"."documentVariant"`),
+        postgres.query(`SELECT "code", "presenceStateId" AS id FROM "eTar"."presenceState"`),
+        postgres.query(`SELECT "code", "relatedSectionTypeId" AS id, "payloadKind" FROM "eTar"."relatedSectionType"`),
+        postgres.query(`SELECT "code", "metadataFieldKeyId" AS id, "valueKind" FROM "eTar"."metadataFieldKey"`),
     ]);
 
     fixedLookups = {
@@ -38,12 +38,12 @@ export function requireLookup(map, code, what) {
 // ---------------------------------------------------------------
 
 const OPEN_VOCABULARIES = {
-    actStatus: { table: "eTarActStatus", id: "actStatusId", column: "name" },
-    actType: { table: "eTarActType", id: "actTypeId", column: "name" },
-    relationType: { table: "eTarRelationType", id: "relationTypeId", column: "name" },
-    institution: { table: "eTarInstitution", id: "institutionId", column: "name" },
-    resourceFormat: { table: "eTarResourceFormat", id: "resourceFormatId", column: "name" },
-    eurovocTerm: { table: "eTarEurovocTerm", id: "eurovocTermId", column: "term" },
+    actStatus: { table: "actStatus", id: "actStatusId", column: "name" },
+    actType: { table: "actType", id: "actTypeId", column: "name" },
+    relationType: { table: "relationType", id: "relationTypeId", column: "name" },
+    institution: { table: "institution", id: "institutionId", column: "name" },
+    resourceFormat: { table: "resourceFormat", id: "resourceFormatId", column: "name" },
+    eurovocTerm: { table: "eurovocTerm", id: "eurovocTermId", column: "term" },
 };
 
 const vocabularyCaches = new Map(Object.keys(OPEN_VOCABULARIES).map(key => [key, new Map()]));
@@ -71,7 +71,7 @@ const NULLABLE_VOCABULARY = new Set(["actStatus", "actType", "institution", "eur
  * vietose raktas sutaptų.
  *
  * `anomalies` paduodamas tik renkant: per ilga reikšmė ten užfiksuojama ir vėliau
- * įrašoma į "eTarSourceAnomaly". Be to brokas taptų nematomas — aktas įsirašytų
+ * įrašoma į "eTar"."sourceAnomaly". Be to brokas taptų nematomas — aktas įsirašytų
  * sėkmingai, `failureCount` nunulintų, ir niekur neliktų pėdsako.
  *
  * @returns {string|null} null = reikšmės nesaugom (nuoroda liks NULL)
@@ -100,7 +100,7 @@ export async function recordAnomalies(client, legalActId, anomalies) {
         if (!esama || a.ilgis > esama.ilgis) worst.set(a.kind, a);
     }
     await insertRows(client, {
-        table: "eTarSourceAnomaly",
+        table: "sourceAnomaly",
         columns: ["legalActId", "kind", "ilgis", "pavyzdys"],
         rows: [...worst.values()].map(a => ({ legalActId, ...a })),
         conflict: `("legalActId", "kind") DO UPDATE SET
@@ -119,11 +119,11 @@ async function ensureVocabulary(kind, names) {
 
     const { table, id, column } = OPEN_VOCABULARIES[kind];
     await postgres.query(
-        `INSERT INTO "${table}" ("${column}") SELECT unnest($1::text[]) ON CONFLICT ("${column}") DO NOTHING`,
+        `INSERT INTO "eTar"."${table}" ("${column}") SELECT unnest($1::text[]) ON CONFLICT ("${column}") DO NOTHING`,
         [missing],
     );
     const { rows } = await postgres.query(
-        `SELECT "${column}" AS name, "${id}" AS id FROM "${table}" WHERE "${column}" = ANY($1::text[])`,
+        `SELECT "${column}" AS name, "${id}" AS id FROM "eTar"."${table}" WHERE "${column}" = ANY($1::text[])`,
         [missing],
     );
     for (const row of rows) cache.set(row.name, row.id);
@@ -185,7 +185,7 @@ export async function insertRows(client, { table, columns, rows, returning = "",
             return `(${placeholders.join(", ")})`;
         });
         const { rows: returned } = await client.query(
-            `INSERT INTO "${table}" (${quoted}) VALUES ${tuples.join(", ")}`
+            `INSERT INTO "eTar"."${table}" (${quoted}) VALUES ${tuples.join(", ")}`
             + `${conflict ? ` ON CONFLICT ${conflict}` : ""}`
             + `${returning ? ` RETURNING ${returning}` : ""}`,
             params,

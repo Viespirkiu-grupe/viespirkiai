@@ -1,6 +1,6 @@
 // Laikinas skriptas: suminis e-TAR teisės aktų žodžių ir simbolių skaičius.
 //
-// Postgres'e ("eTarLegalActDocument") guli tik md5, o pats tekstas — sidecar'e
+// Postgres'e ("eTar"."legalActDocument") guli tik md5, o pats tekstas — sidecar'e
 // (SQLite, zstd). Tad: iš SQL paimam visų dokumentų md5, o skaičiuojam iš
 // sidecar'o `official_text.text`.
 //
@@ -29,7 +29,7 @@ function suskaiciuoti(tekstas) {
 async function main() {
     process.stdout.write("Imamas dokumentų sąrašas iš SQL…\n");
     const { rows } = await postgres.query(
-        `SELECT "documentId", "md5" FROM "eTarLegalActDocument" WHERE "md5" IS NOT NULL`,
+        `SELECT "documentId", "md5" FROM "eTar"."legalActDocument" WHERE "md5" IS NOT NULL`,
     );
     const viso = rows.length;
     process.stdout.write(`Dokumentų: ${formatuoti(viso)}\n\n`);
