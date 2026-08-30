@@ -44,7 +44,7 @@ async function writeFinancialBatch(client, rows) {
                     "laikotarpisNuo", "laikotarpisIki", "registravimoData",
                     "saltinioMetai", "formavimoData"
              FROM report_input
-             ON CONFLICT ON CONSTRAINT "jarFinansinesAtaskaitos_natural_key"
+             ON CONFLICT ON CONSTRAINT "finansinesAtaskaitos_natural_key"
              DO UPDATE SET
                  "pavadinimas" = EXCLUDED."pavadinimas",
                  "formosKodas" = EXCLUDED."formosKodas",
@@ -102,7 +102,7 @@ const BATCH_SQL = {
              "laikotarpisNuo", "laikotarpisIki", "anuliavimoRegistravimoData", "formavimoData")
         SELECT DISTINCT ON ("jarKodas", "templateId", "laikotarpisNuo", "laikotarpisIki", "anuliavimoRegistravimoData") *
         FROM resolved
-        ON CONFLICT ON CONSTRAINT "jarFinansiniuAtaskaituAnuliavimai_natural_key" DO UPDATE SET
+        ON CONFLICT ON CONSTRAINT "finansiniuAtaskaituAnuliavimai_natural_key" DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas", "formosKodas" = EXCLUDED."formosKodas",
             "statusoKodas" = EXCLUDED."statusoKodas",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
@@ -137,7 +137,7 @@ const BATCH_SQL = {
             "jarKodas" integer, "zymosTipas" text, "pavadinimas" text,
             "formosKodas" integer, "statusasNuo" date, "statusasIki" date,
             "formavimoData" date)
-        ON CONFLICT ON CONSTRAINT "jarZymuStatusai_natural_key" DO UPDATE SET
+        ON CONFLICT ON CONSTRAINT "zymuStatusai_natural_key" DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas", "formosKodas" = EXCLUDED."formosKodas",
             "statusasIki" = EXCLUDED."statusasIki",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
@@ -152,7 +152,7 @@ const BATCH_SQL = {
             "savanoriuSkaicius" integer, "savanorystesValanduSkaicius" bigint,
             "laikotarpisNuo" date,
             "laikotarpisIki" date, "formavimoData" date)
-        ON CONFLICT ON CONSTRAINT "jarSavanoryste_natural_key" DO UPDATE SET
+        ON CONFLICT ON CONSTRAINT "savanoryste_natural_key" DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas", "formosKodas" = EXCLUDED."formosKodas",
             "savanoriuSkaicius" = EXCLUDED."savanoriuSkaicius",
             "savanorystesValanduSkaicius" = EXCLUDED."savanorystesValanduSkaicius",
@@ -174,7 +174,7 @@ const BATCH_SQL = {
             "sarasoPateikimoData" = EXCLUDED."sarasoPateikimoData", "formavimoData" = EXCLUDED."formavimoData",
             "importuota" = now()`,
     jadisSarasai: `
-        INSERT INTO public."jadisDalyviuSarasai" AS old
+        INSERT INTO jadis."dalyviuSarasai" AS old
             ("jarKodas", "pavadinimas", "formosKodas", "statusoKodas",
              "registravimoData", "sarasasPateiktas", "sarasoData", "formavimoData")
         SELECT DISTINCT ON ("jarKodas") "jarKodas", "pavadinimas", "formosKodas",
@@ -190,7 +190,7 @@ const BATCH_SQL = {
             "sarasasPateiktas" = EXCLUDED."sarasasPateiktas", "sarasoData" = EXCLUDED."sarasoData",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     jadisDalyviai: `
-        INSERT INTO public."jadisDalyviuSkaiciai" AS old
+        INSERT INTO jadis."dalyviuSkaiciai" AS old
             ("jarKodas", "pavadinimas", "formosKodas", "statusoKodas",
              "lrFiziniai", "lrJuridiniai", "uzsienioFiziniai", "uzsienioJuridiniai",
              "formavimoData")
@@ -210,7 +210,7 @@ const BATCH_SQL = {
             "uzsienioJuridiniai" = EXCLUDED."uzsienioJuridiniai",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     jadisValstybe: `
-        INSERT INTO public."jadisValstybesDalyviai" AS old
+        INSERT INTO jadis."valstybesDalyviai" AS old
             ("jarKodas", "pavadinimas", "formosKodas", "statusoKodas",
              "registravimoData", "njaKodas", "njaPavadinimas", "dalis", "formavimoData")
         SELECT DISTINCT ON ("jarKodas", "njaKodas") "jarKodas", "pavadinimas",
@@ -220,7 +220,7 @@ const BATCH_SQL = {
             "jarKodas" integer, "pavadinimas" text, "formosKodas" integer,
             "statusoKodas" integer, "registravimoData" date, "njaKodas" integer,
             "njaPavadinimas" text, "dalis" numeric, "formavimoData" date)
-        ON CONFLICT ON CONSTRAINT "jadisValstybesDalyviai_natural_key" DO UPDATE SET
+        ON CONFLICT ON CONSTRAINT "valstybesDalyviai_natural_key" DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas", "formosKodas" = EXCLUDED."formosKodas",
             "statusoKodas" = EXCLUDED."statusoKodas", "registravimoData" = EXCLUDED."registravimoData",
             "njaPavadinimas" = EXCLUDED."njaPavadinimas", "dalis" = EXCLUDED."dalis",
@@ -234,7 +234,7 @@ const BATCH_SQL = {
             "jarKodas" integer, "dokumentoTipas" integer, "dokumentoPotipis" integer,
             "dokumentoData" date, "dokumentoRegistravimoData" date,
             "formavimoData" date)
-        ON CONFLICT ON CONSTRAINT "jarDokumentai_natural_key" DO UPDATE SET
+        ON CONFLICT ON CONSTRAINT "dokumentai_natural_key" DO UPDATE SET
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
 };
 

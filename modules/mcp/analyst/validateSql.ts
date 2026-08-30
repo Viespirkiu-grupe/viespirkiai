@@ -31,7 +31,8 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // `priemoniuTipai` (transporto priemonių tipai).
     "priemoniuTipai", "matymai", "atnaujinimai",
     "nepatikimiTiekejai", "melagingiTiekejai",
-    "jadisDalyviuSkaiciai", "jadisDalyviuSarasai", "jadisValstybesDalyviai",
+    // JADIS iškeltas į `jadis` schemą; `suvestine` – buvusi public."jadis".
+    "suvestine", "dalyviuSkaiciai", "dalyviuSarasai", "valstybesDalyviai",
     // RC informaciniai pranešimai iškelti į "rcInformaciniaiPranesimai" schemą ir
     // normalizuoti; `pranesimaiPilni` yra suderinamumo view su senąja plokščia
     // forma, o `juridiniuPavadinimai` – (jarKodas, pavadinimas) poros su matymo

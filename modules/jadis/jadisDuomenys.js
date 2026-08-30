@@ -55,7 +55,7 @@ export async function gautiJadisDuomenis(jarKodas, db = postgres) {
                 FROM (
                     SELECT s."lrFiziniai", s."lrJuridiniai", s."uzsienioFiziniai",
                            s."uzsienioJuridiniai", s."formavimoData"
-                    FROM public."jadisDalyviuSkaiciai" s
+                    FROM jadis."dalyviuSkaiciai" s
                     WHERE s."jarKodas" = $1
                 ) d
             ) AS "dalyviuSkaiciai",
@@ -63,7 +63,7 @@ export async function gautiJadisDuomenis(jarKodas, db = postgres) {
                 SELECT to_jsonb(x)
                 FROM (
                     SELECT p."sarasasPateiktas", p."sarasoData", p."formavimoData"
-                    FROM public."jadisDalyviuSarasai" p
+                    FROM jadis."dalyviuSarasai" p
                     WHERE p."jarKodas" = $1
                 ) x
             ) AS "sarasas",
@@ -72,7 +72,7 @@ export async function gautiJadisDuomenis(jarKodas, db = postgres) {
                 FROM (
                     SELECT n."njaKodas", n."njaPavadinimas", n."dalis",
                            n."formavimoData"
-                    FROM public."jadisValstybesDalyviai" n
+                    FROM jadis."valstybesDalyviai" n
                     WHERE n."jarKodas" = $1
                 ) v
             ), '[]'::jsonb) AS "valstybesDalyviai"`,
