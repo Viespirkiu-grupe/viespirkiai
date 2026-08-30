@@ -68,7 +68,7 @@ export async function upsertDictionaries(client) {
         INSERT INTO public."juridiniaiEvrk" ("kodas", "skyrius", "pavadinimas")
         SELECT DISTINCT ON ("kodas")
             "kodas", left("kodas", 2), COALESCE("pavadinimas", "kodas")
-        FROM public."sodraMonthlyEvrk"
+        FROM sodra."evrk"
         WHERE "kodas" IS NOT NULL
         ORDER BY "kodas", ("pavadinimas" IS NULL), id DESC
         ON CONFLICT ("kodas") DO UPDATE SET
@@ -103,8 +103,8 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
             sav_dict."id" AS "savivaldybeId",
             aps_dict."id" AS "apskritisId",
             evrk_dict."kodas" AS "evrkKodas",
-            sodra."darbuotojai",
-            sodra."vidutinisAtlyginimas",
+            naujausiSodra."darbuotojai",
+            naujausiSodra."vidutinisAtlyginimas",
             vmi."suma" AS "vmiMokesciai",
             kapitalas."kapitalas" AS "istatinisKapitalas",
             COALESCE(sutartys."pirkimai", 0)::bigint AS "pirkimuKiekis",
@@ -142,13 +142,13 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
                             THEN 0 ELSE sm.draustieji2 END
                     )
                 END AS "vidutinisAtlyginimas"
-            FROM public."sodraMonthly" sm
+            FROM sodra."menesiniai" sm
             WHERE sm."jarKodas" = j."jarKodas"
             ORDER BY sm."data" DESC
             LIMIT 1
-        ) sodra ON true
-        LEFT JOIN public."sodraMonthlyEvrk" evrk
-            ON evrk."id" = sodra."evrkId"
+        ) naujausiSodra ON true
+        LEFT JOIN sodra."evrk" evrk
+            ON evrk."id" = naujausiSodra."evrkId"
         LEFT JOIN public."juridiniaiEvrk" evrk_dict
             ON evrk_dict."kodas" = evrk."kodas"
         LEFT JOIN LATERAL (

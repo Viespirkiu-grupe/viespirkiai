@@ -406,7 +406,7 @@ export async function expandOrg(jarKodas) {
 
     const sodraRes = await postgres.query(
         `SELECT DISTINCT ON ("jarKodas") "jarKodas"::text AS "jarKodas", "draustieji", "draustieji2"
-         FROM "sodraMonthly"
+         FROM sodra."menesiniai"
          WHERE "jarKodas" = ANY($1::int[])
          ORDER BY "jarKodas", "data" DESC NULLS LAST`,
         [Array.from(contractOrgCodes)],

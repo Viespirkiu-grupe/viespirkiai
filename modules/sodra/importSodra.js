@@ -17,7 +17,7 @@ import { upsertSodraMonthly } from "./upsertSodraMonthly.js";
 const BATCH_SIZE = 1_000;
 
 /**
- * Perskaito Sodros mėnesinį CSV ir sukelia jį į `sodraMonthly` lenteles.
+ * Perskaito Sodros mėnesinį CSV ir sukelia jį į `sodra` schemos lenteles.
  *
  * Failas skaitomas eilutė po eilutės ir keliamas 1000 eilučių paketais — metinis
  * CSV yra ~95 MB, tad į atmintį jo netraukiam.
@@ -26,7 +26,7 @@ const BATCH_SIZE = 1_000;
  * @param {object} [options]
  * @param {boolean} [options.dryRun=false] - Tik parsinti, į DB nerašyti.
  * @param {string} [options.importFile] - Vardas, kuriuo importas registruojamas
- *   `sodraMonthlyImportai` lentelėje (numatytai — failo vardas).
+ *   `sodra."importai"` lentelėje (numatytai — failo vardas).
  * @returns {Promise<{eiluciuSkaicius: number, praleista: number, irasyta: number, naujausiasMenuo: string|null}>}
  */
 export async function importuotiSodrosCsv(

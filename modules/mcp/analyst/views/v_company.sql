@@ -61,7 +61,7 @@ FROM "jarAsmenys" j
                    ON sav."kodas" = COALESCE(pastatas."savKodas", gyv."savivaldybesKodas")
          LEFT JOIN LATERAL (
     SELECT draustieji, draustieji2, "vidutinisAtlyginimas", "imokuSuma", data
-    FROM "sodraMonthly"
+    FROM sodra."menesiniai"
     WHERE "jarKodas" = j."jarKodas"::integer
     ORDER BY data DESC NULLS LAST
     LIMIT 1

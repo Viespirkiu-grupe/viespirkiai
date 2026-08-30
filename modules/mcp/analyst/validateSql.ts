@@ -15,8 +15,9 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "cpvaProjektuSutartys", "cpvaProjektuSarasas",
     "cvppViesiejiPirkimai",
     "eiluciuSkaiciai", "bvpzKodai",
-    "sodraMonthly", "sodraMonthlyEvrk", "sodraMonthlyImportai",
-    "sodraMonthlyPavadinimai", "sodraMonthlySavivaldybes",
+    // SODRA lentelės iškeltos į `sodra` schemą; analyst search_path jas mato
+    // nekvalifikuotai (menesiniai = buvęs sodraMonthly).
+    "menesiniai", "evrk", "importai", "pavadinimai", "savivaldybes",
     "regitra", "regitraMatymai", "regitraAtnaujinimai",
     "nepatikimiTiekejai", "melagingiTiekejai",
     "jadisDalyviuSkaiciai", "jadisDalyviuSarasai", "jadisValstybesDalyviai",

@@ -524,6 +524,7 @@ REVOKE ALL ON SCHEMA public FROM analyst;
 -- Prieiga prie DB ir schemos
 GRANT CONNECT, TEMPORARY ON DATABASE viespirkiai TO analyst;
 GRANT USAGE ON SCHEMA public TO analyst;
+GRANT USAGE ON SCHEMA sodra TO analyst;   -- kaip ir domenai/liteko/vdi
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -533,8 +534,8 @@ GRANT SELECT ON
     "sabisSaskaituSalys", "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas", "cvppViesiejiPirkimai",
     "eiluciuSkaiciai", "bvpzKodai",
-    "sodraMonthly", "sodraMonthlyEvrk", "sodraMonthlyImportai",
-    "sodraMonthlyPavadinimai", "sodraMonthlySavivaldybes",
+    sodra."menesiniai", sodra."evrk", sodra."importai",
+    sodra."pavadinimai", sodra."savivaldybes",
     "regitra", "regitraMatymai", "regitraAtnaujinimai",
     "nepatikimiTiekejai", "melagingiTiekejai",
     "jadis", "rcInformaciniaiLeidiniaiPranesimai",
@@ -557,4 +558,7 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 
 -- (Pasirinktinai) griežtesnis pool-wide timeout
 ALTER ROLE analyst SET statement_timeout = '180s';
+
+-- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, liteko, vdi, sodra;
 ```

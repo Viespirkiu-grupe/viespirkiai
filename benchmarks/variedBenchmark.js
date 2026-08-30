@@ -115,7 +115,7 @@ const QUERIES = [
                        max(draustieji)                            AS draustieji
                 FROM (
                     SELECT "jarKodas"::text AS "jarKodas", "vidutinisAtlyginimas", draustieji
-                    FROM "sodraMonthly" WHERE ctid < '(:PAGES2,0)'::tid
+                    FROM sodra."menesiniai" WHERE ctid < '(:PAGES2,0)'::tid
                 ) s
                 WHERE "jarKodas" IS NOT NULL
                 GROUP BY "jarKodas"
@@ -144,7 +144,7 @@ const QUERIES = [
                 SELECT "jarKodas", data, draustieji
                 FROM (
                     SELECT "jarKodas", data, draustieji
-                    FROM "sodraMonthly" WHERE ctid < '(:PAGES2,0)'::tid
+                    FROM sodra."menesiniai" WHERE ctid < '(:PAGES2,0)'::tid
                 ) x
                 WHERE draustieji IS NOT NULL AND "jarKodas" IS NOT NULL
             )

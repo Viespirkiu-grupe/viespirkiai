@@ -19,14 +19,14 @@ WITH incoming AS MATERIALIZED (
     FROM jsonb_array_elements($1::jsonb) AS row(doc)
 ),
 inserted_import AS (
-    INSERT INTO public."sodraMonthlyImportai" ("importFile")
+    INSERT INTO sodra."importai" ("importFile")
     VALUES ($2)
     ON CONFLICT ("importFile") DO NOTHING
     RETURNING id
 ),
 target_import AS MATERIALIZED (
     SELECT id
-    FROM public."sodraMonthlyImportai"
+    FROM sodra."importai"
     WHERE "importFile" = $2
     UNION ALL
     SELECT id FROM inserted_import
@@ -38,7 +38,7 @@ names_to_insert AS MATERIALIZED (
     WHERE pavadinimas IS NOT NULL
 ),
 inserted_names AS (
-    INSERT INTO public."sodraMonthlyPavadinimai" (pavadinimas)
+    INSERT INTO sodra."pavadinimai" (pavadinimas)
     SELECT pavadinimas FROM names_to_insert
     ON CONFLICT (pavadinimas) DO NOTHING
     RETURNING id, pavadinimas
@@ -49,7 +49,7 @@ municipalities_to_insert AS MATERIALIZED (
     WHERE savivaldybe IS NOT NULL
 ),
 inserted_municipalities AS (
-    INSERT INTO public."sodraMonthlySavivaldybes" (pavadinimas)
+    INSERT INTO sodra."savivaldybes" (pavadinimas)
     SELECT pavadinimas FROM municipalities_to_insert
     ON CONFLICT (pavadinimas) DO NOTHING
     RETURNING id, pavadinimas
@@ -65,20 +65,20 @@ evrk_to_insert AS MATERIALIZED (
            OR "evrkPavadinimas" IS NOT NULL)
       AND NOT EXISTS (
           SELECT 1
-          FROM public."sodraMonthlyEvrk" existing
+          FROM sodra."evrk" existing
           WHERE existing.kodas IS NOT DISTINCT FROM i."evrkKodas"
             AND existing."kodasEvrk" IS NOT DISTINCT FROM i."evrkKodasEvrk"
             AND existing.pavadinimas IS NOT DISTINCT FROM i."evrkPavadinimas"
       )
 ),
 inserted_evrk AS (
-    INSERT INTO public."sodraMonthlyEvrk" (kodas, "kodasEvrk", pavadinimas)
+    INSERT INTO sodra."evrk" (kodas, "kodasEvrk", pavadinimas)
     SELECT kodas, "kodasEvrk", pavadinimas FROM evrk_to_insert
     ON CONFLICT (kodas, "kodasEvrk", pavadinimas) DO NOTHING
     RETURNING id, kodas, "kodasEvrk", pavadinimas
 ),
 monthly_upsert AS (
-    INSERT INTO public."sodraMonthly" (
+    INSERT INTO sodra."menesiniai" (
         kodas,
         "jarKodas",
         data,
@@ -97,14 +97,14 @@ monthly_upsert AS (
         i."jarKodas",
         i.data,
         (
-            SELECT id FROM public."sodraMonthlyPavadinimai"
+            SELECT id FROM sodra."pavadinimai"
             WHERE pavadinimas = i.pavadinimas
             UNION ALL
             SELECT id FROM inserted_names WHERE pavadinimas = i.pavadinimas
             LIMIT 1
         ),
         (
-            SELECT id FROM public."sodraMonthlySavivaldybes"
+            SELECT id FROM sodra."savivaldybes"
             WHERE pavadinimas = i.savivaldybe
             UNION ALL
             SELECT id FROM inserted_municipalities
@@ -118,7 +118,7 @@ monthly_upsert AS (
             THEN NULL
             ELSE (
                 SELECT id
-                FROM public."sodraMonthlyEvrk"
+                FROM sodra."evrk"
                 WHERE kodas IS NOT DISTINCT FROM i."evrkKodas"
                   AND "kodasEvrk" IS NOT DISTINCT FROM i."evrkKodasEvrk"
                   AND pavadinimas IS NOT DISTINCT FROM i."evrkPavadinimas"
@@ -150,9 +150,9 @@ monthly_upsert AS (
         "imokuSuma" = EXCLUDED."imokuSuma",
         "importoId" = EXCLUDED."importoId"
     WHERE ROW(
-        "sodraMonthly"."jarKodas", "sodraMonthly"."evrkId",
-        "sodraMonthly"."vidutinisAtlyginimas", "sodraMonthly".draustieji,
-        "sodraMonthly"."vidutinisAtlyginimas2", "sodraMonthly".draustieji2
+        "menesiniai"."jarKodas", "menesiniai"."evrkId",
+        "menesiniai"."vidutinisAtlyginimas", "menesiniai".draustieji,
+        "menesiniai"."vidutinisAtlyginimas2", "menesiniai".draustieji2
     ) IS DISTINCT FROM ROW(
         EXCLUDED."jarKodas", EXCLUDED."evrkId",
         EXCLUDED."vidutinisAtlyginimas", EXCLUDED.draustieji,
