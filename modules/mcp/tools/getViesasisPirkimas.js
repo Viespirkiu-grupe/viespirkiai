@@ -16,9 +16,9 @@ export async function handler({ pirkimoId }) {
     const { rows } = await postgres.query(
         `SELECT p.*, a."turinioNuskaitymoData", a."turinioNuskaitymas",
                 v.pavadinimas AS "vykdytojoPavadinimas", v."jarKodas"
-         FROM public."viesiejiPirkimai" p
-         LEFT JOIN public."viesiejiPirkimaiAtnaujinimai" a ON a."pirkimoId" = p."pirkimoId"
-         LEFT JOIN public."viesiejiPirkimaiVykdytojai" v ON v.id = p."pirkimoVykdytojasId"
+         FROM "eppsViesiejiPirkimai"."pirkimai" p
+         LEFT JOIN "eppsViesiejiPirkimai"."atnaujinimai" a ON a."pirkimoId" = p."pirkimoId"
+         LEFT JOIN "eppsViesiejiPirkimai"."vykdytojai" v ON v.id = p."pirkimoVykdytojasId"
          WHERE p."pirkimoId" = $1`,
         [pirkimoId],
     );

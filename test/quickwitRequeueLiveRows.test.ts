@@ -199,8 +199,8 @@ describe("requeueLiveRows transaction", () => {
         const normalized = sql.replace(/\s+/g, " ").trim();
         queries.push(normalized);
         if (normalized.startsWith("SELECT COUNT(*)")) return { rows: [{ total: 3 }], rowCount: 1 };
-        if (normalized.startsWith("DELETE FROM \"viesiejiPirkimaiIndexQueue\"")) return { rows: [], rowCount: 1 };
-        if (normalized.startsWith("INSERT INTO \"viesiejiPirkimaiIndexQueue\"")) {
+        if (normalized.startsWith("DELETE FROM \"eppsViesiejiPirkimai\".\"indexQueue\"")) return { rows: [], rowCount: 1 };
+        if (normalized.startsWith("INSERT INTO \"eppsViesiejiPirkimai\".\"indexQueue\"")) {
           return { rows: [], rowCount: normalized.includes("LEFT JOIN") ? 1 : 2 };
         }
         return { rows: [], rowCount: null };
@@ -218,7 +218,7 @@ describe("requeueLiveRows transaction", () => {
     expect(result).toEqual({ queuedPatches: 2, queuedDeletes: 1, replacedQueueRows: 1, total: 3 });
     expect(queries.some((sql) => sql.startsWith("LOCK TABLE"))).toBe(false);
     const dataQueries = queries.filter((sql) =>
-      sql.includes("\"viesiejiPirkimaiIndexQueue\"") || sql.includes("JOIN \"viesiejiPirkimai\""));
+      sql.includes("\"eppsViesiejiPirkimai\".\"indexQueue\"") || sql.includes("JOIN \"eppsViesiejiPirkimai\".\"pirkimai\""));
     expect(dataQueries).not.toHaveLength(0);
     expect(dataQueries.every((sql) => !sql.includes('e."eilutesId"::text'))).toBe(true);
     expect(dataQueries.every((sql) => sql.includes('e."eilutesId"::bigint'))).toBe(true);

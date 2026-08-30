@@ -203,7 +203,7 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
             const { rows } = await postgres.query(
                 `SELECT EXISTS (
                     SELECT 1
-                    FROM "viesiejiPirkimai"
+                    FROM "eppsViesiejiPirkimai"."pirkimai"
                     WHERE "jarKodas" = $1
                 ) AS "turiViesujuPirkimu"`,
                 [jarKodas],

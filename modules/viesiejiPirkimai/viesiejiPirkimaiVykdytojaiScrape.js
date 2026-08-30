@@ -66,7 +66,7 @@ async function processOrganisation(org) {
             log(`Nepavyko nuskaityti organizacijos ID ${org.id}`);
             await postgres.query(
                 `
-                UPDATE public."viesiejiPirkimaiVykdytojai"
+                UPDATE "eppsViesiejiPirkimai"."vykdytojai"
                 SET "nuskaitymoData"    = NOW(),
                     "nuskaitymoVersija" = ${NUSKAITYMO_VERSIJA}
                 WHERE id = $1
@@ -88,7 +88,7 @@ async function processOrganisation(org) {
 
         await postgres.query(
             `
-            UPDATE public."viesiejiPirkimaiVykdytojai"
+            UPDATE "eppsViesiejiPirkimai"."vykdytojai"
             SET pavadinimas         = $2,
                 trumpinys           = $3,
                 tipas               = $4,
@@ -124,7 +124,7 @@ async function processOrganisation(org) {
 
         const updated = await postgres.query(
             `
-            UPDATE public."viesiejiPirkimai"
+            UPDATE "eppsViesiejiPirkimai"."pirkimai"
             SET "jarKodas" = $1
             WHERE "pirkimoVykdytojasId" = $2
             `,
@@ -132,7 +132,7 @@ async function processOrganisation(org) {
         );
         if (updated.rowCount > 0) {
             signalWork(WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED, {
-                source: "viesiejiPirkimaiVykdytojai",
+                source: "eppsViesiejiPirkimai.vykdytojai",
                 count: updated.rowCount,
             });
         }
@@ -154,7 +154,7 @@ async function getNextVykdytojas() {
         `
         WITH candidate AS (
             SELECT id
-            FROM public."viesiejiPirkimaiVykdytojai"
+            FROM "eppsViesiejiPirkimai"."vykdytojai"
             WHERE "nuskaitymoVersija" IS NULL
                OR "nuskaitymoVersija" < ${NUSKAITYMO_VERSIJA}
                OR "nuskaitymoData" <= NOW() - interval '${NUSKAITYMO_INTERVAL}'
@@ -162,11 +162,11 @@ async function getNextVykdytojas() {
             FOR UPDATE SKIP LOCKED
             LIMIT 1
         )
-        UPDATE public."viesiejiPirkimaiVykdytojai"
+        UPDATE "eppsViesiejiPirkimai"."vykdytojai"
         SET "nuskaitymoData" = NOW()
         FROM candidate
-        WHERE "viesiejiPirkimaiVykdytojai".id = candidate.id
-        RETURNING "viesiejiPirkimaiVykdytojai".*;
+        WHERE "eppsViesiejiPirkimai"."vykdytojai".id = candidate.id
+        RETURNING "eppsViesiejiPirkimai"."vykdytojai".*;
         `,
     );
     return rows[0] ?? null;

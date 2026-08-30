@@ -26,9 +26,11 @@ const TABLES = {
     signal: WORK_SIGNALS.SUTARTYS_CHANGED,
   },
   viesiejiPirkimai: {
-    queue: "viesiejiPirkimaiIndexQueue",
+    queue: "indexQueue",
+    queueSchema: "eppsViesiejiPirkimai",
     queueId: "pirkimoId",
-    source: "viesiejiPirkimai",
+    source: "pirkimai",
+    sourceSchema: "eppsViesiejiPirkimai",
     sourceId: "pirkimoId",
     signal: WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED,
   },
@@ -287,7 +289,7 @@ export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres
     // Otherwise re-indexed rows could land back in a selected current shard.
     await client.query(`UPDATE "quickwitIndeksai" SET "current" = false WHERE "lentele" = $1 AND "indeksas" = ANY($2::text[])`, [lentele, names]);
     const { rowCount: replacedQueueRows } = await client.query(
-      `DELETE FROM "${table.queue}" q USING "quickwitEilutes" e
+      `DELETE FROM ${queueRef(table)} q USING "quickwitEilutes" e
        WHERE e."indeksaiId" = ANY($1::int[])
          AND q."${table.queueId}" = ${table.queueValue ?? `e."eilutesId"::bigint`}`,
       [indexIds],

@@ -164,7 +164,7 @@ function cvppPid(skelbimas: any): number | null {
 
 async function loadNaujosSistemosKandidatas(pirkimoId: number) {
   const row = await postgres
-    .query(`SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`, [pirkimoId])
+    .query(`SELECT * FROM "eppsViesiejiPirkimai"."pirkimai" WHERE "pirkimoId" = $1`, [pirkimoId])
     .then((r: any) => r.rows[0]);
   return row || null;
 }

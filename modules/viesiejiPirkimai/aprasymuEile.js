@@ -118,9 +118,9 @@ let isjungtaPranesta = false;
 export async function iAprasymuEile(pirkimuId, klientas = postgres) {
     if (!pirkimuId?.length) return 0;
     const res = await klientas.query(
-        `INSERT INTO public."viesiejiPirkimaiAprasymaiQueue" ("pirkimoId")
+        `INSERT INTO "eppsViesiejiPirkimai"."aprasymaiQueue" ("pirkimoId")
          SELECT p."pirkimoId"
-         FROM public."viesiejiPirkimai" p
+         FROM "eppsViesiejiPirkimai"."pirkimai" p
          WHERE p."pirkimoId" = ANY($1::int[])
          ON CONFLICT ("pirkimoId") DO NOTHING`,
         [pirkimuId],
@@ -131,7 +131,7 @@ export async function iAprasymuEile(pirkimuId, klientas = postgres) {
 /** Atlaisvina rezervacijas, kurių darbininkas nebegrįžo. */
 async function atlaisvintiPakibusius(klientas = postgres) {
     const res = await klientas.query(
-        `UPDATE public."viesiejiPirkimaiAprasymaiQueue"
+        `UPDATE "eppsViesiejiPirkimai"."aprasymaiQueue"
          SET "lockedBy" = NULL, "lockedAt" = NULL
          WHERE "lockedBy" IS NOT NULL
            AND "lockedAt" < NOW() - INTERVAL '${LOCK_TIMEOUT}'`,
@@ -162,10 +162,10 @@ export async function paimtiAprasymus(
     klientas = postgres,
 ) {
     await klientas.query(
-        `DELETE FROM public."viesiejiPirkimaiAprasymaiQueue" q
+        `DELETE FROM "eppsViesiejiPirkimai"."aprasymaiQueue" q
          WHERE q."lockedBy" IS NULL
            AND EXISTS (
-               SELECT 1 FROM public."viesiejiPirkimaiAprasymai" a
+               SELECT 1 FROM "eppsViesiejiPirkimai"."aprasymai" a
                WHERE a."pirkimoId" = q."pirkimoId"
                  AND a."modelioVariantasId" = $1
            )`,
@@ -175,7 +175,7 @@ export async function paimtiAprasymus(
     const { rows } = await klientas.query(
         `WITH cte AS (
             SELECT q."pirkimoId"
-            FROM public."viesiejiPirkimaiAprasymaiQueue" q
+            FROM "eppsViesiejiPirkimai"."aprasymaiQueue" q
             WHERE q."lockedBy" IS NULL
               AND q.attempts < $2
               AND (q."nextAttempt" IS NULL OR q."nextAttempt" <= NOW())
@@ -184,7 +184,7 @@ export async function paimtiAprasymus(
             LIMIT $3
             FOR UPDATE SKIP LOCKED
         )
-        UPDATE public."viesiejiPirkimaiAprasymaiQueue" q
+        UPDATE "eppsViesiejiPirkimai"."aprasymaiQueue" q
         SET "lockedBy" = $1, "lockedAt" = NOW()
         FROM cte
         WHERE q."pirkimoId" = cte."pirkimoId"
@@ -203,12 +203,12 @@ export async function paimtiAprasymus(
 export async function suskaiciuotiLaukiancius(modelioVariantasId, klientas = postgres) {
     const { rows } = await klientas.query(
         `SELECT count(*)::int AS kiek
-         FROM public."viesiejiPirkimaiAprasymaiQueue" q
+         FROM "eppsViesiejiPirkimai"."aprasymaiQueue" q
          WHERE q."lockedBy" IS NULL
            AND q.attempts < $2
            AND (q."nextAttempt" IS NULL OR q."nextAttempt" <= NOW())
            AND NOT EXISTS (
-               SELECT 1 FROM public."viesiejiPirkimaiAprasymai" a
+               SELECT 1 FROM "eppsViesiejiPirkimai"."aprasymai" a
                WHERE a."pirkimoId" = q."pirkimoId"
                  AND a."modelioVariantasId" = $1
            )
@@ -243,11 +243,11 @@ export async function eilesBusena(modelioVariantasId, klientas = postgres) {
                              AND (q."nextAttempt" IS NULL OR q."nextAttempt" <= NOW())
                              AND NOT ${FAILAI_PARUOSTI_SQL})::int AS "failaiNeparuosti",
             count(*) FILTER (WHERE EXISTS (
-                SELECT 1 FROM public."viesiejiPirkimaiAprasymai" a
+                SELECT 1 FROM "eppsViesiejiPirkimai"."aprasymai" a
                 WHERE a."pirkimoId" = q."pirkimoId"
                   AND a."modelioVariantasId" = $1
             ))::int AS "jauAprasyti"
-         FROM public."viesiejiPirkimaiAprasymaiQueue" q`,
+         FROM "eppsViesiejiPirkimai"."aprasymaiQueue" q`,
         [modelioVariantasId, MAX_BANDYMAI],
     );
     return { ...rows[0], laukia: await suskaiciuotiLaukiancius(modelioVariantasId, klientas) };
@@ -274,11 +274,11 @@ export async function papildytiEileTrukstamais(
         ? [modelioVariantasId, limit]
         : [modelioVariantasId];
     const res = await klientas.query(
-        `INSERT INTO public."viesiejiPirkimaiAprasymaiQueue" ("pirkimoId")
+        `INSERT INTO "eppsViesiejiPirkimai"."aprasymaiQueue" ("pirkimoId")
          SELECT p."pirkimoId"
-         FROM public."viesiejiPirkimai" p
+         FROM "eppsViesiejiPirkimai"."pirkimai" p
          WHERE NOT EXISTS (
-             SELECT 1 FROM public."viesiejiPirkimaiAprasymai" a
+             SELECT 1 FROM "eppsViesiejiPirkimai"."aprasymai" a
              WHERE a."pirkimoId" = p."pirkimoId"
                AND a."modelioVariantasId" = $1
          )
@@ -313,7 +313,7 @@ export async function papildytiEileTrukstamais(
 export async function pazymetiAprasymoRezultata(pirkimoId, klaida, klientas = postgres) {
     if (!klaida) {
         await klientas.query(
-            `DELETE FROM public."viesiejiPirkimaiAprasymaiQueue" WHERE "pirkimoId" = $1`,
+            `DELETE FROM "eppsViesiejiPirkimai"."aprasymaiQueue" WHERE "pirkimoId" = $1`,
             [pirkimoId],
         );
         return;
@@ -323,7 +323,7 @@ export async function pazymetiAprasymoRezultata(pirkimoId, klaida, klientas = po
 
     if (klaida.infrastrukturine) {
         await klientas.query(
-            `UPDATE public."viesiejiPirkimaiAprasymaiQueue"
+            `UPDATE "eppsViesiejiPirkimai"."aprasymaiQueue"
              SET "lockedBy"    = NULL,
                  "lockedAt"    = NULL,
                  "lastError"   = $2,
@@ -335,7 +335,7 @@ export async function pazymetiAprasymoRezultata(pirkimoId, klaida, klientas = po
     }
 
     await klientas.query(
-        `UPDATE public."viesiejiPirkimaiAprasymaiQueue"
+        `UPDATE "eppsViesiejiPirkimai"."aprasymaiQueue"
          SET attempts      = attempts + 1,
              "lockedBy"    = NULL,
              "lockedAt"    = NULL,
@@ -440,7 +440,7 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
     // pažadinam jų drainer'į, kad aprašymai paieškoje atsirastų iškart.
     if (stats.issaugota) {
         signalWork(WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED, {
-            source: "viesiejiPirkimaiAprasymaiQueue",
+            source: "eppsViesiejiPirkimai.aprasymaiQueue",
             count: stats.issaugota,
         });
     }

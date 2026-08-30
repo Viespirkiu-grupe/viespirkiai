@@ -386,7 +386,7 @@ export async function expandOrg(jarKodas) {
             `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas",
                     "paskelbimoData"::date              AS "paskelbimoData",
                     "pasiulymuPateikimoTerminas"::date  AS "pasiulymuPateikimoTerminas"
-             FROM   public."viesiejiPirkimai"
+             FROM   "eppsViesiejiPirkimai"."pirkimai"
              WHERE  "jarKodas" = $1
              ORDER BY "numatomaVerteEUR" DESC NULLS LAST
              LIMIT 20`,
@@ -625,7 +625,7 @@ export async function expandContract(pirkimoNumeris) {
             `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas",
                     "paskelbimoData"::date              AS "paskelbimoData",
                     "pasiulymuPateikimoTerminas"::date  AS "pasiulymuPateikimoTerminas"
-             FROM   public."viesiejiPirkimai"
+             FROM   "eppsViesiejiPirkimai"."pirkimai"
              WHERE  "pirkimoId" = $1
              LIMIT 1`,
             [pirkNr],
@@ -818,7 +818,7 @@ export async function expandPirkimas(pirkimoId) {
                     j."registravimoData"                   AS "buyerRegistravimoData",
                     j."statusasNuo"                        AS "buyerStatusasNuo",
                     j."statusoKodas"                       AS "buyerStatusoKodas"
-             FROM   public."viesiejiPirkimai" vp
+             FROM   "eppsViesiejiPirkimai"."pirkimai" vp
              LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = vp."jarKodas"
              WHERE  vp."pirkimoId" = $1
              LIMIT  1`,

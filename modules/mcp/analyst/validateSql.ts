@@ -8,7 +8,9 @@ const parser = new Parser();
 export const TABLE_WHITELIST: Set<string> = new Set([
     "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
     "jarAsmenys", "jar",
-    "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
+    // EPPS viešieji pirkimai iškelti į `eppsViesiejiPirkimai` schemą; analyst
+    // search_path juos mato nekvalifikuotai (pirkimai = buvęs viesiejiPirkimai).
+    "pirkimai", "vykdytojai",
     "pinregJuridiniaiRysiai", "pinreg",
     "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
     "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",

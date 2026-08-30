@@ -113,7 +113,7 @@ export const FAILAI_ISTAIGA_JOINS = `
     LEFT JOIN public."filesSourceTitles"   st  ON st.id  = f."sourceTitleId"
     LEFT JOIN public."filesDataExtraction" d   ON d.id   = f.id
     LEFT JOIN public."filesInfoFiles"      i   ON i.id   = f.id
-    LEFT JOIN public."viesiejiPirkimai" vp
+    LEFT JOIN "eppsViesiejiPirkimai"."pirkimai" vp
         ON vp."pirkimoId" = CASE
             WHEN st.title = 'cvpIs' AND f."sourceId0" ~ '^[0-9]+$'
             THEN f."sourceId0"::integer

@@ -47,7 +47,7 @@ async function reserveVykdytojas(db) {
             v."jarKodas",
             (
               SELECT known."jarKodas"
-              FROM public."viesiejiPirkimaiVykdytojai" known
+              FROM "eppsViesiejiPirkimai"."vykdytojai" known
               WHERE known.pavadinimas = v.pavadinimas
                 AND known."jarKodas" IS NOT NULL
               ORDER BY known."nuskaitymoData" DESC NULLS LAST

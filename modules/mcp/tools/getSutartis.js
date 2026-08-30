@@ -150,7 +150,7 @@ export async function handler({ id }) {
     if (cvppRes.rowCount > 0) sutartis.cvppPirkimas = cvppRes.rows[0];
 
     const cvpisRes = await postgres.query(
-        `SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`,
+        `SELECT * FROM "eppsViesiejiPirkimai"."pirkimai" WHERE "pirkimoId" = $1`,
         [sutartis.pirkimoNumeris],
     );
     if (cvpisRes.rowCount > 0) sutartis.cvpisPirkimas = cvpisRes.rows[0];

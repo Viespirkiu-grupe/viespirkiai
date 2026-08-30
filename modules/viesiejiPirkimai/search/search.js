@@ -95,7 +95,7 @@ async function searchViesiejiPirkimaiUncached(
 
     const { sql, params, values, queryParams } =
         viesiejiPirkimaiFilter.build(query, {
-            table: `"viesiejiPirkimai"`,
+            table: `"eppsViesiejiPirkimai"."pirkimai"`,
             fixedWhere: FIXED_WHERE,
             limit,
             page,
@@ -183,7 +183,7 @@ export async function countViesiejiPirkimai(query) {
     const { sqlCount, params, visiIrasai } = viesiejiPirkimaiFilter.build(
         query,
         {
-            table: `"viesiejiPirkimai"`,
+            table: `"eppsViesiejiPirkimai"."pirkimai"`,
             fixedWhere: FIXED_WHERE,
         },
     );

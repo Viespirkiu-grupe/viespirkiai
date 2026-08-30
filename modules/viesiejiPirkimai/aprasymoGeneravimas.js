@@ -63,7 +63,7 @@ export async function aprasytiPirkima({
 
     const success = !isFailureResult(aprasymas);
     const result = await postgres.query(
-        `INSERT INTO public."viesiejiPirkimaiAprasymai"
+        `INSERT INTO "eppsViesiejiPirkimai"."aprasymai"
             ("pirkimoId", "modelioVariantasId", "success", "aprasymas")
          VALUES ($1, $2, $3, $4)
          ON CONFLICT ("pirkimoId", "modelioVariantasId") DO NOTHING`,

@@ -198,7 +198,7 @@ describe("v_pirkimas", () => {
             WHERE v.saltinis = 'cvpp'
               -- v_pirkimas."pirkimoId" yra text (cvpis int ir cvpp eilutė suvienodinti),
               -- tad lyginam taip pat, kaip pačiame view'e: p."pirkimoId"::text.
-              AND EXISTS (SELECT 1 FROM "viesiejiPirkimai" p WHERE p."pirkimoId"::text = v."pirkimoId")
+              AND EXISTS (SELECT 1 FROM "eppsViesiejiPirkimai"."pirkimai" p WHERE p."pirkimoId"::text = v."pirkimoId")
         `);
         expect(Number(rows[0].cnt)).toBe(0);
     });

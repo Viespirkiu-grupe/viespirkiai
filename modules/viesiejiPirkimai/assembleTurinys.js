@@ -25,30 +25,30 @@ export async function assembleTurinys(pirkimoId) {
     const [keysRes, dalysRes, failaiRes, versijosRes, skelbimaiRes] =
         await Promise.all([
             postgres.query(
-                `SELECT * FROM public."viesiejiPirkimaiKeys" WHERE "pirkimoId" = $1`,
+                `SELECT * FROM "eppsViesiejiPirkimai"."keys" WHERE "pirkimoId" = $1`,
                 [pirkimoId],
             ),
             postgres.query(
                 `SELECT "rusis", "numeris", "pavadinimas"
-                 FROM public."viesiejiPirkimaiDalys"
+                 FROM "eppsViesiejiPirkimai"."dalys"
                  WHERE "pirkimoId" = $1 ORDER BY "rusis", "numeris"`,
                 [pirkimoId],
             ),
             postgres.query(
-                `SELECT * FROM public."viesiejiPirkimaiFailai"
+                `SELECT * FROM "eppsViesiejiPirkimai"."failai"
                  WHERE "pirkimoId" = $1 ORDER BY "id"`,
                 [pirkimoId],
             ),
             postgres.query(
-                `SELECT v.* FROM public."viesiejiPirkimaiFailuVersijos" v
-                 JOIN public."viesiejiPirkimaiFailai" f ON f."id" = v."failasId"
+                `SELECT v.* FROM "eppsViesiejiPirkimai"."failuVersijos" v
+                 JOIN "eppsViesiejiPirkimai"."failai" f ON f."id" = v."failasId"
                  WHERE f."pirkimoId" = $1 ORDER BY v."id"`,
                 [pirkimoId],
             ),
             postgres.query(
                 `SELECT "tipas", "downloadHref", "externalId", "isLinked",
                         "ikelimoData", "kalba", "statusas", "paskelbimoData"
-                 FROM public."viesiejiPirkimaiSkelbimai"
+                 FROM "eppsViesiejiPirkimai"."skelbimai"
                  WHERE "pirkimoId" = $1 ORDER BY "id"`,
                 [pirkimoId],
             ),

@@ -25,7 +25,8 @@ export async function processViesiejiPirkimaiIndexQueue(opts = {}) {
     return drainIndexQueue(
         {
             lentele: LENTELE,
-            queueTable: "viesiejiPirkimaiIndexQueue",
+            queueTable: "indexQueue",
+            queueSchema: "eppsViesiejiPirkimai",
             keyColumn: "pirkimoId",
             batchSize: BATCH_SIZE,
             commit: "auto",
@@ -42,14 +43,14 @@ export async function processViesiejiPirkimaiIndexQueue(opts = {}) {
                         p."pirkimoObjektoTipas", p."esFinansavimas",
                         p."pirkimoVykdytojasId", p."jarKodas",
                         a."aiAprasymai"
-                     FROM public."viesiejiPirkimai" p
+                     FROM "eppsViesiejiPirkimai"."pirkimai" p
                      -- LATERAL, o ne paprastas JOIN: vienas pirkimas gali turėti po
                      -- aprašymą kiekvienam modelio variantui, o mums reikia vienos
                      -- eilutės su jų sąlaja.
                      LEFT JOIN LATERAL (
                          SELECT string_agg(v."aprasymas", ' ' ORDER BY v."sukurta")
                                 AS "aiAprasymai"
-                         FROM public."viesiejiPirkimaiAprasymai" v
+                         FROM "eppsViesiejiPirkimai"."aprasymai" v
                          WHERE v."pirkimoId" = p."pirkimoId"
                            AND v.success = true
                      ) a ON true
@@ -120,7 +121,7 @@ function toEilutesId(pirkimoId) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     await runShardedDrain({
         work: processViesiejiPirkimaiIndexQueue,
-        label: "viesiejiPirkimai",
+        label: LENTELE,
         logger,
     });
     await postgres.end();
