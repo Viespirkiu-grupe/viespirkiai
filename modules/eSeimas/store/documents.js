@@ -46,7 +46,7 @@ export async function saveDocument(payload, { category, md5, mark = null, force 
         // Senoji eilutė paimama PRIEŠ upsert'ą (ir užrakinama): iš `md5` skirtumo
         // matom, ar tai naujas dokumentas, ar pasikeitęs, ar visai nepakitęs.
         const { rows: [existing] } = await client.query(
-            `SELECT "documentId", "md5" FROM "eSeimasLegalActDocument"
+            `SELECT "documentId", "md5" FROM "eSeimas"."legalActDocument"
               WHERE "category" = $1 AND "legalActId" = $2 AND "documentVariantId" = $3
                 AND COALESCE("editionToken", '') = COALESCE($4, '')
               FOR UPDATE`,
@@ -56,7 +56,7 @@ export async function saveDocument(payload, { category, md5, mark = null, force 
 
         if (keitimas === null) {
             await client.query(
-                `UPDATE "eSeimasLegalActDocument" SET "fetchedAt" = $2 WHERE "documentId" = $1`,
+                `UPDATE "eSeimas"."legalActDocument" SET "fetchedAt" = $2 WHERE "documentId" = $1`,
                 [existing.documentId, payload.fetched_at ?? new Date().toISOString()],
             );
             await markInTransaction(client, category, payload.id, mark);
@@ -65,22 +65,22 @@ export async function saveDocument(payload, { category, md5, mark = null, force 
         }
 
         await client.query(
-            `INSERT INTO "eSeimasLegalAct" ("category", "legalActId", "title", "fetchedAt")
+            `INSERT INTO "eSeimas"."legalAct" ("category", "legalActId", "title", "fetchedAt")
              VALUES ($1, $2, $3, now())
              ON CONFLICT ("category", "legalActId") DO UPDATE
-                SET "title" = COALESCE(EXCLUDED."title", "eSeimasLegalAct"."title"),
+                SET "title" = COALESCE(EXCLUDED."title", "eSeimas"."legalAct"."title"),
                     "fetchedAt" = now()`,
             [category, payload.id, payload.title ?? null],
         );
         await client.query(
-            `INSERT INTO "eSeimasLegalActScrape" ("category", "legalActId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            `INSERT INTO "eSeimas"."legalActScrape" ("category", "legalActId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
             [category, payload.id],
         );
         await ensureLegalActStubs(client, category, referencedActIds(payload));
 
         const officialText = payload.official_text ?? {};
         const { rows: [{ documentId }] } = await client.query(
-            `INSERT INTO "eSeimasLegalActDocument" (
+            `INSERT INTO "eSeimas"."legalActDocument" (
                 "category", "legalActId", "documentVariantId", "editionToken", "sourceUrl", "title",
                 "contentPresenceId", "contentMessage", "fetchedAt", "md5"
              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
@@ -108,12 +108,12 @@ export async function saveDocument(payload, { category, md5, mark = null, force 
         );
 
         // Vaikus perrašom, o ne bandom sulieti: šaltinis neturi stabilių vaikų id'ų.
-        await client.query(`DELETE FROM "eSeimasOfficialTextResource" WHERE "documentId" = $1`, [documentId]);
-        await client.query(`DELETE FROM "eSeimasDocumentMetadata" WHERE "documentId" = $1`, [documentId]);
-        await client.query(`DELETE FROM "eSeimasRelatedSection" WHERE "documentId" = $1`, [documentId]);
+        await client.query(`DELETE FROM "eSeimas"."officialTextResource" WHERE "documentId" = $1`, [documentId]);
+        await client.query(`DELETE FROM "eSeimas"."documentMetadata" WHERE "documentId" = $1`, [documentId]);
+        await client.query(`DELETE FROM "eSeimas"."relatedSection" WHERE "documentId" = $1`, [documentId]);
 
         await insertRows(client, {
-            table: "eSeimasOfficialTextResource",
+            table: "officialTextResource",
             columns: ["documentId", "ordinal", "resourceFormatId", "url"],
             rows: (officialText.resources ?? []).map((resource, index) => ({
                 documentId,
@@ -163,7 +163,7 @@ export async function saveEditionList(payload, { category, md5, mark = { stage: 
         await client.query("BEGIN");
 
         const { rows: [existing] } = await client.query(
-            `SELECT "editionListId", "md5" FROM "eSeimasEditionList"
+            `SELECT "editionListId", "md5" FROM "eSeimas"."editionList"
               WHERE "category" = $1 AND "legalActId" = $2 FOR UPDATE`,
             [category, payload.id],
         );
@@ -171,7 +171,7 @@ export async function saveEditionList(payload, { category, md5, mark = { stage: 
 
         if (keitimas === null) {
             await client.query(
-                `UPDATE "eSeimasEditionList" SET "fetchedAt" = $2 WHERE "editionListId" = $1`,
+                `UPDATE "eSeimas"."editionList" SET "fetchedAt" = $2 WHERE "editionListId" = $1`,
                 [existing.editionListId, payload.fetched_at ?? new Date().toISOString()],
             );
             await markInTransaction(client, category, payload.id, mark);
@@ -180,21 +180,21 @@ export async function saveEditionList(payload, { category, md5, mark = { stage: 
         }
 
         await client.query(
-            `INSERT INTO "eSeimasLegalAct" ("category", "legalActId", "title", "fetchedAt")
+            `INSERT INTO "eSeimas"."legalAct" ("category", "legalActId", "title", "fetchedAt")
              VALUES ($1, $2, $3, now())
              ON CONFLICT ("category", "legalActId") DO UPDATE
-                SET "title" = COALESCE(EXCLUDED."title", "eSeimasLegalAct"."title"),
+                SET "title" = COALESCE(EXCLUDED."title", "eSeimas"."legalAct"."title"),
                     "fetchedAt" = now()`,
             [category, payload.id, payload.title ?? null],
         );
         await client.query(
-            `INSERT INTO "eSeimasLegalActScrape" ("category", "legalActId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            `INSERT INTO "eSeimas"."legalActScrape" ("category", "legalActId") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
             [category, payload.id],
         );
         await ensureLegalActStubs(client, category, referencedActIds(payload));
 
         const { rows: [{ editionListId }] } = await client.query(
-            `INSERT INTO "eSeimasEditionList" (
+            `INSERT INTO "eSeimas"."editionList" (
                 "category", "legalActId", "sourceUrl", "title", "editionsPresenceId", "fetchedAt", "md5"
              ) VALUES ($1,$2,$3,$4,$5,$6,$7)
              ON CONFLICT ("category", "legalActId") DO UPDATE SET
@@ -215,25 +215,25 @@ export async function saveEditionList(payload, { category, md5, mark = { stage: 
             ],
         );
 
-        // 4-o etapo progresas gyvena ant "eSeimasEdition"."scrapedAt", o eilutes perrašom —
+        // 4-o etapo progresas gyvena ant "eSeimas"."edition"."scrapedAt", o eilutes perrašom —
         // tad prieš trynimą pasiimam žymas ir grąžinam jas toms pačioms redakcijoms.
         // Kartu keliauja ir klaidų skaitiklis su `retryAfter`: kitaip redakcijų
         // sąrašo atnaujinimas nutrintų backoff'ą ir lūžtanti redakcija iškart
         // grįžtų į eilę.
         const { rows: previous } = await client.query(
             `SELECT "editionToken", "scrapedAt", "failureCount", "lastError", "retryAfter"
-               FROM "eSeimasEdition" WHERE "category" = $1 AND "legalActId" = $2`,
+               FROM "eSeimas"."edition" WHERE "category" = $1 AND "legalActId" = $2`,
             [category, payload.id],
         );
         const busenaByToken = new Map(previous.map(row => [row.editionToken, row]));
 
-        await client.query(`DELETE FROM "eSeimasEdition" WHERE "editionListId" = $1`, [editionListId]);
-        await client.query(`DELETE FROM "eSeimasDocumentMetadata" WHERE "editionListId" = $1`, [editionListId]);
-        await client.query(`DELETE FROM "eSeimasRelatedSection" WHERE "editionListId" = $1`, [editionListId]);
+        await client.query(`DELETE FROM "eSeimas"."edition" WHERE "editionListId" = $1`, [editionListId]);
+        await client.query(`DELETE FROM "eSeimas"."documentMetadata" WHERE "editionListId" = $1`, [editionListId]);
+        await client.query(`DELETE FROM "eSeimas"."relatedSection" WHERE "editionListId" = $1`, [editionListId]);
 
         const editions = payload.editions ?? [];
         const returned = await insertRows(client, {
-            table: "eSeimasEdition",
+            table: "edition",
             columns: ["editionListId", "category", "legalActId", "ordinal", "editionToken", "effectiveFrom", "effectiveTo", "url",
                 "scrapedAt", "failureCount", "lastError", "retryAfter"],
             rows: editions.map((edition, index) => {
@@ -272,7 +272,7 @@ export async function saveEditionList(payload, { category, md5, mark = { stage: 
             });
         });
         await insertRows(client, {
-            table: "eSeimasEditionChange",
+            table: "editionChange",
             columns: ["editionId", "ordinal", "amendingActId", "adoptedAt", "linkText", "url"],
             rows: changes,
         });

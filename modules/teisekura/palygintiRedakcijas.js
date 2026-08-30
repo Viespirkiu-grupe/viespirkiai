@@ -1,6 +1,6 @@
 // Dviejų teisės akto suvestinių redakcijų palyginimas iš komandinės eilutės.
 //
-// Redakcija nurodoma DATA, ne tokenu: iš "eTar"."edition" (arba "eSeimasEdition")
+// Redakcija nurodoma DATA, ne tokenu: iš "eTar"."edition" (arba "eSeimas"."edition")
 // randam, kuri redakcija tą dieną galiojo, o tekstą — iš sidecar'o pagal
 // "eTar"."legalActDocument"."md5".
 //

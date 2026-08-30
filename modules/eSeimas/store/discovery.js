@@ -4,7 +4,7 @@ import { log } from "../../../utils/log.js";
 // Aktų ATRADIMO sekimas: kas, kada ir iš kurios paieškos eilutės aktą pamatė,
 // ir ką vėliau pagal tą atradimą rado `--stage documents`.
 //
-// Lentelės "eSeimasActDiscovery" čia NIEKAS nekuria — ją reikia paleisti ranka
+// Lentelės "eSeimas"."actDiscovery" čia NIEKAS nekuria — ją reikia paleisti ranka
 // (modules/eSeimas/atradimuSekimas.sql). Jei jos nėra, sekimas išsijungia po
 // pirmos užklausos ir scraper'is dirba toliau kaip anksčiau: tai tyrimo
 // priedas, ne kelias, kuriuo galima nuversti pravažiavimą.
@@ -19,7 +19,7 @@ let lentelėYra = null;
 function apdorotiKlaidą(error, kur) {
     if (error?.code === NĖRA_LENTELĖS) {
         if (lentelėYra !== false) {
-            log(`[e-Seimas] "eSeimasActDiscovery" nėra — atradimų sekimas išjungtas`
+            log(`[e-Seimas] "eSeimas"."actDiscovery" nėra — atradimų sekimas išjungtas`
                 + ` (paleisti: psql -f modules/eSeimas/atradimuSekimas.sql)`);
         }
         lentelėYra = false;
@@ -67,7 +67,7 @@ export async function recordDiscoveries({ source, searchFrom = null, searchTo = 
     const stulpelis = (fn) => eilutės.map(fn);
     try {
         const { rowCount } = await postgres.query(
-            `INSERT INTO "eSeimasActDiscovery" (
+            `INSERT INTO "eSeimas"."actDiscovery" (
                  "category", "legalActId", "source", "searchFrom", "searchTo",
                  "page", "pageSize", "totalItems", "totalPages", "itemsOnPage",
                  "positionOnPage", "sourceIndex", "adoptedAt", "registeredAt",
@@ -122,7 +122,7 @@ export async function recordDocumentOutcome(category, legalActId, outcome, { att
     if (lentelėYra === false) return 0;
     try {
         const { rowCount } = await postgres.query(
-            `UPDATE "eSeimasActDiscovery"
+            `UPDATE "eSeimas"."actDiscovery"
                 SET "documentOutcome" = $3,
                     "documentCheckedAt" = now(),
                     "documentAttempts" = $4,
@@ -149,7 +149,7 @@ export async function getActDiscoveries(category, legalActId, { limit = 3 } = {}
             `SELECT "source", "searchTo"::text AS "searchTo", "page", "totalItems", "totalPages",
                     "positionOnPage", "sourceIndex", "itemsOnPage", "adoptedAt"::text AS "adoptedAt",
                     "searchModelUuid", "discoveredAt"
-               FROM "eSeimasActDiscovery"
+               FROM "eSeimas"."actDiscovery"
               WHERE "category" = $1 AND "legalActId" = $2
               ORDER BY "discoveredAt" DESC
               LIMIT $3`,

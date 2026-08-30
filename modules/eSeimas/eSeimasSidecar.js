@@ -57,7 +57,7 @@ export { closeSqlite };
 
 export function ensureESeimasSidecarSchema(db) {
     // md5 = hex nuo `turinys` prieš suspaudimą; jis pat guli Postgres'e
-    // ("eSeimasLegalActDocument"."md5", "eSeimasEditionList"."md5").
+    // ("eSeimas"."legalActDocument"."md5", "eSeimas"."editionList"."md5").
     // dydis – originalaus JSON baitai, suspaustas – blob'o baitai (statistikai).
     db.exec(`
         CREATE TABLE IF NOT EXISTS "eSeimasAtsakymai" (

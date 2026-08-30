@@ -32,8 +32,8 @@ import {
 
 // e-Seimas scraper'is virš stateless e-Seimas API adapterio.
 //
-// Penki etapai, kiekvienas su savo žyma DB (žr. "eSeimasScrapeDay",
-// "eSeimasLegalActScrape", "eSeimasEdition"."scrapedAt"), tad bet kurį galima nutraukti
+// Penki etapai, kiekvienas su savo žyma DB (žr. "eSeimas"."scrapeDay",
+// "eSeimas"."legalActScrape", "eSeimas"."edition"."scrapedAt"), tad bet kurį galima nutraukti
 // ir tęsti:
 //
 //   1 dienos   — paieška pagal priėmimo datą → atrandami aktų ID
@@ -150,7 +150,7 @@ export function createRunner({ api, sidecar, concurrency, force = false, trace =
          * Su `--trace` prie kiekvienos eilutės prikabinamas AKTO ATRADIMAS (iš
          * kurios dienos paieškos, kurio puslapio ir kelintos eilutės jis atėjo,
          * kiek rezultatų ta paieška žadėjo) ir rezultatas surašomas atgal į
-         * "eSeimasActDiscovery" — tam, kad matytųsi, iš kur imasi 404 aktai.
+         * "eSeimas"."actDiscovery" — tam, kad matytųsi, iš kur imasi 404 aktai.
          */
         async scrapeDocument(category, legalActId, { attempt = 1 } = {}) {
             const started = Date.now();
@@ -280,7 +280,7 @@ function stageSpecs(runner, { rescrapeDays, trace = false }) {
             label: "dienos",
             batchSize: 50,
             key: day => day,
-            // "eSeimasScrapeDay" klaidų skaitiklio neturi, tad nepavykusi diena
+            // "eSeimas"."scrapeDay" klaidų skaitiklio neturi, tad nepavykusi diena
             // lieka nepažymėta — pakartotinį ėmimą stabdo `exclude`.
             pick: (take, praleisti) =>
                 pickDaysToScrape({ limit: take, rescrapeOlderThanDays: rescrapeDays, exclude: praleisti }),
@@ -536,7 +536,7 @@ export async function runPipeline(specs, { concurrency, limit = Infinity, attemp
     /**
      * Vienas elementas su pakartojimais. Galutinė klaida praleidžiama toliau
      * su `bandymai` — kviečiančiam reikia žinoti, kelintas bandymas sudegė
-     * (skaičius keliauja į DB, žr. "eSeimasActDiscovery"."documentAttempts").
+     * (skaičius keliauja į DB, žr. "eSeimas"."actDiscovery"."documentAttempts").
      */
     async function suBandymais(stage, item) {
         for (let attempt = 1; ; attempt++) {
@@ -611,7 +611,7 @@ export async function runStage(stage, options = {}) {
         limit = Infinity,
         rescrapeDays = null,
         force = false,
-        // Atradimų sekimas į "eSeimasActDiscovery" (`--trace`). Numatyta išjungta:
+        // Atradimų sekimas į "eSeimas"."actDiscovery" (`--trace`). Numatyta išjungta:
         // lentelės gali ir nebūti, o įprastam pravažiavimui ji nereikalinga.
         trace = false,
         attempts = DEFAULT_ATTEMPTS,
@@ -676,7 +676,7 @@ function previousDay(date) {
  * kai tarp rezultatų pasirodo SENESNĖ diena, ji tampa nauja riba ir puslapiavimas
  * prasideda iš naujo nuo pirmo puslapio. Todėl niekada nenuklystam giliai į
  * puslapius (kur e-Seimas ir taip neatiduotų), tuščios kalendorinės dienos
- * praleidžiamos be nė vienos užklausos, o į "eSeimasScrapeDay" patenka tik tos
+ * praleidžiamos be nė vienos užklausos, o į "eSeimas"."scrapeDay" patenka tik tos
  * dienos, kuriose aktų realiai buvo.
  *
  * Sustoja tik tada, kai užklausa nebegrąžina nieko — jokios metų ribos nėra.
@@ -768,7 +768,7 @@ export async function discoverBackward({
  * 4020) ir dienai negalioja. Čia imamas tik 1-as puslapis — daugiau puslapių
  * skaičiui nereikia.
  *
- * Rezultatai guli "eSeimasDayPromise" (modules/eSeimas/dienuPazadai.sql).
+ * Rezultatai guli "eSeimas"."dayPromise" (modules/eSeimas/dienuPazadai.sql).
  */
 export async function runDayPromises({
     concurrency = DEFAULT_CONCURRENCY,
@@ -884,7 +884,7 @@ function formatStatus(status, sidecar) {
     out.push(`  Aktų iš viso        ${nr(aktai)}`);
     if (status.suKlaidomis > 0) out.push(`  Su klaidomis        ${nr(status.suKlaidomis)}`);
     if (status.saltinioBrokas > 0) {
-        out.push(`  Šaltinio brokas     ${nr(status.saltinioBrokas)}  (SELECT * FROM "eSeimasSourceAnomaly")`);
+        out.push(`  Šaltinio brokas     ${nr(status.saltinioBrokas)}  (SELECT * FROM "eSeimas"."sourceAnomaly")`);
     }
     if (sidecar) {
         const ratio = sidecar.rawBytes > 0 ? (sidecar.rawBytes / sidecar.zstdBytes).toFixed(1) : "0";
@@ -912,7 +912,7 @@ e-Seimas scraper (sidecar: <SIDECAR_DIR>/eSeimas.sqlite)
   --concurrency N   lygiagrečių užklausų (numatyta ${DEFAULT_CONCURRENCY})
   --attempts N      kiek kartų bandyti kiekvieną elementą, kol skelbiam klaidą
                     (numatyta ${DEFAULT_ATTEMPTS}; pauzės ${RETRY_DELAYS_MS.map(ms => ms / 1000 + " s").join(", ")})
-  --trace           sekti kiekvieno akto ATRADIMĄ lentelėje "eSeimasActDiscovery":
+  --trace           sekti kiekvieno akto ATRADIMĄ lentelėje "eSeimas"."actDiscovery":
                     iš kurios paieškos, kurio puslapio ir kelintos eilutės aktas
                     atėjo, kiek rezultatų ta paieška žadėjo, ir ką vėliau pagal tą
                     atradimą rado --stage documents (ok / notFound / error).
@@ -921,7 +921,7 @@ e-Seimas scraper (sidecar: <SIDECAR_DIR>/eSeimas.sqlite)
                     Jos neradus sekimas tyliai išsijungia.
   --promised        pereiti per visas žinomas dienas ir kiekvienai padaryti PO VIENĄ
                     užklausą (from = to = diena, 1 psl.), įrašant, kiek rezultatų
-                    ta diena žada, į "eSeimasDayPromise". Tik tokios užklausos
+                    ta diena žada, į "eSeimas"."dayPromise". Tik tokios užklausos
                     skaičius ir yra dienos pažadas — --discover riba „viskas iki
                     datos" grąžina viso rėžio sumą. Lentelę reikia sukurti pačiam:
                       psql "$PG_URL" -f modules/eSeimas/dienuPazadai.sql

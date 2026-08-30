@@ -6,7 +6,7 @@ import { recordDiscoveries } from "./discovery.js";
  *
  * @param {Array} items - žali paieškos rezultatai
  * @param {Object|null} [trace] - kai paduotas, atradimas surašomas į
- *   "eSeimasActDiscovery" (`--trace`; žr. modules/eSeimas/atradimuSekimas.sql).
+ *   "eSeimas"."actDiscovery" (`--trace`; žr. modules/eSeimas/atradimuSekimas.sql).
  *   Laukai: `source`, `searchFrom`, `searchTo`, `page`, `pagination`.
  */
 export async function upsertDiscoveredActs(items, trace = null) {
@@ -22,14 +22,14 @@ export async function upsertDiscoveredActs(items, trace = null) {
     const titles = rows.map(item => item.title ?? null);
 
     await postgres.query(
-        `INSERT INTO "eSeimasLegalAct" ("category", "legalActId", "title")
+        `INSERT INTO "eSeimas"."legalAct" ("category", "legalActId", "title")
          SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
          ON CONFLICT ("category", "legalActId") DO UPDATE
-            SET "title" = COALESCE("eSeimasLegalAct"."title", EXCLUDED."title")`,
+            SET "title" = COALESCE("eSeimas"."legalAct"."title", EXCLUDED."title")`,
         [categories, ids, titles],
     );
     const { rows: queued } = await postgres.query(
-        `INSERT INTO "eSeimasLegalActScrape" ("category", "legalActId")
+        `INSERT INTO "eSeimas"."legalActScrape" ("category", "legalActId")
          SELECT * FROM unnest($1::text[], $2::text[])
          ON CONFLICT DO NOTHING RETURNING "category", "legalActId"`,
         [categories, ids],
@@ -46,14 +46,14 @@ export async function upsertDiscoveredActs(items, trace = null) {
 
 export async function markDayScraped(day) {
     await postgres.query(
-        `INSERT INTO "eSeimasScrapeDay" ("day", "lastScrapedAt") VALUES ($1, now())
+        `INSERT INTO "eSeimas"."scrapeDay" ("day", "lastScrapedAt") VALUES ($1, now())
          ON CONFLICT ("day") DO UPDATE SET "lastScrapedAt" = now()`,
         [day],
     );
 }
 
 /**
- * Pratęsia "eSeimasScrapeDay" Į PRIEKĮ — iki šiandien.
+ * Pratęsia "eSeimas"."scrapeDay" Į PRIEKĮ — iki šiandien.
  *
  * Lentelė buvo užsėta VIENĄ kartą schemoje (`generate_series` iki tuometinės
  * `CURRENT_DATE`), tad nušlavus visas dienas etapas amžinai randa 0 darbo:
@@ -64,10 +64,10 @@ export async function markDayScraped(day) {
  */
 export async function ensureScrapeDaysForward() {
     const { rowCount } = await postgres.query(
-        `INSERT INTO "eSeimasScrapeDay" ("day")
+        `INSERT INTO "eSeimas"."scrapeDay" ("day")
          SELECT d::date
          FROM generate_series(
-             COALESCE((SELECT max("day") + 1 FROM "eSeimasScrapeDay"), CURRENT_DATE),
+             COALESCE((SELECT max("day") + 1 FROM "eSeimas"."scrapeDay"), CURRENT_DATE),
              CURRENT_DATE,
              '1 day'
          ) d
@@ -78,11 +78,11 @@ export async function ensureScrapeDaysForward() {
 
 /**
  * Užtikrina slenkantį naujausių dienų langą TaskRunner radarui. Senesnių
- * "eSeimasScrapeDay" eilučių netrinam — jos lieka istorinio backfill'o būsenai.
+ * "eSeimas"."scrapeDay" eilučių netrinam — jos lieka istorinio backfill'o būsenai.
  */
 export async function ensureRecentScrapeDays(days = 180) {
     const { rowCount } = await postgres.query(
-        `INSERT INTO "eSeimasScrapeDay" ("day")
+        `INSERT INTO "eSeimas"."scrapeDay" ("day")
          SELECT d::date
          FROM generate_series(
              CURRENT_DATE - ($1::int - 1),
@@ -103,7 +103,7 @@ export async function ensureRecentScrapeDays(days = 180) {
 export async function pickRecentDayToScrape({ days = 180, refreshHours = 3 } = {}) {
     const { rows: [row] } = await postgres.query(
         `SELECT "day"::text AS day
-         FROM "eSeimasScrapeDay"
+         FROM "eSeimas"."scrapeDay"
          WHERE "day" >= CURRENT_DATE - ($1::int - 1)
            AND "day" <= CURRENT_DATE
            AND (
@@ -126,7 +126,7 @@ export async function markDaysCovered(days) {
     const unique = [...new Set(days.filter(Boolean))];
     if (!unique.length) return 0;
     const { rowCount } = await postgres.query(
-        `INSERT INTO "eSeimasScrapeDay" ("day", "lastScrapedAt")
+        `INSERT INTO "eSeimas"."scrapeDay" ("day", "lastScrapedAt")
          SELECT unnest($1::date[]), now()
          ON CONFLICT ("day") DO UPDATE SET "lastScrapedAt" = now()`,
         [unique],
@@ -136,7 +136,7 @@ export async function markDaysCovered(days) {
 
 /** Seniausia lentelėje esanti diena — nuo jos leidžiamės gilyn. */
 export async function getOldestScrapeDay() {
-    const { rows } = await postgres.query(`SELECT min("day")::text AS day FROM "eSeimasScrapeDay"`);
+    const { rows } = await postgres.query(`SELECT min("day")::text AS day FROM "eSeimas"."scrapeDay"`);
     return rows[0]?.day ?? null;
 }
 
@@ -155,8 +155,8 @@ export async function getOldestScrapeDay() {
  */
 export async function extendScrapeDaysBackward({ count = 30, floor = null } = {}) {
     const { rows } = await postgres.query(
-        `WITH riba AS (SELECT min("day") AS seniausia FROM "eSeimasScrapeDay")
-         INSERT INTO "eSeimasScrapeDay" ("day")
+        `WITH riba AS (SELECT min("day") AS seniausia FROM "eSeimas"."scrapeDay")
+         INSERT INTO "eSeimas"."scrapeDay" ("day")
          SELECT d::date
          FROM riba, generate_series(riba.seniausia - $1::int, riba.seniausia - 1, '1 day') d
          WHERE $2::date IS NULL OR d::date >= $2::date
@@ -170,14 +170,14 @@ export async function extendScrapeDaysBackward({ count = 30, floor = null } = {}
 /**
  * @param {Object} [opts]
  * @param {string[]} [opts.exclude] - dienos, kurių NEgrąžinti (šiame paleidime jau
- *   nepavykusios). "eSeimasScrapeDay" klaidų skaitiklio neturi, tad nepavykusi
+ *   nepavykusios). "eSeimas"."scrapeDay" klaidų skaitiklio neturi, tad nepavykusi
  *   diena lieka `lastScrapedAt IS NULL` ir be šito amžinai stovėtų rikiuotės
  *   priekyje — užimtų visą LIMIT langą ir kitos dienos nebebūtų pasiekiamos.
  * @returns {string[]} dienos (yyyy-mm-dd), kurių dar netraukėm arba traukėm seniausiai.
  */
 export async function pickDaysToScrape({ limit = 50, rescrapeOlderThanDays = null, exclude = [] } = {}) {
     const { rows } = await postgres.query(
-        `SELECT "day"::text AS day FROM "eSeimasScrapeDay"
+        `SELECT "day"::text AS day FROM "eSeimas"."scrapeDay"
          WHERE ("lastScrapedAt" IS NULL
             OR ($2::int IS NOT NULL AND "lastScrapedAt" < now() - ($2 || ' days')::interval))
            AND "day"::text <> ALL($3::text[])
@@ -207,7 +207,7 @@ export async function pickActsToScrape(stage, { limit = 100, maxFailures = 5, ex
         // ir subplanas perskaitomas IŠ NAUJO kiekvienai lentelės eilutei —
         // užklausa iš ~1 s virsta pusantros valandos. `NOT EXISTS` duoda hash
         // anti join'ą, kuris prireikus išsilieja į diską ir lieka tiesinis.
-        `SELECT s."category", s."legalActId" FROM "eSeimasLegalActScrape" s
+        `SELECT s."category", s."legalActId" FROM "eSeimas"."legalActScrape" s
          WHERE s."${column}" IS NULL
            AND s."failureCount" < $2
            AND (s."retryAfter" IS NULL OR s."retryAfter" <= now())
@@ -234,7 +234,7 @@ export async function pickEditionsToScrape({
 } = {}) {
     const { rows } = await postgres.query(
         // Dėl `NOT EXISTS` vietoj `NOT IN` žr. `pickActsToScrape`.
-        `SELECT e."category", e."legalActId", e."editionToken" FROM "eSeimasEdition" e
+        `SELECT e."category", e."legalActId", e."editionToken" FROM "eSeimas"."edition" e
          WHERE e."scrapedAt" IS NULL
            AND ($2::text IS NULL OR e."category" = $2)
            AND ($3::text IS NULL OR e."legalActId" = $3)
@@ -260,7 +260,7 @@ export async function pickEditionsToScrape({
 
 export async function recordFailure(category, legalActId, error, { backoffMinutes = 30 } = {}) {
     await postgres.query(
-        `UPDATE "eSeimasLegalActScrape"
+        `UPDATE "eSeimas"."legalActScrape"
             SET "failureCount" = "failureCount" + 1,
                 "lastError" = $3,
                 "retryAfter" = now() + ($4 * ("failureCount" + 1) || ' minutes')::interval
@@ -276,7 +276,7 @@ export async function recordFailure(category, legalActId, error, { backoffMinute
  */
 export async function recordEditionFailure(category, legalActId, editionToken, error, { backoffMinutes = 30 } = {}) {
     await postgres.query(
-        `UPDATE "eSeimasEdition"
+        `UPDATE "eSeimas"."edition"
             SET "failureCount" = "failureCount" + 1,
                 "lastError" = $4,
                 "retryAfter" = now() + ($5 * ("failureCount" + 1) || ' minutes')::interval
@@ -287,13 +287,13 @@ export async function recordEditionFailure(category, legalActId, editionToken, e
 
 /**
  * Ar redakcija su tokiu tokenu vis dar yra sąraše. Reikia po adapterio 404
- * „pasenęs tokenas": persikrovus `/editions`, pasenusi eilutė iš "eSeimasEdition"
+ * „pasenęs tokenas": persikrovus `/editions`, pasenusi eilutė iš "eSeimas"."edition"
  * dingsta (žr. `saveEditionList`) — o jei liko, tokenas dar sąraše ir klaida
  * tikra.
  */
 export async function editionExists(category, legalActId, editionToken) {
     const { rows } = await postgres.query(
-        `SELECT 1 FROM "eSeimasEdition" WHERE "category" = $1 AND "legalActId" = $2 AND "editionToken" = $3`,
+        `SELECT 1 FROM "eSeimas"."edition" WHERE "category" = $1 AND "legalActId" = $2 AND "editionToken" = $3`,
         [category, legalActId, editionToken],
     );
     return rows.length > 0;
@@ -304,7 +304,7 @@ export async function markStageDone(category, legalActId, stage) {
     const column = { document: "documentScrapedAt", editions: "editionsScrapedAt", asr: "asrScrapedAt" }[stage];
     if (!column) throw new Error(`Nežinomas etapas: ${stage}`);
     await postgres.query(
-        `UPDATE "eSeimasLegalActScrape"
+        `UPDATE "eSeimas"."legalActScrape"
             SET "${column}" = now(), "failureCount" = 0, "lastError" = NULL, "retryAfter" = NULL
           WHERE "category" = $1 AND "legalActId" = $2`,
         [category, legalActId],
@@ -315,16 +315,16 @@ export async function markStageDone(category, legalActId, stage) {
 export async function getScrapeStatus() {
     const { rows: [row] } = await postgres.query(`
         SELECT
-            (SELECT count(*) FROM "eSeimasScrapeDay" WHERE "lastScrapedAt" IS NOT NULL) AS "dienosAtliktos",
-            (SELECT count(*) FROM "eSeimasScrapeDay") AS "dienosViso",
-            (SELECT count(*) FROM "eSeimasLegalActScrape") AS "aktaiViso",
-            (SELECT count(*) FROM "eSeimasLegalActScrape" WHERE "documentScrapedAt" IS NOT NULL) AS "dokumentaiAtlikti",
-            (SELECT count(*) FROM "eSeimasLegalActScrape" WHERE "editionsScrapedAt" IS NOT NULL) AS "redakcijuSarasaiAtlikti",
-            (SELECT count(*) FROM "eSeimasLegalActScrape" WHERE "asrScrapedAt" IS NOT NULL) AS "suvestinesAtliktos",
-            (SELECT count(*) FROM "eSeimasEdition") AS "redakcijosViso",
-            (SELECT count(*) FROM "eSeimasEdition" WHERE "scrapedAt" IS NOT NULL) AS "redakcijosAtliktos",
-            (SELECT count(*) FROM "eSeimasLegalActScrape" WHERE "failureCount" > 0) AS "suKlaidomis",
-            (SELECT count(*) FROM "eSeimasSourceAnomaly") AS "saltinioBrokas"
+            (SELECT count(*) FROM "eSeimas"."scrapeDay" WHERE "lastScrapedAt" IS NOT NULL) AS "dienosAtliktos",
+            (SELECT count(*) FROM "eSeimas"."scrapeDay") AS "dienosViso",
+            (SELECT count(*) FROM "eSeimas"."legalActScrape") AS "aktaiViso",
+            (SELECT count(*) FROM "eSeimas"."legalActScrape" WHERE "documentScrapedAt" IS NOT NULL) AS "dokumentaiAtlikti",
+            (SELECT count(*) FROM "eSeimas"."legalActScrape" WHERE "editionsScrapedAt" IS NOT NULL) AS "redakcijuSarasaiAtlikti",
+            (SELECT count(*) FROM "eSeimas"."legalActScrape" WHERE "asrScrapedAt" IS NOT NULL) AS "suvestinesAtliktos",
+            (SELECT count(*) FROM "eSeimas"."edition") AS "redakcijosViso",
+            (SELECT count(*) FROM "eSeimas"."edition" WHERE "scrapedAt" IS NOT NULL) AS "redakcijosAtliktos",
+            (SELECT count(*) FROM "eSeimas"."legalActScrape" WHERE "failureCount" > 0) AS "suKlaidomis",
+            (SELECT count(*) FROM "eSeimas"."sourceAnomaly") AS "saltinioBrokas"
     `);
     return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value)]));
 }

@@ -6,25 +6,25 @@ export const ESEIMAS_QUEUE_KINDS = ["document", "editions", "asr", "historical"]
 
 const PENDING_SOURCES = {
     document: {
-        from: `public."eSeimasLegalActScrape" s`,
+        from: `"eSeimas"."legalActScrape" s`,
         pending: `s."documentScrapedAt" IS NULL`,
         token: `''`,
         order: `s."discoveredAt", s."category", s."legalActId"`,
     },
     editions: {
-        from: `public."eSeimasLegalActScrape" s`,
+        from: `"eSeimas"."legalActScrape" s`,
         pending: `s."editionsScrapedAt" IS NULL`,
         token: `''`,
         order: `s."discoveredAt", s."category", s."legalActId"`,
     },
     asr: {
-        from: `public."eSeimasLegalActScrape" s`,
+        from: `"eSeimas"."legalActScrape" s`,
         pending: `s."asrScrapedAt" IS NULL`,
         token: `''`,
         order: `s."discoveredAt", s."category", s."legalActId"`,
     },
     historical: {
-        from: `public."eSeimasEdition" s`,
+        from: `"eSeimas"."edition" s`,
         pending: `s."scrapedAt" IS NULL`,
         token: `s."editionToken"`,
         order: `s."category", s."legalActId", s.ordinal`,
@@ -44,13 +44,13 @@ function requireKind(kind) {
 export async function enqueuePendingESeimasJobs(kind, { limit = 1000 } = {}) {
     const source = requireKind(kind);
     const { rowCount } = await postgres.query(
-        `INSERT INTO public."eSeimasScrapeQueue" (kind, "category", "legalActId", "editionToken")
+        `INSERT INTO "eSeimas"."scrapeQueue" (kind, "category", "legalActId", "editionToken")
          SELECT $1, s."category", s."legalActId", ${source.token}
          FROM ${source.from}
          WHERE ${source.pending}
            AND NOT EXISTS (
                SELECT 1
-               FROM public."eSeimasScrapeQueue" q
+               FROM "eSeimas"."scrapeQueue" q
                WHERE q.kind = $1
                  AND q."category" = s."category"
                  AND q."legalActId" = s."legalActId"
@@ -64,7 +64,7 @@ export async function enqueuePendingESeimasJobs(kind, { limit = 1000 } = {}) {
     const queued = rowCount ?? 0;
     if (queued > 0) {
         signalWork(WORK_SIGNALS.ESEIMAS_SCRAPE_READY, {
-            source: "eSeimasScrapeQueue",
+            source: "eSeimas.scrapeQueue",
             kind,
             count: queued,
         });
@@ -89,7 +89,7 @@ export async function claimNextESeimasJob(kind, {
     const { rows: [row] } = await postgres.query(
         `WITH candidate AS (
              SELECT "queueId"
-             FROM public."eSeimasScrapeQueue"
+             FROM "eSeimas"."scrapeQueue"
              WHERE kind = $1
                AND "failureCount" < $2
                AND ("retryAfter" IS NULL OR "retryAfter" <= now())
@@ -98,7 +98,7 @@ export async function claimNextESeimasJob(kind, {
              FOR UPDATE SKIP LOCKED
              LIMIT 1
          )
-         UPDATE public."eSeimasScrapeQueue" q
+         UPDATE "eSeimas"."scrapeQueue" q
             SET "claimToken" = $3,
                 "claimedAt" = now(),
                 "leaseUntil" = now() + ($4 || ' minutes')::interval
@@ -113,7 +113,7 @@ export async function claimNextESeimasJob(kind, {
 
 export async function completeESeimasJob(job) {
     const { rowCount } = await postgres.query(
-        `DELETE FROM public."eSeimasScrapeQueue"
+        `DELETE FROM "eSeimas"."scrapeQueue"
          WHERE "queueId" = $1 AND "claimToken" = $2`,
         [job.queueId, job.claimToken],
     );
@@ -122,7 +122,7 @@ export async function completeESeimasJob(job) {
 
 export async function failESeimasJob(job, error, { backoffMinutes = 30 } = {}) {
     const { rowCount } = await postgres.query(
-        `UPDATE public."eSeimasScrapeQueue"
+        `UPDATE "eSeimas"."scrapeQueue"
             SET "failureCount" = "failureCount" + 1,
                 "lastError" = $3,
                 "retryAfter" = now() + ($4 * ("failureCount" + 1) || ' minutes')::interval,
