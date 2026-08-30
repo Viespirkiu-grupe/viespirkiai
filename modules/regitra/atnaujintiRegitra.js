@@ -46,7 +46,7 @@ const CSV_KELIAS = path.join(DARBO_KATALOGAS, "Atviri_JTP_parko_duomenys.csv");
 async function paskutinisImportas() {
     const { rows } = await postgres.query(
         `SELECT "etag", "pakeitimoData", "zipMd5"
-           FROM "regitraAtnaujinimai"
+           FROM regitra."atnaujinimai"
           WHERE "busena" = 'importuota'
           ORDER BY "id" DESC
           LIMIT 1`,
@@ -69,7 +69,7 @@ async function irasytiPatikra({
     busena,
 }) {
     const { rows } = await postgres.query(
-        `INSERT INTO "regitraAtnaujinimai"
+        `INSERT INTO regitra."atnaujinimai"
              ("etag", "pakeitimoData", "dydis", "zipMd5", "duomenuData", "busena")
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING "id"`,
@@ -124,23 +124,23 @@ async function perkeltiIsStaginga(duomenuData) {
 
         // Tik naujos, dar nematytos eilutės. `regitra` yra append-only.
         const naujos = await klientas.query(
-            `INSERT INTO regitra
-             SELECT DISTINCT ON ("md5") * FROM "regitraImportas"
+            `INSERT INTO regitra."priemoniuTipai"
+             SELECT DISTINCT ON ("md5") * FROM regitra."importas"
              ON CONFLICT ("md5") DO NOTHING`,
         );
 
         // Istorija: kiekvienam md5 — kada pirmą/paskutinį kartą matytas, kiek
         // vienodų TP buvo šioje nuotraukoje ir keliose nuotraukose iš viso matyta.
         const matymai = await klientas.query(
-            `INSERT INTO "regitraMatymai"
+            `INSERT INTO regitra."matymai"
                  ("md5", "pirmaMatytaData", "atnaujinimoData", "kiekis", "matymuSkaicius")
              SELECT "md5", $1::date, $1::date, count(*), 1
-               FROM "regitraImportas"
+               FROM regitra."importas"
               GROUP BY "md5"
              ON CONFLICT ("md5") DO UPDATE SET
                  "atnaujinimoData" = EXCLUDED."atnaujinimoData",
                  "kiekis"          = EXCLUDED."kiekis",
-                 "matymuSkaicius"  = "regitraMatymai"."matymuSkaicius" + 1`,
+                 "matymuSkaicius"  = regitra."matymai"."matymuSkaicius" + 1`,
             [duomenuData],
         );
 
@@ -224,14 +224,14 @@ export async function atnaujintiRegitrosDuomenis({ force = false } = {}) {
         log(`Parsiųsta ${dydis} baitų, md5 ${zipMd5}`);
 
         await postgres.query(
-            `UPDATE "regitraAtnaujinimai" SET "zipMd5" = $1, "dydis" = $2 WHERE "id" = $3`,
+            `UPDATE regitra."atnaujinimai" SET "zipMd5" = $1, "dydis" = $2 WHERE "id" = $3`,
             [zipMd5, dydis, patikrosId],
         );
 
         // Antra apsauga: antraštės pasikeitė, bet turinys — ne.
         if (ankstesnis?.zipMd5 === zipMd5 && !force) {
             await postgres.query(
-                `UPDATE "regitraAtnaujinimai" SET "busena" = 'nepakito' WHERE "id" = $1`,
+                `UPDATE regitra."atnaujinimai" SET "busena" = 'nepakito' WHERE "id" = $1`,
                 [patikrosId],
             );
             await istrinti(ZIP_KELIAS);
@@ -250,7 +250,7 @@ export async function atnaujintiRegitrosDuomenis({ force = false } = {}) {
             await perkeltiIsStaginga(duomenuData);
 
         await postgres.query(
-            `UPDATE "regitraAtnaujinimai"
+            `UPDATE regitra."atnaujinimai"
                 SET "busena" = 'importuota',
                     "eiluciuSkaicius" = $1,
                     "unikaliuSkaicius" = $2,
@@ -260,7 +260,7 @@ export async function atnaujintiRegitrosDuomenis({ force = false } = {}) {
             [eiluciuSkaicius, unikaliuSkaicius, naujuSkaicius, patikrosId],
         );
 
-        await postgres.query(`TRUNCATE TABLE "regitraImportas"`);
+        await postgres.query(`TRUNCATE TABLE regitra."importas"`);
         await istrinti(ZIP_KELIAS);
         await istrinti(CSV_KELIAS);
 
@@ -271,7 +271,7 @@ export async function atnaujintiRegitrosDuomenis({ force = false } = {}) {
         return { busena: "importuota", naujuSkaicius };
     } catch (err) {
         await postgres.query(
-            `UPDATE "regitraAtnaujinimai" SET "busena" = 'klaida', "klaida" = $1 WHERE "id" = $2`,
+            `UPDATE regitra."atnaujinimai" SET "busena" = 'klaida', "klaida" = $1 WHERE "id" = $2`,
             [err.message, patikrosId],
         );
         throw err;

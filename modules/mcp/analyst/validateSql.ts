@@ -27,7 +27,9 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // SODRA lentelės iškeltos į `sodra` schemą; analyst search_path jas mato
     // nekvalifikuotai (menesiniai = buvęs sodraMonthly).
     "menesiniai", "evrk", "importai", "pavadinimai", "savivaldybes",
-    "regitra", "regitraMatymai", "regitraAtnaujinimai",
+    // Regitra iškelta į `regitra` schemą; pagrindinė lentelė pervadinta į
+    // `priemoniuTipai` (transporto priemonių tipai).
+    "priemoniuTipai", "matymai", "atnaujinimai",
     "nepatikimiTiekejai", "melagingiTiekejai",
     "jadisDalyviuSkaiciai", "jadisDalyviuSarasai", "jadisValstybesDalyviai",
     "rcInformaciniaiLeidiniaiPranesimai",

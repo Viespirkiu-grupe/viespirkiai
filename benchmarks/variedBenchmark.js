@@ -181,7 +181,7 @@ const QUERIES = [
                 avg(nullif(regexp_replace(galia, '[^0-9.]', '', 'g'), '')::numeric)        AS galia_vid,
                 avg(nullif(regexp_replace("CO2Kiekis", '[^0-9.]', '', 'g'), '')::numeric)  AS co2_vid,
                 avg(nullif(regexp_replace("nuosavaMase", '[^0-9.]', '', 'g'), '')::numeric) AS mase_vid
-            FROM regitra
+            FROM regitra."priemoniuTipai"
             GROUP BY marke
             HAVING count(*) > 5
             ORDER BY kiekis DESC
