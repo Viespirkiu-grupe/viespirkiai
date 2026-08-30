@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
+  importSource,
   parseCsvLine,
   parseSourceRow,
   SOURCES,
@@ -78,4 +82,31 @@ describe('RC JAR CSV related records', () => {
       )).toBe(true);
     },
   );
+});
+
+describe('importSource eilučių skaitymas', () => {
+  it('nepraranda pradinių eilučių, kai prieš iteraciją laukiama DB užklausos', async () => {
+    const rows = 20_000;
+    const lines = ['ja_kodas|ja_pavadinimas|adresas|ja_reg_data|form_kodas|form_pavadinimas|stat_kodas|stat_pavadinimas|stat_data_nuo|formavimo_data'];
+    for (let i = 0; i < rows; i++) {
+      lines.push(
+        `${110000000 + i}|UAB Testas ${i}|Vilnius, Testo g. ${i}|1996-04-03|310|` +
+        `Uždaroji akcinė bendrovė|0|Teisinis stat neįregistruotas|1996-04-03|2026-08-28`,
+      );
+    }
+    const localPath = join(await mkdtemp(join(tmpdir(), 'jar-csv-test-')), 'JAR_IREGISTRUOTI.csv');
+    await writeFile(localPath, `${lines.join('\n')}\n`);
+
+    // Kiekviena „DB" užklausa atiduoda event loop'ą – būtent per tokį tarpą
+    // readline suspėdavo perskaityti ir išmesti pirmuosius tūkstančius eilučių.
+    const client = {
+      async query() {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return { rowCount: 0, rows: [] };
+      },
+    };
+    const source = { ...SOURCES.find((item) => item.name === 'iregistruoti')!, localPath, sha256: 'x' };
+    const result = await importSource(client as never, source as never);
+    expect(result.scanned).toBe(rows);
+  });
 });

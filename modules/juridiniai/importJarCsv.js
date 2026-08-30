@@ -161,7 +161,22 @@ export async function importJarCsv({
     return { changed: changedTotal };
 }
 
-async function importSource(client, source) {
+export async function importSource(client, source) {
+    const tracksPeople = source.name === "iregistruoti" || source.name === "isregistruoti";
+    const importId = tracksPeople ? randomUUID() : null;
+    // SVARBU: viskas, ko reikia laukti (`await`), turi įvykti PRIEŠ
+    // readline.createInterface(). Sąsaja srautą pradeda skaityti iš karto ir
+    // `line` įvykius siunčia nelaukdama, o `for await` buferį pradeda kaupti tik
+    // nuo iteracijos pradžios — vienas `await` tarpe tyliai praryja tiek eilučių,
+    // kiek per tą laiką suspėta perskaityti (2026-08-28 importe taip dingo pirmos
+    // 4612 JAR_IREGISTRUOTI.csv eilutės, o su jomis ir MAXIMA LT).
+    if (tracksPeople) {
+        await client.query(
+            `DELETE FROM public."jarCsvImportSeen"
+             WHERE "sukurta" < now() - interval '2 days'`,
+        );
+    }
+
     let lines;
     let sourceSha256 = source.sha256 ?? null;
     let metadata = source.downloadMetadata ?? {};
@@ -199,14 +214,6 @@ async function importSource(client, source) {
     let batch = [];
     let scanned = 0;
     let changed = 0;
-    const tracksPeople = source.name === "iregistruoti" || source.name === "isregistruoti";
-    const importId = tracksPeople ? randomUUID() : null;
-    if (tracksPeople) {
-        await client.query(
-            `DELETE FROM public."jarCsvImportSeen"
-             WHERE "sukurta" < now() - interval '2 days'`,
-        );
-    }
 
     for await (const line of lines) {
         let normalizedLine = line;
