@@ -42,7 +42,9 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // `domenaiPilni` yra suderinamumo view su senąja forma. Abu
     // pasiekiami nekvalifikuotai per analyst rolės search_path.
     "domenai", "domenaiPilni", "kotis",
-    "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
+    // Balanso ir pelno (nuostolių) ataskaitos iš ADP — "adpFinansinesAtaskaitos"
+    // schemoje; viena eilutė = vienas rodiklis vienam laikotarpiui.
+    "balansoEilutes", "pelnoNuostoliuEilutes",
     "darboVieta", "istatinisKapitalas",
 
     "neskelbiamosDerybos",

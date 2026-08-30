@@ -394,7 +394,7 @@ sodra | regitra: priemoniuTipai, matymai, atnaujinimai
 nepatikimiTiekejai, melagingiTiekejai
 jadis: suvestine, dalyviuSkaiciai, dalyviuSarasai, valstybesDalyviai | rcInformaciniaiPranesimai: pranesimai, pranesimaiPilni, juridiniuPavadinimai, leidiniai
 domenai, kotis
-balansoAtaskaitos, pelnoNuostoliuAtaskaitos
+adpFinansinesAtaskaitos: balansoEilutes, pelnoNuostoliuEilutes
 darboVieta, istatinisKapitalas
 ppa: ataskaitos, dalyviai, pasiulymuEile, atmestiPasiulymai
 neskelbiamosDerybos
@@ -533,6 +533,7 @@ GRANT USAGE ON SCHEMA sabis TO analyst;
 GRANT USAGE ON SCHEMA regitra TO analyst;
 GRANT USAGE ON SCHEMA "rcInformaciniaiPranesimai" TO analyst;
 GRANT USAGE ON SCHEMA jadis TO analyst;
+GRANT USAGE ON SCHEMA "adpFinansinesAtaskaitos" TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -550,7 +551,7 @@ GRANT SELECT ON
     "rcInformaciniaiPranesimai"."pranesimai", "rcInformaciniaiPranesimai"."pranesimaiPilni",
     "rcInformaciniaiPranesimai"."juridiniuPavadinimai", "rcInformaciniaiPranesimai"."leidiniai",
     "domenai", "kotis",
-    "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
+    "adpFinansinesAtaskaitos"."balansoEilutes", "adpFinansinesAtaskaitos"."pelnoNuostoliuEilutes",
     "darboVieta", "istatinisKapitalas",
     "neskelbiamosDerybos", "vdiPazeidimai",
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai", "mokesciai",
@@ -570,5 +571,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
 ```

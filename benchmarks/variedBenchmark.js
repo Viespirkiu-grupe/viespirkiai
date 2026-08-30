@@ -195,7 +195,7 @@ const QUERIES = [
                 SELECT "jarId", "laikotarpisIki", sum(reiksme) AS turtas
                 FROM (
                     SELECT "jarId", "laikotarpisIki", reiksme
-                    FROM "balansoAtaskaitos" WHERE ctid < '(:PAGES2,0)'::tid
+                    FROM "adpFinansinesAtaskaitos"."balansoEilutes" WHERE ctid < '(:PAGES2,0)'::tid
                 ) bb
                 WHERE reiksme IS NOT NULL
                 GROUP BY 1, 2
@@ -203,7 +203,7 @@ const QUERIES = [
                 SELECT "jarId", "laikotarpisIki", sum(reiksme) AS pelnas
                 FROM (
                     SELECT "jarId", "laikotarpisIki", reiksme
-                    FROM "pelnoNuostoliuAtaskaitos" WHERE ctid < '(:PAGES2,0)'::tid
+                    FROM "adpFinansinesAtaskaitos"."pelnoNuostoliuEilutes" WHERE ctid < '(:PAGES2,0)'::tid
                 ) pp
                 WHERE reiksme IS NOT NULL
                 GROUP BY 1, 2

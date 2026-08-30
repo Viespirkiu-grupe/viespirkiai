@@ -14,7 +14,7 @@ const FINANSINES_ATASKAITOS_COLUMNS = [
     "duomenuData",
 ];
 
-async function upsertPavadinimai(postgres, table, idColumn, nameColumn, rows) {
+async function upsertPavadinimai(postgres, schema, table, idColumn, nameColumn, rows) {
     const filtered = rows.filter(
         (row) => row[idColumn] != null && row[nameColumn] !== undefined,
     );
@@ -30,36 +30,44 @@ async function upsertPavadinimai(postgres, table, idColumn, nameColumn, rows) {
 
     await postgres.query(
         `
-        INSERT INTO "${table}" ("${idColumn}", "${nameColumn}")
+        INSERT INTO "${schema}"."${table}" ("${idColumn}", "${nameColumn}")
         VALUES ${placeholders}
         ON CONFLICT ("${idColumn}") DO UPDATE
         SET "${nameColumn}" = EXCLUDED."${nameColumn}"
         WHERE EXCLUDED."${nameColumn}" IS NOT NULL
-          AND "${table}"."${nameColumn}" IS DISTINCT FROM EXCLUDED."${nameColumn}"
+          AND "${schema}"."${table}"."${nameColumn}" IS DISTINCT FROM EXCLUDED."${nameColumn}"
         `,
         values,
     );
 }
 
-function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
+// Finansinių ataskaitų lentelės gyvena "adpFinansinesAtaskaitos" schemoje
+// (DDL — adpFinansinesAtaskaitosSchema.sql); vardai nebeturi bendro prefikso,
+// tad žodynai nurodomi aiškiai.
+const FINANSINES_ATASKAITOS_SCHEMA = "adpFinansinesAtaskaitos";
+
+function finansinesAtaskaitosBeforeApply({ formos, standartai, eiluciuTipai, mainTable }) {
     return async ({ inserts, patches, postgres }) => {
         await upsertPavadinimai(
             postgres,
-            `${prefix}TemplatePavadinimai`,
+            FINANSINES_ATASKAITOS_SCHEMA,
+            formos,
             "templateId",
             "templateName",
             inserts,
         );
         await upsertPavadinimai(
             postgres,
-            `${prefix}StandardPavadinimai`,
+            FINANSINES_ATASKAITOS_SCHEMA,
+            standartai,
             "standardId",
             "standardName",
             inserts,
         );
         await upsertPavadinimai(
             postgres,
-            `${prefix}LinePavadinimai`,
+            FINANSINES_ATASKAITOS_SCHEMA,
+            eiluciuTipai,
             "lineTypeId",
             "lineName",
             inserts,
@@ -73,14 +81,16 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
 
         for (const patch of patches) {
             const currentRes = await postgres.query(
-                `SELECT "templateId", "standardId", "lineTypeId" FROM "${mainTable}" WHERE "_id" = $1`,
+                `SELECT "templateId", "standardId", "lineTypeId"
+                   FROM "${FINANSINES_ATASKAITOS_SCHEMA}"."${mainTable}" WHERE "_id" = $1`,
                 [patch._id],
             );
             const current = currentRes.rows[0];
             if (current) {
                 await upsertPavadinimai(
                     postgres,
-                    `${prefix}TemplatePavadinimai`,
+                    FINANSINES_ATASKAITOS_SCHEMA,
+                    formos,
                     "templateId",
                     "templateName",
                     [
@@ -94,7 +104,8 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
                 );
                 await upsertPavadinimai(
                     postgres,
-                    `${prefix}StandardPavadinimai`,
+                    FINANSINES_ATASKAITOS_SCHEMA,
+                    standartai,
                     "standardId",
                     "standardName",
                     [
@@ -108,7 +119,8 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
                 );
                 await upsertPavadinimai(
                     postgres,
-                    `${prefix}LinePavadinimai`,
+                    FINANSINES_ATASKAITOS_SCHEMA,
+                    eiluciuTipai,
                     "lineTypeId",
                     "lineName",
                     [
@@ -152,7 +164,7 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
 }
 
 // Normalizuoti string stulpeliai -> lookup lentelių ID (ADP ID neduoda,
-// juos generuojam patys, kaip balansoAtaskaitos pavadinimai).
+// juos generuojam patys, kaip balanso ataskaitų pavadinimai).
 const saskaituSalysTipaiCache = new Map();
 const saskaituSalysVeiklosVietaCache = new Map();
 
@@ -337,14 +349,17 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpBalansoAtaskaitos",
-        table: "balansoAtaskaitos",
+        table: "balansoEilutes",
+        schema: FINANSINES_ATASKAITOS_SCHEMA,
         dataset: "datasets/gov/rc/jar/balanso_ataskaitos/BalansoAtaskaita",
         limit: 2500,
         columns: FINANSINES_ATASKAITOS_COLUMNS,
-        beforeApply: finansinesAtaskaitosBeforeApply(
-            "balansoAtaskaitos",
-            "balansoAtaskaitos",
-        ),
+        beforeApply: finansinesAtaskaitosBeforeApply({
+            formos: "balansoFormos",
+            standartai: "balansoStandartai",
+            eiluciuTipai: "balansoEiluciuTipai",
+            mainTable: "balansoEilutes",
+        }),
         mapping: {
             _id: "_id",
             "juridinis_asmuo._id": "jarId", "forma._id": "formaId",
@@ -411,14 +426,17 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpPelnoNuostoliuAtaskaitos",
-        table: "pelnoNuostoliuAtaskaitos",
+        table: "pelnoNuostoliuEilutes",
+        schema: FINANSINES_ATASKAITOS_SCHEMA,
         dataset: "datasets/gov/rc/jar/pelno_ataskaitos/PelnoAtaskaita",
         limit: 1000,
         columns: FINANSINES_ATASKAITOS_COLUMNS,
-        beforeApply: finansinesAtaskaitosBeforeApply(
-            "pelnoNuostoliuAtaskaitos",
-            "pelnoNuostoliuAtaskaitos",
-        ),
+        beforeApply: finansinesAtaskaitosBeforeApply({
+            formos: "pelnoNuostoliuFormos",
+            standartai: "pelnoNuostoliuStandartai",
+            eiluciuTipai: "pelnoNuostoliuEiluciuTipai",
+            mainTable: "pelnoNuostoliuEilutes",
+        }),
         mapping: {
             _id: "_id",
             "juridinis_asmuo._id": "jarId", "forma._id": "formaId",

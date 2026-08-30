@@ -12,7 +12,7 @@ const VIEW_LIST = [...VIEW_NAMES];
 // ppa, liteko, vdi, sodra, cvpp, rcJar, eppsViesiejiPirkimai) informacinėse
 // schemose randamos tik pagal savo schemą.
 const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "ppa", "sabis", "regitra", "jadis",
-    "eppsViesiejiPirkimai", "liteko", "vdi", "sodra", "cvpp", "rcJar",
+    "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", "liteko", "vdi", "sodra", "cvpp", "rcJar",
     "rcInformaciniaiPranesimai"];
 const SCHEMA_ARRAY = `ARRAY[${ANALYST_SCHEMAS.map((s) => `'${s}'`).join(", ")}]`;
 const IDENTIFIER_CANDIDATES = [
