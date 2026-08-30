@@ -4,7 +4,7 @@
 // Minimalus rinkinys, kurio pakanka JAR_LOCATION_SQL — patalpa, kad iš jos
 // gautume pastato AOB kodą, ir pats adreso taškas. Atskirai, nes dalis užklausų
 // nori tik koordinačių ir joms likę penki JOIN'ai yra tuščias darbas.
-// `adresuRegistras` kodai yra integer, o public."jarAsmenuAdresai"."aobKodas"
+// `adresuRegistras` kodai yra integer, o "rcJar"."asmenuAdresai"."aobKodas"
 // tebėra text — be aiškaus cast'o JOIN'as kristų su „operator does not exist:
 // integer = text“. Duomenys tai leidžia: visos 217 738 nenulinės reikšmės yra
 // vien skaitmenys. Cast'as yra ant mažosios (229 tūkst. eilučių) lentelės pusės,
@@ -12,7 +12,7 @@
 const AOB_KODAS = `jar_address."aobKodas"::int`;
 
 export const JAR_LOCATION_JOINS = `
-LEFT JOIN public."jarAsmenuAdresai" jar_address
+LEFT JOIN "rcJar"."asmenuAdresai" jar_address
     ON jar_address."jarKodas" = jar_person."jarKodas"
 LEFT JOIN "adresuRegistras"."patalposAdresai" jar_room
     ON jar_room."patKodas" = ${AOB_KODAS}

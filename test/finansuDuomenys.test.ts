@@ -81,8 +81,8 @@ describe("RC finansinių ataskaitų skaitymas", () => {
         await gautiFinansuDuomenis("110004884", db as any);
 
         const [sql, params] = db.query.mock.calls[0];
-        expect(sql).toContain('public."jarFinansinesAtaskaitos"');
-        expect(sql).toContain('public."jarFinansiniuAtaskaituRodikliuTipai"');
+        expect(sql).toContain('"rcJar"."finansinesAtaskaitos"');
+        expect(sql).toContain('"rcJar"."finansiniuAtaskaituRodikliuTipai"');
         expect(params).toEqual(["110004884"]);
     });
 });

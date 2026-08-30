@@ -156,16 +156,16 @@ export async function gautiFinansuDuomenis(jarKodas, db = postgres) {
              rodiklio_tipas."pavadinimas" AS "lineName",
              rodiklis."reiksme", a."laikotarpisNuo", a."laikotarpisIki",
              a."registravimoData" AS "duomenuData", a."formavimoData"
-         FROM public."jarFinansinesAtaskaitos" a
-         JOIN public."jarFinansiniuAtaskaituTipai" tipas
+         FROM "rcJar"."finansinesAtaskaitos" a
+         JOIN "rcJar"."finansiniuAtaskaituTipai" tipas
            ON tipas."id" = a."ataskaitosTipas"
-         JOIN public."jarFinansiniuAtaskaituTemplate" template
+         JOIN "rcJar"."finansiniuAtaskaituTemplate" template
            ON template."id" = a."templateId"
-         JOIN public."jarFinansiniuAtaskaituStandartai" standartas
+         JOIN "rcJar"."finansiniuAtaskaituStandartai" standartas
            ON standartas."id" = a."standardId"
-         JOIN public."jarFinansiniuAtaskaituRodikliai" rodiklis
+         JOIN "rcJar"."finansiniuAtaskaituRodikliai" rodiklis
            ON rodiklis."ataskaitaId" = a."id"
-         JOIN public."jarFinansiniuAtaskaituRodikliuTipai" rodiklio_tipas
+         JOIN "rcJar"."finansiniuAtaskaituRodikliuTipai" rodiklio_tipas
            ON rodiklio_tipas."id" = rodiklis."lineTypeId"
          WHERE a."jarKodas" = $1
          ORDER BY a."registravimoData" DESC, a."laikotarpisNuo" DESC,

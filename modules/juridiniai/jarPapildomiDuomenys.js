@@ -16,9 +16,9 @@ export async function gautiJarPapildomusDuomenis(
                     SELECT s."zymosTipas", tipas."pavadinimas" AS "zymosPavadinimas",
                            s."formosKodas", forma."pavadinimas" AS "formosPavadinimas",
                            s."statusasNuo", s."statusasIki", s."formavimoData"
-                    FROM public."jarZymuStatusai" s
-                    JOIN public."jarZymuTipai" tipas ON tipas."kodas" = s."zymosTipas"
-                    LEFT JOIN public."jarFormos" forma ON forma."kodas" = s."formosKodas"
+                    FROM "rcJar"."zymuStatusai" s
+                    JOIN "rcJar"."zymuTipai" tipas ON tipas."kodas" = s."zymosTipas"
+                    LEFT JOIN "rcJar"."formos" forma ON forma."kodas" = s."formosKodas"
                     WHERE s."jarKodas" = $1
                 ) z
             ), '[]'::jsonb) AS "zymos",
@@ -28,8 +28,8 @@ export async function gautiJarPapildomusDuomenis(
                     SELECT v."savanoriuSkaicius", v."savanorystesValanduSkaicius",
                            v."laikotarpisNuo", v."laikotarpisIki", v."formavimoData",
                            v."formosKodas", forma."pavadinimas" AS "formosPavadinimas"
-                    FROM public."jarSavanoryste" v
-                    LEFT JOIN public."jarFormos" forma ON forma."kodas" = v."formosKodas"
+                    FROM "rcJar"."savanoryste" v
+                    LEFT JOIN "rcJar"."formos" forma ON forma."kodas" = v."formosKodas"
                     WHERE v."jarKodas" = $1
                 ) s
             ), '[]'::jsonb) AS "savanoryste",
@@ -39,8 +39,8 @@ export async function gautiJarPapildomusDuomenis(
                     SELECT t."sarasasPateiktas", t."sarasoBusena",
                            busena."pavadinimas" AS "sarasoBusenosPavadinimas",
                            t."sarasoPateikimoData", t."formavimoData"
-                    FROM public."jarJangisTeikimai" t
-                    LEFT JOIN public."jarJangisBusenos" busena
+                    FROM "rcJar"."jangisTeikimai" t
+                    LEFT JOIN "rcJar"."jangisBusenos" busena
                       ON busena."kodas" = t."sarasoBusena"
                     WHERE t."jarKodas" = $1
                 ) j
@@ -52,8 +52,8 @@ export async function gautiJarPapildomusDuomenis(
                            template."pavadinimas" AS "templateName",
                            x."laikotarpisNuo", x."laikotarpisIki",
                            x."anuliavimoRegistravimoData", x."formavimoData"
-                    FROM public."jarFinansiniuAtaskaituAnuliavimai" x
-                    JOIN public."jarFinansiniuAtaskaituTemplate" template
+                    FROM "rcJar"."finansiniuAtaskaituAnuliavimai" x
+                    JOIN "rcJar"."finansiniuAtaskaituTemplate" template
                       ON template."id" = x."templateId"
                     WHERE x."jarKodas" = $1
                 ) a
@@ -62,7 +62,7 @@ export async function gautiJarPapildomusDuomenis(
                 SELECT to_jsonb(v)
                 FROM (
                     SELECT x."paskutineAtaskaitaIki", x."formavimoData"
-                    FROM public."jarFinansiniuAtaskaituVelavimai" x
+                    FROM "rcJar"."finansiniuAtaskaituVelavimai" x
                     WHERE x."jarKodas" = $1
                 ) v
             ) AS "finansiniuAtaskaituVelavimas",
@@ -70,20 +70,20 @@ export async function gautiJarPapildomusDuomenis(
                 SELECT jsonb_agg(to_jsonb(n) ORDER BY n."nepateiktaUzMetus" DESC)
                 FROM (
                     SELECT x."nepateiktaUzMetus", x."formavimoData"
-                    FROM public."jarFinansiniuAtaskaituNepateikimai" x
+                    FROM "rcJar"."finansiniuAtaskaituNepateikimai" x
                     WHERE x."jarKodas" = $1
                 ) n
             ), '[]'::jsonb) AS "finansiniuAtaskaituNepateikimai",
             jsonb_build_object(
-                'count', (SELECT count(*) FROM public."jarDokumentai" d WHERE d."jarKodas" = $1),
+                'count', (SELECT count(*) FROM "rcJar"."dokumentai" d WHERE d."jarKodas" = $1),
                 'rows', COALESCE((
                     SELECT jsonb_agg(to_jsonb(d) ORDER BY d."dokumentoRegistravimoData" DESC, d."id" DESC)
                     FROM (
                         SELECT x."id", x."dokumentoTipas", x."dokumentoPotipis",
                                potipis."pavadinimas" AS "dokumentoPotipioPavadinimas",
                                x."dokumentoData", x."dokumentoRegistravimoData", x."formavimoData"
-                        FROM public."jarDokumentai" x
-                        LEFT JOIN public."jarDokumentuPotipiai" potipis
+                        FROM "rcJar"."dokumentai" x
+                        LEFT JOIN "rcJar"."dokumentuPotipiai" potipis
                           ON potipis."dokumentoTipas" = x."dokumentoTipas"
                          AND potipis."dokumentoPotipis" = x."dokumentoPotipis"
                         WHERE x."jarKodas" = $1

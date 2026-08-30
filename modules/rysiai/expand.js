@@ -319,7 +319,7 @@ export async function expandOrg(jarKodas) {
     const [jarRes, pinregRes, asBuyerRes, asSellerRes, vpRes] = await Promise.all([
         // Org metadata from normalized JAR
         postgres.query(
-            `SELECT "pavadinimas", "formosKodas", "registravimoData", "statusasNuo", "statusoKodas" FROM public."jarAsmenys" WHERE "jarKodas" = $1 LIMIT 1`,
+            `SELECT "pavadinimas", "formosKodas", "registravimoData", "statusasNuo", "statusoKodas" FROM "rcJar"."asmenys" WHERE "jarKodas" = $1 LIMIT 1`,
             [jk],
         ),
         // All pinreg declarations for this org
@@ -345,7 +345,7 @@ export async function expandOrg(jarKodas) {
                     seller."statusoKodas"         AS "tiekejoStatusoKodas"
              FROM   public."vpmSutartys" s
              LEFT JOIN public."vpmSutartysTipai" st ON st.id = s."tipasId"
-             LEFT JOIN public."jarAsmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
+             LEFT JOIN "rcJar"."asmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
              WHERE  s."perkanciosiosOrganizacijosKodas" = $1
                AND  st."tipas" <> 'SP'
                AND  s."numatomaVerte" IS NOT NULL
@@ -372,7 +372,7 @@ export async function expandOrg(jarKodas) {
                     buyer."statusoKodas"                AS "pirkejoStatusoKodas"
              FROM   public."vpmSutartys" s
              LEFT JOIN public."vpmSutartysTipai" st ON st.id = s."tipasId"
-             LEFT JOIN public."jarAsmenys" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+             LEFT JOIN "rcJar"."asmenys" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
              WHERE  s."pirmoTiekejoKodas" = $1
                AND  st."tipas" <> 'SP'
                AND  s."numatomaVerte" IS NOT NULL
@@ -580,7 +580,7 @@ export async function expandProcurement(pirkimoId) {
                 MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
                              COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
          FROM   public."vpmSutartys" s
-         LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
+         LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
          WHERE  s."pirkimoNumeris" = $1
            AND  s.istrinta = false
          GROUP  BY s."pirmoTiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
@@ -644,7 +644,7 @@ export async function expandContract(pirkimoNumeris) {
                     MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
                                  COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
              FROM   public."vpmSutartys" s
-             LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
+             LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
              WHERE  s."pirkimoNumeris" = $1
                AND  s.istrinta = false
              GROUP  BY s."pirmoTiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
@@ -660,7 +660,7 @@ export async function expandContract(pirkimoNumeris) {
                     j."statusoKodas"
              FROM   ppa."dalyviai" d
              JOIN   ppa."ataskaitos" a ON a."id" = d."ataskaitaId"
-             LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = d."kodas"
+             LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = d."kodas"
              WHERE  a."pirkimoNumeris" = $1
                AND  d."salis" = 'LT'`,
             [pirkNr],
@@ -740,8 +740,8 @@ export async function expandSutartis(sutartiesUnikalusId) {
                 seller."statusasNuo"           AS "tiekejoStatusasNuo",
                 seller."statusoKodas"          AS "tiekejoStatusoKodas"
          FROM   public."vpmSutartys" s
-         LEFT JOIN public."jarAsmenys" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
-         LEFT JOIN public."jarAsmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
+         LEFT JOIN "rcJar"."asmenys" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
+         LEFT JOIN "rcJar"."asmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
          WHERE  s."unikalusId" = $1
          LIMIT  1`,
         [id],
@@ -819,7 +819,7 @@ export async function expandPirkimas(pirkimoId) {
                     j."statusasNuo"                        AS "buyerStatusasNuo",
                     j."statusoKodas"                       AS "buyerStatusoKodas"
              FROM   "eppsViesiejiPirkimai"."pirkimai" vp
-             LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = vp."jarKodas"
+             LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = vp."jarKodas"
              WHERE  vp."pirkimoId" = $1
              LIMIT  1`,
             [id],

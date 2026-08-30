@@ -7,7 +7,9 @@ const parser = new Parser();
 
 export const TABLE_WHITELIST: Set<string> = new Set([
     "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
-    "jarAsmenys", "jar",
+    // RC JAR CSV lentelės iškeltos į `rcJar` schemą (asmenys = buvęs jarAsmenys);
+    // `jar` yra atskira public lentelė iš data.gov.lt (Spinta).
+    "asmenys", "jar",
     // EPPS viešieji pirkimai iškelti į `eppsViesiejiPirkimai` schemą; analyst
     // search_path juos mato nekvalifikuotai (pirkimai = buvęs viesiejiPirkimai).
     "pirkimai", "vykdytojai",

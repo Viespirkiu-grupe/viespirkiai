@@ -19,13 +19,13 @@ async function writeFinancialBatch(client, rows) {
                     standartas."id" AS "standardIdFk",
                     rodiklis."id" AS "lineTypeIdFk"
              FROM input
-             JOIN public."jarFinansiniuAtaskaituTipai" tipas
+             JOIN "rcJar"."finansiniuAtaskaituTipai" tipas
                ON tipas."kodas" = input."ataskaitosTipas"
-             JOIN public."jarFinansiniuAtaskaituTemplate" template
+             JOIN "rcJar"."finansiniuAtaskaituTemplate" template
                ON template."kodas" = input."templateId"
-             JOIN public."jarFinansiniuAtaskaituStandartai" standartas
+             JOIN "rcJar"."finansiniuAtaskaituStandartai" standartas
                ON standartas."kodas" = input."standardId"
-             JOIN public."jarFinansiniuAtaskaituRodikliuTipai" rodiklis
+             JOIN "rcJar"."finansiniuAtaskaituRodikliuTipai" rodiklis
                ON rodiklis."kodas" = input."lineTypeId"
          ), report_input AS (
              SELECT DISTINCT ON (
@@ -33,7 +33,7 @@ async function writeFinancialBatch(client, rows) {
                  "laikotarpisNuo", "laikotarpisIki", "registravimoData"
              ) * FROM resolved
          ), reports AS (
-             INSERT INTO public."jarFinansinesAtaskaitos" AS old (
+             INSERT INTO "rcJar"."finansinesAtaskaitos" AS old (
                  "ataskaitosTipas", "jarKodas", "pavadinimas", "formosKodas",
                  "statusoKodas", "templateId", "standardId",
                  "laikotarpisNuo", "laikotarpisIki", "registravimoData",
@@ -70,7 +70,7 @@ async function writeFinancialBatch(client, rows) {
               AND reports."laikotarpisIki" = resolved."laikotarpisIki"
               AND reports."registravimoData" = resolved."registravimoData"
          )
-         INSERT INTO public."jarFinansiniuAtaskaituRodikliai" AS old
+         INSERT INTO "rcJar"."finansiniuAtaskaituRodikliai" AS old
              ("ataskaitaId", "lineTypeId", "reiksme")
          SELECT "ataskaitaId", "lineTypeId", "reiksme"
          FROM indicators
@@ -93,10 +93,10 @@ const BATCH_SQL = {
                    input."laikotarpisNuo", input."laikotarpisIki",
                    input."anuliavimoRegistravimoData", input."formavimoData"
             FROM input
-            JOIN public."jarFinansiniuAtaskaituTemplate" template
+            JOIN "rcJar"."finansiniuAtaskaituTemplate" template
               ON template."kodas" = input."templateId"
         )
-        INSERT INTO public."jarFinansiniuAtaskaituAnuliavimai" AS old
+        INSERT INTO "rcJar"."finansiniuAtaskaituAnuliavimai" AS old
             ("jarKodas", "pavadinimas", "formosKodas",
              "statusoKodas", "templateId",
              "laikotarpisNuo", "laikotarpisIki", "anuliavimoRegistravimoData", "formavimoData")
@@ -107,7 +107,7 @@ const BATCH_SQL = {
             "statusoKodas" = EXCLUDED."statusoKodas",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     velavimai: `
-        INSERT INTO public."jarFinansiniuAtaskaituVelavimai" AS old
+        INSERT INTO "rcJar"."finansiniuAtaskaituVelavimai" AS old
             ("jarKodas", "pavadinimas", "formosKodas", "statusoKodas", "paskutineAtaskaitaIki", "formavimoData")
         SELECT DISTINCT ON ("jarKodas") * FROM jsonb_to_recordset($1::jsonb) AS x(
             "jarKodas" integer, "pavadinimas" text, "formosKodas" integer,
@@ -117,7 +117,7 @@ const BATCH_SQL = {
             "statusoKodas" = EXCLUDED."statusoKodas", "paskutineAtaskaitaIki" = EXCLUDED."paskutineAtaskaitaIki",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     nepateikimai: `
-        INSERT INTO public."jarFinansiniuAtaskaituNepateikimai" AS old
+        INSERT INTO "rcJar"."finansiniuAtaskaituNepateikimai" AS old
             ("jarKodas", "nepateiktaUzMetus", "pavadinimas", "registravimoData",
              "formosKodas", "statusoKodas", "formavimoData")
         SELECT DISTINCT ON ("jarKodas", "nepateiktaUzMetus") *
@@ -129,7 +129,7 @@ const BATCH_SQL = {
             "formosKodas" = EXCLUDED."formosKodas", "statusoKodas" = EXCLUDED."statusoKodas",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     zymos: `
-        INSERT INTO public."jarZymuStatusai" AS old
+        INSERT INTO "rcJar"."zymuStatusai" AS old
             ("jarKodas", "zymosTipas", "pavadinimas", "formosKodas",
              "statusasNuo", "statusasIki", "formavimoData")
         SELECT DISTINCT ON ("jarKodas", "zymosTipas", "statusasNuo") *
@@ -142,7 +142,7 @@ const BATCH_SQL = {
             "statusasIki" = EXCLUDED."statusasIki",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     savanoryste: `
-        INSERT INTO public."jarSavanoryste" AS old
+        INSERT INTO "rcJar"."savanoryste" AS old
             ("jarKodas", "pavadinimas", "formosKodas",
              "savanoriuSkaicius", "savanorystesValanduSkaicius", "laikotarpisNuo",
              "laikotarpisIki", "formavimoData")
@@ -158,7 +158,7 @@ const BATCH_SQL = {
             "savanorystesValanduSkaicius" = EXCLUDED."savanorystesValanduSkaicius",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     jangis: `
-        INSERT INTO public."jarJangisTeikimai" AS old
+        INSERT INTO "rcJar"."jangisTeikimai" AS old
             ("jarKodas", "pavadinimas", "registravimoData", "formosKodas",
              "statusoKodas", "sarasasPateiktas", "sarasoBusena",
              "sarasoPateikimoData", "formavimoData")
@@ -226,7 +226,7 @@ const BATCH_SQL = {
             "njaPavadinimas" = EXCLUDED."njaPavadinimas", "dalis" = EXCLUDED."dalis",
             "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     dokumentai: `
-        INSERT INTO public."jarDokumentai" AS old
+        INSERT INTO "rcJar"."dokumentai" AS old
             ("jarKodas", "dokumentoTipas", "dokumentoPotipis",
              "dokumentoData", "dokumentoRegistravimoData", "formavimoData")
         SELECT DISTINCT ON ("jarKodas", "dokumentoTipas", "dokumentoPotipis", "dokumentoData", "dokumentoRegistravimoData") *
@@ -251,44 +251,44 @@ async function upsertDictionaries(client, rows) {
                  "dokumentoPotipis" integer, "dokumentoPotipioPavadinimas" text
              )
          ), forms AS (
-             INSERT INTO public."jarFormos" ("_id", "_revision", "kodas", "pavadinimas")
+             INSERT INTO "rcJar"."formos" ("_id", "_revision", "kodas", "pavadinimas")
              SELECT gen_random_uuid(), gen_random_uuid(), "formosKodas", max("formosPavadinimas")
              FROM input
              WHERE "formosKodas" IS NOT NULL AND "formosPavadinimas" IS NOT NULL
              GROUP BY "formosKodas"
              ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
          ), statuses AS (
-             INSERT INTO public."jarStatusai" ("kodas", "pavadinimas")
+             INSERT INTO "rcJar"."statusai" ("kodas", "pavadinimas")
              SELECT "statusoKodas", max("statusoPavadinimas") FROM input
              WHERE "statusoKodas" IS NOT NULL AND "statusoPavadinimas" IS NOT NULL
              GROUP BY "statusoKodas"
              ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
          ), templates AS (
-             INSERT INTO public."jarFinansiniuAtaskaituTemplate" ("kodas", "pavadinimas")
+             INSERT INTO "rcJar"."finansiniuAtaskaituTemplate" ("kodas", "pavadinimas")
              SELECT "templateId", COALESCE(max("templateName"), "templateId") FROM input
              WHERE "templateId" IS NOT NULL
              GROUP BY "templateId"
              ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
          ), standards AS (
-             INSERT INTO public."jarFinansiniuAtaskaituStandartai" ("kodas", "pavadinimas")
+             INSERT INTO "rcJar"."finansiniuAtaskaituStandartai" ("kodas", "pavadinimas")
              SELECT "standardId", COALESCE(max("standardName"), "standardId") FROM input
              WHERE "standardId" IS NOT NULL
              GROUP BY "standardId"
              ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
          ), lines AS (
-             INSERT INTO public."jarFinansiniuAtaskaituRodikliuTipai" ("kodas", "pavadinimas")
+             INSERT INTO "rcJar"."finansiniuAtaskaituRodikliuTipai" ("kodas", "pavadinimas")
              SELECT "lineTypeId", COALESCE(max("lineName"), "lineTypeId") FROM input
              WHERE "lineTypeId" IS NOT NULL
              GROUP BY "lineTypeId"
              ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
          ), jangis_statuses AS (
-             INSERT INTO public."jarJangisBusenos" ("kodas", "pavadinimas")
+             INSERT INTO "rcJar"."jangisBusenos" ("kodas", "pavadinimas")
              SELECT "sarasoBusena", initcap(lower("sarasoBusena")) FROM input
              WHERE "sarasoBusena" IS NOT NULL
              GROUP BY "sarasoBusena"
              ON CONFLICT ("kodas") DO NOTHING
          ), document_subtypes AS (
-             INSERT INTO public."jarDokumentuPotipiai"
+             INSERT INTO "rcJar"."dokumentuPotipiai"
                  ("dokumentoTipas", "dokumentoPotipis", "pavadinimas")
              SELECT "dokumentoTipas", "dokumentoPotipis",
                     max("dokumentoPotipioPavadinimas")

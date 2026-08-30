@@ -78,7 +78,7 @@ describe('RC JAR CSV related records', () => {
       const insertQueries = queries.filter((sql) => sql.includes('INSERT INTO'));
       expect(insertQueries.length).toBeGreaterThan(0);
       expect(insertQueries.every((sql) =>
-        sql.includes('JOIN public."jarAsmenys" person'),
+        sql.includes('JOIN "rcJar"."asmenys" person'),
       )).toBe(true);
     },
   );

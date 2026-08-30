@@ -18,7 +18,7 @@ export async function geolocateJarAddress() {
     const { rows } = await postgres.query(
         `
     SELECT "jarKodas", adresas
-    FROM "jarAsmenuAdresai"
+    FROM "rcJar"."asmenuAdresai"
     WHERE (
       "fallbackLocationState" IS NULL
       OR "fallbackLocationState" = 0
@@ -38,7 +38,7 @@ export async function geolocateJarAddress() {
 
     if (!result) {
         await postgres.query(
-            `UPDATE "jarAsmenuAdresai"
+            `UPDATE "rcJar"."asmenuAdresai"
        SET "fallbackLocationState" = -404,
            "fallbackLocationVersion" = $1
        WHERE "jarKodas" = $2`,
@@ -50,7 +50,7 @@ export async function geolocateJarAddress() {
 
     const [lat, lon] = result.location;
     await postgres.query(
-        `UPDATE "jarAsmenuAdresai"
+        `UPDATE "rcJar"."asmenuAdresai"
      SET "fallbackLocation" = ST_SetSRID(ST_MakePoint($1, $2), 4326),
          "fallbackLocationState" = 1,
          "fallbackLocationVersion" = $3

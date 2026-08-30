@@ -73,10 +73,10 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
                     ${JAR_ADDRESS_SQL} AS "adresas",
                     ST_X((${JAR_LOCATION_SQL})::geometry) AS lon,
                     ST_Y((${JAR_LOCATION_SQL})::geometry) AS lat
-                 FROM public."jarAsmenys" jar_person
-                 LEFT JOIN public."jarFormos" jar_form
+                 FROM "rcJar"."asmenys" jar_person
+                 LEFT JOIN "rcJar"."formos" jar_form
                     ON jar_form."kodas" = jar_person."formosKodas"
-                 LEFT JOIN public."jarStatusai" jar_status
+                 LEFT JOIN "rcJar"."statusai" jar_status
                     ON jar_status."kodas" = jar_person."statusoKodas"
                  ${JAR_ADDRESS_JOINS}
                  WHERE jar_person."jarKodas" = $1

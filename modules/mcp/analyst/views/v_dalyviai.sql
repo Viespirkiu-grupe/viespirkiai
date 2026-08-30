@@ -42,4 +42,4 @@ FROM ppa."ataskaitos" a
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas
          ) p ON true
-         LEFT JOIN "jarAsmenys" j ON j."jarKodas"::text = d.kodas
+         LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = d.kodas

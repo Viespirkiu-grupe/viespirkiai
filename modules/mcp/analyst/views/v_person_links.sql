@@ -21,4 +21,4 @@ SELECT r.id,
        r."dalyvavimoVpInformacija",
        r."pateikimoData"
 FROM "pinregJuridiniaiRysiai" r
-         LEFT JOIN "jarAsmenys" j ON j."jarKodas"::text = r."jarKodas"
+         LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = r."jarKodas"

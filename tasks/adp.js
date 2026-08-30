@@ -267,7 +267,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncJarFormos",
-        table: "jarFormos",
+        table: "formos",
+        schema: "rcJar",
         dataset: "datasets/gov/rc/jar/formos_statusai/Forma",
         limit: 1000,
         mapping: {

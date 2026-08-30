@@ -80,10 +80,10 @@ export async function searchJar(query = {}, options = {}) {
                    jar_status."pavadinimas" AS "statusoPavadinimas",
                    ${JAR_ADDRESS_SQL} AS "adresas",
                    ${JAR_LOCATION_SQL} AS location
-            FROM public."jarAsmenys" jar_person
-            LEFT JOIN public."jarFormos" jar_form
+            FROM "rcJar"."asmenys" jar_person
+            LEFT JOIN "rcJar"."formos" jar_form
               ON jar_form."kodas" = jar_person."formosKodas"
-            LEFT JOIN public."jarStatusai" jar_status
+            LEFT JOIN "rcJar"."statusai" jar_status
               ON jar_status."kodas" = jar_person."statusoKodas"
             ${JAR_ADDRESS_JOINS}
             WHERE ${JAR_LOCATION_SQL} IS NOT NULL
@@ -108,10 +108,10 @@ export async function searchJar(query = {}, options = {}) {
                    jar_status."pavadinimas" AS "statusoPavadinimas",
                    ${JAR_ADDRESS_SQL} AS "adresas",
                    ${JAR_LOCATION_SQL} AS location
-            FROM public."jarAsmenys" jar_person
-            LEFT JOIN public."jarFormos" jar_form
+            FROM "rcJar"."asmenys" jar_person
+            LEFT JOIN "rcJar"."formos" jar_form
               ON jar_form."kodas" = jar_person."formosKodas"
-            LEFT JOIN public."jarStatusai" jar_status
+            LEFT JOIN "rcJar"."statusai" jar_status
               ON jar_status."kodas" = jar_person."statusoKodas"
             ${JAR_ADDRESS_JOINS}
             WHERE ${JAR_ADDRESS_SQL} = $1

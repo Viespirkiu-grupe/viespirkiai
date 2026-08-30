@@ -7,6 +7,7 @@ const logger = new Logger();
  * Sinchronizuoja bet kurį :changes dataset pagal CONFIG
  * @param {Object} CONFIG
  * @param {string} CONFIG.table - DB lentelė
+ * @param {string} [CONFIG.schema] - DB schema (numatytai `public`)
  * @param {string} CONFIG.dataset - dataset path
  * @param {Object} CONFIG.mapping - API key -> DB stulpelis
  * @param {string[]} [CONFIG.columns] - DB stulpeliai, kuriuos rašyti į pagrindinę lentelę
@@ -16,6 +17,11 @@ const logger = new Logger();
  */
 export async function syncAdpChanges(CONFIG) {
     const BASE = `${appConfig.dataGovUrl}/${CONFIG.dataset}/:changes`;
+    // Schemą prirašom tik tada, kai ji nurodyta — taip užklausos `public`
+    // lentelėms lieka žodis žodin tokios pačios.
+    const lentele = CONFIG.schema
+        ? `"${CONFIG.schema}"."${CONFIG.table}"`
+        : `"${CONFIG.table}"`;
 
     async function getLastState() {
         const res = await postgres.query(
@@ -81,7 +87,7 @@ export async function syncAdpChanges(CONFIG) {
             .join(",");
 
         const sql = `
-            INSERT INTO "${CONFIG.table}" (${dbCols.map((c) => `"${c}"`).join(",")})
+            INSERT INTO ${lentele} (${dbCols.map((c) => `"${c}"`).join(",")})
             VALUES ${placeholders}
             ON CONFLICT DO NOTHING;
             `;
@@ -106,7 +112,7 @@ export async function syncAdpChanges(CONFIG) {
             if (!fields.length) continue;
             values.push(r._id);
             await postgres.query(
-                `UPDATE "${CONFIG.table}" SET ${fields.join(", ")} WHERE "_id" = $${fields.length + 1}`,
+                `UPDATE ${lentele} SET ${fields.join(", ")} WHERE "_id" = $${fields.length + 1}`,
                 values,
             );
         }
@@ -115,7 +121,7 @@ export async function syncAdpChanges(CONFIG) {
     async function applyDelete(ids) {
         if (!ids || !ids.length) return;
         await postgres.query(
-            `DELETE FROM "${CONFIG.table}" WHERE "_id" = ANY($1)`,
+            `DELETE FROM ${lentele} WHERE "_id" = ANY($1)`,
             [ids],
         );
     }

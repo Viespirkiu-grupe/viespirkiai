@@ -52,7 +52,7 @@ export async function findSingleJuridinisPanel(q: string): Promise<JuridinisPane
       `SELECT
          CASE WHEN resolved.location IS NULL THEN NULL ELSE ST_Y(resolved.location::geometry) END AS lat,
          CASE WHEN resolved.location IS NULL THEN NULL ELSE ST_X(resolved.location::geometry) END AS lon
-       FROM public."jarAsmenys" jar_person
+       FROM "rcJar"."asmenys" jar_person
        ${JAR_LOCATION_JOINS}
        CROSS JOIN LATERAL (
          SELECT ${JAR_LOCATION_SQL} AS location

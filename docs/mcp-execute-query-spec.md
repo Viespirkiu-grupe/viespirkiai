@@ -184,10 +184,10 @@ fails fast rather than silently returning incomplete schema.
 
 ### Covered-table redirect
 
-Tables that are fully covered by a view (`jarAsmenys`, `sutartys`, `pirkimai`, `pinregJuridiniaiRysiai`,
+Tables that are fully covered by a view (`asmenys`, `sutartys`, `pirkimai`, `pinregJuridiniaiRysiai`,
 `ppa."ataskaitos"`, `bylosDalyviai`) return a redirect message instead of raw column data:
 
-> *"Table 'jarAsmenys' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
+> *"Table 'asmenys' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
 > and an example query."*
 
 The mapping is defined in [`tempViews.js`](../../modules/mcp/analyst/tempViews.js) as `COVERED_TABLES_BY_VIEWS`.
@@ -355,7 +355,7 @@ recursive graph traversal where full schema control is needed.
 
 | View             | Tags                                                      | Main table               | Key additions                                                       |
 |------------------|-----------------------------------------------------------|--------------------------|---------------------------------------------------------------------|
-| `v_company`      | capacity, blacklist, labor, domains, court                | `jarAsmenys`                 | Latest Sodra snapshot (LATERAL), compliance flags, count subqueries |
+| `v_company`      | capacity, blacklist, labor, domains, court                | `asmenys` (rcJar)            | Latest Sodra snapshot (LATERAL), compliance flags, count subqueries |
 | `v_sutartys`     | contracts, buyer-supplier, cpv, value, timing, frameworks | `sutartys`               | Buyer + seller names denormalized; `::text` cast on `jarKodas`      |
 | `v_pirkimas`     | procedures, criteria, lot-count, single-bidder            | `pirkimai`               | Organizer name, municipality, short code                            |
 | `v_person_links` | conflict-of-interest, directors, beneficial-owners        | `pinregJuridiniaiRysiai` | Company name joined; `irasoTipas` distinguishes role type           |
@@ -382,7 +382,7 @@ All tables accessible to `execute_query` (Layer 2) and queryable by the analyst 
 
 ```
 sutartys, sutartysAtviriDuomenys, sutartysAtviriDuomenysImp
-jarAsmenys, jar
+rcJar: asmenys | public: jar
 eppsViesiejiPirkimai: pirkimai, vykdytojai
 pinregJuridiniaiRysiai, pinreg
 failai
@@ -528,10 +528,11 @@ GRANT USAGE ON SCHEMA sodra TO analyst;   -- kaip ir domenai/liteko/vdi
 GRANT USAGE ON SCHEMA ppa TO analyst;
 GRANT USAGE ON SCHEMA cvpp TO analyst;
 GRANT USAGE ON SCHEMA "eppsViesiejiPirkimai" TO analyst;
+GRANT USAGE ON SCHEMA "rcJar" TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
-    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp", "jarAsmenys",
+    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp", "rcJar"."asmenys",
     "jar", "eppsViesiejiPirkimai"."pirkimai", "eppsViesiejiPirkimai"."vykdytojai", "pinregJuridiniaiRysiai",
     "pinreg", "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos",
     "sabisSaskaituSalys", "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
@@ -563,5 +564,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp;
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar";
 ```

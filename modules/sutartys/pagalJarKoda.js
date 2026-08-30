@@ -77,7 +77,7 @@ export async function gautiSutarciuDuomenisPagalJarKoda(
         postgres.query(
             `SELECT agg."tiekejoKodas" AS "jarKodas", COALESCE(j."pavadinimas", fallback."pavadinimas", 'Nežinomas') AS "pavadinimas", agg."suma" AS "total", agg."pirkimai" AS "count"
              FROM (SELECT "tiekejoKodas", "suma", "pirkimai" FROM "vpmSutartysSumosPirkejasTiekejas" WHERE "pirkejoKodas" = $1 AND "pirkimai" > 0 ORDER BY ("suma" = 'NaN'::numeric), "suma" DESC ${limitSql}) agg
-             LEFT JOIN public."jarAsmenys" j ON j."jarKodas" = ${JAR_KODAS_INT(`agg."tiekejoKodas"`)}
+             LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas" = ${JAR_KODAS_INT(`agg."tiekejoKodas"`)}
              ${TIEKEJO_PAVADINIMAS_LATERAL(`agg."tiekejoKodas"`)}
              ORDER BY (agg."suma" = 'NaN'::numeric), agg."suma" DESC`,
             [jarKodas],
@@ -85,7 +85,7 @@ export async function gautiSutarciuDuomenisPagalJarKoda(
         postgres.query(
             `SELECT agg."pirkejoKodas" AS "jarKodas", COALESCE(j."pavadinimas", fallback."pavadinimas", 'Nežinomas') AS "pavadinimas", agg."suma" AS "total", agg."pirkimai" AS "count"
              FROM (SELECT "pirkejoKodas", "suma", "pirkimai" FROM "vpmSutartysSumosPirkejasTiekejas" WHERE "tiekejoKodas" = $1 AND "pirkimai" > 0 ORDER BY ("suma" = 'NaN'::numeric), "suma" DESC ${limitSql}) agg
-             LEFT JOIN public."jarAsmenys" j ON j."jarKodas" = ${JAR_KODAS_INT(`agg."pirkejoKodas"`)}
+             LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas" = ${JAR_KODAS_INT(`agg."pirkejoKodas"`)}
              ${PIRKEJO_PAVADINIMAS_LATERAL(`agg."pirkejoKodas"`)}
              ORDER BY (agg."suma" = 'NaN'::numeric), agg."suma" DESC`,
             [jarKodas],

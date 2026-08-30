@@ -9,8 +9,10 @@ const COVERED_TABLES = new Set(Object.keys(COVERED_TABLES_BY_VIEWS));
 const TABLE_LIST = [...TABLE_WHITELIST].filter((t) => !COVERED_TABLES.has(t));
 const VIEW_LIST = [...VIEW_NAMES];
 // Analyst rolės search_path schemos — lentelės iškeltos iš `public` (domenai,
-// ppa, liteko, vdi, sodra) informacinėse schemose randamos tik pagal savo schemą.
-const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "ppa", "liteko", "vdi", "sodra"];
+// ppa, liteko, vdi, sodra, cvpp, rcJar, eppsViesiejiPirkimai) informacinėse
+// schemose randamos tik pagal savo schemą.
+const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "ppa", "eppsViesiejiPirkimai",
+    "liteko", "vdi", "sodra", "cvpp", "rcJar"];
 const SCHEMA_ARRAY = `ARRAY[${ANALYST_SCHEMAS.map((s) => `'${s}'`).join(", ")}]`;
 const IDENTIFIER_CANDIDATES = [
     "id",
@@ -40,7 +42,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         tags: ["capacity", "blacklist", "labor", "domains", "court"],
         keys: ["jarKodas", "pavadinimas", "darbuotojai", "melagingisTiekejas", "bylosSkaicius"],
         joins: [
-            ["jarKodas", "jarAsmenys.jarKodas", "strict"],
+            ["jarKodas", "asmenys.jarKodas", "strict"],
         ],
         columns: [
             "jarKodas: text",

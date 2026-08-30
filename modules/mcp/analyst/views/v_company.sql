@@ -48,10 +48,10 @@ SELECT j."jarKodas"::text,
        (SELECT COUNT(*)
         FROM "neskelbiamosDerybos" nd
         WHERE nd."jarKodas" = j."jarKodas"::text)                                   AS "neskelbiamosDerybosSkaicius"
-FROM "jarAsmenys" j
-         LEFT JOIN "jarFormos" forma ON forma."kodas" = j."formosKodas"
-         LEFT JOIN "jarStatusai" statusas ON statusas."kodas" = j."statusoKodas"
-         LEFT JOIN "jarAsmenuAdresai" ja ON ja."jarKodas" = j."jarKodas"
+FROM "rcJar"."asmenys" j
+         LEFT JOIN "rcJar"."formos" forma ON forma."kodas" = j."formosKodas"
+         LEFT JOIN "rcJar"."statusai" statusas ON statusas."kodas" = j."statusoKodas"
+         LEFT JOIN "rcJar"."asmenuAdresai" ja ON ja."jarKodas" = j."jarKodas"
          LEFT JOIN "adresuRegistras"."patalposAdresai" patalpa ON patalpa."patKodas" = ja."aobKodas"::int
          LEFT JOIN "adresuRegistras"."pastataiSklypaiAdresai" pastatas
                    ON pastatas."kodas" = COALESCE(patalpa."aobKodas", ja."aobKodas"::int)

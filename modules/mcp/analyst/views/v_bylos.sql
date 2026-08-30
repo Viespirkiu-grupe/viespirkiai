@@ -10,4 +10,4 @@ SELECT n.id           AS "bylosId",
        d."bylojeKaip"
 FROM liteko."dalyviaiPilni" d
          JOIN liteko."nuosprendziaiPilni" n ON n.id = d."nuosprendzioId"
-         LEFT JOIN "jarAsmenys" j ON j."jarKodas"::text = d.kodas
+         LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = d.kodas

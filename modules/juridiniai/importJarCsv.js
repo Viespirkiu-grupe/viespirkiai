@@ -172,7 +172,7 @@ export async function importSource(client, source) {
     // 4612 JAR_IREGISTRUOTI.csv eilutės, o su jomis ir MAXIMA LT).
     if (tracksPeople) {
         await client.query(
-            `DELETE FROM public."jarCsvImportSeen"
+            `DELETE FROM "rcJar"."csvImportSeen"
              WHERE "sukurta" < now() - interval '2 days'`,
         );
     }
@@ -289,7 +289,7 @@ async function writeBatch(client, source, rows, importId) {
         const changed = await source.write(client, rows);
         if (source.name === "iregistruoti" || source.name === "isregistruoti") {
             await client.query(
-                `INSERT INTO public."jarCsvImportSeen" ("importoId", "jarKodas")
+                `INSERT INTO "rcJar"."csvImportSeen" ("importoId", "jarKodas")
                  SELECT $1::uuid, "jarKodas"
                  FROM jsonb_to_recordset($2::jsonb) AS x("jarKodas" integer)
                  ON CONFLICT DO NOTHING`,
@@ -308,18 +308,18 @@ async function updatePeopleMembership(client, source, importId) {
     await client.query("BEGIN");
     try {
         await client.query(
-            `DELETE FROM public."jarCsvAsmenuSaltiniai" WHERE "failas" = $1`,
+            `DELETE FROM "rcJar"."csvAsmenuSaltiniai" WHERE "failas" = $1`,
             [source.file],
         );
         await client.query(
-            `INSERT INTO public."jarCsvAsmenuSaltiniai" ("failas", "jarKodas")
+            `INSERT INTO "rcJar"."csvAsmenuSaltiniai" ("failas", "jarKodas")
              SELECT $1, "jarKodas"
-             FROM public."jarCsvImportSeen"
+             FROM "rcJar"."csvImportSeen"
              WHERE "importoId" = $2`,
             [source.file, importId],
         );
         await client.query(
-            `DELETE FROM public."jarCsvImportSeen" WHERE "importoId" = $1`,
+            `DELETE FROM "rcJar"."csvImportSeen" WHERE "importoId" = $1`,
             [importId],
         );
         await client.query("COMMIT");
@@ -334,14 +334,14 @@ async function removeMissingPeople(client) {
     await client.query("BEGIN");
     try {
         const removed = await client.query(
-            `DELETE FROM public."jarAsmenys" person
+            `DELETE FROM "rcJar"."asmenys" person
              WHERE (
                  SELECT count(DISTINCT "failas")
-                 FROM public."jarCsvAsmenuSaltiniai"
+                 FROM "rcJar"."csvAsmenuSaltiniai"
                  WHERE "failas" = ANY($1::text[])
              ) = 2
                AND NOT EXISTS (
-                   SELECT 1 FROM public."jarCsvAsmenuSaltiniai" membership
+                   SELECT 1 FROM "rcJar"."csvAsmenuSaltiniai" membership
                    WHERE membership."jarKodas" = person."jarKodas"
                      AND membership."failas" = ANY($1::text[])
                )`,
@@ -361,12 +361,12 @@ async function upsertForms(client, rows) {
             SELECT * FROM jsonb_to_recordset($1::jsonb)
                 AS x("formosKodas" integer, "formosPavadinimas" text)
         )
-        INSERT INTO public."jarFormos" ("_id", "_revision", "kodas", "pavadinimas")
+        INSERT INTO "rcJar"."formos" ("_id", "_revision", "kodas", "pavadinimas")
         SELECT gen_random_uuid(), gen_random_uuid(), "formosKodas", max("formosPavadinimas")
         FROM input WHERE "formosKodas" IS NOT NULL AND "formosPavadinimas" IS NOT NULL
         GROUP BY "formosKodas"
         ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
-        WHERE "jarFormos"."pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
+        WHERE "rcJar"."formos".pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
     `, [JSON.stringify(rows)]);
 }
 
@@ -377,12 +377,12 @@ async function upsertRegistered(client, rows) {
             SELECT * FROM jsonb_to_recordset($1::jsonb)
                 AS x("statusoKodas" integer, "statusoPavadinimas" text)
         )
-        INSERT INTO public."jarStatusai" ("kodas", "pavadinimas")
+        INSERT INTO "rcJar"."statusai" ("kodas", "pavadinimas")
         SELECT "statusoKodas", max("statusoPavadinimas") FROM input
         WHERE "statusoKodas" IS NOT NULL AND "statusoPavadinimas" IS NOT NULL
         GROUP BY "statusoKodas"
         ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
-        WHERE "jarStatusai"."pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
+        WHERE "rcJar"."statusai".pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
     `, [JSON.stringify(rows)]);
     return upsertPeople(client, rows, false);
 }
@@ -397,7 +397,7 @@ async function upsertPeople(client, rows, updateForms = true) {
                 "isregistravimoData" date, "duomenuData" date
             )
         )
-        INSERT INTO public."jarAsmenys" AS old
+        INSERT INTO "rcJar"."asmenys" AS old
             ("jarKodas", "pavadinimas", "registravimoData", "formosKodas",
              "statusoKodas", "statusasNuo", "isregistravimoData", "duomenuData")
         SELECT "jarKodas", "pavadinimas", "registravimoData", "formosKodas",
@@ -429,12 +429,12 @@ async function upsertAddresses(client, rows) {
                 "adresasNuo" date, "duomenuData" date
             )
         )
-        INSERT INTO public."jarAsmenuAdresai" AS old
+        INSERT INTO "rcJar"."asmenuAdresai" AS old
             ("jarKodas", "aobKodas", "adresas", "adresasNuo", "duomenuData")
         SELECT input."jarKodas", input."aobKodas", input."adresas",
                input."adresasNuo", input."duomenuData"
         FROM input
-        JOIN public."jarAsmenys" person
+        JOIN "rcJar"."asmenys" person
           ON person."jarKodas" = input."jarKodas"
         ON CONFLICT ("jarKodas") DO UPDATE SET
             "aobKodas" = EXCLUDED."aobKodas", "adresas" = EXCLUDED."adresas",
@@ -466,12 +466,12 @@ async function upsertManagement(client, rows) {
                 "vadovoLytis" text, "kitiValdymoOrganai" boolean, "duomenuData" date
             )
         )
-        INSERT INTO public."jarValdymas" AS old
+        INSERT INTO "rcJar"."valdymas" AS old
             ("jarKodas", "vadovas", "vadovasNuo", "vadovoLytis", "kitiValdymoOrganai", "duomenuData")
         SELECT input."jarKodas", input."vadovas", input."vadovasNuo",
                input."vadovoLytis", input."kitiValdymoOrganai", input."duomenuData"
         FROM input
-        JOIN public."jarAsmenys" person
+        JOIN "rcJar"."asmenys" person
           ON person."jarKodas" = input."jarKodas"
         ON CONFLICT ("jarKodas") DO UPDATE SET
             "vadovas" = EXCLUDED."vadovas", "vadovasNuo" = EXCLUDED."vadovasNuo",
@@ -481,17 +481,17 @@ async function upsertManagement(client, rows) {
     `, [JSON.stringify(rows)]);
 
     const codes = rows.map((row) => row.jarKodas);
-    await client.query(`DELETE FROM public."jarValdymoOrganai" WHERE "jarKodas" = ANY($1::integer[])`, [codes]);
+    await client.query(`DELETE FROM "rcJar"."valdymoOrganai" WHERE "jarKodas" = ANY($1::integer[])`, [codes]);
     const organs = rows.flatMap((row) => row.organai);
     if (organs.length) await client.query(`
-        INSERT INTO public."jarValdymoOrganai"
+        INSERT INTO "rcJar"."valdymoOrganai"
             ("jarKodas", "tipas", "nuo", "vyruKiekis", "moteruKiekis", "lytisNenurodytaKiekis", "duomenuData")
         SELECT input.*
         FROM jsonb_to_recordset($1::jsonb) AS input(
                  "jarKodas" integer, "tipas" text, "nuo" date, "vyruKiekis" integer,
                  "moteruKiekis" integer, "lytisNenurodytaKiekis" integer, "duomenuData" date
              )
-        JOIN public."jarAsmenys" person
+        JOIN "rcJar"."asmenys" person
           ON person."jarKodas" = input."jarKodas"
     `, [JSON.stringify(organs)]);
     return result.rowCount;
@@ -505,12 +505,12 @@ async function upsertCapital(client, rows) {
                 "valiuta" text, "duomenuData" date
             )
         )
-        INSERT INTO public."jarKapitalas" AS old
+        INSERT INTO "rcJar"."kapitalas" AS old
             ("jarKodas", "kapitalasNuo", "kapitalas", "valiuta", "duomenuData")
         SELECT input."jarKodas", input."kapitalasNuo", input."kapitalas",
                upper(input."valiuta"), input."duomenuData"
         FROM input
-        JOIN public."jarAsmenys" person
+        JOIN "rcJar"."asmenys" person
           ON person."jarKodas" = input."jarKodas"
         ON CONFLICT ("jarKodas", "kapitalasNuo") DO UPDATE SET
             "kapitalas" = EXCLUDED."kapitalas", "valiuta" = EXCLUDED."valiuta",

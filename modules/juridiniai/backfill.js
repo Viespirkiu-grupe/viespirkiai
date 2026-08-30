@@ -41,7 +41,7 @@ export async function upsertDictionaries(client) {
     await client.query(`
         INSERT INTO public."juridiniaiFormos" ("kodas", "pavadinimas", "viesasis")
         SELECT "kodas", "pavadinimas", "tipas" = 'Viešasis'
-        FROM public."jarFormos"
+        FROM "rcJar"."formos"
         ON CONFLICT ("kodas") DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas",
             "viesasis" = EXCLUDED."viesasis"
@@ -57,7 +57,7 @@ export async function upsertDictionaries(client) {
     await client.query(`
         INSERT INTO public."juridiniaiStatusai" ("kodas", "pavadinimas")
         SELECT "kodas", "pavadinimas"
-        FROM public."jarStatusai"
+        FROM "rcJar"."statusai"
         ON CONFLICT ("kodas") DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas"
         WHERE "juridiniaiStatusai"."pavadinimas"
@@ -119,7 +119,7 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
             ${JAR_LOCATION_SQL} AS "location"
         FROM batch j
         -- Bendram fragmentui reikia vienodo pagrindinės lentelės aliaso.
-        LEFT JOIN public."jarAsmenys" jar_person
+        LEFT JOIN "rcJar"."asmenys" jar_person
             ON jar_person."jarKodas" = j."jarKodas"
         ${JAR_ADDRESS_JOINS}
         LEFT JOIN LATERAL (
@@ -160,7 +160,7 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
         ) vmi ON true
         LEFT JOIN LATERAL (
             SELECT k."kapitalas"
-            FROM public."jarKapitalas" k
+            FROM "rcJar"."kapitalas" k
             WHERE k."jarKodas" = j."jarKodas"
             ORDER BY k."kapitalasNuo" DESC, k."duomenuData" DESC
             LIMIT 1
@@ -257,7 +257,7 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
 
 export const UPSERT_BATCH_SQL = buildJuridiniaiUpsertSql(
     `SELECT jar_person.*
-     FROM public."jarAsmenys" jar_person
+     FROM "rcJar"."asmenys" jar_person
      WHERE jar_person."jarKodas" > $1
      ORDER BY jar_person."jarKodas"
      LIMIT $2`,
@@ -322,7 +322,7 @@ export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}
             `DELETE FROM public."juridiniai" target
              WHERE target."jarKodas" ~ '^[0-9]{9}$'
                AND NOT EXISTS (
-                   SELECT 1 FROM public."jarAsmenys" source
+                   SELECT 1 FROM "rcJar"."asmenys" source
                    WHERE source."jarKodas"::text = target."jarKodas"
                )`,
         );
