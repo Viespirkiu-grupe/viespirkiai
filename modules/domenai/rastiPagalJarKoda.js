@@ -8,11 +8,11 @@ export async function rastiDomenusPagalJarKoda(jarKodas, options = {}) {
 
     let [domenaiRes, domenaiCountRes] = await Promise.all([
         postgres.query(
-            `SELECT * FROM domenai WHERE "savininkoKodas" = $1 ORDER BY created ASC LIMIT $2;`,
+            `SELECT * FROM domenai."domenaiPilni" WHERE "savininkoKodas" = $1 ORDER BY created ASC LIMIT $2;`,
             [jarKodas, limit],
         ),
         postgres.query(
-            `SELECT "domainCount" FROM "domenaiCounts" WHERE "savininkoKodas" = $1;`,
+            `SELECT "domainCount" FROM domenai.counts WHERE "savininkoKodas" = $1;`,
             [jarKodas],
         ),
     ]);

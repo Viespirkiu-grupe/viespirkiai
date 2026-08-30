@@ -42,7 +42,7 @@ SELECT j."jarKodas"::text,
         FROM "teismoNuosprendziaiDalyviai" d
         WHERE d.kodas = j."jarKodas"::text)                                         AS "bylosSkaicius",
        (SELECT COUNT(*)
-        FROM domenai d
+        FROM domenai."domenaiPilni" d
         WHERE d."savininkoKodas" = j."jarKodas"::text)                              AS "domenaiSkaicius",
        (SELECT COUNT(*)
         FROM "neskelbiamosDerybos" nd

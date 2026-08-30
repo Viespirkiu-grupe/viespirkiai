@@ -15,17 +15,23 @@ if (!filename || !saltinioPavadinimas) {
 async function upsertDomain(domain, lineNumber) {
     try {
         await postgres.query(
-            `INSERT INTO domenai (domain, "radimoSaltiniai", created)
-              VALUES ($1, ARRAY[$2], NOW())
+            // Šaltinių rinkinys dabar yra žodyne, tad naujas šaltinis
+            // pridedamas ne prie masyvo vietoje, o suskaičiuojant naują
+            // rinkinį ir paimant (ar sukuriant) jo id.
+            `INSERT INTO domenai.domenai (domain, "radimoSaltiniaiId", created)
+              VALUES ($1, domenai.saltiniai_id(ARRAY[$2]), NOW())
               ON CONFLICT (domain)
               DO UPDATE
-              SET "radimoSaltiniai" =
-                CASE
-                  WHEN NOT ($2 = ANY(domenai."radimoSaltiniai"))
-                  THEN array_append(domenai."radimoSaltiniai", $2)
-                  ELSE domenai."radimoSaltiniai"
-                END,
-                updated = NOW()`,
+              SET "radimoSaltiniaiId" = domenai.saltiniai_id(
+                    COALESCE(
+                      (SELECT CASE
+                                WHEN $2 = ANY(e.saltiniai) THEN e.saltiniai
+                                ELSE array_append(e.saltiniai, $2)
+                              END
+                         FROM domenai."radimoSaltiniai" e
+                        WHERE e.id = domenai.domenai."radimoSaltiniaiId"),
+                      ARRAY[$2])),
+                  updated = NOW()`,
             [domain, saltinioPavadinimas],
         );
         signalWork(WORK_SIGNALS.DOMENAI_ADP_READY, {

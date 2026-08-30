@@ -22,7 +22,7 @@ async function main() {
         async (cursor, pageLimit) => {
             const { rows } = await postgres.query(
                 `SELECT id, domain
-                 FROM public.domenai
+                 FROM domenai.domenai
                  WHERE id > $1
                  ORDER BY id
                  LIMIT $2`,

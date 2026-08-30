@@ -78,15 +78,13 @@ function isRateLimitResponse(status, body) {
  * @property {object} domreg
  * @property {string | null} savininkas
  * @property {string | null} savininkasAdresas
- * @property {string | null} technikas
- * @property {string | null} technikasAdresas
  * @property {string | null} status
  * @property {string | null} created
  * @property {string | null} expired
  * @property {string | null} updated
  * @property {string[] | null} domregNs
  * @property {string | null} savininkoKodas
- * @property {number | null} savininkoKodasStatus
+ * @property {boolean | null} kodasIeskotas
  */
 
 /**
@@ -239,20 +237,20 @@ function buildSnapshot(domenas, data, scrapedAt, resolved) {
         domreg: data,
         savininkas: data.details?.registrant?.org ?? null,
         savininkasAdresas: data.details?.registrant?.addr ?? null,
-        technikas: data.details?.technical?.org ?? null,
-        technikasAdresas: data.details?.technical?.addr ?? null,
         status: data.domainstatus ?? null,
         created: data.details?.domain?.created ?? null,
         expired: data.details?.domain?.expired ?? null,
         updated: data.details?.domain?.updated ?? null,
         domregNs: data.details?.nameservers ?? null,
         savininkoKodas: resolved?.kodas ?? null,
-        savininkoKodasStatus: resolved?.status ?? null,
+        // `resolved.status` visada 2, taip pat ir tada, kai kodas nerastas —
+        // reikšmė reiškia „jau ieškota", ne „nustatyta".
+        kodasIeskotas: resolved == null ? null : true,
     };
 }
 
 /**
- * Updates public.domenai and inserts a full historical row into public."domenaiScrapes".
+ * Updates domenai.domenai and inserts a full historical row into domenai.scrapes.
  * @param {DbDomainRow} domenas
  * @param {object} data
  * @param {number} scrapeStatus
@@ -266,76 +264,63 @@ async function saveDomainData(domenas, data, scrapeStatus, scrapedAt) {
     const s = buildSnapshot(domenas, data, scrapedAt, resolved);
 
     await postgres.query(
-        `UPDATE public.domenai
+        `UPDATE domenai.domenai
          SET "domregNuskaitymas" = $1,
              "domregData" = $2,
-             domreg = $3,
-             savininkas = $4,
-             "savininkasAdresas" = $5,
-             technikas = $6,
-             "technikasAdresas" = $7,
-             status = $8,
-             created = $9,
-             expired = $10,
-             updated = $11,
-             "domregNs" = $12,
-             "savininkoKodas" = $13,
-             "savininkoKodasStatus" = $14
-         WHERE id = $15`,
+             "domregId" = domenai.domreg_id($3),
+             "savininkasId" = domenai.savininkas_id($4, $5, $6),
+             "busenaId" = domenai.busena_id($7),
+             created = $8,
+             expired = $9,
+             updated = $10,
+             "nsId" = domenai.ns_id($11),
+             "kodasIeskotas" = $12
+         WHERE id = $13`,
         [
             scrapeStatus,
             s.domregData,
             s.domreg,
             s.savininkas,
             s.savininkasAdresas,
-            s.technikas,
-            s.technikasAdresas,
+            s.savininkoKodas,
             s.status,
             s.created,
             s.expired,
             s.updated,
             s.domregNs,
-            s.savininkoKodas,
-            s.savininkoKodasStatus,
+            s.kodasIeskotas,
             domenas.id,
         ],
     );
 
     await postgres.query(
-        `INSERT INTO public."domenaiScrapes" (
+        `INSERT INTO domenai.scrapes (
             "domainId",
-            domain,
             "domregData",
-            domreg,
-            savininkas,
-            "savininkasAdresas",
-            technikas,
-            "technikasAdresas",
-            status,
+            "domregId",
+            "savininkasId",
+            "busenaId",
             created,
             expired,
             updated,
-            "domregNs",
-            "savininkoKodas",
-            "savininkoKodasStatus"
+            "nsId",
+            "kodasIeskotas"
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+         VALUES ($1, $2, domenai.domreg_id($3), domenai.savininkas_id($4, $5, $6),
+                 domenai.busena_id($7), $8, $9, $10, domenai.ns_id($11), $12)`,
         [
             domenas.id,
-            s.domain,
             s.domregData,
             s.domreg,
             s.savininkas,
             s.savininkasAdresas,
-            s.technikas,
-            s.technikasAdresas,
+            s.savininkoKodas,
             s.status,
             s.created,
             s.expired,
             s.updated,
             s.domregNs,
-            s.savininkoKodas,
-            s.savininkoKodasStatus,
+            s.kodasIeskotas,
         ],
     );
 
@@ -372,7 +357,7 @@ async function rotateAfterRateLimit(domain, reason, signal) {
 export async function nuskaitytiDomregDomena(signal) {
     const result = await postgres.query(
         `SELECT id, domain
-         FROM public.domenai
+         FROM domenai.domenai
          WHERE COALESCE("domregNuskaitymas", 0) <> $1
          ORDER BY "domregData" ASC NULLS FIRST
          LIMIT 1`,
@@ -427,7 +412,7 @@ export async function nuskaitytiDomregDomena(signal) {
 
             logger.log(`Fetch error for ${domenas.domain}: ${error.message}`);
             await postgres.query(
-                `UPDATE public.domenai
+                `UPDATE domenai.domenai
                  SET "domregNuskaitymas" = $1,
                      "domregData" = $2
                  WHERE id = $3`,

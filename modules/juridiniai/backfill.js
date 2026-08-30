@@ -174,7 +174,7 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
             FROM public."vdiPazeidimai" v
             WHERE v."jarKodas" = j."jarKodas"::text
         ) vdi ON true
-        LEFT JOIN public."domenaiCounts" domenai
+        LEFT JOIN domenai.counts domenai
             ON domenai."savininkoKodas" = j."jarKodas"::text
         LEFT JOIN public."juridiniaiSavivaldybesPavadinimai" sav_dict
             ON sav_dict."pavadinimas" = jar_municipality."pavadinimas"

@@ -21,7 +21,10 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "nepatikimiTiekejai", "melagingiTiekejai",
     "jadisDalyviuSkaiciai", "jadisDalyviuSarasai", "jadisValstybesDalyviai",
     "rcInformaciniaiLeidiniaiPranesimai",
-    "domenai", "kotis",
+    // `domenai` dabar yra normalizuota lentelė be savininko laukų;
+    // `domenaiPilni` yra suderinamumo view su senąja forma. Abu
+    // pasiekiami nekvalifikuotai per analyst rolės search_path.
+    "domenai", "domenaiPilni", "kotis",
     "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
     "darboVieta", "istatinisKapitalas",
 

@@ -85,7 +85,7 @@ export async function* iterateDomenai({ batchSize = DEFAULT_BATCH_SIZE, startAft
         const { rows } = await postgres.query(
             `SELECT id, domain, status, created, expired, updated,
                     "domregNs", savininkas, "savininkoKodas"
-             FROM domenai
+             FROM domenai."domenaiPilni"
              WHERE id > $1
              ORDER BY id ASC
              LIMIT $2`,
@@ -102,7 +102,7 @@ export async function fetchScrapesForDomains(domainIds) {
     const { rows } = await postgres.query(
         `SELECT "scrapeId", "domainId", domain, "domregData", status, expired,
                 "domregNs", savininkas, "savininkoKodas"
-         FROM "domenaiScrapes"
+         FROM domenai."scrapesPilni"
          WHERE "domainId" = ANY($1::int[])
          ORDER BY "domainId" ASC, "scrapeId" ASC`,
         [domainIds],

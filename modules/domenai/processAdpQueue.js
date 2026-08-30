@@ -9,10 +9,10 @@ import {
 
 async function claimOne() {
     const { rows } = await postgres.query(
-        `DELETE FROM public."domenaiAdpQueue"
+        `DELETE FROM domenai."adpQueue"
          WHERE domain = (
              SELECT domain
-             FROM public."domenaiAdpQueue"
+             FROM domenai."adpQueue"
              ORDER BY "queuedAt"
              FOR UPDATE SKIP LOCKED
              LIMIT 1
@@ -37,7 +37,7 @@ export async function processDomenaiAdpQueue() {
         return true;
     } catch (error) {
         await postgres.query(
-            `INSERT INTO public."domenaiAdpQueue" (domain)
+            `INSERT INTO domenai."adpQueue" (domain)
              VALUES ($1)
              ON CONFLICT (domain) DO NOTHING`,
             [domain],
