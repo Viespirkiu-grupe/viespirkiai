@@ -400,7 +400,7 @@ ppa: ataskaitos, dalyviai, pasiulymuEile, atmestiPasiulymai
 neskelbiamosDerybos
 vdiPazeidimai
 bylos, bylosDalyviai
-mokesciai
+vmi: mokesciai, mokesciaiPilni
 ```
 
 Plus the six TEMP view names. The in-code `TABLE_WHITELIST` in
@@ -534,6 +534,7 @@ GRANT USAGE ON SCHEMA regitra TO analyst;
 GRANT USAGE ON SCHEMA "rcInformaciniaiPranesimai" TO analyst;
 GRANT USAGE ON SCHEMA jadis TO analyst;
 GRANT USAGE ON SCHEMA "adpFinansinesAtaskaitos" TO analyst;
+GRANT USAGE ON SCHEMA vmi TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -554,7 +555,8 @@ GRANT SELECT ON
     "adpFinansinesAtaskaitos"."balansoEilutes", "adpFinansinesAtaskaitos"."pelnoNuostoliuEilutes",
     "darboVieta", "istatinisKapitalas",
     "neskelbiamosDerybos", "vdiPazeidimai",
-    "teismoNuosprendziai", "teismoNuosprendziaiDalyviai", "mokesciai",
+    "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
+    vmi."mokesciai", vmi."mokesciaiPilni",
     ppa."ataskaitos", ppa."dalyviai", ppa."ataskaituSutartys",
     ppa."pasiulymuEile", ppa."atmestiPasiulymai"
 TO analyst;
@@ -571,5 +573,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
 ```

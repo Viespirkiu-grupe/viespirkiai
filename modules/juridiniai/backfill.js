@@ -151,10 +151,14 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
             ON evrk."id" = naujausiSodra."evrkId"
         LEFT JOIN public."juridiniaiEvrk" evrk_dict
             ON evrk_dict."kodas" = evrk."kodas"
+        -- VMI su juridiniu asmeniu siejasi per public."jar"._id, o ne per kodą:
+        -- buvęs mokesciai."jarKodas" buvo "id" dublikatas ir nesutapdavo su nė
+        -- vienu JAR kodu, tad šis stulpelis būdavo visada tuščias.
         LEFT JOIN LATERAL (
             SELECT m."suma"
-            FROM public."mokesciai" m
-            WHERE m."jarKodas" = j."jarKodas"::text
+            FROM public."jar" jr
+            JOIN "vmi"."mokesciai" m ON m."jarId" = jr."_id"
+            WHERE jr."jarKodas" = j."jarKodas"::text
             ORDER BY m."metai" DESC, m."menuo" DESC, m."duomenuData" DESC
             LIMIT 1
         ) vmi ON true

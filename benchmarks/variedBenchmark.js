@@ -166,7 +166,7 @@ const QUERIES = [
                     sum(suma) - lag(sum(suma)) OVER (
                         PARTITION BY savivaldybe ORDER BY metai, menuo
                     ) AS pokytis
-                FROM mokesciai
+                FROM "vmi"."mokesciai"
                 GROUP BY savivaldybe, metai, menuo
             ) m
             WHERE pokytis IS NOT NULL`,

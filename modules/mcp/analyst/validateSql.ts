@@ -54,7 +54,9 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // LITEKO lentelės iškeltos į `liteko` schemą; senąją stulpelių formą
     // atkuria view'ai, pasiekiami nekvalifikuotai per analyst search_path.
     "nuosprendziaiPilni", "dalyviaiPilni",
-    "mokesciai",
+    // VMI mokesčiai iškelti į `vmi` schemą ir normalizuoti; `mokesciaiPilni`
+    // yra suderinamumo view su senąja plokščia forma.
+    "mokesciai", "mokesciaiPilni",
 
     // PPA (ATN-1) XLSX ataskaitos iškeltos į `ppa` schemą. `dalyviai` yra ir
     // `liteko` schemoje, todėl analyst search_path'e `ppa` eina pirmiau —

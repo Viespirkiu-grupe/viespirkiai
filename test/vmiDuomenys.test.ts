@@ -14,24 +14,30 @@ describe("gautiVmiDuomenis", () => {
         pgQuery.mockReset();
     });
 
-    it("queries mokesciai by jarKodas and data.gov.lt jar id", async () => {
+    it("queries vmi.mokesciai by the data.gov.lt jar id", async () => {
         pgQuery.mockResolvedValue({ rows: [] });
 
         const { gautiVmiDuomenis } = await import("../modules/vmi/vmiDuomenys.js");
         await gautiVmiDuomenis("123456789", "jar-id-1");
 
         expect(pgQuery).toHaveBeenCalledWith(
-            expect.stringContaining("mm_kodas_id = $2"),
-            ["123456789", "jar-id-1"],
+            expect.stringContaining('m."jarId" = $1::uuid'),
+            ["jar-id-1"],
         );
     });
 
-    it("fills result jarKodas from requested code when VMI row has no jarKodas", async () => {
+    it("returns undefined without a jar id — there is no other link to VMI", async () => {
+        const { gautiVmiDuomenis } = await import("../modules/vmi/vmiDuomenys.js");
+
+        expect(await gautiVmiDuomenis("123456789", null)).toBeUndefined();
+        expect(pgQuery).not.toHaveBeenCalled();
+    });
+
+    it("fills result jarKodas from the requested code", async () => {
         pgQuery.mockResolvedValue({
             rows: [
                 {
                     pavadinimas: "UAB Test",
-                    jarKodas: null,
                     formosPavadinimas: "Uždaroji akcinė bendrovė",
                     suma: 120.5,
                     metai: 2026,
