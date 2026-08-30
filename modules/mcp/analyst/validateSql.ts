@@ -29,7 +29,9 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "darboVieta", "istatinisKapitalas",
 
     "neskelbiamosDerybos",
-    "vdiPazeidimai",
+    // `vdi` schema; `pazeidimaiPilni` yra suderinamumo view su senąja forma.
+    // Abu pasiekiami nekvalifikuotai per analyst search_path.
+    "pazeidimai", "pazeidimaiPilni", "subjektai",
     // LITEKO lentelės iškeltos į `liteko` schemą; senąją stulpelių formą
     // atkuria view'ai, pasiekiami nekvalifikuotai per analyst search_path.
     "nuosprendziaiPilni", "dalyviaiPilni",

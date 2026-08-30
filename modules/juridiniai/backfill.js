@@ -171,8 +171,9 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
             ON bylos."jarKodas" = j."jarKodas"::text
         LEFT JOIN LATERAL (
             SELECT count(*) AS "count"
-            FROM public."vdiPazeidimai" v
-            WHERE v."jarKodas" = j."jarKodas"::text
+            FROM vdi.pazeidimai v
+            JOIN vdi.subjektai s ON s.id = v."subjektoId"
+            WHERE s."jarKodas" = j."jarKodas"::integer
         ) vdi ON true
         LEFT JOIN domenai.counts domenai
             ON domenai."savininkoKodas" = j."jarKodas"::text

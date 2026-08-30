@@ -36,8 +36,9 @@ SELECT j."jarKodas"::text,
               WHERE n."tiekejoJarKodas" = j."jarKodas"::text
                 AND (n."itrauktaIki" IS NULL OR n."itrauktaIki" >= CURRENT_DATE))   AS "nepatikimasTiekejas",
        (SELECT COUNT(*)
-        FROM "vdiPazeidimai" v
-        WHERE v."jarKodas" = j."jarKodas"::text)                                    AS "vdiPazeidimuSkaicius",
+        FROM vdi.pazeidimai v
+        JOIN vdi.subjektai s ON s.id = v."subjektoId"
+        WHERE s."jarKodas" = j."jarKodas"::integer)                                    AS "vdiPazeidimuSkaicius",
        (SELECT COUNT(*)
         FROM liteko."dalyviaiPilni" d
         WHERE d.kodas = j."jarKodas"::text)                                         AS "bylosSkaicius",
