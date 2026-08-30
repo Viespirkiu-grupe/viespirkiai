@@ -267,7 +267,7 @@ export default [
         job: processJuridiniaiTypesenseQueue,
     },
     {
-        // mcpToolCalls -> quickwit (iš mcpToolCallsQuickwitIndexQueue)
+        // mcp."toolCalls" -> quickwit (iš mcp."indexQueue")
         name: "mcpToolCallsQuickwitProcessIndexQueue",
         mode: "asap",
         // MCP logas nėra skubus – žemesnis prioritetas nei duomenų srautai.

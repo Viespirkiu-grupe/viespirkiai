@@ -480,10 +480,10 @@ ORDER BY metai
 ## Auditing
 
 Every tool call is logged via the existing `logToolCall` wrapper in `server.js`, which writes to the
-`mcpToolCalls` table. That table holds only facts (`durationMs`, `success`, `createdAt`) plus references
-into the dictionary tables `mcpToolCallsToolName`, `mcpToolCallsUserAgent` and `mcpToolCallsErrorMsg`, so
-reading the audit log means joining those three (see `modules/mcp/sql/mcpToolCallsSplit1.sql`). Each row
-is also queued for Quickwit indexing in `mcpToolCallsQuickwitIndexQueue`. The `purpose` field from
+`mcp."toolCalls"` table. That table holds only facts (`durationMs`, `success`, `createdAt`) plus references
+into the dictionary tables `mcp."toolName"`, `mcp."userAgent"` and `mcp."errorMsg"`, so
+reading the audit log means joining those three (DDL: `mcpSchema.sql`). Each row
+is also queued for Quickwit indexing in `mcp."indexQueue"`. The `purpose` field from
 `execute_query` becomes a human-readable narrative of the investigation in the audit log. No additional
 audit infrastructure is needed.
 

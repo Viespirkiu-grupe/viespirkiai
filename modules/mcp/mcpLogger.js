@@ -1,9 +1,6 @@
 /**
- * SVARBU (deploy'o tvarka): šis modulis rašo tik žodynų ID, o ne tekstą, tad
- * prieš jį paleidžiant DB jau turi būti pritaikyta
- * `modules/mcp/sql/mcpToolCallsSplit1.sql` (žodyninės lentelės + `*Id` stulpeliai).
- * `modules/mcp/sql/mcpToolCallsSplit2.sql` (tekstinių stulpelių dropas) leidžiamas
- * tik po to, kai ši versija jau veikia.
+ * MCP įrankių iškvietimų žurnalas. Lentelės gyvena `mcp` schemoje
+ * (DDL — mcpSchema.sql): faktų eilutė `mcp."toolCalls"` laiko tik žodynų ID.
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 import { postgres } from "../../postgres/postgres.js";
@@ -28,21 +25,21 @@ const MAX_ZODYNO_ILGIS = 256;
  */
 const INSERT_SQL = `
     WITH tn AS (
-        INSERT INTO "mcpToolCallsToolName" ("toolName") VALUES ($1)
+        INSERT INTO mcp."toolName" ("toolName") VALUES ($1)
         ON CONFLICT ("toolName") DO UPDATE SET "toolName" = EXCLUDED."toolName"
         RETURNING id
     ), em AS (
-        INSERT INTO "mcpToolCallsErrorMsg" ("errorMsg")
+        INSERT INTO mcp."errorMsg" ("errorMsg")
         SELECT $4::text WHERE $4::text IS NOT NULL
         ON CONFLICT ("errorMsg") DO UPDATE SET "errorMsg" = EXCLUDED."errorMsg"
         RETURNING id
     ), ua AS (
-        INSERT INTO "mcpToolCallsUserAgent" ("userAgent")
+        INSERT INTO mcp."userAgent" ("userAgent")
         SELECT $5::text WHERE $5::text IS NOT NULL
         ON CONFLICT ("userAgent") DO UPDATE SET "userAgent" = EXCLUDED."userAgent"
         RETURNING id
     )
-    INSERT INTO "mcpToolCalls" ("toolNameId", "durationMs", success, "errorMsgId", "userAgentId")
+    INSERT INTO mcp."toolCalls" ("toolNameId", "durationMs", success, "errorMsgId", "userAgentId")
     SELECT (SELECT id FROM tn), $2, $3, (SELECT id FROM em), (SELECT id FROM ua)`;
 
 function trumpinti(value) {

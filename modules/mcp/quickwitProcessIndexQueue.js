@@ -15,20 +15,16 @@ Indekso schema gyvena tik DB — `quickwitLenteles."indexConfig"` stulpelyje
 (`quickwit/quickwit.js` iš ten ją ir paima kurdamas shard'ą), tad kode jos
 nedubliuojame; čia lieka tik patikra, kad įrašas egzistuoja.
 
-`mcpToolCalls` skaidymas į žodynines lenteles vyksta dviem dalimis
-(`sql/mcpToolCallsSplit1.sql`, `sql/mcpToolCallsSplit2.sql`), tad šaltinio lentelė
-pereinamuoju laikotarpiu gali būti dviejų formų. `fetchRows` formą nustato pati
-(vieną kartą, pagal `toolNameId` stulpelio buvimą), kad drainer'į būtų galima
-paleisti bet kurioje migracijos stadijoje.
+Žurnalo lentelės gyvena `mcp` schemoje (DDL — mcpSchema.sql); `LENTELE` lieka
+Quickwit indekso etiketė (`quickwitLenteles."lentele"`), o ne SQL vardas.
 */
 
 const logger = new Logger();
 const LENTELE = "mcpToolCalls";
-const QUEUE_TABLE = "mcpToolCallsQuickwitIndexQueue";
+const QUEUE_SCHEMA = "mcp";
+const QUEUE_TABLE = "indexQueue";
 const BATCH_SIZE = 5_000;
 
-/** @type {boolean|null} */
-let normalizedShape = null;
 let configChecked = false;
 
 async function ensureConfigRegistered() {
@@ -41,24 +37,6 @@ async function ensureConfigRegistered() {
         throw new Error(`quickwitLenteles neturi „${LENTELE}" įrašo`);
     }
     configChecked = true;
-}
-
-/**
- * `true`, kai jau pritaikytas mcpToolCallsSplit1.sql (yra `toolNameId`).
- * @param {import("pg").ClientBase} client
- */
-async function isNormalized(client) {
-    if (normalizedShape != null) return normalizedShape;
-    const { rows } = await client.query(
-        `SELECT 1
-         FROM information_schema.columns
-         WHERE table_schema = 'public'
-           AND table_name = $1
-           AND column_name = 'toolNameId'`,
-        [LENTELE],
-    );
-    normalizedShape = rows.length > 0;
-    return normalizedShape;
 }
 
 /** Quickwit `mode: strict` – null reikšmes geriau praleisti, nei siųsti. */
@@ -86,41 +64,27 @@ export async function processMcpToolCallsIndexQueue(opts = {}) {
         {
             lentele: LENTELE,
             queueTable: QUEUE_TABLE,
+            queueSchema: QUEUE_SCHEMA,
             keyColumn: "mcpToolCallId",
             batchSize: BATCH_SIZE,
             commit: "auto",
             rowId: (row) => row.id,
             buildDoc,
             fetchRows: async (client, ids) => {
-                const normalized = await isNormalized(client);
                 const { rows } = await client.query(
-                    normalized
-                        ? `SELECT
-                                c."id",
-                                t."toolName",
-                                u."userAgent",
-                                e."errorMsg",
-                                c."durationMs",
-                                c."success",
-                                c."createdAt"
-                           FROM public."mcpToolCalls" c
-                           LEFT JOIN public."mcpToolCallsToolName" t
-                                ON t."id" = c."toolNameId"
-                           LEFT JOIN public."mcpToolCallsUserAgent" u
-                                ON u."id" = c."userAgentId"
-                           LEFT JOIN public."mcpToolCallsErrorMsg" e
-                                ON e."id" = c."errorMsgId"
-                           WHERE c."id" = ANY($1::bigint[])`
-                        : `SELECT
-                                c."id",
-                                c."toolName",
-                                c."userAgent",
-                                c."errorMsg",
-                                c."durationMs",
-                                c."success",
-                                c."createdAt"
-                           FROM public."mcpToolCalls" c
-                           WHERE c."id" = ANY($1::bigint[])`,
+                    `SELECT
+                            c."id",
+                            t."toolName",
+                            u."userAgent",
+                            e."errorMsg",
+                            c."durationMs",
+                            c."success",
+                            c."createdAt"
+                       FROM mcp."toolCalls" c
+                       LEFT JOIN mcp."toolName" t ON t."id" = c."toolNameId"
+                       LEFT JOIN mcp."userAgent" u ON u."id" = c."userAgentId"
+                       LEFT JOIN mcp."errorMsg" e ON e."id" = c."errorMsgId"
+                      WHERE c."id" = ANY($1::bigint[])`,
                     [ids],
                 );
                 return rows;

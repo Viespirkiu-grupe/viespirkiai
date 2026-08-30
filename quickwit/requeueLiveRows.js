@@ -7,8 +7,7 @@ import { signalWork, WORK_SIGNALS } from "../utils/taskSignals.js";
 // `signal` – NATS signalas, kuriuo po commit'o pažadinamas atitinkamas
 // taskRunner'io indeksavimo eilės darbas (žr. tasks/*.js `wakeOn`).
 const TABLES = {
-  // Vienintelė lentelė ne public schemoje; eilės keitimo stulpelis čia
-  // vadinasi „change", o ne „keitimas".
+  // Eilės keitimo stulpelis čia vadinasi „change", o ne „keitimas".
   documents: {
     queue: "indexQueue",
     queueSchema: "documents",
@@ -43,10 +42,14 @@ const TABLES = {
     sourceValue: `e."eilutesId"::text`,
     signal: WORK_SIGNALS.JURIDINIAI_INDEX_READY,
   },
+  // Raktas – `quickwitIndeksai."lentele"` reikšmė (Quickwit indekso etiketė);
+  // pačios lentelės gyvena `mcp` schemoje.
   mcpToolCalls: {
-    queue: "mcpToolCallsQuickwitIndexQueue",
+    queue: "indexQueue",
+    queueSchema: "mcp",
     queueId: "mcpToolCallId",
-    source: "mcpToolCalls",
+    source: "toolCalls",
+    sourceSchema: "mcp",
     sourceId: "id",
     signal: WORK_SIGNALS.MCP_TOOL_CALLS_INDEX_READY,
   },
