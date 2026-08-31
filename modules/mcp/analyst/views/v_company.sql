@@ -28,13 +28,17 @@ SELECT j."jarKodas"::text,
        s."vidutinisAtlyginimas",
        s."imokuSuma",
        EXISTS(SELECT 1
-              FROM "melagingiTiekejai" m
+              FROM "vptJuodiejiSarasai"."tiekejai" m
+              JOIN "vptJuodiejiSarasai"."sarasai" ms ON ms."id" = m."sarasoId"
               WHERE m."tiekejoJarKodas" = j."jarKodas"::text
+                AND ms."kodas" = 'melagingi'
                 AND (m."itrauktasIki" IS NULL OR m."itrauktasIki" >= CURRENT_DATE)) AS "melagingisTiekejas",
        EXISTS(SELECT 1
-              FROM "nepatikimiTiekejai" n
+              FROM "vptJuodiejiSarasai"."tiekejai" n
+              JOIN "vptJuodiejiSarasai"."sarasai" ns ON ns."id" = n."sarasoId"
               WHERE n."tiekejoJarKodas" = j."jarKodas"::text
-                AND (n."itrauktaIki" IS NULL OR n."itrauktaIki" >= CURRENT_DATE))   AS "nepatikimasTiekejas",
+                AND ns."kodas" = 'nepatikimi'
+                AND (n."itrauktasIki" IS NULL OR n."itrauktasIki" >= CURRENT_DATE)) AS "nepatikimasTiekejas",
        (SELECT COUNT(*)
         FROM vdi.pazeidimai v
         JOIN vdi.subjektai s ON s.id = v."subjektoId"

@@ -391,7 +391,7 @@ cpvaProjektuSutartys, cpvaProjektuSarasas
 cvpp: archyvoSkelbimai (CVPP archyvas)
 eiluciuSkaiciai, bvpzKodai
 sodra | regitra: priemoniuTipai, matymai, atnaujinimai
-nepatikimiTiekejai, melagingiTiekejai
+vptJuodiejiSarasai: tiekejai, pagrindimai, sarasai (VPT juodieji sąrašai)
 jadis: suvestine, dalyviuSkaiciai, dalyviuSarasai, valstybesDalyviai | rcInformaciniaiPranesimai: pranesimai, pranesimaiPilni, juridiniuPavadinimai, leidiniai
 domenai, kotis
 adpFinansinesAtaskaitos: balansoEilutes, pelnoNuostoliuEilutes
@@ -537,6 +537,7 @@ GRANT USAGE ON SCHEMA jadis TO analyst;
 GRANT USAGE ON SCHEMA "adpFinansinesAtaskaitos" TO analyst;
 GRANT USAGE ON SCHEMA vmi TO analyst;
 GRANT USAGE ON SCHEMA uzt TO analyst;
+GRANT USAGE ON SCHEMA "vptJuodiejiSarasai" TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -549,7 +550,8 @@ GRANT SELECT ON
     sodra."menesiniai", sodra."evrk", sodra."importai",
     sodra."pavadinimai", sodra."savivaldybes",
     regitra."priemoniuTipai", regitra."matymai", regitra."atnaujinimai",
-    "nepatikimiTiekejai", "melagingiTiekejai",
+    "vptJuodiejiSarasai"."tiekejai", "vptJuodiejiSarasai"."pagrindimai",
+    "vptJuodiejiSarasai"."sarasai",
     jadis."suvestine", jadis."dalyviuSkaiciai", jadis."dalyviuSarasai", jadis."valstybesDalyviai",
     "rcInformaciniaiPranesimai"."pranesimai", "rcInformaciniaiPranesimai"."pranesimaiPilni",
     "rcInformaciniaiPranesimai"."juridiniuPavadinimai", "rcInformaciniaiPranesimai"."leidiniai",
@@ -581,5 +583,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, "vptJuodiejiSarasai", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
 ```

@@ -30,7 +30,11 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // Regitra iškelta į `regitra` schemą; pagrindinė lentelė pervadinta į
     // `priemoniuTipai` (transporto priemonių tipai).
     "priemoniuTipai", "matymai", "atnaujinimai",
-    "nepatikimiTiekejai", "melagingiTiekejai",
+    // VPT juodieji sąrašai iškelti į "vptJuodiejiSarasai" schemą ir sujungti į
+    // vieną lentelę: nekvalifikuotas `tiekejai` reiškia BŪTENT juoduosius
+    // sąrašus (kuriame sąraše – sako `sarasai` žodynas per "sarasoId"), o
+    // `pagrindimai` – tiekėjų paaiškinimus dėl įtraukimo.
+    "tiekejai", "pagrindimai", "sarasai",
     // JADIS iškeltas į `jadis` schemą; `suvestine` – buvusi public."jadis".
     "suvestine", "dalyviuSkaiciai", "dalyviuSarasai", "valstybesDalyviai",
     // RC informaciniai pranešimai iškelti į "rcInformaciniaiPranesimai" schemą ir

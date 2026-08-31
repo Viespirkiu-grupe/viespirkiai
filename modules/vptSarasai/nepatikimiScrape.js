@@ -218,7 +218,8 @@ export async function importuotiNepatikimusTiekejus() {
 
         await postgres.query(
             `
-      INSERT INTO "nepatikimiTiekejai" (
+      INSERT INTO "vptJuodiejiSarasai"."tiekejai" (
+        "sarasoId",
         "atvejoNr",
         "duomenuIvedimoData",
         "pirkimoVykdytojoPavadinimas",
@@ -226,25 +227,26 @@ export async function importuotiNepatikimusTiekejus() {
         "tiekejoJarKodas",
         "pirkimoNumeris",
         "sutartiesNutraukimoData",
-        "dataNuoKuriosSkaiciuojama",
-        "itrauktaIki",
+        "terminoPradzia",
+        "itrauktasIki",
         "teismoData",
         "teismoSprendimoLink",
         "teismoSprendimoData",
         "metai",
         "paskutiniKartaMatytaSarase"
       ) VALUES (
+        (SELECT "id" FROM "vptJuodiejiSarasai"."sarasai" WHERE "kodas" = 'nepatikimi'),
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
       )
-      ON CONFLICT ("tiekejoJarKodas", "pirkimoNumeris")
+      ON CONFLICT ("sarasoId", "tiekejoJarKodas", "pirkimoNumeris")
       DO UPDATE SET
         "atvejoNr" = EXCLUDED."atvejoNr",
         "duomenuIvedimoData" = EXCLUDED."duomenuIvedimoData",
         "pirkimoVykdytojoPavadinimas" = EXCLUDED."pirkimoVykdytojoPavadinimas",
         "tiekejoPavadinimas" = EXCLUDED."tiekejoPavadinimas",
         "sutartiesNutraukimoData" = EXCLUDED."sutartiesNutraukimoData",
-        "dataNuoKuriosSkaiciuojama" = EXCLUDED."dataNuoKuriosSkaiciuojama",
-        "itrauktaIki" = EXCLUDED."itrauktaIki",
+        "terminoPradzia" = EXCLUDED."terminoPradzia",
+        "itrauktasIki" = EXCLUDED."itrauktasIki",
         "teismoData" = EXCLUDED."teismoData",
         "teismoSprendimoLink" = EXCLUDED."teismoSprendimoLink",
         "teismoSprendimoData" = EXCLUDED."teismoSprendimoData",
@@ -278,7 +280,8 @@ export async function importuotiNepatikimusTiekejus() {
 
         await postgres.query(
             `
-      INSERT INTO "nepatikimiTiekejaiPagrindimai" (
+      INSERT INTO "vptJuodiejiSarasai"."pagrindimai" (
+        "sarasoId",
         "duomenuIvedimoData",
         "pirkimoVykdytojoPavadinimas",
         "tiekejoPavadinimas",
@@ -289,8 +292,10 @@ export async function importuotiNepatikimusTiekejus() {
         "paaiskinimoPateikimoData",
         "tiekejoPaaiskinimas",
         "tiekejoPaaiskinimoDokumentoNuoroda"
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-      ON CONFLICT ("tiekejoJarKodas", "pirkimoNumeris")
+      ) VALUES (
+        (SELECT "id" FROM "vptJuodiejiSarasai"."sarasai" WHERE "kodas" = 'nepatikimi'),
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      ON CONFLICT ("sarasoId", "tiekejoJarKodas", "pirkimoNumeris")
       DO UPDATE SET
         "duomenuIvedimoData" = EXCLUDED."duomenuIvedimoData",
         "pirkimoVykdytojoPavadinimas" = EXCLUDED."pirkimoVykdytojoPavadinimas",

@@ -16,8 +16,10 @@ import { gautiRegitrosDuomenis } from "../regitra/regitraDuomenys.js";
 import { gautiTeismoNuosprendzius } from "../liteko/teismoNuosprendziai.js";
 import { gautiIstatiniKapitala } from "../istatinisKapitalas/istatinisKapitalasDuomenys.js";
 import { gautiPinregDeklaracijasPagalJarKoda } from "../pinreg/pinregDeklaracijos.js";
-import { gautiNepatikimuTiekejuIrasusPagalJarKoda } from "../vptSarasai/nepatikimiTiekejai.js";
-import { gautiMelaginguTiekejuIrasusPagalJarKoda } from "../vptSarasai/melagingiTiekejai.js";
+import {
+    gautiNepatikimuTiekejuIrasusPagalJarKoda,
+    gautiMelaginguTiekejuIrasusPagalJarKoda,
+} from "../vptSarasai/juodiejiSarasai.js";
 import { gautiJadisDuomenis } from "../jadis/jadisDuomenys.js";
 import { gautiRcPranesimusPagalJarKoda } from "../registruCentrasPranesimai/rcPranesimai.js";
 import {

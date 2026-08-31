@@ -59,33 +59,14 @@ const quoteMatch = rawSearch.match(/^"(.*)"$/);
 const tsQueryFunc = quoteMatch ? 'phraseto_tsquery' : 'plainto_tsquery';
 const cleanSearch = quoteMatch ? quoteMatch[1] : rawSearch;
 
-// Abu sąrašai suvienodinami į vieną `nd` CTE: bendri stulpeliai, sąrašo
-// pavadinimas (`saltinis`) ir išvestinė įtraukimo būsena (`busena`).
+// Abu sąrašai gyvena vienoje lentelėje (`vptJuodiejiSarasai`), tad lieka tik
+// išvestinė įtraukimo būsena (`busena`) ir sąrašo pavadinimas (`saltinis`).
 const BASE_CTE = `
-  WITH raw AS (
-    SELECT
-      "atvejoNr", "duomenuIvedimoData", "pirkimoVykdytojoPavadinimas", "tiekejoPavadinimas",
-      "tiekejoJarKodas", "pirkimoNumeris", "sutartiesNutraukimoData"::date,
-      "dataNuoKuriosSkaiciuojama"::date, "itrauktaIki"::date AS "itrauktasIki",
-      "teismoData"::date, "teismoSprendimoData"::date, "teismoSprendimoLink", metai,
-      "paskutiniKartaMatytaSarase", NULL::text AS "irasymoPagrindas",
-      "search_index", 'Nepatikimas' AS saltinis
-    FROM public."nepatikimiTiekejai"
-
-    UNION ALL
-
-    SELECT
-      "atvejoNr", "duomenuIvedimoData", "pirkimoVykdytojoPavadinimas", "tiekejoPavadinimas",
-      "tiekejoJarKodas", "pirkimoNumeris", NULL::date AS "sutartiesNutraukimoData",
-      "dataNuoKuriosSkaiciuojamasTerminas"::date AS "dataNuoKuriosSkaiciuojama",
-      "itrauktasIki"::date, "teismoData"::date, NULL::date AS "teismoSprendimoData",
-      "teismoSprendimoLink", metai, "paskutiniKartaMatytaSarase", "irasymoPagrindas",
-      "search_index", 'Melagingas' AS saltinis
-    FROM public."melagingiTiekejai"
-  ), seen AS (
-    SELECT raw.*,
-      MAX(raw."paskutiniKartaMatytaSarase") OVER (PARTITION BY raw.saltinis) AS "sarasoData"
-    FROM raw
+  WITH seen AS (
+    SELECT t.*, s."pavadinimas" AS saltinis,
+      MAX(t."paskutiniKartaMatytaSarase") OVER (PARTITION BY t."sarasoId") AS "sarasoData"
+    FROM "vptJuodiejiSarasai"."tiekejai" t
+    JOIN "vptJuodiejiSarasai"."sarasai" s ON s."id" = t."sarasoId"
   ), nd AS (
     SELECT seen.*, CASE
       -- Įrašas laikomas galiojančiu tik jei jis dar buvo paskutiniame sąrašo
@@ -110,7 +91,7 @@ const BASE_CTE = `
 function buildWhere(params: SqlParams, skipFacet?: string) {
   const conditions: string[] = [];
   if (cleanSearch) {
-    conditions.push(`nd."search_index" @@ ${tsQueryFunc}('simple', ${params.add(cleanSearch)})`);
+    conditions.push(`nd."paieskosIndeksas" @@ ${tsQueryFunc}('simple', ${params.add(cleanSearch)})`);
   }
   if (skipFacet !== 'saltinis' && selected.saltinis.length) {
     conditions.push(`nd.saltinis = ANY(${params.add(selected.saltinis)}::text[])`);
@@ -185,11 +166,11 @@ function facetBranch(
 const startedAt = Date.now();
 
 // Rezultatų stulpeliai vardais, o ne `nd.*` — kad į atsakymą (ir ?json) nekeliautų
-// `search_index` tsvector'ius, kuris naudingas tik `@@` filtrui.
+// `paieskosIndeksas` tsvector'ių, kuris naudingas tik `@@` filtrui.
 const ROW_COLUMNS = [
   'atvejoNr', 'duomenuIvedimoData', 'pirkimoVykdytojoPavadinimas', 'tiekejoPavadinimas',
-  'tiekejoJarKodas', 'pirkimoNumeris', 'sutartiesNutraukimoData', 'dataNuoKuriosSkaiciuojama',
-  'itrauktasIki', 'teismoData', 'teismoSprendimoData', 'teismoSprendimoLink', 'metai',
+  'tiekejoJarKodas', 'pirkimoNumeris', 'sutartiesNutraukimoData', 'tiekejoPasalinimoData',
+  'terminoPradzia', 'itrauktasIki', 'teismoData', 'teismoSprendimoData', 'teismoSprendimoLink', 'metai',
   'paskutiniKartaMatytaSarase', 'irasymoPagrindas', 'saltinis', 'sarasoData', 'busena',
 ].map((column) => `nd."${column}"`).join(', ');
 
@@ -446,7 +427,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 
                   <div>
                     <dt class="sr-only">Galiojimas</dt>
-                    <dd>{item.dataNuoKuriosSkaiciuojama || 'nežinoma'} – {item.itrauktasIki || 'nežinoma'}</dd>
+                    <dd>{item.terminoPradzia || 'nežinoma'} – {item.itrauktasIki || 'nežinoma'}</dd>
                   </div>
 
                   <div>
