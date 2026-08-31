@@ -220,7 +220,7 @@ triaged.
 | LT-COM-23 | Bidder statements indicate collusion                    | Competition        | OECD-BR-33; OECD-BR-34; OECD-BR-35; OECD-BR-36; OECD-BR-37; OECD-BR-38; OECD-BR-39; OECD-BR-40; OECD-BR-41 | Cannot implement |
 | LT-PRI-02 | Line-item price anomalously high or low                 | Pricing            | OCP-R017                                                                                                   | Cannot implement |
 | LT-PRI-09 | Heavily discounted bid                                  | Pricing            | OCP-R058                                                                                                   | Accepted         |
-| LT-PRI-11 | Supplier bid much higher than for a comparable contract | Pricing            | OECD-BR-27                                                                                                 |                  |
+| LT-PRI-11 | Supplier bid much higher than for a comparable contract | Pricing            | OECD-BR-27                                                                                                 | Cannot implement |
 | LT-PRI-12 | Anomalous geographic delivery or transport pricing      | Pricing            | OECD-BR-30; OECD-BR-31                                                                                     | Cannot implement |
 
 #### Design Required Explanations
@@ -456,6 +456,28 @@ here blocking a time-series comparison rather than a within-bid breakdown. Separ
 match `nuolaid`/`discount` — so the `OECD-BR-21`/`OECD-BR-22` half of this row's concept has no candidate field to begin
 with, structurally, not just thinly covered. Revisit if either an auction/negotiation-round price history is ingested,
 or a unit-normalized/discount-relative price field becomes available.
+
+**LT-PRI-11** — Supplier bid much higher than for a comparable contract: not implementable with currently ingested
+data, for the same root cause `LT-PRI-10` above documents in detail — `v_dalyviai."pasiulymoKaina"` is not a
+comparable value across different lots/procurements at all, since 95.9% of priced rows carry a `"kainosIsraiskaId"`
+reference into a 359-label lookup table mixing lump-sum totals, per-unit rates (`"Eur/km"`, `"1 kg kaina Eur be
+PVM"`), evaluation-score points, and bare re-stated numbers, with nothing on the row saying which a given value is.
+This indicator's own comparison — "this supplier's bid vs. a comparable contract" — needs exactly that
+cross-procurement commensurability, one step further than `LT-PRI-10`'s within-buyer time series: a *comparable
+contract* has to mean comparable scope and quantity, not merely the same CPV code, and no ingested source carries a
+quantity, unit count, or line-item breakdown for a bid to establish that — the same structural gap `LT-PRI-02`
+documents for the within-bid case.
+
+Measured directly (2026-08 measurement, `public.v_dalyviai`) rather than left as a theoretical concern: grouping
+priced bids (`pasiulymoKaina > 0`) by the exact `(tiekejoKodas, pagrindinisKodasBvpz)` pair — the narrowest, most
+favourable reading of "comparable contract" available in the warehouse — finds 1,644 pairs where one supplier has
+≥3 priced bids under the identical 8-digit CPV code. Within those pairs, the ratio between a supplier's highest and
+lowest recorded price for the *same* CPV code has a median of 12.3×, with 76.5% (1,258/1,644) exceeding 3× and 53.1%
+(873/1,644) exceeding 10×. That is variation an order of magnitude too wide, and far too common, to read as a pricing
+anomaly at any reasonable fixed threshold — it is consistent with the ratio simply tracking each contract's own scope
+or quantity rather than the supplier's pricing behaviour. A formula built on this field would mostly be re-detecting
+"this contract is bigger than that one," not the catalogue concept. Revisit if a quantity-normalized or unit-price
+field (line items, or a reliable `kainosIsraiskaId` classification) is ever ingested.
 
 **LT-PRI-12** — Anomalous geographic delivery or transport pricing: not implementable with currently ingested data. No
 ingested source records a delivery location, distance, or transport-cost component for a bid — `pasiulymoKaina` is one
