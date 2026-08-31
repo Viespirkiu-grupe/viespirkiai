@@ -74,7 +74,7 @@ export async function nuskaitytiMvpTvarkosAprasuSubjektuPage(
 
     await postgres.query(
         `
-        INSERT INTO "mvpAprasaiSubjektai"
+        INSERT INTO "mvpAprasai"."subjektai"
             ("id", "pavadinimas", "jarKodas")
         VALUES
             ${placeholders.join(",")}
