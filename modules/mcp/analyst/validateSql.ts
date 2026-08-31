@@ -45,7 +45,15 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // Balanso ir pelno (nuostolių) ataskaitos iš ADP — "adpFinansinesAtaskaitos"
     // schemoje; viena eilutė = vienas rodiklis vienam laikotarpiui.
     "balansoEilutes", "pelnoNuostoliuEilutes",
-    "darboVieta", "istatinisKapitalas",
+    "istatinisKapitalas",
+    // UŽT darbo vietos iškeltos į `uzt` schemą ir normalizuotos:
+    // `darboVietos` + žodynai + `darbdaviai` (ten ir buvęs "darboVietaCount"),
+    // o `darboVietosPilnos` – suderinamumo view su senąja plokščia forma.
+    // `savivaldybes` čia irgi yra, bet nekvalifikuotai reiškia sodros lentelę
+    // (analyst search_path'e `sodra` eina pirmiau) – UŽT savivaldybes rašyti
+    // su schema: uzt."savivaldybes".
+    "darboVietos", "darboVietosPilnos", "darbdaviai", "profesijos",
+    "profesijuGrupes", "issilavinimai", "mokymoProgramos",
 
     "neskelbiamosDerybos",
     // `vdi` schema; `pazeidimaiPilni` yra suderinamumo view su senąja forma.

@@ -1,4 +1,7 @@
 import { syncAdpChanges } from "../modules/adp/syncChanges.js";
+// UŽT darbo vietos iškeltos į `uzt` schemą – vieną šaltinio eilutę reikia
+// išskaidyti į žodynus, darbdavį ir skelbimą, todėl aprašas gyvena moduly.
+import { DARBO_VIETU_SYNC } from "../modules/uzimtumoTarnyba/adpSync.js";
 
 const FINANSINES_ATASKAITOS_COLUMNS = [
     "_id",
@@ -450,55 +453,7 @@ const ADP_DATASETS = [
             reg_date: "duomenuData",
         },
     },
-    {
-        name: "syncAdpDarboVieta",
-        table: "darboVieta",
-        dataset: "datasets/gov/uzt/ldv/Vieta",
-        limit: 1000,
-        mapping: {
-            _id: "_id", _revision: "_revision",
-            darbo_vietos_id: "darbo_vietos_id", statusas: "statusas",
-            ikelimo_data: "ikelimo_data", galioja_nuo: "galioja_nuo",
-            galioja_iki: "galioja_iki",
-            imones_iregistravimas: "imones_iregistravimas",
-            prelim_darbo_uzmokestis: "prelim_darbo_uzmokestis",
-            vid_darbo_uzmokestis: "vid_darbo_uzmokestis",
-            maks_darbo_uzmokestis: "maks_darbo_uzmokestis",
-            valiuta: "valiuta",
-            uzmokescio_komentaras_lt: "uzmokescio_komentaras_lt",
-            profesijos_pareigybes_pav: "profesijos_pareigybes_pav",
-            darbo_aprasymas_lt: "darbo_aprasymas_lt",
-            ar_aktuali_siandien: "ar_aktuali_siandien",
-            ar_uzpildyta: "ar_uzpildyta",
-            ar_papildomai_remia: "ar_papildomai_remia",
-            ar_darbina_po_mokymu: "ar_darbina_po_mokymu",
-            ar_apmoka_keliones: "ar_apmoka_keliones",
-            ar_apgyvendina: "ar_apgyvendina",
-            ar_maitina: "ar_maitina",
-            pageidaujama_darbo_pradzia: "pageidaujama_darbo_pradzia",
-            darbo_vietu_skaicius: "darbo_vietu_skaicius",
-            darbo_vietos_adresas: "darbo_vietos_adresas",
-            darbo_vietos_sav_pav: "darbo_vietos_sav_pav",
-            registravimo_pagrindo_pav: "registravimo_pagrindo_pav",
-            registravimo_budo_pav: "registravimo_budo_pav",
-            pageidavimo_pateikimo_pav: "pageidavimo_pateikimo_pav",
-            rizikos_lt: "rizikos_lt",
-            jar_kodas: "jar_kodas", darbdavys: "darbdavys",
-            teisinio_statuso_pav: "teisinio_statuso_pav",
-            teisines_formos_pav: "teisines_formos_pav",
-            darbdavio_bustine: "darbdavio_bustine",
-            darbdavio_kontaktinis_asmuo: "darbdavio_kontaktinis_asmuo",
-            susisiekimo_budas: "susisiekimo_budas",
-            darbdavio_tel_nr: "darbdavio_tel_nr",
-            darbdavio_mob_nr: "darbdavio_mob_nr",
-            darbdavio_el_pastas: "darbdavio_el_pastas",
-            reik_darbo_patirtis: "reik_darbo_patirtis",
-            reik_kompetencijos_lt: "reik_kompetencijos_lt",
-            reik_gebejimai: "reik_gebejimai",
-            reik_issilavinimo_pav: "reik_issilavinimo_pav",
-            reik_mok_progr_pav: "reik_mok_progr_pav",
-        },
-    },
+    DARBO_VIETU_SYNC,
 ];
 
 export default ADP_DATASETS.map((cfg) => ({

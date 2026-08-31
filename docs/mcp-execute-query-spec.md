@@ -395,7 +395,8 @@ nepatikimiTiekejai, melagingiTiekejai
 jadis: suvestine, dalyviuSkaiciai, dalyviuSarasai, valstybesDalyviai | rcInformaciniaiPranesimai: pranesimai, pranesimaiPilni, juridiniuPavadinimai, leidiniai
 domenai, kotis
 adpFinansinesAtaskaitos: balansoEilutes, pelnoNuostoliuEilutes
-darboVieta, istatinisKapitalas
+istatinisKapitalas
+uzt: darboVietos, darboVietosPilnos, darbdaviai, profesijos, profesijuGrupes, issilavinimai, mokymoProgramos
 ppa: ataskaitos, dalyviai, pasiulymuEile, atmestiPasiulymai
 neskelbiamosDerybos
 vdiPazeidimai
@@ -535,6 +536,7 @@ GRANT USAGE ON SCHEMA "rcInformaciniaiPranesimai" TO analyst;
 GRANT USAGE ON SCHEMA jadis TO analyst;
 GRANT USAGE ON SCHEMA "adpFinansinesAtaskaitos" TO analyst;
 GRANT USAGE ON SCHEMA vmi TO analyst;
+GRANT USAGE ON SCHEMA uzt TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -553,7 +555,13 @@ GRANT SELECT ON
     "rcInformaciniaiPranesimai"."juridiniuPavadinimai", "rcInformaciniaiPranesimai"."leidiniai",
     "domenai", "kotis",
     "adpFinansinesAtaskaitos"."balansoEilutes", "adpFinansinesAtaskaitos"."pelnoNuostoliuEilutes",
-    "darboVieta", "istatinisKapitalas",
+    "istatinisKapitalas",
+    uzt."darboVietos", uzt."darboVietosPilnos", uzt."darbdaviai",
+    uzt."profesijos", uzt."profesijuGrupes", uzt."savivaldybes",
+    uzt."issilavinimai", uzt."mokymoProgramos", uzt."statusai", uzt."valiutos",
+    uzt."registravimoPagrindai", uzt."registravimoBudai", uzt."pageidavimoBudai",
+    uzt."susisiekimoBudai", uzt."rizikos", uzt."gebejimai",
+    uzt."teisiniaiStatusai", uzt."teisinesFormos", uzt."kontraktuTipai",
     "neskelbiamosDerybos", "vdiPazeidimai",
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
     vmi."mokesciai", vmi."mokesciaiPilni",
@@ -573,5 +581,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
 ```
