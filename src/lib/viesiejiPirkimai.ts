@@ -141,7 +141,7 @@ export async function loadPirkimoAiSantrauka(pirkimoId: string): Promise<{ apras
             CASE WHEN v.modelis LIKE '%/%' THEN v.modelis ELSE v.tiekejas || '/' || v.modelis END AS modelis,
             v.link
        FROM "eppsViesiejiPirkimai"."aprasymai" a
-       JOIN public."aiModelVariants" v ON v.id = a."modelioVariantasId"
+       JOIN "ai"."modeliuVariantai" v ON v.id = a."modelioVariantasId"
       WHERE a."pirkimoId" = $1 AND a.success = true AND a."aprasymas" IS NOT NULL
       ORDER BY a."sukurta" DESC
       LIMIT 1`,

@@ -35,8 +35,8 @@ function usage() {
         "  --limit N          aprašyti daugiausia N sutarčių (numatyta: visas eilėje)",
         "  --rps N            OpenRouter užklausų per sekundę (numatyta: 12.5)",
         "  --concurrency N    fiksuotas darbų skaičius (numatyta: automatinis)",
-        "  --variant N        naudoti esamą aiModelVariants.id (numatyta: pagal aiModelPaskirtys)",
-        "  --force            aprašyti net kai aiModelPaskirtys.aktyvus = false",
+        '  --variant N        naudoti esamą ai."modeliuVariantai".id (numatyta: pagal ai."paskirtys")',
+        '  --force            aprašyti net kai ai."paskirtys".aktyvus = false',
     ].join("\n");
 }
 
@@ -126,13 +126,13 @@ export async function main(argv = process.argv.slice(2)) {
     const variantId = args.variant == null
         ? null
         : positiveInteger(args.variant, "--variant");
-    // Modelis ir įjungimo vėliava — DB lentelėje `aiModelPaskirtys`. Sutarčių
+    // Modelis ir įjungimo vėliava — DB lentelėje `ai."paskirtys"`. Sutarčių
     // aprašymas sustabdytas ten (`aktyvus = false`), tad be `--force` skriptas
     // nieko nedaro, net jei kas nors paleistų jį iš įpročio.
     const paskirtis = await getPaskirtis(PASKIRTYS.SUTARCIU_APRASYMAS);
     if (!paskirtis.aktyvus && !args.force) {
         process.stderr.write(
-            `Sutarčių aprašymas išjungtas (aiModelPaskirtys."${paskirtis.paskirtis}".aktyvus = false).`
+            `Sutarčių aprašymas išjungtas (ai."paskirtys"."${paskirtis.paskirtis}".aktyvus = false).`
             + " Nieko nedaroma; priverstinai – su --force.\n",
         );
         return;

@@ -43,8 +43,8 @@ function usage() {
         "                     (naujausius pirmiau; be N – visus)",
         "  --rps N            OpenRouter užklausų per sekundę (numatyta: 12.5)",
         "  --concurrency N    fiksuotas darbų skaičius (numatyta: automatinis)",
-        "  --variant N        naudoti esamą aiModelVariants.id (numatyta: pagal aiModelPaskirtys)",
-        "  --force            aprašyti net kai aiModelPaskirtys.aktyvus = false",
+        '  --variant N        naudoti esamą ai."modeliuVariantai".id (numatyta: pagal ai."paskirtys")',
+        '  --force            aprašyti net kai ai."paskirtys".aktyvus = false',
         "  --log              loginti kiekvieną OpenRouter užklausą (dydžiai ir",
         "                     kaina, be turinio) – matyti, kur suka tokenus",
         "",
@@ -130,13 +130,13 @@ export async function main(argv = process.argv.slice(2)) {
     */
     const logintiUzklausas = argv.includes("--log");
     const suvestine = sukurtiSuvestine();
-    // Modelis imamas iš DB (`aiModelPaskirtys`), nebent nurodytas `--variant`.
+    // Modelis imamas iš DB (`ai."paskirtys"`), nebent nurodytas `--variant`.
     // Ta pati vėliava, kuri stabdo eilę, stabdo ir šį backfill'ą — kad
     // sustabdytas darbas nepasileistų per rankinį paleidimą netyčia.
     const paskirtis = await getPaskirtis(PASKIRTYS.VIESUJU_PIRKIMU_APRASYMAS);
     if (!paskirtis.aktyvus && !args.force) {
         process.stderr.write(
-            `Pirkimų aprašymas išjungtas (aiModelPaskirtys."${paskirtis.paskirtis}".aktyvus = false).`
+            `Pirkimų aprašymas išjungtas (ai."paskirtys"."${paskirtis.paskirtis}".aktyvus = false).`
             + " Nieko nedaroma; priverstinai – su --force.\n",
         );
         return;

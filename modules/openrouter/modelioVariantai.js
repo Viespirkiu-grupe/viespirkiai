@@ -3,9 +3,9 @@ import { postgres } from "../../postgres/postgres.js";
 /*
 AI modelių parinkimas iš DB.
 
-`aiModelVariants` laiko konkrečias modelių konfigūracijas (platforma, modelis,
-reasoning effort, limitai), o `aiModelPaskirtys` pasako, KURIS variantas kuriam
-darbui naudojamas ir ar tas darbas išvis įjungtas. Taip modelio keitimas ar
+`ai."modeliuVariantai"` laiko konkrečias modelių konfigūracijas (platforma,
+modelis, reasoning effort, limitai), o `ai."paskirtys"` pasako, KURIS
+variantas kuriam darbui naudojamas ir ar tas darbas išvis įjungtas. Taip modelio keitimas ar
 eilės stabdymas yra `UPDATE`, o ne kodo pakeitimas su perkrovimu.
 
 Aprašymų lentelėse PK yra (objektas, modelioVariantasId), tad pakeitus paskirties
@@ -13,22 +13,22 @@ variantą tie patys objektai bus aprašomi iš naujo nauju modeliu — seni apra
 lieka vietoje ir niekas neperrašoma.
 */
 
-/** Žinomi `aiModelPaskirtys.paskirtis` raktai. */
+/** Žinomi `ai."paskirtys".paskirtis` raktai. */
 export const PASKIRTYS = {
     VIESUJU_PIRKIMU_APRASYMAS: "viesiejiPirkimaiAprasymas",
     SUTARCIU_APRASYMAS: "sutarciuAprasymas",
 };
 
 /**
- * @param {number|string} id - `aiModelVariants.id`
+ * @param {number|string} id - `ai."modeliuVariantai".id`
  * @returns {Promise<Record<string, any>>}
  */
 export async function getVariant(id) {
     const { rows } = await postgres.query(
-        `SELECT * FROM public."aiModelVariants" WHERE "id" = $1`,
+        `SELECT * FROM "ai"."modeliuVariantai" WHERE "id" = $1`,
         [id],
     );
-    if (!rows[0]) throw new Error(`aiModelVariants.id=${id} nerastas.`);
+    if (!rows[0]) throw new Error(`ai."modeliuVariantai".id=${id} nerastas.`);
     return rows[0];
 }
 
@@ -44,22 +44,22 @@ export async function getVariant(id) {
 export async function getPaskirtis(paskirtis) {
     const { rows } = await postgres.query(
         `SELECT p."aktyvus", v.*
-         FROM public."aiModelPaskirtys" p
-         JOIN public."aiModelVariants" v ON v.id = p."modelioVariantasId"
+         FROM "ai"."paskirtys" p
+         JOIN "ai"."modeliuVariantai" v ON v.id = p."modelioVariantasId"
          WHERE p."paskirtis" = $1`,
         [paskirtis],
     );
     if (!rows[0]) {
         throw new Error(
-            `aiModelPaskirtys eilutė "${paskirtis}" nerasta — nurodykite, kuris`
-            + " aiModelVariants variantas naudojamas šiam darbui.",
+            `ai."paskirtys" eilutė "${paskirtis}" nerasta — nurodykite, kuris`
+            + ' ai."modeliuVariantai" variantas naudojamas šiam darbui.',
         );
     }
     const { aktyvus, ...variant } = rows[0];
     return { paskirtis, aktyvus, variant };
 }
 
-/** `aiModelVariants` eilutė → OpenRouter modelio pavadinimas. */
+/** `ai."modeliuVariantai"` eilutė → OpenRouter modelio pavadinimas. */
 export function apiModel(variant) {
     if (variant.platforma !== "openrouter") {
         throw new Error(`Kol kas palaikoma tik openrouter platforma, gauta: ${variant.platforma}`);

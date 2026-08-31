@@ -364,13 +364,13 @@ export async function processViesiejiPirkimaiAprasymaiQueue() {
 
     // Variantas išsiaiškinamas PRIEŠ rezervaciją — pagal jį atsijojami pirkimai,
     // kurie šiuo modeliu jau aprašyti. Modelis ir įjungimo vėliava — DB
-    // lentelėje `aiModelPaskirtys`, tad juos galima keisti nestabdant runner'io.
+    // lentelėje `ai."paskirtys"`, tad juos galima keisti nestabdant runner'io.
     const { aktyvus, variant } = await getPaskirtis(PASKIRTYS.VIESUJU_PIRKIMU_APRASYMAS);
     if (!aktyvus) {
         if (!isjungtaPranesta) {
             isjungtaPranesta = true;
             logger.log(
-                "aprasymuEile: išjungta per aiModelPaskirtys"
+                "aprasymuEile: išjungta per ai.\"paskirtys\""
                 + ` ("${PASKIRTYS.VIESUJU_PIRKIMU_APRASYMAS}".aktyvus = false) — eilė nedirbs`,
             );
         }

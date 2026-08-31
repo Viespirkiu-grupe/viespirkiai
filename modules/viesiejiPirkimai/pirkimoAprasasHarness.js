@@ -6,7 +6,7 @@ Numatytojo modelio čia SĄMONINGAI nėra.
 
 Anksčiau buvo `DEFAULT_MODEL = "stealth/ox-alpha"`. Kai OpenRouter tą stealth
 alias'ą pašalino, kodas liko rodyti į nebeegzistuojantį modelį, o vienintelė
-vieta, kur modelis iš tikrųjų tvarkomas (`aiModelPaskirtys` DB lentelė), apie
+vieta, kur modelis iš tikrųjų tvarkomas (`ai."paskirtys"` DB lentelė), apie
 tai nieko nežinojo. Modelį privalo perduoti kviečiantysis — žr.
 `modules/openrouter/modelioVariantai.js` (`getPaskirtis` + `apiModel`).
 */
@@ -326,7 +326,7 @@ export async function runPirkimoAprasas({
     if (!apiKey) throw infraKlaida("Nenustatytas OPENROUTER_API_KEY.");
     if (!model) {
         throw infraKlaida(
-            "Nenurodytas modelis. Jį reikia paimti iš `aiModelPaskirtys`"
+            "Nenurodytas modelis. Jį reikia paimti iš `ai.\"paskirtys\"`"
             + " (getPaskirtis + apiModel), o ne pasikliauti numatytąja reikšme.",
         );
     }
@@ -397,7 +397,7 @@ export async function runPirkimoAprasas({
                 `max_tokens` biudžetą suėdė reasoning'as ir matomam atsakymui
                 nieko neliko. Užklausa pilnai apmokėta, o rezultato nėra —
                 todėl klaidos tekste iškart rodome, kurį nustatymą taisyti
-                (`aiModelVariants.maxOutputTokens` arba `reasoningEffort`).
+                (`ai."modeliuVariantai".maxOutputTokens` arba `reasoningEffort`).
 
                 Bandymus ši klaida DEGINA sąmoningai: jei biudžetas per mažas
                 sistemiškai, kartojimas kas kelias minutes tik krautų sąskaitą.
@@ -408,7 +408,7 @@ export async function runPirkimoAprasas({
                     throw new Error(
                         `Modelis išnaudojo visą ${maxOutputTokens} tokenų biudžetą`
                         + " reasoning'ui ir negrąžino nei teksto, nei įrankio kvietimo."
-                        + " Kelkite aiModelVariants.maxOutputTokens arba mažinkite"
+                        + ' Kelkite ai."modeliuVariantai".maxOutputTokens arba mažinkite'
                         + " reasoningEffort.",
                     );
                 }

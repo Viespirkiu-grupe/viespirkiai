@@ -29,7 +29,7 @@ export function aprasymoIrankiai() {
  *
  * @param {object} p
  * @param {number|string} p.pirkimoId
- * @param {Record<string, any>} p.variant - `aiModelVariants` eilutė
+ * @param {Record<string, any>} p.variant - `ai."modeliuVariantai"` eilutė
  * @param {string} p.model - `apiModel(variant)`
  * @param {object[]} p.tools - `aprasymoIrankiai()`
  * @param {string} p.apiKey
