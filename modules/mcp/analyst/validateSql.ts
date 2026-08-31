@@ -6,7 +6,15 @@ const { Parser } = pkg;
 const parser = new Parser();
 
 export const TABLE_WHITELIST: Set<string> = new Set([
-    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
+    "vpmSutartys",
+    // VPT atvirų sutarčių rinkiniai iškelti į "vpmSutartys" schemą ir
+    // normalizuoti; `atviriDuomenysPilni` / `atviriDuomenysImpPilni` yra
+    // suderinamumo view'ai su senąja plokščia forma. Žodynai su `atviri`
+    // priešdėliu – kad nekvalifikuoti vardai nesikirstų su kitomis schemomis.
+    "atviriDuomenys", "atviriDuomenysImp",
+    "atviriDuomenysPilni", "atviriDuomenysImpPilni",
+    "atviriTiekejai", "atviriPirkejai", "atviriCpvKodai",
+    "atviriObjektai", "atviriValstybes", "atviriPirkimoBudai",
     // RC JAR CSV lentelės iškeltos į `rcJar` schemą (asmenys = buvęs jarAsmenys);
     // `jar` yra atskira public lentelė iš data.gov.lt (Spinta).
     "asmenys", "jar",

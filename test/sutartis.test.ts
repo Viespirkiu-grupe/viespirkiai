@@ -25,8 +25,8 @@ describe('loadSutartis', () => {
           }],
         });
       }
-      if (sql.includes('sutartysAtviriDuomenys')) return Promise.resolve({ rows: [] });
-      if (sql.includes('sutartysAtviriDuomenysImp')) return Promise.resolve({ rows: [] });
+      if (sql.includes('"vpmSutartys"."atviriDuomenys"')) return Promise.resolve({ rows: [] });
+      if (sql.includes('"vpmSutartys"."atviriDuomenysImp"')) return Promise.resolve({ rows: [] });
       if (sql.includes('public."vpmSutartys" s') && sql.includes('WHERE "sutartiesUnikalusId" != $1')) return Promise.resolve({ rows: [] });
       if (sql.includes('FROM sabis."sutartys"')) return Promise.resolve({ rows: [] });
       if (sql.includes('FROM public.files f')) return Promise.resolve({ rows: [] });

@@ -15,8 +15,8 @@ export type Sutartis = Record<string, any>;
  * legal-form suffixes, or wrong country codes.  Two parallel "open data"
  * tables ship corrected values:
  *
- *   - `sutartysAtviriDuomenys`     — original open-data dump.
- *   - `sutartysAtviriDuomenysImp`  — imported / supplemental dump that may
+ *   - `vpmSutartys."atviriDuomenys"`     — original open-data dump.
+ *   - `vpmSutartys."atviriDuomenysImp"`  — imported / supplemental dump that may
  *                                    refine the original.
  *
  * Both are consulted; the second wins if it has a value, since it is
@@ -25,8 +25,20 @@ export type Sutartis = Record<string, any>;
  */
 async function applyTiekejasPatikslinimas(sutartis: Sutartis) {
   const [atviri, atviriImp] = await Promise.all([
-    postgres.query(`SELECT * FROM "sutartysAtviriDuomenys" WHERE "dokId" = $1 LIMIT 1`, [sutartis.sutartiesUnikalusId]),
-    postgres.query(`SELECT * FROM "sutartysAtviriDuomenysImp" WHERE "dokId" = $1 LIMIT 1`, [sutartis.sutartiesUnikalusId]),
+    postgres.query(
+      `SELECT d."tiekPavPatikslinimas", v."pavadinimas" AS "tiekSalis"
+         FROM "vpmSutartys"."atviriDuomenys" d
+         LEFT JOIN "vpmSutartys"."atviriValstybes" v ON v.id = d."valstybesId"
+        WHERE d."dokId" = $1 LIMIT 1`,
+      [sutartis.sutartiesUnikalusId],
+    ),
+    postgres.query(
+      `SELECT d."tiekSbjPatikslinimas", v."pavadinimas" AS "tiekSalis"
+         FROM "vpmSutartys"."atviriDuomenysImp" d
+         LEFT JOIN "vpmSutartys"."atviriValstybes" v ON v.id = d."valstybesId"
+        WHERE d."dokId" = $1 LIMIT 1`,
+      [sutartis.sutartiesUnikalusId],
+    ),
   ]);
   const a = atviri.rows[0];
   const ai = atviriImp.rows[0];

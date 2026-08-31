@@ -29,7 +29,10 @@ export async function handler({ id }) {
 
     // Tiekėjo patikslinimas
     const atviri = await postgres.query(
-        `SELECT * FROM "sutartysAtviriDuomenys" WHERE "dokId" = $1 LIMIT 1`,
+        `SELECT d."tiekPavPatikslinimas", v."pavadinimas" AS "tiekSalis"
+           FROM "vpmSutartys"."atviriDuomenys" d
+           LEFT JOIN "vpmSutartys"."atviriValstybes" v ON v.id = d."valstybesId"
+          WHERE d."dokId" = $1 LIMIT 1`,
         [id],
     );
     if (atviri.rowCount > 0) {
@@ -41,7 +44,10 @@ export async function handler({ id }) {
     }
 
     const atviriImp = await postgres.query(
-        `SELECT * FROM "sutartysAtviriDuomenysImp" WHERE "dokId" = $1 LIMIT 1`,
+        `SELECT d."tiekSbjPatikslinimas", v."pavadinimas" AS "tiekSalis"
+           FROM "vpmSutartys"."atviriDuomenysImp" d
+           LEFT JOIN "vpmSutartys"."atviriValstybes" v ON v.id = d."valstybesId"
+          WHERE d."dokId" = $1 LIMIT 1`,
         [id],
     );
     if (atviriImp.rowCount > 0) {

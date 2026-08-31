@@ -216,12 +216,14 @@ export async function fetchBatch(afterId, batchSize = DEFAULT_BATCH_SIZE) {
         `
         SELECT ${VPM_SUTARTIS_ROW_SELECT},
             a."tiekPavPatikslinimas",
-            a."tiekSalis",
+            av."pavadinimas"          AS "tiekSalis",
             ai."tiekSbjPatikslinimas" AS "tiekPavPatikslinimasImp",
-            ai."tiekSalis"            AS "tiekSalisImp"
+            aiv."pavadinimas"         AS "tiekSalisImp"
         FROM ${VPM_SUTARTIS_ROW_FROM}
-        LEFT JOIN "sutartysAtviriDuomenys"    a  ON a."dokId"  = s."unikalusId"
-        LEFT JOIN "sutartysAtviriDuomenysImp" ai ON ai."dokId" = s."unikalusId"
+        LEFT JOIN "vpmSutartys"."atviriDuomenys"    a   ON a."dokId"  = s."unikalusId"
+        LEFT JOIN "vpmSutartys"."atviriValstybes"   av  ON av.id = a."valstybesId"
+        LEFT JOIN "vpmSutartys"."atviriDuomenysImp" ai  ON ai."dokId" = s."unikalusId"
+        LEFT JOIN "vpmSutartys"."atviriValstybes"   aiv ON aiv.id = ai."valstybesId"
         WHERE s."unikalusId" > $1
           AND s.istrinta = false
         ORDER BY s."unikalusId" ASC

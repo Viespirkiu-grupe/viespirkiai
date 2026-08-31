@@ -381,7 +381,7 @@ Raw tables used directly (no covering view):
 All tables accessible to `execute_query` (Layer 2) and queryable by the analyst PostgreSQL role:
 
 ```
-sutartys, sutartysAtviriDuomenys, sutartysAtviriDuomenysImp
+sutartys | vpmSutartys: atviriDuomenys, atviriDuomenysImp, atviriDuomenysPilni, atviriDuomenysImpPilni, atviriTiekejai, atviriPirkejai, atviriCpvKodai, atviriObjektai, atviriValstybes, atviriPirkimoBudai
 rcJar: asmenys | public: jar
 eppsViesiejiPirkimai: pirkimai, vykdytojai
 pinregJuridiniaiRysiai, pinreg
@@ -538,10 +538,16 @@ GRANT USAGE ON SCHEMA "adpFinansinesAtaskaitos" TO analyst;
 GRANT USAGE ON SCHEMA vmi TO analyst;
 GRANT USAGE ON SCHEMA uzt TO analyst;
 GRANT USAGE ON SCHEMA "vptJuodiejiSarasai" TO analyst;
+GRANT USAGE ON SCHEMA "vpmSutartys" TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
-    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp", "rcJar"."asmenys",
+    "vpmSutartys", "rcJar"."asmenys",
+    "vpmSutartys"."atviriDuomenys", "vpmSutartys"."atviriDuomenysImp",
+    "vpmSutartys"."atviriDuomenysPilni", "vpmSutartys"."atviriDuomenysImpPilni",
+    "vpmSutartys"."atviriTiekejai", "vpmSutartys"."atviriPirkejai",
+    "vpmSutartys"."atviriCpvKodai", "vpmSutartys"."atviriObjektai",
+    "vpmSutartys"."atviriValstybes", "vpmSutartys"."atviriPirkimoBudai",
     "jar", "eppsViesiejiPirkimai"."pirkimai", "eppsViesiejiPirkimai"."vykdytojai", "pinregJuridiniaiRysiai",
     "pinreg", sabis."sutartys", sabis."sutarciuSalys", sabis."saskaitos",
     sabis."saskaituSalys", sabis."saskaituSalysTipai", sabis."saskaituSalysVeiklosVieta",
@@ -583,5 +589,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, "vptJuodiejiSarasai", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
 ```
