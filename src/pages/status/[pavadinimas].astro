@@ -1,7 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import Chart from '@design-system/components/charts/Chart.astro';
-import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import EmptyState from '@design-system/components/EmptyState.astro';
 import Linksnis from '@design-system/components/Linksnis.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { postgres } from '@/postgres/postgres.js';
@@ -14,240 +16,492 @@ let pavadinimas = rawPavadinimas || '';
 const isJson = pavadinimas.endsWith('.json');
 if (isJson) pavadinimas = pavadinimas.slice(0, -5);
 
-if (pavadinimas !== 'eviesiejipirkimai.lt') {
-  return Astro.redirect('/');
-}
+if (pavadinimas !== 'eviesiejipirkimai.lt') return Astro.redirect('/');
 
-function toIsoDay(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+const PERIODAI = [
+  { key: '7', label: '7 dienos', days: 7 },
+  { key: '30', label: '30 dienų', days: 30 },
+  { key: '90', label: '90 dienų', days: 90 },
+  { key: 'all', label: 'Visa istorija', days: null },
+] as const;
 
-const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = await Promise.all([
-  postgres.query(`
-    WITH ordered AS (
-      -- Puslapio diagramos ašis sudaroma iš Date.UTC(...), tad laikas imamas
-      -- Lietuvos sieniniu laiku be zonos – taip, kaip buvo iki perkėlimo.
-      SELECT g.id, g."laikas" AT TIME ZONE 'Europe/Vilnius' AS "timestamp", t."kodas" AS tipas,
-        g."laikas" - LAG(g."laikas") OVER (PARTITION BY t."kodas" ORDER BY g."laikas") AS delta
-      FROM monitoring."cvpIsGedimai" g
-      LEFT JOIN monitoring."gedimuTipai" t ON t.id = g."tipoId"
-    ),
-    groups AS (
-      SELECT *,
-        SUM(CASE WHEN delta IS NULL OR delta > INTERVAL '5 minutes' THEN 1 ELSE 0 END)
-          OVER (PARTITION BY tipas ORDER BY "timestamp") AS grp
-      FROM ordered
-    ),
-    intervals AS (
-      SELECT tipas, MIN("timestamp") AS start_time, MAX("timestamp") AS end_time,
-        MAX("timestamp") - MIN("timestamp") AS duration,
-        COUNT(*) AS unmerged_count
-      FROM groups
-      GROUP BY tipas, grp
-    )
-    SELECT
-      start_time::date AS day,
-      SUM(duration) AS total_duration,
-      COUNT(*) AS merged_incidents,
-      SUM(unmerged_count) AS unmerged_events
-    FROM intervals
-    GROUP BY day
-    ORDER BY day DESC`),
-  postgres.query(`
-    WITH ordered AS (
-      -- Puslapio diagramos ašis sudaroma iš Date.UTC(...), tad laikas imamas
-      -- Lietuvos sieniniu laiku be zonos – taip, kaip buvo iki perkėlimo.
-      SELECT g.id, g."laikas" AT TIME ZONE 'Europe/Vilnius' AS "timestamp", t."kodas" AS tipas,
-        g."laikas" - LAG(g."laikas") OVER (PARTITION BY t."kodas" ORDER BY g."laikas") AS delta
-      FROM monitoring."cvpIsGedimai" g
-      LEFT JOIN monitoring."gedimuTipai" t ON t.id = g."tipoId"
-    ),
-    groups AS (
-      SELECT *,
-        SUM(CASE WHEN delta IS NULL OR delta > INTERVAL '5 minutes' THEN 1 ELSE 0 END)
-          OVER (PARTITION BY tipas ORDER BY "timestamp") AS grp
-      FROM ordered
-    ),
-    intervals AS (
-      SELECT tipas, MIN("timestamp") AS start_time, MAX("timestamp") AS end_time
-      FROM groups
-      GROUP BY tipas, grp
-    )
-    SELECT tipas, start_time, end_time FROM intervals ORDER BY start_time`),
-  postgres.query(
-    `SELECT ("laikas" AT TIME ZONE 'Europe/Vilnius')::date AS day,
-            MAX("laikas" AT TIME ZONE 'Europe/Vilnius') AS "timestamp"
-     FROM monitoring."cvpIsGedimai"
-     GROUP BY 1
-     ORDER BY day DESC`,
-  ),
-  postgres.query(
-    `SELECT "laikas" AS "timestamp" FROM monitoring."cvpIsGedimai" ORDER BY "laikas" DESC LIMIT 1`
-  ),
-]);
-
-const paskutinisGedimas = paskutinisGedimasRes.rows[0] ?? null;
-if (paskutinisGedimas) {
-  paskutinisGedimas.per5min = Date.now() - new Date(paskutinisGedimas.timestamp).getTime() <= 5 * 60 * 1000;
-}
-
-const allTimestamps: string[] = allTimestampsResult.rows.map((r: any) => r.timestamp);
-const intervalai: any[] = intervalaiRes.rows;
-const apjungti: any[] = apjungtiRes.rows;
-
-const byDay = new Map<string, string[]>();
-for (const ts of allTimestamps) {
-  const day = toIsoDay(new Date(ts));
-  if (!byDay.has(day)) byDay.set(day, []);
-  byDay.get(day)!.push(ts);
-}
-
-const intervalsByDay = new Map<string, any[]>();
-for (const i of intervalai) {
-  const day = toIsoDay(new Date(i.start_time));
-  if (!intervalsByDay.has(day)) intervalsByDay.set(day, []);
-  intervalsByDay.get(day)!.push(i);
-}
-
-for (const item of apjungti) {
-  const day = toIsoDay(new Date(item.day));
-  item.timestamps = byDay.get(day) ?? [];
-  item.intervals = intervalsByDay.get(day) ?? [];
-}
+const requestedPeriod = Astro.url.searchParams.get('laikotarpis');
+const periodas = PERIODAI.find((p) => p.key === requestedPeriod)
+  ?? (isJson ? PERIODAI[3] : PERIODAI[0]);
 
 function todayLT(): string {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Vilnius',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    timeZone: 'Europe/Vilnius', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
 }
 
-if (isJson) {
-  return new Response(JSON.stringify({ apjungti }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+function minusDays(isoDay: string, days: number): string {
+  const [year, month, day] = isoDay.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day - days)).toISOString().slice(0, 10);
 }
 
-// Pre-build all chart configs server-side for client use
-const nowTimestamp = Date.now();
-const today = todayLT();
-const chartConfigs = apjungti.map((diena: any) => {
-  const dayStr: string = toIsoDay(new Date(diena.day));
-  const [year, month, dayNum] = dayStr.split('-').map(Number);
-  const annotations: any[] = (diena.intervals as any[]).map((i: any) => ({
-    x: new Date(i.start_time).getTime(),
-    x2: new Date(i.end_time).getTime(),
-    fillColor: '#FF4560',
-    borderColor: '#777',
-  }));
+const cutoffDay = periodas.days == null ? null : minusDays(todayLT(), periodas.days - 1);
 
-  if (today === dayStr) {
-    annotations.push({
-      x: nowTimestamp,
-      label: { text: 'Dabar', style: { color: '#000' } },
-      borderColor: '#777',
-    });
+// Vienu praėjimu sujungiame gretimus tos pačios rūšies signalus į incidentus ir
+// išskaidome juos per vidurnaktį. Taip nebereikia trijų pilnos istorijos užklausų.
+const [incidentaiRes, paskutinisGedimasRes] = await Promise.all([
+  postgres.query(`
+    WITH ordered AS (
+      SELECT
+        g.id,
+        g."laikas" AT TIME ZONE 'Europe/Vilnius' AS local_time,
+        t."kodas" AS tipas,
+        g."laikas" - LAG(g."laikas") OVER (
+          PARTITION BY t."kodas" ORDER BY g."laikas"
+        ) AS delta
+      FROM monitoring."cvpIsGedimai" g
+      LEFT JOIN monitoring."gedimuTipai" t ON t.id = g."tipoId"
+      WHERE $1::date IS NULL
+         OR g."laikas" >= (($1::date - 1)::timestamp AT TIME ZONE 'Europe/Vilnius')
+    ), grouped AS (
+      SELECT *,
+        SUM(CASE WHEN delta IS NULL OR delta > INTERVAL '5 minutes' THEN 1 ELSE 0 END)
+          OVER (PARTITION BY tipas ORDER BY local_time) AS grp
+      FROM ordered
+    ), intervals AS (
+      SELECT
+        ROW_NUMBER() OVER (ORDER BY MIN(local_time), tipas)::integer AS incident_id,
+        tipas,
+        MIN(local_time) AS start_local,
+        MAX(local_time) AS end_local,
+        COUNT(*)::integer AS signalai
+      FROM grouped
+      GROUP BY tipas, grp
+    ), split AS (
+      SELECT
+        i.*,
+        d::date AS day,
+        GREATEST(i.start_local, d) AS segment_start,
+        LEAST(i.end_local, d + INTERVAL '1 day') AS segment_end
+      FROM intervals i
+      CROSS JOIN LATERAL generate_series(
+        date_trunc('day', i.start_local),
+        date_trunc('day', i.end_local),
+        INTERVAL '1 day'
+      ) d
+      WHERE $1::date IS NULL OR d::date >= $1::date
+    )
+    SELECT
+      incident_id, tipas, day, segment_start, segment_end, signalai,
+      EXTRACT(EPOCH FROM segment_start - day::timestamp)::integer AS start_second,
+      EXTRACT(EPOCH FROM segment_end - day::timestamp)::integer AS end_second,
+      GREATEST(0, EXTRACT(EPOCH FROM segment_end - segment_start))::integer AS duration_seconds
+    FROM split
+    ORDER BY day DESC, segment_start DESC
+  `, [cutoffDay]),
+  postgres.query(
+    `SELECT "laikas" AS "timestamp"
+       FROM monitoring."cvpIsGedimai"
+      ORDER BY "laikas" DESC
+      LIMIT 1`,
+  ),
+]);
+
+type Segmentas = {
+  incident_id: number;
+  tipas: string | null;
+  day: string;
+  segment_start: string;
+  segment_end: string;
+  signalai: number;
+  start_second: number;
+  end_second: number;
+  duration_seconds: number;
+};
+
+type Diena = {
+  day: string;
+  segmentai: Segmentas[];
+  incidentai: number;
+  signalai: number;
+  durationSeconds: number;
+};
+
+function unionDuration(segmentai: Segmentas[]): number {
+  const ranges = segmentai
+    .filter((s) => s.end_second > s.start_second)
+    .map((s) => [s.start_second, s.end_second] as [number, number])
+    .sort((a, b) => a[0] - b[0]);
+  if (!ranges.length) return 0;
+
+  let total = 0;
+  let [start, end] = ranges[0];
+  for (const [nextStart, nextEnd] of ranges.slice(1)) {
+    if (nextStart <= end) end = Math.max(end, nextEnd);
+    else {
+      total += end - start;
+      [start, end] = [nextStart, nextEnd];
+    }
   }
+  return total + end - start;
+}
 
+const dienosMap = new Map<string, Segmentas[]>();
+for (const raw of incidentaiRes.rows) {
+  const segmentas: Segmentas = {
+    ...raw,
+    incident_id: Number(raw.incident_id),
+    signalai: Number(raw.signalai),
+    start_second: Number(raw.start_second),
+    end_second: Number(raw.end_second),
+    duration_seconds: Number(raw.duration_seconds),
+  };
+  const segmentai = dienosMap.get(segmentas.day) ?? [];
+  segmentai.push(segmentas);
+  dienosMap.set(segmentas.day, segmentai);
+}
+
+const dienos: Diena[] = [...dienosMap.entries()].map(([day, segmentai]) => {
+  const incidentIds = new Set(segmentai.map((s) => s.incident_id));
+  const signalaiPagalIncidenta = new Map<number, number>();
+  for (const s of segmentai) signalaiPagalIncidenta.set(s.incident_id, s.signalai);
   return {
-    id: `Gedimai${dayStr.replaceAll('-', '')}Diagrama`,
-    labels: (diena.timestamps as string[]).map((t: string) => new Date(t + 'Z').getTime()),
-    series: (diena.timestamps as string[]).map(() => 1),
-    flags: ['xAxisHourMinute', 'yAxisNoLabel', 'noLine', 'statusTimeline'],
-    customOptions: {
-      chart: { height: 200 },
-      annotations: { xaxis: annotations },
-      xaxis: {
-        min: Date.UTC(year, month - 1, dayNum, 0, 0, 0),
-        max: Date.UTC(year, month - 1, dayNum, 23, 59, 59),
-      },
-    },
+    day,
+    segmentai,
+    incidentai: incidentIds.size,
+    signalai: [...signalaiPagalIncidenta.values()].reduce((sum, n) => sum + n, 0),
+    durationSeconds: unionDuration(segmentai),
   };
 });
 
-const chartEntries = apjungti.map((diena: any, index: number) => ({
-  diena,
-  chartConfig: chartConfigs[index],
-}));
+const incidentIds = new Set(incidentaiRes.rows.map((r: any) => Number(r.incident_id)));
+const totalDurationSeconds = dienos.reduce((sum, d) => sum + d.durationSeconds, 0);
+const totalSignals = new Map<number, number>();
+for (const r of incidentaiRes.rows) totalSignals.set(Number(r.incident_id), Number(r.signalai));
+const totalSignalsCount = [...totalSignals.values()].reduce((sum, n) => sum + n, 0);
 
-function formatDuration(d: any): string {
-  if (!d) return '0s';
-  const parts = [];
-  if (d.hours) parts.push(`${d.hours}h`);
-  if (d.minutes) parts.push(`${d.minutes}min`);
-  if (d.seconds) parts.push(`${d.seconds}s`);
-  return parts.length ? parts.join(' ') : '0s';
+const paskutinisGedimas = paskutinisGedimasRes.rows[0] ?? null;
+const galimasSutrikimas = paskutinisGedimas
+  ? Date.now() - new Date(paskutinisGedimas.timestamp).getTime() <= 5 * 60 * 1000
+  : false;
+
+function formatDuration(seconds: number): string {
+  const rounded = Math.max(0, Math.round(seconds));
+  if (rounded === 0) return '0 min.';
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const secs = rounded % 60;
+  const parts: string[] = [];
+  if (hours) parts.push(`${hours} val.`);
+  if (minutes) parts.push(`${minutes} min.`);
+  if (!hours && !minutes && secs) parts.push(`${secs} sek.`);
+  return parts.join(' ');
 }
+
+function formatDay(day: string): string {
+  return new Intl.DateTimeFormat('lt-LT', {
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
+  }).format(new Date(`${day}T12:00:00Z`));
+}
+
+function formatDateTime(value: string | Date): string {
+  return new Intl.DateTimeFormat('lt-LT', {
+    timeZone: 'Europe/Vilnius', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function timePart(value: string): string {
+  return String(value).slice(11, 16);
+}
+
+function tipoLabel(tipas: string | null): string {
+  if (tipas === 'sistemosAtnaujinimoDarbai') return 'Sistemos atnaujinimo darbai';
+  if (tipas === 'nerastaLentele') return 'Nerastas sutarčių sąrašas';
+  if (tipas === '403') return 'Prieiga užblokuota (403)';
+  return tipas || 'Nežinoma klaida';
+}
+
+function tipoClass(tipas: string | null): string {
+  if (tipas === 'sistemosAtnaujinimoDarbai') return 'status-segment--maintenance';
+  if (tipas === '403') return 'status-segment--blocked';
+  return 'status-segment--error';
+}
+
+function segmentStyle(segmentas: Segmentas): string {
+  const left = Math.max(0, Math.min(100, segmentas.start_second / 864));
+  const width = Math.max(0, Math.min(100 - left, (segmentas.end_second - segmentas.start_second) / 864));
+  return `left:${left.toFixed(4)}%;width:max(${width.toFixed(4)}%, 3px)`;
+}
+
+if (isJson) {
+  return new Response(JSON.stringify({
+    laikotarpis: periodas.key,
+    nuo: cutoffDay,
+    paskutinisGedimas: paskutinisGedimas?.timestamp ?? null,
+    galimasSutrikimas,
+    suvestine: {
+      dienosSuSutrikimais: dienos.length,
+      incidentai: incidentIds.size,
+      signalai: totalSignalsCount,
+      trukmeSekundemis: totalDurationSeconds,
+    },
+    dienos,
+  }), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+}
+
+const laikotarpioLabel = periodas.days == null
+  ? 'per visą stebėjimo laiką'
+  : `per pastarąsias ${periodas.days} dienas`;
 ---
 
 <Layout
   pageTitle="Ar veikia eviesiejipirkimai.lt?"
-  pageDescription="Išorinių sistemų prieinamumo stebėjimas"
-  pageImage="https://viespirkiai.org/status/eviesiejipirkimai.lt.png"
+  pageDescription="eViesiejiPirkimai.lt prieinamumo ir sutrikimų istorija"
   colorScheme={colorScheme}
   font={font}
 >
   <main>
-    <div class="page-header justify-center mb-7">
-      <div class="text-center">
-        <h1 class="mb-3">Ar veikia eviesiejipirkimai.lt?</h1>
-        {paskutinisGedimas?.per5min ? (
-          <>
-            <h2 class="text-danger text-3xl mb-2">Tikriausiai NE</h2>
-            <p class="text-muted"><em>Per paskutines 5min fiksavome sutrikimų</em></p>
-          </>
-        ) : (
-          <>
-            <h2 class="text-success text-3xl mb-2">Tikriausiai TAIP</h2>
-            <p class="text-muted"><em>Per paskutines 5min sutrikimų nefiksavome</em></p>
-          </>
-        )}
+    <PageHeader>
+      <Fragment slot="subtext">Išorinės sistemos stebėjimas</Fragment>
+      eviesiejipirkimai.lt
+      <div slot="actions">
+        <a class="btn btn-outline btn-sm" href="https://eviesiejipirkimai.lt" target="_blank" rel="noopener noreferrer">
+          Atverti svetainę ↗
+        </a>
       </div>
-    </div>
+    </PageHeader>
 
-    <section class="page-section">
-      <h2>Istoriniai duomenys</h2>
-      <h3 class="mt-4 mb-2">Skaičiavimo metodologija</h3>
-      <p class="text-muted text-sm">
-        Sistemos veikimas yra tikrinamas bent kas 2 minutes.
-        Jeigu pateikiama klaida (šiuo atveju užrašas „Vyksta sistemos atnaujinimo darbai"), tada tai yra fiksuojama duomenų bazėje.
-        Kai tarp fiksavimų yra mažiau nei 5 minutės, jie yra apjungiami ir skaičiuojama trukmė (gali būti apjungti ir keli jeigu kartojasi).
-        Laikoma, kad gedimas prasidėjo gavus pirmąjį klaidos pranešimą ir pasibaigė iškart po paskutinio (sistemos naudai).
-      </p>
+    <section class:list={['status-overview', galimasSutrikimas ? 'status-overview--danger' : 'status-overview--success']}>
+      <div>
+        <h2>{galimasSutrikimas ? 'Galimas sutrikimas' : 'Pastaruoju metu sutrikimų nefiksuota'}</h2>
+        <p class="mb-0">
+          {galimasSutrikimas
+            ? 'Per paskutines 5 minutes gautas klaidos atsakymas.'
+            : paskutinisGedimas
+              ? `Paskutinis sutrikimo signalas: ${formatDateTime(paskutinisGedimas.timestamp)}.`
+              : 'Sutrikimų signalų istorijoje nėra.'}
+        </p>
+      </div>
     </section>
 
-    {chartEntries.length > 0 && (
-      <div class="grid-2">
-        {chartEntries.map(({ diena, chartConfig }: any) => (
-          <ResultCardShell>
-            <div slot="meta" class="result-card-meta">
-              <span>{toIsoDay(new Date(diena.day))}</span>
-              <span><Linksnis n={Number(diena.merged_incidents)} forms={['gedimas', 'gedimai', 'gedimų', 'gedimo']} /></span>
-              <span><Linksnis n={Number(diena.unmerged_events)} forms={['fiksavimas', 'fiksavimai', 'fiksavimų', 'fiksavimo']} /></span>
-            </div>
-
-            <h3 slot="title" class="result-card-title">
-              Neveikė bent {formatDuration(diena.total_duration)}
-            </h3>
-
-            <Chart
-              id={chartConfig.id}
-              type="line-datetime"
-              labels={chartConfig.labels}
-              series={chartConfig.series}
-              flags={chartConfig.flags}
-              customOptions={chartConfig.customOptions}
-              framed={false}
-              wrapperClass=""
-              chartClass="mt-3 w-full"
-              heightClass="h-[200px]"
-            />
-          </ResultCardShell>
-        ))}
+    <section id="istorija" class="page-section">
+      <div class="status-section-heading">
+        <div>
+          <h2 class="mb-1">Sutrikimų istorija</h2>
+          <p class="text-muted text-sm mb-0">Laikas rodomas Lietuvos laiku. Pasirinkta: {laikotarpioLabel}.</p>
+        </div>
+        <nav class="status-periods" aria-label="Istorijos laikotarpis">
+          {PERIODAI.map((p) => (
+            <a
+              href={`/status/eviesiejipirkimai.lt?laikotarpis=${p.key}#istorija`}
+              class:list={['btn btn-sm', p.key === periodas.key ? 'btn-primary' : 'btn-outline']}
+              aria-current={p.key === periodas.key ? 'page' : undefined}
+            >{p.label}</a>
+          ))}
+        </nav>
       </div>
-    )}
+
+      <MetricCardGrid minWidth="150px" className="mb-7">
+        <MetricCard label="Dienos su sutrikimais" value={dienos.length.toLocaleString('lt-LT')} meta={laikotarpioLabel} />
+        <MetricCard label="Incidentai" value={incidentIds.size.toLocaleString('lt-LT')} meta="Tarpas tarp signalų ≤ 5 min." />
+        <MetricCard label="Fiksuota trukmė" value={formatDuration(totalDurationSeconds)} meta="Persidengiantys signalai neskaičiuojami dukart" />
+        <MetricCard label="Klaidų signalai" value={totalSignalsCount.toLocaleString('lt-LT')} meta="Atskiri stebėjimo atsakymai" />
+      </MetricCardGrid>
+
+      <div class="status-legend text-sm text-muted" aria-label="Sutrikimų tipai">
+        <span><i class="status-legend__mark status-segment--error"></i>Nerastas sutarčių sąrašas</span>
+        <span><i class="status-legend__mark status-segment--maintenance"></i>Atnaujinimo darbai</span>
+        <span><i class="status-legend__mark status-segment--blocked"></i>Prieiga užblokuota</span>
+      </div>
+
+      {dienos.length ? (
+        <div class="status-history">
+          <div class="status-axis" aria-hidden="true">
+            <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
+          </div>
+          {dienos.map((diena) => (
+            <article class="status-day">
+              <div class="status-day__heading">
+                <h3>{formatDay(diena.day)}</h3>
+                <p class="text-muted text-sm mb-0">
+                  <Linksnis n={diena.incidentai} forms={['incidentas', 'incidentai', 'incidentų', 'incidento']} /> · {formatDuration(diena.durationSeconds)}
+                </p>
+              </div>
+
+              <div class="status-timeline" aria-label={`${diena.day} sutrikimų laiko juosta`}>
+                <span class="status-timeline__grid status-timeline__grid--25"></span>
+                <span class="status-timeline__grid status-timeline__grid--50"></span>
+                <span class="status-timeline__grid status-timeline__grid--75"></span>
+                {diena.segmentai.map((segmentas) => (
+                  <span
+                    class:list={['status-segment', tipoClass(segmentas.tipas)]}
+                    style={segmentStyle(segmentas)}
+                    title={`${tipoLabel(segmentas.tipas)}: ${timePart(segmentas.segment_start)}–${timePart(segmentas.segment_end)}`}
+                    aria-label={`${tipoLabel(segmentas.tipas)}, nuo ${timePart(segmentas.segment_start)} iki ${timePart(segmentas.segment_end)}`}
+                  ></span>
+                ))}
+              </div>
+
+              <details class="status-day__details">
+                <summary>Rodyti incidentų detales</summary>
+                <div class="status-incidents">
+                  {diena.segmentai.map((segmentas) => (
+                    <div class="status-incident">
+                      <i class:list={['status-legend__mark', tipoClass(segmentas.tipas)]} aria-hidden="true"></i>
+                      <span class="cell-mono status-incident__time">{timePart(segmentas.segment_start)}–{timePart(segmentas.segment_end)}</span>
+                      <span>{tipoLabel(segmentas.tipas)}</span>
+                      <span class="text-muted">{formatDuration(segmentas.duration_seconds)}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          compact
+          icon="✓"
+          title="Šiuo laikotarpiu sutrikimų neužfiksuota"
+          message="Pasirinkite ilgesnį laikotarpį, jei norite matyti ankstesnę istoriją."
+          className="status-empty"
+        />
+      )}
+    </section>
 
   </main>
 </Layout>
+
+<style>
+  .status-overview {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding: 22px 24px;
+    border: 1px solid;
+    border-radius: var(--radius-lg);
+  }
+  .status-overview--success {
+    color: var(--color-success);
+    background: var(--color-success-bg);
+    border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+  }
+  .status-overview--danger {
+    color: var(--color-danger);
+    background: var(--color-danger-bg);
+    border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
+  }
+  .status-overview h2 { margin: 0 0 4px; color: currentColor; }
+  .status-section-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .status-periods {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    margin-bottom: 12px;
+  }
+  .status-legend > span,
+  .status-incident { display: flex; align-items: center; gap: 8px; }
+  .status-legend__mark {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+    border-radius: 2px;
+  }
+  .status-history {
+    overflow: hidden;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+  }
+  .status-axis {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    margin-left: min(270px, 28%);
+    padding: 9px 20px 7px;
+    color: var(--gray);
+    font-size: var(--text-xs);
+  }
+  .status-axis span:not(:first-child):not(:last-child) { text-align: center; }
+  .status-axis span:last-child { text-align: right; }
+  .status-day {
+    display: grid;
+    grid-template-columns: minmax(190px, 28%) 1fr;
+    gap: 16px 20px;
+    padding: 17px 20px;
+    border-top: var(--border);
+  }
+  .status-day__heading h3 {
+    margin: 0 0 2px;
+    font-size: var(--text-base);
+  }
+  .status-timeline {
+    position: relative;
+    align-self: center;
+    height: 24px;
+    overflow: hidden;
+    border: 1px solid var(--light-gray);
+    border-radius: var(--radius-sm);
+    background: var(--shade-3);
+  }
+  .status-timeline__grid {
+    position: absolute;
+    inset-block: 0;
+    width: 1px;
+    background: var(--light-gray);
+  }
+  .status-timeline__grid--25 { left: 25%; }
+  .status-timeline__grid--50 { left: 50%; }
+  .status-timeline__grid--75 { left: 75%; }
+  .status-segment {
+    position: absolute;
+    inset-block: 3px;
+    z-index: 1;
+    min-width: 3px;
+    border-radius: 2px;
+    opacity: .9;
+  }
+  .status-segment--error { background: var(--color-danger); }
+  .status-segment--maintenance { background: var(--color-warning); }
+  .status-segment--blocked { background: var(--color-info); }
+  .status-day__details {
+    grid-column: 2;
+    color: var(--gray);
+    font-size: var(--text-sm);
+  }
+  .status-day__details summary {
+    width: max-content;
+    cursor: pointer;
+    color: var(--link);
+  }
+  .status-incidents { display: grid; gap: 8px; margin-top: 12px; }
+  .status-incident {
+    display: grid;
+    grid-template-columns: 9px 105px minmax(180px, 1fr) auto;
+  }
+  .status-incident__time { color: var(--black); }
+  .status-empty {
+    min-height: 180px;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  @media (max-width: 760px) {
+    .status-section-heading { align-items: flex-start; flex-direction: column; }
+    .status-periods { justify-content: flex-start; }
+    .status-axis { margin-left: 0; }
+    .status-day { grid-template-columns: 1fr; }
+    .status-day__details { grid-column: 1; }
+    .status-incident { grid-template-columns: 9px 96px 1fr; }
+    .status-incident > :last-child { grid-column: 3; }
+  }
+</style>
