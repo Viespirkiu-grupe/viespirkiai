@@ -228,7 +228,7 @@ export async function bvpzFacetOptions(
        ORDER BY ${pinned}count DESC, 1
        LIMIT ${Math.max(size, 500)}
      ) x
-     LEFT JOIN public."bvpzKodai" b ON b.code = x.code
+     LEFT JOIN bvpz."kodai" b ON b.code = x.code
      ${needle}
      ORDER BY x.count DESC, x.code
      LIMIT ${size}`,

@@ -25,9 +25,10 @@ function toIsoDay(d: Date): string {
 const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = await Promise.all([
   postgres.query(`
     WITH ordered AS (
-      SELECT id, "timestamp", tipas,
-        "timestamp" - LAG("timestamp") OVER (PARTITION BY tipas ORDER BY "timestamp") AS delta
-      FROM public."eviesiejipirkimaiGedimai"
+      SELECT g.id, g."laikas" AS "timestamp", t."kodas" AS tipas,
+        g."laikas" - LAG(g."laikas") OVER (PARTITION BY t."kodas" ORDER BY g."laikas") AS delta
+      FROM monitoring."cvpIsGedimai" g
+      LEFT JOIN monitoring."gedimuTipai" t ON t.id = g."tipoId"
     ),
     groups AS (
       SELECT *,
@@ -52,9 +53,10 @@ const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = 
     ORDER BY day DESC`),
   postgres.query(`
     WITH ordered AS (
-      SELECT id, "timestamp", tipas,
-        "timestamp" - LAG("timestamp") OVER (PARTITION BY tipas ORDER BY "timestamp") AS delta
-      FROM public."eviesiejipirkimaiGedimai"
+      SELECT g.id, g."laikas" AS "timestamp", t."kodas" AS tipas,
+        g."laikas" - LAG(g."laikas") OVER (PARTITION BY t."kodas" ORDER BY g."laikas") AS delta
+      FROM monitoring."cvpIsGedimai" g
+      LEFT JOIN monitoring."gedimuTipai" t ON t.id = g."tipoId"
     ),
     groups AS (
       SELECT *,
@@ -69,13 +71,13 @@ const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = 
     )
     SELECT tipas, start_time, end_time FROM intervals ORDER BY start_time`),
   postgres.query(
-    `SELECT "timestamp"::date AS day, MAX("timestamp") AS "timestamp"
-     FROM public."eviesiejipirkimaiGedimai"
-     GROUP BY "timestamp"::date
+    `SELECT "laikas"::date AS day, MAX("laikas") AS "timestamp"
+     FROM monitoring."cvpIsGedimai"
+     GROUP BY "laikas"::date
      ORDER BY day DESC`,
   ),
   postgres.query(
-    `SELECT "timestamp" FROM public."eviesiejipirkimaiGedimai" ORDER BY "timestamp" DESC LIMIT 1`
+    `SELECT "laikas" AS "timestamp" FROM monitoring."cvpIsGedimai" ORDER BY "laikas" DESC LIMIT 1`
   ),
 ]);
 

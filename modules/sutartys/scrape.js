@@ -13,21 +13,20 @@ import { DateTime } from "luxon";
 import Timings from "../../utils/timings.js";
 import { parseSutartysHtmlInWorker } from "./parsePageInWorker.js";
 
+/**
+ * Užfiksuoja CVP IS neprieinamumą. Laiką rašo pati DB (timestamptz), o gedimo
+ * tipą įrašo į žodyną, jei tokio dar nebuvo.
+ */
 function recordCvpIsFailure(tipas) {
     return postgres.query(
-        `INSERT INTO "eviesiejipirkimaiGedimai" ("timestamp", "tipas") VALUES ($1, $2);`,
-        [
-            new Date().toLocaleString("lt-LT", {
-                timeZone: "Europe/Vilnius",
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-            }),
-            tipas,
-        ],
+        `WITH tipas AS (
+             INSERT INTO monitoring."gedimuTipai" ("kodas") VALUES ($1)
+             ON CONFLICT ("kodas") DO UPDATE SET "kodas" = EXCLUDED."kodas"
+             RETURNING "id"
+         )
+         INSERT INTO monitoring."cvpIsGedimai" ("laikas", "tipoId")
+         SELECT now(), "id" FROM tipas`,
+        [tipas],
     );
 }
 

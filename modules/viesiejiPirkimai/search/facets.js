@@ -71,7 +71,7 @@ async function attachBvpzNames(options) {
     const codes = [...byCode.keys()];
     if (!codes.length) return [];
     const { rows } = await postgres.query(
-        `SELECT code, pavadinimas FROM public."bvpzKodai" WHERE code = ANY($1)`,
+        `SELECT code, pavadinimas FROM bvpz."kodai" WHERE code = ANY($1)`,
         [codes],
     );
     const names = new Map(rows.map((r) => [String(r.code), String(r.pavadinimas)]));
@@ -216,13 +216,13 @@ export async function viesiejiPirkimaiFacetOptions(field, query, size = 1000, op
         const rows = /^\d+$/.test(optionSearch)
             ? (
                   await postgres.query(
-                      `SELECT code, pavadinimas FROM public."bvpzKodai" WHERE code LIKE $1 ORDER BY code LIMIT 50`,
+                      `SELECT code, pavadinimas FROM bvpz."kodai" WHERE code LIKE $1 ORDER BY code LIMIT 50`,
                       [`${optionSearch}%`],
                   )
               ).rows
             : (
                   await postgres.query(
-                      `SELECT code, pavadinimas FROM public."bvpzKodai" WHERE pavadinimas ILIKE $1 ORDER BY code LIMIT 50`,
+                      `SELECT code, pavadinimas FROM bvpz."kodai" WHERE pavadinimas ILIKE $1 ORDER BY code LIMIT 50`,
                       [`%${optionSearch}%`],
                   )
               ).rows;

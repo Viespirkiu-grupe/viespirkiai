@@ -89,7 +89,7 @@ const dezePagalMd5 = preparedStatement(
      FROM public."filesMd5Boxes" b
      JOIN public."filesMd5" m ON m.id = b."md5Id"
      JOIN public.dezes d ON d.id = b."boxId"
-     JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+     JOIN auth."raktai" a ON a.id = d."apiRaktasId"
      WHERE m.md5 = $1
      ORDER BY -LN(random()) / NULLIF(d.speed, 0)
      LIMIT 1`,

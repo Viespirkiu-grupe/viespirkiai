@@ -18,7 +18,7 @@ export const VPM_SUTARTIS_ROW_SELECT = `
     s."pirkimoNumeris",
     CASE WHEN s."bvpzKodas" IS NULL THEN NULL
          ELSE COALESCE(
-             bvpz.code || CASE WHEN NULLIF(bvpz.checksum, '') IS NULL
+             bvpz.code || CASE WHEN bvpz.checksum IS NULL
                                THEN '' ELSE '-' || bvpz.checksum END,
              s."bvpzKodas"::text
          ) END AS "bvpzKodas",
@@ -75,7 +75,7 @@ export const VPM_SUTARTIS_ROW_FROM = `
       ON kategorija.id = s."kategorijaId"
     LEFT JOIN LATERAL (
         SELECT b.code, b.checksum, b.pavadinimas
-        FROM public."bvpzKodai" b
+        FROM bvpz."kodai" b
         WHERE b.code = s."bvpzKodas"::text
         LIMIT 1
     ) bvpz ON true
@@ -95,13 +95,13 @@ export const VPM_SUTARTIS_ROW_FROM = `
     LEFT JOIN LATERAL (
         SELECT
             array_agg(COALESCE(
-                b.code || CASE WHEN NULLIF(b.checksum, '') IS NULL
+                b.code || CASE WHEN b.checksum IS NULL
                                THEN '' ELSE '-' || b.checksum END,
                 eb."bvpzKodas"::text
             ) ORDER BY eb.id) AS kodai,
             array_agg(b.pavadinimas ORDER BY eb.id) AS pavadinimai
         FROM public."vpmSutartysPapildomiBvpzKodai" eb
-        LEFT JOIN public."bvpzKodai" b ON b.code = eb."bvpzKodas"::text
+        LEFT JOIN bvpz."kodai" b ON b.code = eb."bvpzKodas"::text
         WHERE eb."unikalusId" = s."unikalusId"
     ) extra_bvpz ON true`;
 

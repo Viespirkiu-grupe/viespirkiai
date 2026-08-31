@@ -389,7 +389,7 @@ failai
 sabis: sutartys, sutarciuSalys, saskaitos, saskaituSalys
 cpvaProjektuSutartys, cpvaProjektuSarasas
 cvpp: archyvoSkelbimai (CVPP archyvas)
-eiluciuSkaiciai, bvpzKodai
+eiluciuSkaiciai | bvpz: kodai (BVPŽ/CPV)
 sodra | regitra: priemoniuTipai, matymai, atnaujinimai
 vptJuodiejiSarasai: tiekejai, pagrindimai, sarasai (VPT juodieji sąrašai)
 jadis: suvestine, dalyviuSkaiciai, dalyviuSarasai, valstybesDalyviai | rcInformaciniaiPranesimai: pranesimai, pranesimaiPilni, juridiniuPavadinimai, leidiniai
@@ -539,6 +539,7 @@ GRANT USAGE ON SCHEMA vmi TO analyst;
 GRANT USAGE ON SCHEMA uzt TO analyst;
 GRANT USAGE ON SCHEMA "vptJuodiejiSarasai" TO analyst;
 GRANT USAGE ON SCHEMA "vpmSutartys" TO analyst;
+GRANT USAGE ON SCHEMA bvpz TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -552,7 +553,7 @@ GRANT SELECT ON
     "pinreg", sabis."sutartys", sabis."sutarciuSalys", sabis."saskaitos",
     sabis."saskaituSalys", sabis."saskaituSalysTipai", sabis."saskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas", cvpp."archyvoSkelbimai",
-    "eiluciuSkaiciai", "bvpzKodai",
+    "eiluciuSkaiciai", bvpz."kodai",
     sodra."menesiniai", sodra."evrk", sodra."importai",
     sodra."pavadinimai", sodra."savivaldybes",
     regitra."priemoniuTipai", regitra."matymai", regitra."atnaujinimai",
@@ -589,5 +590,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, bvpz, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
 ```

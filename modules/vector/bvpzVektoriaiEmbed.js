@@ -32,7 +32,7 @@ async function main() {
         console.log(`═══ ${DB_PATH} ═══`);
         const result = await postgres.query(`
             SELECT "mask", "code", "checksum", "pavadinimas"
-            FROM public."bvpzKodai" ORDER BY "mask"
+            FROM bvpz."kodai" ORDER BY "mask"
         `);
         syncBvpzRows(db, result.rows);
         const model = prepareModel(db, MODEL);

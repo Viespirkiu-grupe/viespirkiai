@@ -31,7 +31,9 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // schemoje; nukirptas vardas `viesiejiPirkimai` būtų sutapęs su public
     // lentele, tad lentelė pervadinta į `archyvoSkelbimai`.
     "archyvoSkelbimai",
-    "eiluciuSkaiciai", "bvpzKodai",
+    "eiluciuSkaiciai",
+    // BVPŽ (CPV) kodai iškelti į `bvpz` schemą; nekvalifikuotai – `kodai`.
+    "kodai",
     // SODRA lentelės iškeltos į `sodra` schemą; analyst search_path jas mato
     // nekvalifikuotai (menesiniai = buvęs sodraMonthly).
     "menesiniai", "evrk", "importai", "pavadinimai", "savivaldybes",

@@ -56,8 +56,10 @@ function parseCpvXml(xmlText) {
 
         const pavadinimas = normalizeLt(ltMatch[1]);
         const mask = computeMask(codeBase);
+        // `checksum` DB'e yra smallint, tad nežinomas -> null, o ne "".
         const checksumMatch = codeAttr.match(/-(\d)$/);
-        const checksum = checksumMatch ? checksumMatch[1] : codeDigits[8] || "";
+        const checksumRaw = checksumMatch ? checksumMatch[1] : codeDigits[8];
+        const checksum = /^\d$/.test(checksumRaw ?? "") ? Number(checksumRaw) : null;
 
         rows.push({
             mask,
@@ -83,7 +85,7 @@ async function bulkInsertRows(rows, client) {
         });
 
         await client.query(
-            `INSERT INTO "bvpzKodai" ("mask", "code", "checksum", "pavadinimas")
+            `INSERT INTO bvpz."kodai" ("mask", "code", "checksum", "pavadinimas")
              VALUES ${placeholders.join(", ")}
              ON CONFLICT ("mask") DO UPDATE
              SET "code" = EXCLUDED."code",

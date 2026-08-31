@@ -11,7 +11,7 @@ const VIEW_LIST = [...VIEW_NAMES];
 // Analyst rolės search_path schemos — lentelės iškeltos iš `public` (domenai,
 // ppa, liteko, vdi, sodra, cvpp, rcJar, eppsViesiejiPirkimai) informacinėse
 // schemose randamos tik pagal savo schemą.
-const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "ppa", "sabis", "regitra", "jadis", "vmi", "uzt", "vptJuodiejiSarasai", "vpmSutartys",
+const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "ppa", "sabis", "regitra", "jadis", "vmi", "uzt", "bvpz", "vptJuodiejiSarasai", "vpmSutartys",
     "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", "liteko", "vdi", "sodra", "cvpp", "rcJar",
     "rcInformaciniaiPranesimai"];
 const SCHEMA_ARRAY = `ARRAY[${ANALYST_SCHEMAS.map((s) => `'${s}'`).join(", ")}]`;

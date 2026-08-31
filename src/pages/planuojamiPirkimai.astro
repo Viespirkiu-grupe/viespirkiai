@@ -206,7 +206,7 @@ const kortelesKodai = [...new Set(rows.flatMap((row: any) => row.bvpzKodai ?? []
 const bvpzVardai = new Map<string, string>(
   kortelesKodai.length
     ? (await postgres.query(
-        'SELECT code, pavadinimas FROM public."bvpzKodai" WHERE code = ANY($1)',
+        'SELECT code, pavadinimas FROM bvpz."kodai" WHERE code = ANY($1)',
         [kortelesKodai],
       )).rows.map((row: any) => [String(row.code), row.pavadinimas as string])
     : [],

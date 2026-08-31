@@ -8,7 +8,7 @@ export async function validateOcrApiKey(apiKey, options = {}) {
         `
         SELECT o.*
         FROM public."ocrNuskaitytojai" o
-        JOIN public."apiRaktai" a ON a.id = o."apiRaktasId"
+        JOIN auth."raktai" a ON a.id = o."apiRaktasId"
         WHERE a."apiKey" = $1
         LIMIT 1
         `,
@@ -36,7 +36,7 @@ export async function validateReverseProxyApiKey(authHeader) {
         `
         SELECT r.*
         FROM public."reverseProxies" r
-        JOIN public."apiRaktai" a ON a.id = r."apiRaktasId"
+        JOIN auth."raktai" a ON a.id = r."apiRaktasId"
         WHERE a."apiKey" = $1
         LIMIT 1
         `,
