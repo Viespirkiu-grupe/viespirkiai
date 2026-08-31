@@ -11,10 +11,10 @@ const FACT_CHECK_MAX_LIVE = 5_000;
 async function findCandidates() {
   const { rows } = await postgres.query(
     `SELECT i."indeksas", i."gyvosEilutes", i."mirusiosEilutes"
-     FROM "quickwitIndeksai" i
+     FROM "quickwit"."indeksai" i
      JOIN (
        SELECT "lentele", MAX("seq") AS "paskutinisSeq"
-       FROM "quickwitIndeksai"
+       FROM "quickwit"."indeksai"
        GROUP BY "lentele"
      ) latest USING ("lentele")
      WHERE i."seq" < latest."paskutinisSeq"

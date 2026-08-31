@@ -17,7 +17,7 @@ pasiimama su `SELECT ... FOR UPDATE SKIP LOCKED`, atliekamos šalutinės operaci
 tik po sėkmingo `indexDocs` eilutės ištrinamos bei `COMMIT`'inama. Bet kokia klaida →
 `ROLLBACK`, eilutės lieka eilėje ir bus apdorotos pakartotinai (duomenys neprarandami).
 
-Sakinių tvarka šioje tranzakcijoje NĖRA laisva: nieko, kas paima `quickwitIndeksai`
+Sakinių tvarka šioje tranzakcijoje NĖRA laisva: nieko, kas paima `quickwit.indeksai`
 eilutės lock'ą, negalima daryti prieš `indexDocs` — plačiau žr. komentarą prie
 trynimų žemiau.
 */
@@ -56,7 +56,7 @@ function summarize(phases) {
  * @param {string} [cfg.changeColumn] - keitimo stulpelis, pagal nutylėjimą `keitimas`.
  * @param {number} cfg.batchSize - kiek eilės įrašų imti vienu kartu.
  * @param {"auto"|"force"} [cfg.commit] - Quickwit ingest commit režimas.
- * @param {(id: string) => string} [cfg.toEilutesId] - raktas → `quickwitEilutes.eilutesId`.
+ * @param {(id: string) => string} [cfg.toEilutesId] - raktas → `quickwit.eilutes.eilutesId`.
  * @param {(client: import("pg").ClientBase, ids: string[]) => Promise<object[]>} cfg.fetchRows
  * @param {(row: object) => object|Promise<object>} cfg.buildDoc
  * @param {(row: object) => string|number} cfg.rowId - eilutė → jos raktas (dedupui).
@@ -162,7 +162,7 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
             lap("fetch");
 
             // Objektai, kurių insert/patch metu šaltinio lentelėje jau nebėra —
-            // traktuojam kaip delete. Kitaip jų quickwitEilutes įrašas liktų
+            // traktuojam kaip delete. Kitaip jų quickwit.eilutes įrašas liktų
             // našlaitis: niekas jo nebeišvalytų, o gyvosEilutes rodytų jį gyvą.
             const found = new Set(rows.map((row) => String(rowId(row))));
             vanished = toIndex.filter((id) => !found.has(id));
@@ -201,21 +201,21 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
             }
         }
 
-        // Trynimai — nuimam quickwitEilutes žemėlapį. Paieškos filterLive() po to
+        // Trynimai — nuimam quickwit.eilutes žemėlapį. Paieškos filterLive() po to
         // nustoja matyti našlaitį Quickwit dokumentą (jis guli shard'e, kol
-        // deleteDeadIndexes išveda visą shard'ą). quickwitEilutesGyvosDel trigeris
+        // deleteDeadIndexes išveda visą shard'ą). quickwit.gyvos_eilutes_del() trigeris
         // sumažina gyvosEilutes, o generuotas mirusiosEilutes pakyla — skaitiklių
         // rankomis liesti nereikia.
         //
         // SĄMONINGAI po `indexDocs`, ne prieš jį. Tas trigeris daro
-        // `UPDATE "quickwitIndeksai"` ir paima aktyvaus shard'o eilutės lock'ą,
+        // `UPDATE "quickwit"."indeksai"` ir paima aktyvaus shard'o eilutės lock'ą,
         // kurį ši tranzakcija laikytų iki COMMIT. `indexDocs` gi dirba ATSKIROJE
         // pool'o jungtyje ir toje pačioje eilutėje bumpina `iterptosEilutes` —
         // t. y. lauktų lock'o, kurį laiko jį iškvietusi tranzakcija. Postgres to
         // neaptinka kaip deadlock'o (pusė ciklo yra Node'e: išorinis backend'as
         // būna `idle in transaction` / ClientRead, nelaukdamas jokio lock'o), tad
         // abi jungtys kabo neribotai ir prikala globalų xmin horizontą — vacuum'as
-        // nustoja valyti visą duomenų bazę. Kol niekas iš `quickwitIndeksai` eilutės
+        // nustoja valyti visą duomenų bazę. Kol niekas iš `quickwit.indeksai` eilutės
         // lock'ų nepaimamas prieš `indexDocs`, ciklas nesusidaro.
         //
         // `vanished` — NE po `if (rows.length)`: jei dingo visa porcija, žemėlapius
@@ -263,8 +263,8 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
 
 async function deleteEilutes(client, lentele, eilutesIds) {
     await client.query(
-        `DELETE FROM "quickwitEilutes"
-         WHERE "lentelesId" = (SELECT id FROM "quickwitLenteles" WHERE "lentele" = $1)
+        `DELETE FROM "quickwit"."eilutes"
+         WHERE "lentelesId" = (SELECT id FROM "quickwit"."lenteles" WHERE "lentele" = $1)
            AND "eilutesId" = ANY($2::bigint[])`,
         [lentele, eilutesIds],
     );

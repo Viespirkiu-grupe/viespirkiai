@@ -20,15 +20,15 @@ let configRegistered = false;
 export async function ensureJuridiniaiQuickwitConfig() {
     if (configRegistered) return;
     await postgres.query(
-        `INSERT INTO public."quickwitLenteles"
+        `INSERT INTO "quickwit"."lenteles" AS l
             ("lentele", "defaultShardSize", "indexConfig")
          VALUES ($1, $2, $3)
          ON CONFLICT ("lentele") DO UPDATE SET
             "defaultShardSize" = EXCLUDED."defaultShardSize",
             "indexConfig" = EXCLUDED."indexConfig"
          WHERE ROW(
-            "quickwitLenteles"."defaultShardSize",
-            "quickwitLenteles"."indexConfig"
+            l."defaultShardSize",
+            l."indexConfig"
          ) IS DISTINCT FROM ROW(
             EXCLUDED."defaultShardSize",
             EXCLUDED."indexConfig"

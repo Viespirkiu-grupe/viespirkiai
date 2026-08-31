@@ -33,7 +33,7 @@ export async function getDeadRatio(lentele) {
     `SELECT
        SUM("gyvosEilutes")     AS gyva,
        SUM("mirusiosEilutes")  AS mirusi
-     FROM "quickwitIndeksai"
+     FROM "quickwit"."indeksai"
      WHERE "lentele" = $1`,
     [lentele]
   );
@@ -50,7 +50,7 @@ async function getQuickwitTableId(lentele, client = postgres) {
 
   const { rows } = await client.query(
     `SELECT id
-     FROM "quickwitLenteles"
+     FROM "quickwit"."lenteles"
      WHERE "lentele" = $1`,
     [lentele]
   );
@@ -162,7 +162,7 @@ async function ensureQuickwitIndex(indeksas, indexConfig) {
     await qwGet(`/api/v1/indexes/${indeksas}`);
   } catch {
     // Rewrite the index_id in the YAML so every shard gets its own Quickwit
-    // index while sharing the same schema blob in quickwitLenteles.
+    // index while sharing the same schema blob in quickwit.lenteles.
     const yaml = indexConfig.replace(/^index_id:.*$/m, `index_id: ${indeksas}`);
     await qwCreateIndex(yaml);
   }
@@ -183,7 +183,7 @@ async function ensureQuickwitIndex(indeksas, indexConfig) {
 async function selectActiveShard(lentele, client) {
   const { rows } = await client.query(
     `SELECT id, "indeksas"
-     FROM "quickwitIndeksai"
+     FROM "quickwit"."indeksai"
      WHERE "lentele" = $1
        AND "iterptosEilutes" < "shardSize"
        AND "current" = true
@@ -225,7 +225,7 @@ async function getOrCreateActiveShard(lentele) {
 
     const { rows: cfg } = await client.query(
       `SELECT "defaultShardSize", "indexConfig", "indexConfigHash"
-       FROM "quickwitLenteles"
+       FROM "quickwit"."lenteles"
        WHERE "lentele" = $1`,
       [lentele]
     );
@@ -234,7 +234,7 @@ async function getOrCreateActiveShard(lentele) {
 
     const { rows: seqRows } = await client.query(
       `SELECT COALESCE(MAX("seq"), 0) + 1 AS "nextSeq"
-       FROM "quickwitIndeksai"
+       FROM "quickwit"."indeksai"
        WHERE "lentele" = $1`,
       [lentele]
     );
@@ -242,7 +242,7 @@ async function getOrCreateActiveShard(lentele) {
     const indeksas = `${lentele}_${nextSeq}`;
 
     const { rows: inserted } = await client.query(
-      `INSERT INTO "quickwitIndeksai"
+      `INSERT INTO "quickwit"."indeksai"
          ("lentele", "seq", "shardSize", "indexConfig", "indexConfigHash", "current")
        VALUES ($1, $2, $3, $4, $5, true)
        RETURNING id, "indeksas"`,
@@ -291,16 +291,16 @@ export async function indexDoc(lentele, eilutesId, doc, opts) {
  * Batch-index multiple documents from the same table.
  *
  * Per-row behaviour:
- *   - NEW eilutesId: INSERT into quickwitEilutes on the current shard.
- *   - EXISTING on a current shard: UPDATE quickwitEilutes (rotate quickwitIdInt
+ *   - NEW eilutesId: INSERT into quickwit.eilutes on the current shard.
+ *   - EXISTING on a current shard: UPDATE quickwit.eilutes (rotate quickwitIdInt
  *     in place). The old quickwitIdInt becomes a tombstone once the new doc
  *     lands in Quickwit.
- *   - EXISTING on a non-current shard: migrate — UPDATE quickwitEilutes to
+ *   - EXISTING on a non-current shard: migrate — UPDATE quickwit.eilutes to
  *     point at the active current shard with a fresh quickwitIdInt.
  *
  * Counter ownership split:
  *   - gyvosEilutes (live row count per shard) is maintained by statement-
- *     level triggers on quickwitEilutes. The triggers watch INSERT/UPDATE/
+ *     level triggers on quickwit.eilutes. The triggers watch INSERT/UPDATE/
  *     DELETE and aggregate deltas per shard.
  *   - iterptosEilutes (cumulative Quickwit ingest events per shard) is bumped
  *     by THIS code, right after a successful Quickwit ingest. iterptos means
@@ -332,8 +332,8 @@ export async function indexDocs(lentele, items, opts = {}) {
   const [{ rows: existing }, currentShard] = await Promise.all([
     postgres.query(
       `SELECT e."eilutesId", e."indeksaiId", i."indeksas"
-       FROM "quickwitEilutes" e
-       JOIN "quickwitIndeksai" i ON i.id = e."indeksaiId"
+       FROM "quickwit"."eilutes" e
+       JOIN "quickwit"."indeksai" i ON i.id = e."indeksaiId"
        WHERE e."lentelesId" = $1 AND e."eilutesId" = ANY($2::bigint[])`,
       [lentelesId, eilutesIds]
     ),
@@ -363,7 +363,7 @@ export async function indexDocs(lentele, items, opts = {}) {
   // ── Ingest into Quickwit ──────────────────────────────────────────────────
   // Deliberately outside the transaction. The old mapping stays live until the
   // publish below commits, so a failure here leaves search untouched; the only
-  // residue is orphan docs in Quickwit that no quickwitEilutes row points at,
+  // residue is orphan docs in Quickwit that no quickwit.eilutes row points at,
   // and filterLive already treats those as tombstones.
   //
   // Keeping this inside the transaction (and, worse, under the per-lentele
@@ -407,7 +407,7 @@ export async function indexDocs(lentele, items, opts = {}) {
         .join(", ");
       const params = toUpdate.flatMap((id) => [id, quickwitIdIntByEilutesId.get(id)]);
       await client.query(
-        `UPDATE "quickwitEilutes" AS qe
+        `UPDATE "quickwit"."eilutes" AS qe
          SET "quickwitIdInt" = v."quickwitIdInt",
              "indeksaiId" = $${params.length + 2}
          FROM (VALUES ${vals}) AS v("eilutesId", "quickwitIdInt")
@@ -418,7 +418,7 @@ export async function indexDocs(lentele, items, opts = {}) {
     }
     mark("update", tUpdate);
 
-    // ── Batch INSERT quickwitEilutes for new rows ───────────────────────────
+    // ── Batch INSERT quickwit.eilutes for new rows ───────────────────────────
     // ON CONFLICT because the new/existing split was decided outside a lock:
     // a concurrent batch holding the same eilutesId may have inserted it in
     // between, and last writer wins is the same outcome the update path gives.
@@ -430,7 +430,7 @@ export async function indexDocs(lentele, items, opts = {}) {
       const params = toInsert.flatMap((id) => [id, quickwitIdIntByEilutesId.get(id)]);
 
       await client.query(
-        `INSERT INTO "quickwitEilutes"("lentelesId", "eilutesId", "indeksaiId", "quickwitIdInt")
+        `INSERT INTO "quickwit"."eilutes"("lentelesId", "eilutesId", "indeksaiId", "quickwitIdInt")
          SELECT $${params.length + 1}, v."eilutesId", $${params.length + 2}, v."quickwitIdInt"
          FROM (VALUES ${vals}) AS v("eilutesId", "quickwitIdInt")
          ON CONFLICT ("lentelesId", "eilutesId") DO UPDATE
@@ -454,7 +454,7 @@ export async function indexDocs(lentele, items, opts = {}) {
         .join(", ");
       const params = shardCounts.flatMap(([indeksas, docs]) => [indeksas, docs.length]);
       await client.query(
-        `UPDATE "quickwitIndeksai" i
+        `UPDATE "quickwit"."indeksai" i
          SET "iterptosEilutes" = i."iterptosEilutes" + v.cnt
          FROM (VALUES ${vals}) AS v("indeksas", "cnt")
          WHERE i."indeksas" = v."indeksas"`,
@@ -491,7 +491,7 @@ export async function indexDocs(lentele, items, opts = {}) {
 /**
  * Given Quickwit search hits, return only those whose id is still live in
  * Postgres. The Quickwit document field is named quickwitId and holds the
- * quickwitEilutes."quickwitIdInt" value as a string; anything that isn't a
+ * quickwit.eilutes."quickwitIdInt" value as a string; anything that isn't a
  * plain integer is a pre-migration document and counts as dead.
  *
  * @param {string} lentele
@@ -510,7 +510,7 @@ export async function filterLive(lentele, hits) {
 
   const { rows } = await postgres.query(
     `SELECT "quickwitIdInt"
-     FROM "quickwitEilutes"
+     FROM "quickwit"."eilutes"
      WHERE "lentelesId" = $1 AND "quickwitIdInt" = ANY($2::int[])`,
     [lentelesId, quickwitIdInts]
   );
@@ -782,7 +782,7 @@ export async function shardStats(lentele) {
          * 100,
          1
        ) AS "mirusiuProc"
-     FROM "quickwitIndeksai"
+     FROM "quickwit"."indeksai"
      WHERE "lentele" = $1
      ORDER BY "seq"`,
     [lentele]
@@ -794,7 +794,7 @@ export async function shardStats(lentele) {
 
 /**
  * One-shot repair: recompute gyvosEilutes per shard from the ground truth in
- * quickwitEilutes, and bump iterptosEilutes up to gyvos wherever it's lower
+ * quickwit.eilutes, and bump iterptosEilutes up to gyvos wherever it's lower
  * (shouldn't happen under the current code but may on legacy data from
  * earlier buggy counter logic). Run after schema changes to counter tracking
  * or whenever drift is suspected.
@@ -811,13 +811,13 @@ export async function reconcileCounters(lentele) {
   const lentelesId = await getQuickwitTableId(lentele);
   await postgres.query("BEGIN");
   try {
-    // Recompute gyvos from quickwitEilutes. Shards with no rows get 0.
+    // Recompute gyvos from quickwit.eilutes. Shards with no rows get 0.
     await postgres.query(
-      `UPDATE "quickwitIndeksai" i
+      `UPDATE "quickwit"."indeksai" i
        SET "gyvosEilutes" = COALESCE(a.cnt, 0)
        FROM (
          SELECT "indeksaiId", COUNT(*)::int AS cnt
-         FROM "quickwitEilutes"
+         FROM "quickwit"."eilutes"
          WHERE "lentelesId" = $2
          GROUP BY "indeksaiId"
        ) a
@@ -825,18 +825,18 @@ export async function reconcileCounters(lentele) {
       [lentele, lentelesId]
     );
     await postgres.query(
-      `UPDATE "quickwitIndeksai" i
+      `UPDATE "quickwit"."indeksai" i
        SET "gyvosEilutes" = 0
        WHERE i."lentele" = $1
          AND NOT EXISTS (
-           SELECT 1 FROM "quickwitEilutes" e
+           SELECT 1 FROM "quickwit"."eilutes" e
            WHERE e."lentelesId" = $2 AND e."indeksaiId" = i.id
          )`,
       [lentele, lentelesId]
     );
     // Keep the generated mirusios >= 0.
     await postgres.query(
-      `UPDATE "quickwitIndeksai"
+      `UPDATE "quickwit"."indeksai"
        SET "iterptosEilutes" = "gyvosEilutes"
        WHERE "lentele" = $1 AND "iterptosEilutes" < "gyvosEilutes"`,
       [lentele]

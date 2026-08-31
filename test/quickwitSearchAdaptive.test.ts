@@ -41,7 +41,7 @@ async function loadSearch(index: { total: number; isLive: (i: number) => boolean
         if (normalized.startsWith('SELECT SUM("gyvosEilutes")')) {
           return { rows: [{ gyva: index.total - deadCount, mirusi: deadCount }] };
         }
-        if (normalized.startsWith('SELECT id FROM "quickwitLenteles"')) {
+        if (normalized.startsWith('SELECT id FROM "quickwit"."lenteles"')) {
           return { rows: [{ id: 7 }] };
         }
         if (normalized.startsWith('SELECT "quickwitIdInt"')) {

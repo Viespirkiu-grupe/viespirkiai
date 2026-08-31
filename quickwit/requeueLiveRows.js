@@ -34,7 +34,7 @@ const TABLES = {
     sourceId: "pirkimoId",
     signal: WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED,
   },
-  // jarKodas yra text, o quickwitEilutes."eilutesId" – bigint, tad reikia ::text.
+  // jarKodas yra text, o quickwit.eilutes."eilutesId" – bigint, tad reikia ::text.
   juridiniai: {
     queue: "juridiniaiIndexQueue",
     queueId: "jarKodas",
@@ -44,7 +44,7 @@ const TABLES = {
     sourceValue: `e."eilutesId"::text`,
     signal: WORK_SIGNALS.JURIDINIAI_INDEX_READY,
   },
-  // Raktas – `quickwitIndeksai."lentele"` reikšmė (Quickwit indekso etiketė);
+  // Raktas – `quickwit.indeksai."lentele"` reikšmė (Quickwit indekso etiketė);
   // pačios lentelės gyvena `mcp` schemoje.
   mcpToolCalls: {
     queue: "indexQueue",
@@ -71,7 +71,7 @@ Naudojimas:
   npm run quickwit:requeue-live -- [QUICKWIT_INDEKSO_PAVADINIMAS ...] [parinktys]
 
 Indeksą nurodykite stulpelio „quickwit_indeksas“ reikšme, pvz. documents_32.
-Šaltinio lentelės įrašo ID ir vidinis quickwitIndeksai.id čia nenaudojami.
+Šaltinio lentelės įrašo ID ir vidinis quickwit.indeksai.id čia nenaudojami.
 
 Pasirinkimas:
   --top N             N indeksų, turinčių daugiausia mirusių eilučių
@@ -152,7 +152,7 @@ async function getIndexes({ lentele, minDead, minDeadRatio }) {
             i."gyvosEilutes", i."mirusiosEilutes", i."iterptosEilutes",
             CASE WHEN i."iterptosEilutes" = 0 THEN 0
                  ELSE 100.0 * i."mirusiosEilutes" / i."iterptosEilutes" END AS "deadRatio"
-     FROM "quickwitIndeksai" i
+     FROM "quickwit"."indeksai" i
      WHERE ($1::text IS NULL OR i."lentele" = $1) AND i."mirusiosEilutes" >= $2
        AND CASE WHEN i."iterptosEilutes" = 0 THEN 0
                 ELSE 100.0 * i."mirusiosEilutes" / i."iterptosEilutes" END >= $3
@@ -277,7 +277,7 @@ export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, [lentele]);
     const { rows: countRows } = await client.query(
       `SELECT COUNT(*)::int AS total
-       FROM "quickwitEilutes"
+       FROM "quickwit"."eilutes"
        WHERE "indeksaiId" = ANY($1::int[])`,
       [indexIds],
     );
@@ -287,9 +287,9 @@ export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres
     }
 
     // Otherwise re-indexed rows could land back in a selected current shard.
-    await client.query(`UPDATE "quickwitIndeksai" SET "current" = false WHERE "lentele" = $1 AND "indeksas" = ANY($2::text[])`, [lentele, names]);
+    await client.query(`UPDATE "quickwit"."indeksai" SET "current" = false WHERE "lentele" = $1 AND "indeksas" = ANY($2::text[])`, [lentele, names]);
     const { rowCount: replacedQueueRows } = await client.query(
-      `DELETE FROM ${queueRef(table)} q USING "quickwitEilutes" e
+      `DELETE FROM ${queueRef(table)} q USING "quickwit"."eilutes" e
        WHERE e."indeksaiId" = ANY($1::int[])
          AND q."${table.queueId}" = ${table.queueValue ?? `e."eilutesId"::bigint`}`,
       [indexIds],
@@ -298,7 +298,7 @@ export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres
     const { rowCount: queuedPatches } = await client.query(
       `INSERT INTO ${queueRef(table)} ("${table.queueId}", "${table.changeColumn ?? "keitimas"}")
        SELECT ${table.queueValue ?? `e."eilutesId"::bigint`}, 'patch'
-       FROM "quickwitEilutes" e
+       FROM "quickwit"."eilutes" e
        JOIN ${sourceRef(table)} s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
        WHERE e."indeksaiId" = ANY($1::int[])`,
       [indexIds],
@@ -306,7 +306,7 @@ export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres
     const { rowCount: queuedDeletes } = await client.query(
       `INSERT INTO ${queueRef(table)} ("${table.queueId}", "${table.changeColumn ?? "keitimas"}")
        SELECT ${table.queueValue ?? `e."eilutesId"::bigint`}, 'delete'
-       FROM "quickwitEilutes" e
+       FROM "quickwit"."eilutes" e
        LEFT JOIN ${sourceRef(table)} s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
        WHERE e."indeksaiId" = ANY($1::int[]) AND s."${table.sourceId}" IS NULL`,
       [indexIds],

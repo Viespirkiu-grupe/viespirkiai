@@ -129,7 +129,7 @@ SELECT "sql" FROM public."sqlLogTekstai" WHERE "md5" = '…';
 Jei lentelės nėra (`42P01`) arba jungtis read-only (`25006`), rašymas išsijungia
 su vienu įspėjimu — logavimas dėl to nenutrūksta, tik `md5` liks be teksto.
 
-**Kitaip Postgres nedalyvauja**: jokių shard'ų, `quickwitLenteles`/`quickwitIndeksai`
+**Kitaip Postgres nedalyvauja**: jokių shard'ų, `quickwit.lenteles`/`quickwit.indeksai`
 įrašų ar schemos versijų. Indekso schema —
 [`quickwit/sqlLogIndexConfig.js`](quickwit/sqlLogIndexConfig.js) (JS eilutė, o ne
 .yaml failas: runtime image'e yra tik `dist`, tad failo ten paprasčiausiai nebūtų);

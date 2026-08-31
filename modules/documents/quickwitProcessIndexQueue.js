@@ -108,19 +108,19 @@ išsiplėstų daugiausia vienas.
 */
 const SIDECAR_CHUNK = 100;
 
-/** Įrašo/atnaujina indekso schemą `quickwitLenteles`, kaip daro juridiniai. */
+/** Įrašo/atnaujina indekso schemą `quickwit.lenteles`, kaip daro juridiniai. */
 export async function ensureDocumentsQuickwitConfig() {
     if (configRegistered) return;
     await postgres.query(
-        `INSERT INTO public."quickwitLenteles"
+        `INSERT INTO "quickwit"."lenteles" AS l
             ("lentele", "defaultShardSize", "indexConfig")
          VALUES ($1, $2, $3)
          ON CONFLICT ("lentele") DO UPDATE SET
             "defaultShardSize" = EXCLUDED."defaultShardSize",
             "indexConfig" = EXCLUDED."indexConfig"
          WHERE ROW(
-            "quickwitLenteles"."defaultShardSize",
-            "quickwitLenteles"."indexConfig"
+            l."defaultShardSize",
+            l."indexConfig"
          ) IS DISTINCT FROM ROW(
             EXCLUDED."defaultShardSize",
             EXCLUDED."indexConfig"

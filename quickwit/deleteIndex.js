@@ -5,7 +5,7 @@ import { QW_URL } from "./qwHttp.js";
 const logger = new Logger();
 
 /**
- * Delete one Quickwit index and its quickwitIndeksai row.
+ * Delete one Quickwit index and its quickwit.indeksai row.
  *
  * @param {string} indeksas
  * @param {{ allowLive?: boolean, protectLatest?: boolean, dryRun?: boolean }} options
@@ -22,7 +22,7 @@ export async function deleteIndex(
 
     const { rows: indexRows } = await client.query(
       `SELECT "lentele"
-       FROM "quickwitIndeksai"
+       FROM "quickwit"."indeksai"
        WHERE "indeksas" = $1`,
       [indeksas],
     );
@@ -37,13 +37,13 @@ export async function deleteIndex(
     const { rows } = await client.query(
       `SELECT COUNT(e.*)::int AS "live",
               i."seq" = latest."seq" AS "latest"
-       FROM "quickwitIndeksai" i
+       FROM "quickwit"."indeksai" i
        CROSS JOIN LATERAL (
          SELECT MAX("seq") AS "seq"
-         FROM "quickwitIndeksai"
+         FROM "quickwit"."indeksai"
          WHERE "lentele" = i."lentele"
        ) latest
-       LEFT JOIN "quickwitEilutes" e
+       LEFT JOIN "quickwit"."eilutes" e
          ON e."indeksaiId" = i.id
        WHERE i."lentele" = $1 AND i."indeksas" = $2
        GROUP BY i."lentele", i."seq", latest."seq"`,
@@ -71,7 +71,7 @@ export async function deleteIndex(
       throw new Error(`Quickwit DELETE returned ${response.status}: ${await response.text()}`);
     }
 
-    await client.query(`DELETE FROM "quickwitIndeksai" WHERE "indeksas" = $1`, [indeksas]);
+    await client.query(`DELETE FROM "quickwit"."indeksai" WHERE "indeksas" = $1`, [indeksas]);
     await client.query("COMMIT");
     return { deleted: true, alreadyAbsent: response.status === 404, live };
   } catch (error) {

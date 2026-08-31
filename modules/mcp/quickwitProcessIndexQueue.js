@@ -11,12 +11,12 @@ import { toRfc3339 } from "../../utils/time.js";
 /*
 MCP įrankių iškvietimų logas → Quickwit.
 
-Indekso schema gyvena tik DB — `quickwitLenteles."indexConfig"` stulpelyje
+Indekso schema gyvena tik DB — `quickwit.lenteles."indexConfig"` stulpelyje
 (`quickwit/quickwit.js` iš ten ją ir paima kurdamas shard'ą), tad kode jos
 nedubliuojame; čia lieka tik patikra, kad įrašas egzistuoja.
 
 Žurnalo lentelės gyvena `mcp` schemoje (DDL — mcpSchema.sql); `LENTELE` lieka
-Quickwit indekso etiketė (`quickwitLenteles."lentele"`), o ne SQL vardas.
+Quickwit indekso etiketė (`quickwit.lenteles."lentele"`), o ne SQL vardas.
 */
 
 const logger = new Logger();
@@ -30,11 +30,11 @@ let configChecked = false;
 async function ensureConfigRegistered() {
     if (configChecked) return;
     const { rows } = await postgres.query(
-        `SELECT 1 FROM public."quickwitLenteles" WHERE "lentele" = $1`,
+        `SELECT 1 FROM "quickwit"."lenteles" WHERE "lentele" = $1`,
         [LENTELE],
     );
     if (!rows.length) {
-        throw new Error(`quickwitLenteles neturi „${LENTELE}" įrašo`);
+        throw new Error(`quickwit.lenteles neturi „${LENTELE}" įrašo`);
     }
     configChecked = true;
 }

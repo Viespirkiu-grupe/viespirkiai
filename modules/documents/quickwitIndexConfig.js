@@ -2,7 +2,7 @@
  * Quickwit schema dokumentų indeksams.
  *
  * Schema laikoma JS modulyje, o ne tik DB, nes šis kodas veikia ir tiesiogiai
- * per Node, ir iš sukompiliuoto runtime bundle'io. `quickwitLenteles` eilutę
+ * per Node, ir iš sukompiliuoto runtime bundle'io. `quickwit.lenteles` eilutę
  * atnaujina pats indeksavimo darbas (žr. ensureDocumentsQuickwitConfig).
  *
  * `index_id` yra tik šablonas. `quickwit/quickwit.js`, kurdamas naują shard'ą,
