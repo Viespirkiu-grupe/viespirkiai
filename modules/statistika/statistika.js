@@ -70,14 +70,6 @@ export function buildSsePayload(h) {
       tup_deleted: Number(h.database.tup_deleted).toLocaleString('lt-LT'),
       tup_fetched: Number(h.database.tup_fetched).toLocaleString('lt-LT'),
     },
-    lenteles: h.lenteles.map((l) => ({
-      tableName: l.tableName,
-      dataSize: convertUnit(Number(l.dataSize), 'B'),
-      indexSize: convertUnit(Number(l.indexSize), 'B'),
-      totalSize: convertUnit(Number(l.totalSize), 'B'),
-      approxRowCount: Number(l.approxRowCount).toLocaleString('lt-LT'),
-      isTotal: l.tableName === 'Iš viso',
-    })),
     eiles: h.eiles.map((e) => ({
       tableName: e.tableName,
       approxRowCount: Number(e.approxRowCount).toLocaleString('lt-LT'),

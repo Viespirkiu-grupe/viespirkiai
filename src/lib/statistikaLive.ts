@@ -56,13 +56,6 @@ export function initStatistikaLive() {
       ).join('');
     }
 
-    const lBody = document.getElementById('lentelesBody');
-    if (lBody && payload.lenteles) {
-      lBody.innerHTML = payload.lenteles.map((l: any) =>
-        `<tr class="${l.isTotal ? 'font-bold' : ''}"${l.isTotal ? ' data-sort-pin="last"' : ''}><td>${escapeHtml(l.tableName)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.dataSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.indexSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.totalSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.approxRowCount)}</td></tr>`
-      ).join('');
-    }
-
     if (payload.eiles) {
       payload.eiles.forEach((e: any) => {
         const value = document.querySelector(`[data-queue="${CSS.escape(e.tableName)}"]`);
