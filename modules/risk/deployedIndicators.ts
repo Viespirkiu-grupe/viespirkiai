@@ -18,6 +18,7 @@ import { LtOth04Decision } from "./indicators/LT-OTH-04/decision.ts";
 import { LtOth05Decision } from "./indicators/LT-OTH-05/decision.ts";
 import { LtPri05Decision } from "./indicators/LT-PRI-05/decision.ts";
 import { LtPri06Decision } from "./indicators/LT-PRI-06/decision.ts";
+import { LtPri09Decision } from "./indicators/LT-PRI-09/decision.ts";
 import { LtPro01Decision } from "./indicators/LT-PRO-01/decision.ts";
 import { LtPro05Decision } from "./indicators/LT-PRO-05/decision.ts";
 import { LtPro08Decision } from "./indicators/LT-PRO-08/decision.ts";
@@ -46,6 +47,7 @@ const deployedIndicatorClasses = [
     LtOth05Decision,
     LtPri05Decision,
     LtPri06Decision,
+    LtPri09Decision,
     LtPro01Decision,
     LtPro05Decision,
     LtPro08Decision,
