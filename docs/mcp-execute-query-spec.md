@@ -184,7 +184,7 @@ fails fast rather than silently returning incomplete schema.
 
 ### Covered-table redirect
 
-Tables that are fully covered by a view (`asmenys`, `sutartys`, `pirkimai`, `pinregJuridiniaiRysiai`,
+Tables that are fully covered by a view (`asmenys`, `sutartys`, `pirkimai`, `juridiniaiRysiaiPilni`,
 `ppa."ataskaitos"`, `bylosDalyviai`) return a redirect message instead of raw column data:
 
 > *"Table 'asmenys' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
@@ -358,7 +358,7 @@ recursive graph traversal where full schema control is needed.
 | `v_company`      | capacity, blacklist, labor, domains, court                | `asmenys` (rcJar)            | Latest Sodra snapshot (LATERAL), compliance flags, count subqueries |
 | `v_sutartys`     | contracts, buyer-supplier, cpv, value, timing, frameworks | `sutartys`               | Buyer + seller names denormalized; `::text` cast on `jarKodas`      |
 | `v_pirkimas`     | procedures, criteria, lot-count, single-bidder            | `pirkimai`               | Organizer name, municipality, short code                            |
-| `v_person_links` | conflict-of-interest, directors, beneficial-owners        | `pinregJuridiniaiRysiai` | Company name joined; `irasoTipas` distinguishes role type           |
+| `v_person_links` | conflict-of-interest, directors, beneficial-owners        | `pinreg."juridiniaiRysiai"` | Company name joined; `irasoTipas` distinguishes role type           |
 | `v_dalyviai`     | bid-ranking, rejections, co-bidding, single-bidder        | `ppa."ataskaitos"`      | Full bidder list with rank, bid amount, rejection reason            |
 | `v_bylos`        | court, litigation, enforcement                            | `bylosDalyviai`          | Case metadata joined; company name denormalized                     |
 
@@ -372,7 +372,7 @@ Raw tables used directly (no covering view):
 | `cpvaProjektuSutartys`   | CPVA subcontractor data — join shape varies per query |
 | `domenai`                | Domain pair queries need flexible self-join           |
 | `neskelbiamosDerybos`    | Single-table lookup, no join needed                   |
-| `pinregJuridiniaiRysiai` | Revolving-door queries need self-join on date ranges  |
+| `pinreg."juridiniaiRysiai"` | Revolving-door queries need self-join on date ranges |
 
 ---
 
@@ -384,7 +384,7 @@ All tables accessible to `execute_query` (Layer 2) and queryable by the analyst 
 sutartys | vpmSutartys: atviriDuomenys, atviriDuomenysImp, atviriDuomenysPilni, atviriDuomenysImpPilni, atviriTiekejai, atviriPirkejai, atviriCpvKodai, atviriObjektai, atviriValstybes, atviriPirkimoBudai
 rcJar: asmenys | public: jar
 eppsViesiejiPirkimai: pirkimai, vykdytojai
-pinregJuridiniaiRysiai, pinreg
+pinreg: deklaracijos, juridiniaiRysiai, juridiniaiRysiaiPilni, rysiuPobudziai, teisinesFormos
 failai
 sabis: sutartys, sutarciuSalys, saskaitos, saskaituSalys
 cpvaProjektuSutartys, cpvaProjektuSarasas
@@ -540,6 +540,7 @@ GRANT USAGE ON SCHEMA uzt TO analyst;
 GRANT USAGE ON SCHEMA "vptJuodiejiSarasai" TO analyst;
 GRANT USAGE ON SCHEMA "vpmSutartys" TO analyst;
 GRANT USAGE ON SCHEMA bvpz TO analyst;
+GRANT USAGE ON SCHEMA pinreg TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -549,8 +550,9 @@ GRANT SELECT ON
     "vpmSutartys"."atviriTiekejai", "vpmSutartys"."atviriPirkejai",
     "vpmSutartys"."atviriCpvKodai", "vpmSutartys"."atviriObjektai",
     "vpmSutartys"."atviriValstybes", "vpmSutartys"."atviriPirkimoBudai",
-    "jar", "eppsViesiejiPirkimai"."pirkimai", "eppsViesiejiPirkimai"."vykdytojai", "pinregJuridiniaiRysiai",
-    "pinreg", sabis."sutartys", sabis."sutarciuSalys", sabis."saskaitos",
+    "jar", "eppsViesiejiPirkimai"."pirkimai", "eppsViesiejiPirkimai"."vykdytojai",
+    pinreg."deklaracijos", pinreg."juridiniaiRysiai", pinreg."juridiniaiRysiaiPilni",
+    pinreg."rysiuPobudziai", pinreg."teisinesFormos", sabis."sutartys", sabis."sutarciuSalys", sabis."saskaitos",
     sabis."saskaituSalys", sabis."saskaituSalysTipai", sabis."saskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas", cvpp."archyvoSkelbimai",
     "eiluciuSkaiciai", bvpz."kodai",
@@ -590,5 +592,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, bvpz, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, bvpz, pinreg, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
 ```

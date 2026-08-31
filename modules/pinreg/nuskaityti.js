@@ -4,12 +4,12 @@ import { log } from "../../utils/log.js";
 import { deklaracijaToRysiai, upsertRysiai } from "./rysiaiUtils.js";
 
 /**
- * Nuskaityti vieną VTEK deklaraciją ir įrašyti į pinregJuridiniaiRysiai.
+ * Nuskaityti vieną VTEK deklaraciją ir įrašyti į pinreg."juridiniaiRysiai".
  * @returns {Promise<boolean>} true jei nuskaityta, false jei daugiau deklaracijų nėra
  */
 export async function nuskaitytiPinregDeklaracija() {
     const deklaracijaRes = await postgres.query(
-        `SELECT * FROM pinreg WHERE nuskaitytas IS NULL LIMIT 1`,
+        `SELECT * FROM pinreg."deklaracijos" WHERE nuskaitytas IS NULL LIMIT 1`,
     );
     if (deklaracijaRes.rowCount === 0) return false;
 
@@ -38,7 +38,7 @@ export async function nuskaitytiPinregDeklaracija() {
                     `Klaida nuskaityti deklaracija ${deklaracija.uuid}: ${status}`,
                 );
                 await postgres.query(
-                    `UPDATE pinreg SET nuskaitytas = -1 WHERE uuid = $1`,
+                    `UPDATE pinreg."deklaracijos" SET nuskaitytas = -1 WHERE uuid = $1`,
                     [deklaracija.uuid],
                 );
                 return reject(
@@ -60,7 +60,7 @@ export async function nuskaitytiPinregDeklaracija() {
 
     // Žymime nuskaitytą
     await postgres.query(
-        `UPDATE pinreg SET nuskaitytas = 1, json = $1, "pateikimoData" = $2 WHERE uuid = $3`,
+        `UPDATE pinreg."deklaracijos" SET nuskaitytas = 1, json = $1, "pateikimoData" = $2 WHERE uuid = $3`,
         [data, data.pateikimoData ?? null, deklaracija.uuid],
     );
 

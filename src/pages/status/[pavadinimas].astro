@@ -25,7 +25,9 @@ function toIsoDay(d: Date): string {
 const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = await Promise.all([
   postgres.query(`
     WITH ordered AS (
-      SELECT g.id, g."laikas" AS "timestamp", t."kodas" AS tipas,
+      -- Puslapio diagramos ašis sudaroma iš Date.UTC(...), tad laikas imamas
+      -- Lietuvos sieniniu laiku be zonos – taip, kaip buvo iki perkėlimo.
+      SELECT g.id, g."laikas" AT TIME ZONE 'Europe/Vilnius' AS "timestamp", t."kodas" AS tipas,
         g."laikas" - LAG(g."laikas") OVER (PARTITION BY t."kodas" ORDER BY g."laikas") AS delta
       FROM monitoring."cvpIsGedimai" g
       LEFT JOIN monitoring."gedimuTipai" t ON t.id = g."tipoId"
@@ -53,7 +55,9 @@ const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = 
     ORDER BY day DESC`),
   postgres.query(`
     WITH ordered AS (
-      SELECT g.id, g."laikas" AS "timestamp", t."kodas" AS tipas,
+      -- Puslapio diagramos ašis sudaroma iš Date.UTC(...), tad laikas imamas
+      -- Lietuvos sieniniu laiku be zonos – taip, kaip buvo iki perkėlimo.
+      SELECT g.id, g."laikas" AT TIME ZONE 'Europe/Vilnius' AS "timestamp", t."kodas" AS tipas,
         g."laikas" - LAG(g."laikas") OVER (PARTITION BY t."kodas" ORDER BY g."laikas") AS delta
       FROM monitoring."cvpIsGedimai" g
       LEFT JOIN monitoring."gedimuTipai" t ON t.id = g."tipoId"
@@ -71,9 +75,10 @@ const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = 
     )
     SELECT tipas, start_time, end_time FROM intervals ORDER BY start_time`),
   postgres.query(
-    `SELECT "laikas"::date AS day, MAX("laikas") AS "timestamp"
+    `SELECT ("laikas" AT TIME ZONE 'Europe/Vilnius')::date AS day,
+            MAX("laikas" AT TIME ZONE 'Europe/Vilnius') AS "timestamp"
      FROM monitoring."cvpIsGedimai"
-     GROUP BY "laikas"::date
+     GROUP BY 1
      ORDER BY day DESC`,
   ),
   postgres.query(

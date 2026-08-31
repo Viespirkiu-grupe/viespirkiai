@@ -1,4 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
+import { RYSIAI_FROM, RYSIAI_SELECT, RYSIO_POBUDIS_SQL } from "./rysiuUzklausa.js";
 
 const TIPAI = {
     DEKLARUOJANCIO_DARBOVIETE: "darbovietes",
@@ -17,11 +18,11 @@ export const TIPU_FILTRAI = {
 // niekada nesudaromas iš vartotojo įvesties. Pagal asmenį nerikiuojama sąmoningai
 // – vardai rodomi užcenzūruoti, o abėcėlinė tvarka padėtų juos atspėti.
 const RIKIAVIMAI = {
-    pateikta: '"pateikimoData"',
-    nuo: '"rysioPradzia"',
-    iki: '"rysioPabaiga"',
-    pareigos: '"pareigos"',
-    tipas: '"irasoTipas"',
+    pateikta: 'r."pateikimoData"',
+    nuo: 'r."rysioPradzia"',
+    iki: 'r."rysioPabaiga"',
+    pareigos: 'r."pareigos"',
+    tipas: 'r."irasoTipas"',
 };
 
 /**
@@ -51,22 +52,22 @@ export async function gautiPinregDeklaracijasPagalJarKoda(
     // Bendros sąlygos (be tipo) – pagal jas skaičiuojami kiekiai kiekvienam tipui,
     // kad filtro parinktys rodytų, kiek įrašų jose liks.
     const params = [jarKodas];
-    const salygos = ['"jarKodas" = $1'];
+    const salygos = ['r."jarKodas" = $1'];
     if (pareigos) {
         params.push(`%${pareigos}%`);
         salygos.push(
-            `(COALESCE("pareigos", '') || ' ' || COALESCE("rysioPobudzioPavadinimas", '')) ILIKE $${params.length}`,
+            `(COALESCE(r."pareigos", '') || ' ' || COALESCE(${RYSIO_POBUDIS_SQL}, '')) ILIKE $${params.length}`,
         );
     }
-    if (galiojimas === "galiojantys") salygos.push('"rysioPabaiga" IS NULL');
-    if (galiojimas === "pasibaige") salygos.push('"rysioPabaiga" IS NOT NULL');
+    if (galiojimas === "galiojantys") salygos.push('r."rysioPabaiga" IS NULL');
+    if (galiojimas === "pasibaige") salygos.push('r."rysioPabaiga" IS NOT NULL');
     const kur = salygos.join(" AND ");
 
     const eiluciuParams = [...params];
     let eiluciuKur = kur;
     if (tipas) {
         eiluciuParams.push(TIPU_FILTRAI[tipas]);
-        eiluciuKur += ` AND "irasoTipas" = $${eiluciuParams.length}`;
+        eiluciuKur += ` AND r."irasoTipas" = $${eiluciuParams.length}`;
     }
     const limitSql = limit ? ` LIMIT $${eiluciuParams.length + 1}` : "";
     if (limit) eiluciuParams.push(limit);
@@ -75,17 +76,18 @@ export async function gautiPinregDeklaracijasPagalJarKoda(
 
     const [irasaiQuery, kiekiaiQuery] = await Promise.all([
         postgres.query(
-            `SELECT * FROM public."pinregJuridiniaiRysiai"
+            `SELECT ${RYSIAI_SELECT}
+           FROM ${RYSIAI_FROM}
            WHERE ${eiluciuKur}
-           ORDER BY ${RIKIAVIMAI[sort]} ${kryptis === "asc" ? "ASC" : "DESC"} NULLS LAST, "id" DESC
+           ORDER BY ${RIKIAVIMAI[sort]} ${kryptis === "asc" ? "ASC" : "DESC"} NULLS LAST, r."id" DESC
            ${limitSql}${offsetSql}`,
             eiluciuParams,
         ),
         postgres.query(
-            `SELECT "irasoTipas", COUNT(*)::int AS kiekis
-           FROM public."pinregJuridiniaiRysiai"
+            `SELECT r."irasoTipas", COUNT(*)::int AS kiekis
+           FROM ${RYSIAI_FROM}
            WHERE ${kur}
-           GROUP BY "irasoTipas"`,
+           GROUP BY r."irasoTipas"`,
             params,
         ),
     ]);

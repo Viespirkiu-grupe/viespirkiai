@@ -7,6 +7,20 @@ import Badge from '@design-system/components/Badge.astro';
 import Pagination from '@design-system/components/Pagination.astro';
 import { linksniuotiOnly } from '@/utils/linksniai.js';
 
+// `pateikimoData` yra timestamptz, tad driveris grąžina Date. Rodom Lietuvos
+// laiku „YYYY-MM-DD HH:MM:SS" (sv-SE lokalė duoda būtent tokį pavidalą).
+const pateiktaFormatas = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Europe/Vilnius',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+function pateiktaTekstas(reiksme: any): string {
+  if (!reiksme) return '';
+  const data = reiksme instanceof Date ? reiksme : new Date(String(reiksme));
+  if (Number.isNaN(data.getTime())) return String(reiksme).replace('T', ' ').slice(0, 19);
+  return pateiktaFormatas.format(data);
+}
+
 const { asmuo } = Astro.props;
 const pinreg = asmuo.pinreg;
 if (!pinreg) return;
@@ -36,7 +50,7 @@ const irasai = (pinreg.irasai || []).map((r: any) => ({
       : r.pareigos,
   nuo: r.rysioPradzia ? String(r.rysioPradzia).slice(0, 10) : '',
   iki: r.rysioPabaiga ? String(r.rysioPabaiga).slice(0, 10) : '',
-  pateikta: r.pateikimoData ? String(r.pateikimoData).replace('T', ' ').slice(0, 19) : '',
+  pateikta: pateiktaTekstas(r.pateikimoData),
 }));
 
 const { tipas: tipoFiltras, pareigos: pareiguFiltras, galiojimas } = pinreg.filtrai ?? {};

@@ -97,7 +97,7 @@ async function crawlPrefix(prefix) {
         for (const row of items) {
             if (row.accessUuid) {
                 await postgres.query(
-                    `INSERT INTO pinreg (uuid) VALUES ($1) ON CONFLICT DO NOTHING;`,
+                    `INSERT INTO pinreg."deklaracijos" (uuid) VALUES ($1) ON CONFLICT DO NOTHING;`,
                     [row.accessUuid],
                 );
             }

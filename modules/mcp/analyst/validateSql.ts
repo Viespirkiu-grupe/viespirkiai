@@ -21,7 +21,11 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // EPPS viešieji pirkimai iškelti į `eppsViesiejiPirkimai` schemą; analyst
     // search_path juos mato nekvalifikuotai (pirkimai = buvęs viesiejiPirkimai).
     "pirkimai", "vykdytojai",
-    "pinregJuridiniaiRysiai", "pinreg",
+    // PINREG iškeltas į `pinreg` schemą: `deklaracijos` (buvęs public."pinreg"),
+    // `juridiniaiRysiai` su enum tipais bei žodynais ir `juridiniaiRysiaiPilni`
+    // – suderinamumo view su senąja plokščia forma.
+    "deklaracijos", "juridiniaiRysiai", "juridiniaiRysiaiPilni",
+    "rysiuPobudziai", "teisinesFormos",
     // SABIS iškeltas į `sabis` schemą; nekvalifikuotas `sutartys` reiškia būtent
     // SABIS sutarčių registrą (PPA ataskaitų sutartys — `ataskaituSutartys`).
     "sutartys", "sutarciuSalys", "saskaitos", "saskaituSalys",

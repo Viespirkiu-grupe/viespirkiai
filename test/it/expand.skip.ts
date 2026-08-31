@@ -91,7 +91,7 @@ describe('expandPerson (IT)', () => {
         // Pick a person who has at least one pinreg declaration.
         const res = await postgres.query<{ vardas: string; pavarde: string }>(
             `SELECT "vardas", "pavarde"
-             FROM public."pinregJuridiniaiRysiai"
+             FROM pinreg."juridiniaiRysiai"
              WHERE "vardas" IS NOT NULL AND "pavarde" IS NOT NULL
                AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'
              ORDER BY "pateikimoData" DESC NULLS LAST

@@ -1,5 +1,6 @@
 import { postgres } from '../../postgres/postgres.js';
 import { specialJarCodes } from '../juridiniai/specialJarCodes.js';
+import { RYSIAI_FROM, RYSIAI_SELECT } from '../pinreg/rysiuUzklausa.js';
 
 /**
  * @typedef {{ id: string; attributes: Record<string, unknown> }} NodeLike
@@ -324,7 +325,8 @@ export async function expandOrg(jarKodas) {
         ),
         // All pinreg declarations for this org
         postgres.query(
-            `SELECT * FROM public."pinregJuridiniaiRysiai" WHERE "jarKodas" = $1 ORDER BY "pateikimoData" DESC LIMIT 500`,
+            `SELECT ${RYSIAI_SELECT} FROM ${RYSIAI_FROM}
+              WHERE r."jarKodas" = $1 ORDER BY r."pateikimoData" DESC LIMIT 500`,
             [jk],
         ),
         // Top contracts where this org is the buyer
@@ -868,7 +870,7 @@ export async function expandPirkimas(pirkimoId) {
  * SUTUOKTINIO_DARBOVIETE handler must detect which role the person plays to
  * avoid emitting a self-loop Spouse edge.
  *
- * @param {object[]} rows  Rows from pinregJuridiniaiRysiai
+ * @param {object[]} rows  Rows from pinreg."juridiniaiRysiai"
  * @param {string} rootPersonId  Stable node id of the searched person, e.g. "person:jonas jonaitis"
  * @param {string} vardas  First name (trimmed, original case)
  * @param {string} pavarde Last name (trimmed, original case)
@@ -983,10 +985,10 @@ export async function expandPerson(fullName) {
     const rootPersonId = personId(vardas, pavarde);
 
     const pinregRes = await postgres.query(
-        `SELECT * FROM public."pinregJuridiniaiRysiai"
-         WHERE (lower(trim(vardas)) || ' ' || lower(trim(pavarde)) = lower($1)
-                OR lower(trim("susijusioAsmensVardas")) || ' ' || lower(trim("susijusioAsmensPavarde")) = lower($1))
-         ORDER BY "pateikimoData" DESC LIMIT 500`,
+        `SELECT ${RYSIAI_SELECT} FROM ${RYSIAI_FROM}
+         WHERE (lower(trim(r.vardas)) || ' ' || lower(trim(r.pavarde)) = lower($1)
+                OR lower(trim(r."susijusioAsmensVardas")) || ' ' || lower(trim(r."susijusioAsmensPavarde")) = lower($1))
+         ORDER BY r."pateikimoData" DESC LIMIT 500`,
         [name.toLowerCase()],
     );
 

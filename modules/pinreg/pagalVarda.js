@@ -15,7 +15,7 @@ export async function gautiPinregDeklaracijasPagalVardaPavarde(
 
     const declarationsQuery = await postgres.query(
         `SELECT uuid, json, "pateikimoData"
-         FROM public.pinreg
+         FROM pinreg."deklaracijos"
          WHERE lower(asmuo) = lower($1)
             OR lower(sutuoktinis) = lower($1)
          ORDER BY "pateikimoData" DESC
