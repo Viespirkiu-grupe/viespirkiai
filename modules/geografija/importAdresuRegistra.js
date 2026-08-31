@@ -10,6 +10,7 @@
 // FK tarp lentelių nėra, tad kiekvieną žingsnį galima paleisti ir atskirai.
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
+import { closeNats } from "../../utils/natsHub.js";
 import { updateAdresai } from "./importAdresai.js";
 import { updateApskritys } from "./importApskriciuRibos.js";
 import { updateGatves } from "./importGatviuRibos.js";
@@ -62,10 +63,14 @@ export async function importuotiAdresuRegistra(vardai = []) {
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
     const argumentai = process.argv.slice(2);
-    if (argumentai.includes("--sarasas")) {
-        for (const z of ZINGSNIAI) console.log(z.vardas);
-    } else {
-        await importuotiAdresuRegistra(argumentai);
+    try {
+        if (argumentai.includes("--sarasas")) {
+            for (const z of ZINGSNIAI) console.log(z.vardas);
+        } else {
+            await importuotiAdresuRegistra(argumentai);
+        }
+    } finally {
+        await closeNats().catch(() => {});
+        await postgres.end();
     }
-    await postgres.end();
 }
