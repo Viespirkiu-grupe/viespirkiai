@@ -2,7 +2,6 @@
 import PageSection from '@design-system/components/PageSection.astro';
 import DataTable from '@design-system/components/DataTable.astro';
 import DateValue from '@design-system/components/DateValue.astro';
-import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import TruncationNotice from '@design-system/components/TruncationNotice.astro';
 import Button from '@design-system/components/Button.astro';
 
@@ -27,7 +26,7 @@ const dokumentaiUrl = `/dokumentai?mode=phrase&type=teismoNuosprendis&jar=${enco
     {nuosprendziai.map((n: any) => (
       <tr>
         <td class="cell-nowrap">
-          <ExternalSourceLink href={`https://liteko.teismai.lt/viesasprendimupaieska/${n.fileHref}`} label={n.bylosNumeris} source="court" icon={false} />
+          <a href={`/teismoNuosprendis/${encodeURIComponent(n.litekoId)}`}>{n.bylosNumeris}</a>
         </td>
         <td class="teismai-col-rusis">
           <span class="cell-truncate">{n.bylosRusis}</span>
