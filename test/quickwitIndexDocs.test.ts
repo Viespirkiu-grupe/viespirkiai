@@ -13,7 +13,7 @@ const routeQuery = (normalized: string, params: any[] | undefined, opts: QueryOp
   if (normalized.startsWith("SELECT e.\"eilutesId\", e.\"indeksaiId\", i.\"indeksas\"")) {
     return { rows: opts.existingRows ?? [] };
   }
-  if (normalized.startsWith("SELECT id FROM \"quickwitLenteles\"")) {
+  if (normalized.startsWith("SELECT id FROM \"quickwit\".\"lenteles\"")) {
     return { rows: [{ id: 7 }] };
   }
   if (normalized.startsWith("SELECT nextval")) {
@@ -21,10 +21,10 @@ const routeQuery = (normalized: string, params: any[] | undefined, opts: QueryOp
     const nextIds = opts.nextIds ?? Array.from({ length: count }, (_, i) => i + 101);
     return { rows: nextIds.slice(0, count).map((id) => ({ id })) };
   }
-  if (normalized.startsWith("SELECT id, \"indeksas\" FROM \"quickwitIndeksai\"")) {
+  if (normalized.startsWith("SELECT id, \"indeksas\" FROM \"quickwit\".\"indeksai\"")) {
     return { rows: opts.currentShardRows ?? [] };
   }
-  if (normalized.startsWith("INSERT INTO \"quickwitIndeksai\"")) {
+  if (normalized.startsWith("INSERT INTO \"quickwit\".\"indeksai\"")) {
     return { rows: [{ id: 1, indeksas: "test_1" }] };
   }
   if (normalized.startsWith("SELECT \"defaultShardSize\"")) {
@@ -100,7 +100,7 @@ describe("indexDocs", () => {
     vi.clearAllMocks();
   });
 
-  it("publishes quickwitEilutes only after Quickwit ingest succeeds", async () => {
+  it("publishes quickwit.eilutes only after Quickwit ingest succeeds", async () => {
     const events: string[] = [];
     const fetchMock = vi.fn(async (url: string, options?: any) => {
       if (url.endsWith("/api/v1/indexes/test_1")) {
@@ -128,8 +128,8 @@ describe("indexDocs", () => {
     const stats = await indexDocs("test", [{ eilutesId: "10", doc: { title: "ok" } }]);
 
     const ingestAt = events.indexOf("fetch:ingest");
-    const insertAt = events.findIndex((event) => event.startsWith("INSERT INTO \"quickwitEilutes\""));
-    const iterptosAt = events.findIndex((event) => event.startsWith("UPDATE \"quickwitIndeksai\" i SET \"iterptosEilutes\""));
+    const insertAt = events.findIndex((event) => event.startsWith("INSERT INTO \"quickwit\".\"eilutes\""));
+    const iterptosAt = events.findIndex((event) => event.startsWith("UPDATE \"quickwit\".\"indeksai\" i SET \"iterptosEilutes\""));
     // lastIndexOf: shard creation runs in its own earlier transaction, so the
     // publish COMMIT is the second one.
     const commitAt = events.lastIndexOf("COMMIT");
@@ -142,14 +142,14 @@ describe("indexDocs", () => {
     expect(events[insertAt]).not.toContain("\"quickwitId\")");
     expect(iterptosAt).toBeGreaterThan(insertAt);
     expect(commitAt).toBeGreaterThan(iterptosAt);
-    expect(events.some((event) => event.startsWith("pool:UPDATE \"quickwitIndeksai\""))).toBe(false);
+    expect(events.some((event) => event.startsWith("pool:UPDATE \"quickwit\".\"indeksai\""))).toBe(false);
     expect(stats).toEqual({
       documentCount: 1,
       serializedBytes: Buffer.byteLength(JSON.stringify({ title: "ok", quickwitId: "101" })),
     });
   });
 
-  it("does not publish quickwitEilutes when ingest fails", async () => {
+  it("does not publish quickwit.eilutes when ingest fails", async () => {
     const events: string[] = [];
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith("/api/v1/indexes/test_1")) {
@@ -172,8 +172,8 @@ describe("indexDocs", () => {
     await expect(indexDocs("test", [{ eilutesId: "10", doc: { title: "bad" } }]))
       .rejects.toThrow(/Quickwit ingest test_1/);
 
-    expect(events.some((event) => event.startsWith("INSERT INTO \"quickwitEilutes\""))).toBe(false);
-    expect(events.some((event) => event.startsWith("UPDATE \"quickwitIndeksai\" i SET \"iterptosEilutes\""))).toBe(false);
+    expect(events.some((event) => event.startsWith("INSERT INTO \"quickwit\".\"eilutes\""))).toBe(false);
+    expect(events.some((event) => event.startsWith("UPDATE \"quickwit\".\"indeksai\" i SET \"iterptosEilutes\""))).toBe(false);
     // Ingest happens before the publish transaction opens, so a failure means
     // the only transaction on record is the earlier shard creation one.
     expect(events.filter((event) => event === "BEGIN")).toHaveLength(1);
@@ -202,7 +202,7 @@ describe("indexDocs", () => {
 
     await indexDocs("test", [{ eilutesId: "10", doc: { title: "updated" } }]);
 
-    const update = events.find((event) => event.startsWith("UPDATE \"quickwitEilutes\" AS qe"));
+    const update = events.find((event) => event.startsWith("UPDATE \"quickwit\".\"eilutes\" AS qe"));
     expect(update).toContain("\"quickwitIdInt\" = v.\"quickwitIdInt\"");
     expect(update).not.toContain("\"quickwitId\" =");
   });
@@ -218,7 +218,7 @@ describe("indexDocs", () => {
           expect(params).toEqual([7, ["101", "303"]]);
           return { rows: [{ quickwitIdInt: "303" }] };
         }
-        if (sql.includes("FROM \"quickwitLenteles\"")) {
+        if (sql.includes("FROM \"quickwit\".\"lenteles\"")) {
           expect(params).toEqual(["test"]);
           return { rows: [{ id: 7 }] };
         }

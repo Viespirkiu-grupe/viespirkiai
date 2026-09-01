@@ -72,7 +72,7 @@ async function main() {
         console.log(`\nUžklausa: ${UZKLAUSA}`);
         console.log(`Modelis: ${MODEL}; kandidatų: ${rows.length}; iš viso ${(performance.now() - started).toFixed(0)} ms\n`);
         for (const [index, row] of results.entries()) {
-            console.log(`${String(index + 1).padStart(2)}  ${row.cos.toFixed(4)}  ${row.code}-${row.checksum}  ${row.pavadinimas}`);
+            console.log(`${String(index + 1).padStart(2)}  ${row.cos.toFixed(4)}  ${row.code}${row.checksum == null ? "" : `-${row.checksum}`}  ${row.pavadinimas}`);
         }
     } finally {
         db.close();

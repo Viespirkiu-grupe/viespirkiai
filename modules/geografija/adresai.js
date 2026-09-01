@@ -16,7 +16,7 @@ export async function getAddressCoords(raw) {
         const { rows: r0 } = await postgres.query(
             `SELECT ST_Y(ST_Centroid("geometrija"::geometry)) AS lat,
                ST_X(ST_Centroid("geometrija"::geometry)) AS lon
-        FROM "arGyvenvietesRibos"
+        FROM "adresuRegistras"."gyvenvietesRibos"
         WHERE "pavadinimas" ILIKE $1
         LIMIT 1`,
             [`${name.trim()}%`],
@@ -26,8 +26,8 @@ export async function getAddressCoords(raw) {
         const { rows: r1 } = await postgres.query(
             `SELECT ST_Y(ST_Centroid("geometrija"::geometry)) AS lat,
                ST_X(ST_Centroid("geometrija"::geometry)) AS lon
-        FROM "arGyvenvietesRibos" gyv
-        JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+        FROM "adresuRegistras"."gyvenvietesRibos" gyv
+        JOIN geografija."gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
         WHERE gv."pavadinimas" ILIKE $1
         LIMIT 1`,
             [`${name.trim()}%`],
@@ -37,7 +37,7 @@ export async function getAddressCoords(raw) {
         const { rows: r2 } = await postgres.query(
             `SELECT ST_Y(ST_Centroid("geometrija"::geometry)) AS lat,
                ST_X(ST_Centroid("geometrija"::geometry)) AS lon
-        FROM "arSavivaldybes"
+        FROM "adresuRegistras"."savivaldybes"
         WHERE "pavadinimas" ILIKE $1
         LIMIT 1`,
             [`${name.trim()}%`],
@@ -106,11 +106,11 @@ export async function getAddressCoords(raw) {
             const { rows } = await postgres.query(
                 `SELECT ST_X(a."geometrija"::geometry) AS lon,
                  ST_Y(a."geometrija"::geometry) AS lat
-          FROM "arPastataiSklypaiAdresai" p
-          JOIN "arAdresai" a ON a."kodas" = p."kodas"
-          JOIN "arGatves" g ON g."kodas" = p."gatKodas"
-          JOIN "arGyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
-          JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+          FROM "adresuRegistras"."pastataiSklypaiAdresai" p
+          JOIN "adresuRegistras"."adresai" a ON a."kodas" = p."kodas"
+          JOIN "adresuRegistras"."gatves" g ON g."kodas" = p."gatKodas"
+          JOIN "adresuRegistras"."gyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
+          JOIN geografija."gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
           WHERE p."nr" = $1
             AND g."pavadinimas" ILIKE $2
             AND gv."pavadinimas" ILIKE $3
@@ -120,15 +120,15 @@ export async function getAddressCoords(raw) {
             if (rows.length) return { location: [rows[0].lat, rows[0].lon] };
         }
 
-        // Village city — match directly against arGyvenvietesRibos pavadinimas
+        // Village city — match directly against gyvenvietesRibos pavadinimas
         if (cityIsVillage && city) {
             const { rows } = await postgres.query(
                 `SELECT ST_X(a."geometrija"::geometry) AS lon,
                  ST_Y(a."geometrija"::geometry) AS lat
-          FROM "arPastataiSklypaiAdresai" p
-          JOIN "arAdresai" a ON a."kodas" = p."kodas"
-          JOIN "arGatves" g ON g."kodas" = p."gatKodas"
-          JOIN "arGyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
+          FROM "adresuRegistras"."pastataiSklypaiAdresai" p
+          JOIN "adresuRegistras"."adresai" a ON a."kodas" = p."kodas"
+          JOIN "adresuRegistras"."gatves" g ON g."kodas" = p."gatKodas"
+          JOIN "adresuRegistras"."gyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
           WHERE p."nr" = $1
             AND g."pavadinimas" ILIKE $2
             AND gyv."pavadinimas" ILIKE $3
@@ -143,9 +143,9 @@ export async function getAddressCoords(raw) {
             const { rows } = await postgres.query(
                 `SELECT ST_X(a."geometrija"::geometry) AS lon,
                  ST_Y(a."geometrija"::geometry) AS lat
-          FROM "arPastataiSklypaiAdresai" p
-          JOIN "arAdresai" a ON a."kodas" = p."kodas"
-          JOIN "arGatves" g ON g."kodas" = p."gatKodas"
+          FROM "adresuRegistras"."pastataiSklypaiAdresai" p
+          JOIN "adresuRegistras"."adresai" a ON a."kodas" = p."kodas"
+          JOIN "adresuRegistras"."gatves" g ON g."kodas" = p."gatKodas"
           WHERE p."nr" = $1
             AND p."pastoKodas" = $2
             AND g."pavadinimas" ILIKE $3
@@ -160,11 +160,11 @@ export async function getAddressCoords(raw) {
             const { rows } = await postgres.query(
                 `SELECT ST_X(a."geometrija"::geometry) AS lon,
                  ST_Y(a."geometrija"::geometry) AS lat
-          FROM "arPastataiSklypaiAdresai" p
-          JOIN "arAdresai" a ON a."kodas" = p."kodas"
-          JOIN "arGatves" g ON g."kodas" = p."gatKodas"
-          JOIN "arGyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
-          JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+          FROM "adresuRegistras"."pastataiSklypaiAdresai" p
+          JOIN "adresuRegistras"."adresai" a ON a."kodas" = p."kodas"
+          JOIN "adresuRegistras"."gatves" g ON g."kodas" = p."gatKodas"
+          JOIN "adresuRegistras"."gyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
+          JOIN geografija."gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
           WHERE p."nr" = $1
             AND g."pavadinimas" ILIKE $2
             AND gv."pavadinimas" ILIKE $3
@@ -183,7 +183,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
 
     if (arg === "--test") {
         const { rows } = await postgres.query(
-            `SELECT "adresas" FROM "jarAsmenuAdresai"
+            `SELECT "adresas" FROM "rcJar"."asmenuAdresai"
            WHERE "aobKodas" IS NULL AND "adresas" IS NOT NULL
            ORDER BY RANDOM()
            LIMIT 1000`,

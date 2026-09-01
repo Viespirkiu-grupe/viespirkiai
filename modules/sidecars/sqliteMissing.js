@@ -15,7 +15,9 @@ const SIDECAR_SALTINIAI = {
         keySql: `"fileHash"`,
     },
     dokumentai: {
-        fromSql: `FROM public.dokumentai WHERE md5 IS NOT NULL`,
+        // Sidecar saugyklos vardas lieka „dokumentai"; md5 dabar gali ateiti ir
+        // iš dokumento eilutės, ir iš failo, tad imam jį iš vaizdo.
+        fromSql: `FROM documents."documentsFull" WHERE md5 IS NOT NULL`,
         keySql: `md5`,
     },
     ocrRezultatai: {
@@ -23,16 +25,16 @@ const SIDECAR_SALTINIAI = {
         keySql: `"resultHash"`,
     },
     liteko2: {
-        fromSql: `FROM public."liteko2Sprendimai" WHERE md5 IS NOT NULL`,
+        fromSql: `FROM liteko2."sprendimai" WHERE md5 IS NOT NULL`,
         keySql: `md5`,
     },
     eTar: {
         // Aktų dokumentai ir redakcijų sąrašai rašo į tą pačią sidecar lentelę,
         // tad referencinė aibė yra jų md5 sąjunga.
         fromSql: `FROM (
-                      SELECT md5 FROM public."eTarLegalActDocument"
+                      SELECT md5 FROM "eTar"."legalActDocument"
                       UNION
-                      SELECT md5 FROM public."eTarEditionList"
+                      SELECT md5 FROM "eTar"."editionList"
                   ) t WHERE md5 IS NOT NULL`,
         keySql: `md5`,
     },

@@ -6,38 +6,95 @@ const { Parser } = pkg;
 const parser = new Parser();
 
 export const TABLE_WHITELIST: Set<string> = new Set([
-    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
-    "jarAsmenys", "jar",
-    "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
-    "pinregJuridiniaiRysiai", "pinreg",
-    "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
-    "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
+    "vpmSutartys",
+    // VPT atvirų sutarčių rinkiniai iškelti į "vpmSutartys" schemą ir
+    // normalizuoti; `atviriDuomenysPilni` / `atviriDuomenysImpPilni` yra
+    // suderinamumo view'ai su senąja plokščia forma. Žodynai su `atviri`
+    // priešdėliu – kad nekvalifikuoti vardai nesikirstų su kitomis schemomis.
+    "atviriDuomenys", "atviriDuomenysImp",
+    "atviriDuomenysPilni", "atviriDuomenysImpPilni",
+    "atviriTiekejai", "atviriPirkejai", "atviriCpvKodai",
+    "atviriObjektai", "atviriValstybes", "atviriPirkimoBudai",
+    // RC JAR CSV lentelės iškeltos į `rcJar` schemą (asmenys = buvęs jarAsmenys);
+    // `jar` yra atskira public lentelė iš data.gov.lt (Spinta).
+    "asmenys", "jar",
+    // EPPS viešieji pirkimai iškelti į `eppsViesiejiPirkimai` schemą; analyst
+    // search_path juos mato nekvalifikuotai (pirkimai = buvęs viesiejiPirkimai).
+    "pirkimai", "vykdytojai",
+    // PINREG iškeltas į `pinreg` schemą: `deklaracijos` (buvęs public."pinreg"),
+    // `juridiniaiRysiai` su enum tipais bei žodynais ir `juridiniaiRysiaiPilni`
+    // – suderinamumo view su senąja plokščia forma.
+    "deklaracijos", "juridiniaiRysiai", "juridiniaiRysiaiPilni",
+    "rysiuPobudziai", "teisinesFormos",
+    // SABIS iškeltas į `sabis` schemą; nekvalifikuotas `sutartys` reiškia būtent
+    // SABIS sutarčių registrą (PPA ataskaitų sutartys — `ataskaituSutartys`).
+    "sutartys", "sutarciuSalys", "saskaitos", "saskaituSalys",
+    "saskaituSalysTipai", "saskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas",
-    "cvppViesiejiPirkimai",
-    "eiluciuSkaiciai", "bvpzKodai",
-    "sodraMonthly", "sodraMonthlyEvrk", "sodraMonthlyImportai",
-    "sodraMonthlyPavadinimai", "sodraMonthlySavivaldybes",
-    "regitra", "regitraMatymai", "regitraAtnaujinimai",
-    "nepatikimiTiekejai", "melagingiTiekejai",
-    "jadisDalyviuSkaiciai", "jadisDalyviuSarasai", "jadisValstybesDalyviai",
-    "rcInformaciniaiLeidiniaiPranesimai",
-    "domenai", "kotis",
-    "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
-    "darboVieta", "istatinisKapitalas",
+    // CVPP archyvo skelbimai (buvęs public."cvppViesiejiPirkimai") — `cvpp`
+    // schemoje; nukirptas vardas `viesiejiPirkimai` būtų sutapęs su public
+    // lentele, tad lentelė pervadinta į `archyvoSkelbimai`.
+    "archyvoSkelbimai",
+    "eiluciuSkaiciai",
+    // BVPŽ (CPV) kodai iškelti į `bvpz` schemą; nekvalifikuotai – `kodai`.
+    "kodai",
+    // SODRA lentelės iškeltos į `sodra` schemą; analyst search_path jas mato
+    // nekvalifikuotai (menesiniai = buvęs sodraMonthly).
+    "menesiniai", "evrk", "importai", "pavadinimai", "savivaldybes",
+    // Regitra iškelta į `regitra` schemą; pagrindinė lentelė pervadinta į
+    // `priemoniuTipai` (transporto priemonių tipai).
+    "priemoniuTipai", "matymai", "atnaujinimai",
+    // VPT juodieji sąrašai iškelti į "vptJuodiejiSarasai" schemą ir sujungti į
+    // vieną lentelę: nekvalifikuotas `tiekejai` reiškia BŪTENT juoduosius
+    // sąrašus (kuriame sąraše – sako `sarasai` žodynas per "sarasoId"), o
+    // `pagrindimai` – tiekėjų paaiškinimus dėl įtraukimo.
+    "tiekejai", "pagrindimai", "sarasai",
+    // JADIS iškeltas į `jadis` schemą; `suvestine` – buvusi public."jadis".
+    "suvestine", "dalyviuSkaiciai", "dalyviuSarasai", "valstybesDalyviai",
+    // RC informaciniai pranešimai iškelti į "rcInformaciniaiPranesimai" schemą ir
+    // normalizuoti; `pranesimaiPilni` yra suderinamumo view su senąja plokščia
+    // forma, o `juridiniuPavadinimai` – (jarKodas, pavadinimas) poros su matymo
+    // datomis, patogios ankstesniems pavadinimams nustatyti.
+    "pranesimai", "pranesimaiPilni", "juridiniuPavadinimai", "leidiniai",
+    // `domenai` dabar yra normalizuota lentelė be savininko laukų;
+    // `domenaiPilni` yra suderinamumo view su senąja forma. Abu
+    // pasiekiami nekvalifikuotai per analyst rolės search_path.
+    "domenai", "domenaiPilni", "kotis",
+    // Balanso ir pelno (nuostolių) ataskaitos iš ADP — "adpFinansinesAtaskaitos"
+    // schemoje; viena eilutė = vienas rodiklis vienam laikotarpiui.
+    "balansoEilutes", "pelnoNuostoliuEilutes",
+    "istatinisKapitalas",
+    // UŽT darbo vietos iškeltos į `uzt` schemą ir normalizuotos:
+    // `darboVietos` + žodynai + `darbdaviai` (ten ir buvęs "darboVietaCount"),
+    // o `darboVietosPilnos` – suderinamumo view su senąja plokščia forma.
+    // `savivaldybes` čia irgi yra, bet nekvalifikuotai reiškia sodros lentelę
+    // (analyst search_path'e `sodra` eina pirmiau) – UŽT savivaldybes rašyti
+    // su schema: uzt."savivaldybes".
+    "darboVietos", "darboVietosPilnos", "darbdaviai", "profesijos",
+    "profesijuGrupes", "issilavinimai", "mokymoProgramos",
 
     "neskelbiamosDerybos",
-    "vdiPazeidimai",
-    "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
-    "mokesciai",
+    // `vdi` schema; `pazeidimaiPilni` yra suderinamumo view su senąja forma.
+    // Abu pasiekiami nekvalifikuotai per analyst search_path.
+    "pazeidimai", "pazeidimaiPilni", "subjektai",
+    // LITEKO lentelės iškeltos į `liteko` schemą; senąją stulpelių formą
+    // atkuria view'ai, pasiekiami nekvalifikuotai per analyst search_path.
+    "nuosprendziaiPilni", "dalyviaiPilni",
+    // VMI mokesčiai iškelti į `vmi` schemą ir normalizuoti; `mokesciaiPilni`
+    // yra suderinamumo view su senąja plokščia forma.
+    "mokesciai", "mokesciaiPilni",
 
-    "xlsxPPAataskaitos", "xlsxPPAdalyviai", "xlsxPPAsutartys",
-    "xlsxPPApasiulymuEile", "xlsxPPAatmestiPasiulymai",
-    "xlsxPPAteisiniaiPagrindai", "xlsxPPAataskaitosTipai",
-    "xlsxPPApirkimoVertes", "xlsxPPAperkanciosiosOrganizacijosTipai",
-    "xlsxPPAigaliotosiosTipai", "xlsxPPApirkimoBudai",
-    "xlsxPPAatmestuPasiulymuStatusai", "xlsxPPAatmetimoTeisiniaiPagrindai",
-    "xlsxPPAatmetimoPriezastys", "xlsxPPAkainosIsraiskos",
-    "xlsxPPAsalys", "xlsxPPAcentralizacijosTipai", "xlsxPPApirkimoObjektoRusys",
+    // PPA (ATN-1) XLSX ataskaitos iškeltos į `ppa` schemą. `dalyviai` yra ir
+    // `liteko` schemoje, todėl analyst search_path'e `ppa` eina pirmiau —
+    // nekvalifikuotas `dalyviai` čia reiškia PPA dalyvius.
+    "ataskaitos", "dalyviai", "ataskaituSutartys",
+    "pasiulymuEile", "atmestiPasiulymai",
+    "teisiniaiPagrindai", "ataskaitosTipai",
+    "pirkimoVertes", "perkanciosiosOrganizacijosTipai",
+    "igaliotosiosTipai", "pirkimoBudai",
+    "atmestuPasiulymuStatusai", "atmetimoTeisiniaiPagrindai",
+    "atmetimoPriezastys", "kainosIsraiskos",
+    "salys", "centralizacijosTipai", "pirkimoObjektoRusys",
 ]);
 
 export const FUNCTION_WHITELIST: Set<string> = new Set([

@@ -66,12 +66,12 @@ The graph uses the entity and edge model defined in the repository data structur
 
 | Node type            | Expand trigger                                                             | Source function / data                                                                                                                                                                                                                                                                                                                                                   | Key fields                                                                                                   | Details panel link                                                                             |
 |----------------------|----------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `OrganizationEntity` | Org node double-click                                                      | `jarAsmenys` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarAsmenys` (partner org names)                                                                                                                                                                                                                                                       | `jarKodas`, `pavadinimas`, `formosKodas`                                                                     | `/asmuo/{jarKodas}`                                                                            |
-| `PersonEntity`       | Org node double-click                                                      | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows                                                                                                                                                                                                                                    | `vardas + pavarde` (name is the identity key), `rysioPradzia`                                                | *(no dedicated page)*                                                                          |
-| `PersonEntity`       | Person node double-click                                                   | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person                                                                                                                                                                                                                            | Same; all declarations for that name are merged into one node                                                | *(no dedicated page)*                                                                          |
-| `ContractEntity`     | Org node double-click (creates node)                                       | `sutartys JOIN jarAsmenys` (top 30 contracts by value; buyer/seller names from `jarAsmenys` JOIN)                                                                                                                                                                                                                                                                                | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`, `pirkimoNumeris` (may be null) | `/sutartis/{sutartiesUnikalusId}` (primary); `/viesiejiPirkimai/{pirkimoNumeris}` (if present) |
-| `ContractEntity`     | Contract node double-click (when `pirkimoNumeris` is present)              | `expandContract(pirkimoNumeris)` — fetches full `ProcurementEntity` node (`viesiejiPirkimai WHERE pirkimoId = $1`) + all winner org stubs (`sutartys GROUP BY tiekejoKodas`) + best-effort loser org stubs (`xlsxPPAataskaitos JOIN xlsxPPAdalyviai WHERE salis='LT'`, only ~425 procurements covered). Client creates the `ContractProcurementLink` edge locally after merge. | Same as above (contract node already in graph)                                                               | *(same, already shown)*                                                                        |
-| `ProcurementEntity`  | Org node double-click (buyer) / Contract node double-click (auto-expanded) | Created when buyer org is expanded: `viesiejiPirkimai WHERE jarKodas = $jarKodas ORDER BY numatomaVerteEUR DESC LIMIT 20`. When reached via contract expansion, already fully populated and auto-expanded by `expandContract`.                                                                                                                                           | `pirkimoId` (node ID key), `pavadinimas`, `numatomaVerteEUR`, `statusas`, `pirkimoBudas`                     | `/viesiejiPirkimai/{pirkimoId}`                                                                |
+| `OrganizationEntity` | Org node double-click                                                      | `rcJar."asmenys"` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN rcJar."asmenys"` (partner org names)                                                                                                                                                                                                                                                       | `jarKodas`, `pavadinimas`, `formosKodas`                                                                     | `/asmuo/{jarKodas}`                                                                            |
+| `PersonEntity`       | Org node double-click                                                      | `pinreg."juridiniaiRysiai"` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows                                                                                                                                                                                                                                    | `vardas + pavarde` (name is the identity key), `rysioPradzia`                                                | *(no dedicated page)*                                                                          |
+| `PersonEntity`       | Person node double-click                                                   | `pinreg."juridiniaiRysiai"` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person                                                                                                                                                                                                                            | Same; all declarations for that name are merged into one node                                                | *(no dedicated page)*                                                                          |
+| `ContractEntity`     | Org node double-click (creates node)                                       | `sutartys JOIN rcJar."asmenys"` (top 30 contracts by value; buyer/seller names from `rcJar."asmenys"` JOIN)                                                                                                                                                                                                                                                                                | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`, `pirkimoNumeris` (may be null) | `/sutartis/{sutartiesUnikalusId}` (primary); `/viesiejiPirkimai/{pirkimoNumeris}` (if present) |
+| `ContractEntity`     | Contract node double-click (when `pirkimoNumeris` is present)              | `expandContract(pirkimoNumeris)` — fetches full `ProcurementEntity` node (`"eppsViesiejiPirkimai"."pirkimai" WHERE pirkimoId = $1`) + all winner org stubs (`sutartys GROUP BY tiekejoKodas`) + best-effort loser org stubs (`ppa."ataskaitos" JOIN ppa."dalyviai" WHERE salis='LT'`, only ~425 procurements covered). Client creates the `ContractProcurementLink` edge locally after merge. | Same as above (contract node already in graph)                                                               | *(same, already shown)*                                                                        |
+| `ProcurementEntity`  | Org node double-click (buyer) / Contract node double-click (auto-expanded) | Created when buyer org is expanded: `"eppsViesiejiPirkimai"."pirkimai" WHERE jarKodas = $jarKodas ORDER BY numatomaVerteEUR DESC LIMIT 20`. When reached via contract expansion, already fully populated and auto-expanded by `expandContract`.                                                                                                                                           | `pirkimoId` (node ID key), `pavadinimas`, `numatomaVerteEUR`, `statusas`, `pirkimoBudas`                     | `/viesiejiPirkimai/{pirkimoId}`                                                                |
 
 > **`ProcurementEntity` is a hub node.** One procurement notice can result in contracts with multiple
 > different winners (32,605 of 37,796 procurements have >1 distinct winner — see `docs/DB_ER.md`).
@@ -85,11 +85,11 @@ The graph uses the entity and edge model defined in the repository data structur
 > handler uses this flag to trigger `expandContract`. When `pirkimoNumeris` is null, the contract
 > node is not expandable and keeps `expanded: true`.
 >
-> **Loser (Bid) coverage is best-effort.** Loser participant data comes from `xlsxPPAdalyviai` via
-> `xlsxPPAataskaitos.pirkimoNumeris`. Only ~425 of 37,797 procurements have PPA data in the DB. When
+> **Loser (Bid) coverage is best-effort.** Loser participant data comes from `ppa."dalyviai"` via
+> `ppa."ataskaitos".pirkimoNumeris`. Only ~425 of 37,797 procurements have PPA data in the DB. When
 > no PPA data exists for a procurement, only winner `Award` edges are shown — this is normal and
-> expected. `xlsxPPAdalyviai.kodas` maps to `jarAsmenys.jarKodas` for Lithuanian companies (`salis = 'LT'`).
-> Foreign bidders are excluded (no jarAsmenys entry).
+> expected. `ppa."dalyviai".kodas` maps to `rcJar."asmenys".jarKodas` for Lithuanian companies (`salis = 'LT'`).
+> Foreign bidders are excluded (no rcJar."asmenys" entry).
 
 **Entity ID convention:**
 
@@ -109,7 +109,7 @@ The graph uses the entity and edge model defined in the repository data structur
 
 #### Person node expansion — `expandPerson` and `expandOrg` DB mapping
 
-Both functions query `pinregJuridiniaiRysiai` directly — this table stores all pinreg declared
+Both functions query `pinreg."juridiniaiRysiai"` directly — this table stores all pinreg declared
 relationships as structured rows, with one row per person↔org link. When a **person node is clicked**,
 `expandPerson` filters this table by `vardas + pavarde` (or `susijusioAsmensVardas + susijusioAsmensPavarde`
 for spouse relationships), returning all darbovietes, governance roles, and spouse links declared
@@ -124,16 +124,16 @@ determines which graph elements to produce:
 
 | Edge type                               | Direction              | Style           | Source                                                                                                                                                                                                       |
 |-----------------------------------------|------------------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Employment` / `Director` / `Official`  | Person → Org           | solid           | `pinregJuridiniaiRysiai` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE`                                                                                                                                  |
-| `Employment` / `Director`               | Spouse → Org           | solid           | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE`                                                                                                                                     |
-| `Shareholder` / `Director` / `Official` | Person → Org           | solid           | `pinregJuridiniaiRysiai` rows with `irasoTipas = KITI_RYSIAI_SU_JA`                                                                                                                                          |
-| `Spouse`                                | Person → Person        | solid           | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse)                                                                                                                |
+| `Employment` / `Director` / `Official`  | Person → Org           | solid           | `pinreg."juridiniaiRysiai"` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE`                                                                                                                                  |
+| `Employment` / `Director`               | Spouse → Org           | solid           | `pinreg."juridiniaiRysiai"` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE`                                                                                                                                     |
+| `Shareholder` / `Director` / `Official` | Person → Org           | solid           | `pinreg."juridiniaiRysiai"` rows with `irasoTipas = KITI_RYSIAI_SU_JA`                                                                                                                                          |
+| `Spouse`                                | Person → Person        | solid           | `pinreg."juridiniaiRysiai"` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse)                                                                                                                |
 | `Order`                                 | Org → Contract         | solid, sized    | `sutartys.topPirkejai` → buyer side                                                                                                                                                                          |
 | `Delivery`                              | Contract → Org         | solid, sized    | `sutartys.topTiekejai` → supplier side                                                                                                                                                                       |
-| `Procurement`                           | Org → Procurement      | solid           | `viesiejiPirkimai WHERE jarKodas = $jarKodas` — buyer org issued the tender                                                                                                                                  |
+| `Procurement`                           | Org → Procurement      | solid           | `"eppsViesiejiPirkimai"."pirkimai" WHERE jarKodas = $jarKodas` — buyer org issued the tender                                                                                                                                  |
 | `ContractProcurementLink`               | Contract → Procurement | thin, muted     | Created client-side when a contract node is expanded — links the clicked contract to its procurement hub. Color `#94a3b8`. Size 1.                                                                           |
 | `Award`                                 | Procurement → Org      | thin, **green** | `sutartys WHERE pirkimoNumeris = $pirkimoId GROUP BY tiekejoKodas` — winning seller orgs. Color `#22c55e`. Size 1.                                                                                           |
-| `Bidder`                                | Procurement → Org      | thin, **red**   | `xlsxPPAataskaitos JOIN xlsxPPAdalyviai WHERE pirkimoNumeris = $pirkimoId AND salis='LT'` — procurement participants who did not win. Color `#ef4444`. Size 1. Best-effort: only ~425 procurements have PPA data. |
+| `Bidder`                                | Procurement → Org      | thin, **red**   | `ppa."ataskaitos" JOIN ppa."dalyviai" WHERE pirkimoNumeris = $pirkimoId AND salis='LT'` — procurement participants who did not win. Color `#ef4444`. Size 1. Best-effort: only ~425 procurements have PPA data. |
 
 > **`irasoTipas` is a record classifier, not a role label.** The three distinct values in the DB are
 > `DEKLARUOJANCIO_DARBOVIETE`, `SUTUOKTINIO_DARBOVIETE`, and `KITI_RYSIAI_SU_JA`. They must **never**
@@ -144,15 +144,15 @@ determines which graph elements to produce:
 ```mermaid
 flowchart LR
     subgraph DB["PostgreSQL Tables"]
-        JC[("jarAsmenys\npavadinimas · formosKodas")]
-        PR[("pinregJuridiniaiRysiai\nirasoTipas · vardas · pavarde\npareigos · rysioPobudzioPavadinimas\njarKodas · pavadinimas\ndarbovietesTipas")]
+        JC[("rcJar.asmenys\npavadinimas · formosKodas")]
+        PR[("pinreg.juridiniaiRysiai\nirasoTipas · vardas · pavarde\npareigos · rysioPobudzioPavadinimas\njarKodas · pavadinimas\ndarbovietesTipas")]
         ST[("sutartys\nsutartiesUnikalusId · pavadinimas · verte\nperkanciosiosOrganizacijosKodas · tiekejoKodas\npirkimoNumeris")]
-        VP[("viesiejiPirkimai\npirkimoId · pavadinimas\njarKodas · numatomaVerteEUR\nstatusas · pirkimoBudas")]
+        VP[("eppsViesiejiPirkimai.pirkimai\npirkimoId · pavadinimas\njarKodas · numatomaVerteEUR\nstatusas · pirkimoBudas")]
     end
 
     subgraph GN["Graph Nodes"]
         OE_root["OrganizationEntity\n— root —\nexpanded=true"]
-        OE_stub["OrganizationEntity\n— stub —\nexpanded=false\n(partner name from jarAsmenys JOIN)"]
+        OE_stub["OrganizationEntity\n— stub —\nexpanded=false\n(partner name from rcJar.asmenys JOIN)"]
         PE["PersonEntity\n(all darbovietes + rysiaiSuJa\n+ sutuoktinioDarbovietes)"]
         CE["ContractEntity\nlabel: contract pavadinimas\n(first 9 words)"]
         VPE["ProcurementEntity\nlabel: pavadinimas (first 6 words)\nnumatomaVerteEUR"]
@@ -176,8 +176,8 @@ flowchart LR
     PR -->|" DEKLARUOJANCIO / SUTUOKTINIO\ndirection: person → org\npareigos "| E1
     PR -->|" KITI_RYSIAI_SU_JA\ndirection: person → org\nrysioPobudzioPavadinimas "| E2
     PR -->|" SUTUOKTINIO_DARBOVIETE\ndirection: declarant → spouse "| E3
-    ST & JC -->|" sutartiesUnikalusId\npavadinimas (contract title)\nverte · partner names via JOIN jarAsmenys "| CE
-    ST & JC -->|" perkanciosiosOrganizacijosKodas / tiekejoKodas\npavadinimas via JOIN jarAsmenys "| OE_stub
+    ST & JC -->|" sutartiesUnikalusId\npavadinimas (contract title)\nverte · partner names via JOIN rcJar.asmenys "| CE
+    ST & JC -->|" perkanciosiosOrganizacijosKodas / tiekejoKodas\npavadinimas via JOIN rcJar.asmenys "| OE_stub
     ST -->|" direction: org → contract\nverte as label "| E4
     ST -->|" direction: contract → org "| E5
     VP & JC -->|" pirkimoId · pavadinimas\nnumatomaVerteEUR · statusas · pirkimoBudas "| VPE
@@ -222,22 +222,22 @@ Sigma's default label renderer draws labels to the right of the node centre. A c
 New server-side module `modules/rysiai/` containing:
 
 - `expand.js` — exported functions:
-    - `expandOrg(jarKodas)` — queries `jarAsmenys` (root org metadata), `pinregJuridiniaiRysiai` (person
-      relationships), `sutartys JOIN jarAsmenys` (top 30 contracts by value), and `viesiejiPirkimai`
+    - `expandOrg(jarKodas)` — queries `rcJar."asmenys"` (root org metadata), `pinreg."juridiniaiRysiai"` (person
+      relationships), `sutartys JOIN rcJar."asmenys"` (top 30 contracts by value), and `"eppsViesiejiPirkimai"."pirkimai"`
       (top 20 procurement notices by `numatomaVerteEUR`) for this org as **buyer**; maps raw rows to
       `GraphNode[]` and `GraphEdge[]`. Returns `{ nodes, edges }`.
-    - `expandPerson(fullName)` — queries `pinregJuridiniaiRysiai` directly, matching on
+    - `expandPerson(fullName)` — queries `pinreg."juridiniaiRysiai"` directly, matching on
       `vardas + pavarde` or `susijusioAsmensVardas + susijusioAsmensPavarde`; returns **all
       darbovietes, governance roles, and spouse relationships** declared by that person across all
       employers, as stub `OrganizationEntity` nodes + person↔org / spouse edges.
     - `expandProcurement(pirkimoId)` — queries `sutartys WHERE pirkimoNumeris = $pirkimoId GROUP BY
-      tiekejoKodas` to find distinct winning seller orgs + `jarAsmenys JOIN` for their names; returns
+      tiekejoKodas` to find distinct winning seller orgs + `rcJar."asmenys" JOIN` for their names; returns
       seller `OrganizationEntity` stub nodes + `Award` edges from the procurement node.
-    - `expandSutartis(sutartiesUnikalusId)` — queries `sutartys JOIN jarAsmenys` for the single
+    - `expandSutartis(sutartiesUnikalusId)` — queries `sutartys JOIN rcJar."asmenys"` for the single
       contract row; returns the `ContractEntity` node (marked `isRoot: true`) + buyer and seller
       `OrganizationEntity` stub nodes + `Order`/`Delivery` edges. Used when the page opens with a
       contract as the center figure.
-    - `expandPirkimas(pirkimoId)` — queries `viesiejiPirkimai JOIN jarAsmenys` for the
+    - `expandPirkimas(pirkimoId)` — queries `"eppsViesiejiPirkimai"."pirkimai" JOIN rcJar."asmenys"` for the
       procurement row + buyer org name; delegates to `expandProcurement` for winner/bidder data;
       returns the `ProcurementEntity` node (marked `isRoot: true`, `expanded: true`) + buyer
       `OrganizationEntity` stub + `Procurement` edge + all winner/bidder stubs. Used when the page
@@ -616,10 +616,10 @@ is found, the entity is treated as still active (open-ended).
 
 | Node type            | DB table                 | Start fields                                                                          | Possible end fields, If not found, the treat as not ended                        | Notes                                                                                                                                                                                                 |
 |----------------------|--------------------------|---------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `OrganizationEntity` | `jarAsmenys`                 | `registravimoData` (100% filled)                                                      | `statusasNuo` (100% filled — "status since")                                     | `registravimoData` → `statusasNuo` = org lifespan, but only when `statusoKodas ≠ 0` (inactive). Active orgs have no closing date — treat as open-ended.                                               |
-| `PersonEntity`       | `pinregJuridiniaiRysiai` | `rysioPradzia` (100% filled) — one row per relationship; take **min** across all rows | `rysioPabaiga` (~0.6% filled, very sparse) — take **max** across all rows        | Time lives on relationship rows, not the person node. min(`rysioPradzia`) → max(`rysioPabaiga` or `rysioPradzia`) = known active period. Most persons appear open-ended due to sparse `rysioPabaiga`. |
+| `OrganizationEntity` | `rcJar."asmenys"`                 | `registravimoData` (100% filled)                                                      | `statusasNuo` (100% filled — "status since")                                     | `registravimoData` → `statusasNuo` = org lifespan, but only when `statusoKodas ≠ 0` (inactive). Active orgs have no closing date — treat as open-ended.                                               |
+| `PersonEntity`       | `pinreg."juridiniaiRysiai"` | `rysioPradzia` (100% filled) — one row per relationship; take **min** across all rows | `rysioPabaiga` (~0.6% filled, very sparse) — take **max** across all rows        | Time lives on relationship rows, not the person node. min(`rysioPradzia`) → max(`rysioPabaiga` or `rysioPradzia`) = known active period. Most persons appear open-ended due to sparse `rysioPabaiga`. |
 | `ContractEntity`     | `sutartys`               | `sudarymoData` (~100% filled), `paskelbimoData` (~100% filled) — take **min**         | `galiojimoData` (~100% filled), `faktineIvykdimoData` (7% filled) — take **max** | min(`sudarymoData`, `paskelbimoData`) → max(`galiojimoData`, `faktineIvykdimoData`) = contract lifespan. `faktineIvykdimoData` extends the window only when present.                                  |
-| `ProcurementEntity`  | `viesiejiPirkimai`       | `paskelbimoData` (100% filled)                                                        | `pasiulymuPateikimoTerminas` (98% filled)                                        | `paskelbimoData` → `pasiulymuPateikimoTerminas` = procurement active period. End marks bid submission deadline, not contract award.                                                                   |
+| `ProcurementEntity`  | `eppsViesiejiPirkimai.pirkimai` | `paskelbimoData` (100% filled)                                                        | `pasiulymuPateikimoTerminas` (98% filled)                                        | `paskelbimoData` → `pasiulymuPateikimoTerminas` = procurement active period. End marks bid submission deadline, not contract award.                                                                   |
 
 ### Edge Time Fields
 
@@ -628,13 +628,13 @@ the dates come from the individual pinreg row — not aggregated across all rows
 
 | Edge type                                              | DB table                 | `fromDate`                                                | `toDate`                                              | Notes                                                                                           |
 |--------------------------------------------------------|--------------------------|-----------------------------------------------------------|-------------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| `Employment` / `Director` / `Official` / `Shareholder` | `pinregJuridiniaiRysiai` | `rysioPradzia` of the row (100% filled)                   | `rysioPabaiga` of the row (~0.6% filled)              | Per-row, not aggregated. Each edge represents one declared relationship with its own start/end. |
-| `Spouse`                                               | `pinregJuridiniaiRysiai` | `rysioPradzia` of the declaration row                     | `rysioPabaiga` of the declaration row                 | Currently stored as `null`; same row carries the dates — can be populated.                      |
+| `Employment` / `Director` / `Official` / `Shareholder` | `pinreg."juridiniaiRysiai"` | `rysioPradzia` of the row (100% filled)                   | `rysioPabaiga` of the row (~0.6% filled)              | Per-row, not aggregated. Each edge represents one declared relationship with its own start/end. |
+| `Spouse`                                               | `pinreg."juridiniaiRysiai"` | `rysioPradzia` of the declaration row                     | `rysioPabaiga` of the declaration row                 | Currently stored as `null`; same row carries the dates — can be populated.                      |
 | `Order`                                                | `sutartys`               | mirrors `ContractEntity` `fromDate` (min of start fields) | mirrors `ContractEntity` `toDate` (max of end fields) | Edge lifespan equals the contract lifespan.                                                     |
 | `Delivery`                                             | `sutartys`               | mirrors `ContractEntity` `fromDate`                       | mirrors `ContractEntity` `toDate`                     | Same contract row as `Order`.                                                                   |
-| `Procurement`                                          | `viesiejiPirkimai`       | `paskelbimoData`                                          | `pasiulymuPateikimoTerminas`                          | Mirrors the `ProcurementEntity` node dates.                                                     |
+| `Procurement`                                          | `eppsViesiejiPirkimai.pirkimai` | `paskelbimoData`                                          | `pasiulymuPateikimoTerminas`                          | Mirrors the `ProcurementEntity` node dates.                                                     |
 | `Award`                                                | `sutartys`               | mirrors winning `ContractEntity` `fromDate`               | mirrors winning `ContractEntity` `toDate`             | Each award edge spans the winning contract's lifespan.                                          |
-| `Bidder`                                               | `xlsxPPAdalyviai`       | `null`                                                    | `null`                                                | No date columns in `xlsxPPAdalyviai`; always open-ended.                                       |
+| `Bidder`                                               | `ppa."dalyviai"`       | `null`                                                    | `null`                                                | No date columns in `ppa."dalyviai"`; always open-ended.                                       |
 | `ContractProcurementLink`                              | *(client-side)*          | mirrors `ContractEntity` `fromDate`                       | mirrors `ContractEntity` `toDate`                     | Client-created link; inherits from the contract node already in the graph.                      |
 
 ---

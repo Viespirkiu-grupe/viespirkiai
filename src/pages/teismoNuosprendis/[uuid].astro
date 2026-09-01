@@ -5,7 +5,7 @@ import DetailsSection from '@design-system/components/DetailsSection.astro';
 import DataTable from '@design-system/components/DataTable.astro';
 import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import { postgres } from '@/postgres/postgres.js';
-import { readDokumentasFs } from '@/modules/dokumentai/dokumentaiFs.js';
+import { readDocumentFs } from '@/modules/documents/documentsFs.js';
 import { readLiteko2Sidecar } from '@/modules/liteko2/sidecar.js';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
 import config from '../../lib/config.ts';
@@ -21,7 +21,7 @@ if (!uuid) return Astro.redirect('/404');
 const { rows: litekoRows } = await postgres.query(
   `SELECT id, md5, "litekoId", "bylosNumeris", "teisminisProcesoNr", "bylosRusis",
           teismas, "teismoRumai", skyrius, instancija, data, "fileHref"
-     FROM public."teismoNuosprendziai" WHERE "litekoId" = $1`,
+     FROM liteko."nuosprendziaiPilni" WHERE "litekoId" = $1`,
   [uuid],
 );
 let n: any = litekoRows[0];
@@ -35,11 +35,11 @@ if (!n) {
             NULL::text AS skyrius, NULL::text AS instancija,
             s."sprendimoData" AS data, s."bylosAprasymas", s."bylaGauta",
             dt.pavadinimas AS "sprendimoTipas", s.busena
-       FROM public."liteko2Sprendimai" s
-       LEFT JOIN public."liteko2Teismai" t ON t."liteko2Id" = s."teismoId"
-       LEFT JOIN public."liteko2Teismai" r ON r."liteko2Id" = s."rumuId"
-       LEFT JOIN public."liteko2ByluRusys" br ON br."liteko2Id" = s."bylosRusiesId"
-       LEFT JOIN public."liteko2DokumentuTipai" dt ON dt."liteko2Id" = s."sprendimoTipoId"
+       FROM liteko2."sprendimai" s
+       LEFT JOIN liteko2."teismai" t ON t."liteko2Id" = s."teismoId"
+       LEFT JOIN liteko2."teismai" r ON r."liteko2Id" = s."rumuId"
+       LEFT JOIN liteko2."byluRusys" br ON br."liteko2Id" = s."bylosRusiesId"
+       LEFT JOIN liteko2."dokumentuTipai" dt ON dt."liteko2Id" = s."sprendimoTipoId"
       WHERE s."liteko2Id" = $1`,
     [uuid],
   );
@@ -53,15 +53,15 @@ const [dalyviaiRes, kategorijosRes] = await Promise.all([
   saltinis === 'liteko'
     ? postgres.query(
         `SELECT pavadinimas, kodas, "bylojeKaip"
-           FROM public."teismoNuosprendziaiDalyviai"
+           FROM liteko."dalyviaiPilni"
           WHERE "nuosprendzioId" = $1
           ORDER BY "bylojeKaip" NULLS LAST, pavadinimas`,
         [n.id],
       )
     : postgres.query(
         `SELECT d.pavadinimas, d.kodas, v.pavadinimas AS "bylojeKaip"
-           FROM public."liteko2SprendimuDalyviai" d
-           LEFT JOIN public."liteko2Vaidmenys" v ON v.id = d."vaidmuoId"
+           FROM liteko2."sprendimuDalyviai" d
+           LEFT JOIN liteko2."vaidmenys" v ON v.id = d."vaidmuoId"
           WHERE d."sprendimoId" = $1
           ORDER BY v.pavadinimas NULLS LAST, d.pavadinimas`,
         [n.id],
@@ -69,16 +69,17 @@ const [dalyviaiRes, kategorijosRes] = await Promise.all([
   saltinis === 'liteko'
     ? postgres.query(
         `SELECT k.kodas, p.pavadinimas
-           FROM public."teismoNuosprendziaiKategorijos" k
-           LEFT JOIN public."teismoNuosprendziaiKategorijuPavadinimai" p ON p.id = k."pavadinimoId"
-          WHERE k."nuosprendzioId" = $1
+           FROM liteko."nuosprendziuKategorijos" nk
+           JOIN liteko.kategorijos k ON k.id = nk."kategorijaId"
+           LEFT JOIN liteko."kategorijuPavadinimai" p ON p.id = k."pavadinimoId"
+          WHERE nk."nuosprendzioId" = $1
           ORDER BY p.pavadinimas NULLS LAST`,
         [n.id],
       )
     : postgres.query(
         `SELECT k."kategorijosId" AS kodas, p.pavadinimas
-           FROM public."liteko2SprendimuKategorijos" k
-           LEFT JOIN public."liteko2Kategorijos" p ON p."liteko2Id" = k."kategorijosId"
+           FROM liteko2."sprendimuKategorijos" k
+           LEFT JOIN liteko2."kategorijos" p ON p."liteko2Id" = k."kategorijosId"
           WHERE k."sprendimoId" = $1
           ORDER BY p.pavadinimas NULLS LAST`,
         [n.id],
@@ -105,7 +106,7 @@ const kategorijos = (kategorijosRes.rows as any[]).filter((k) => k.pavadinimas);
 let sidecar: any = null;
 try {
   sidecar = n.md5
-    ? await (saltinis === 'liteko2' ? readLiteko2Sidecar(n.md5) : readDokumentasFs(n.md5))
+    ? await (saltinis === 'liteko2' ? readLiteko2Sidecar(n.md5) : readDocumentFs(n.md5))
     : null;
 } catch { sidecar = null; }
 // Nuvalom tekstą: pašalinam eilučių pradžios tarpus, sutraukiam >1 tuščią eilutę iki vienos.

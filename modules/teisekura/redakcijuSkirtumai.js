@@ -12,7 +12,7 @@ import { indexStructure, normalizeLegalActText } from "../mcp/tools/teisesAktoTu
 /** Kurio šaltinio lentelėse ieškoti redakcijų — e-TAR ar e-Seimo. */
 export async function lenteliuPriesagas(teisesAktoId, db = postgres) {
     const { rows } = await db.query(
-        `SELECT 1 FROM "eTarEdition" WHERE "legalActId" = $1 LIMIT 1`,
+        `SELECT 1 FROM "eTar"."edition" WHERE "legalActId" = $1 LIMIT 1`,
         [teisesAktoId],
     );
     return rows.length ? "eTar" : "eSeimas";
@@ -66,7 +66,7 @@ export function redakcijaPagalData(rows, data) {
 
 /**
  * Redakcijos tekstas. Sąmoningai NE per `loadLegalActDocument`: ten paieška eina
- * per `public.dokumentai` be `source`, o tam indekso nėra – 2,7 mln. eilučių
+ * per `documents.documents` be `sourceId`, o tam indekso nėra – 2,7 mln. eilučių
  * seq scan'as ir ~13 s vienai redakcijai. Čia raktas `legalActId` yra indeksuotas.
  *
  * @returns `{ok: true, pavadinimas, text, structure, index}` arba

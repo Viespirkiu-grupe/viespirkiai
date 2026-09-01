@@ -1,5 +1,6 @@
 import { postgres } from '../../postgres/postgres.js';
 import { specialJarCodes } from '../juridiniai/specialJarCodes.js';
+import { RYSIAI_FROM, RYSIAI_SELECT } from '../pinreg/rysiuUzklausa.js';
 
 /**
  * @typedef {{ id: string; attributes: Record<string, unknown> }} NodeLike
@@ -319,12 +320,13 @@ export async function expandOrg(jarKodas) {
     const [jarRes, pinregRes, asBuyerRes, asSellerRes, vpRes] = await Promise.all([
         // Org metadata from normalized JAR
         postgres.query(
-            `SELECT "pavadinimas", "formosKodas", "registravimoData", "statusasNuo", "statusoKodas" FROM public."jarAsmenys" WHERE "jarKodas" = $1 LIMIT 1`,
+            `SELECT "pavadinimas", "formosKodas", "registravimoData", "statusasNuo", "statusoKodas" FROM "rcJar"."asmenys" WHERE "jarKodas" = $1 LIMIT 1`,
             [jk],
         ),
         // All pinreg declarations for this org
         postgres.query(
-            `SELECT * FROM public."pinregJuridiniaiRysiai" WHERE "jarKodas" = $1 ORDER BY "pateikimoData" DESC LIMIT 500`,
+            `SELECT ${RYSIAI_SELECT} FROM ${RYSIAI_FROM}
+              WHERE r."jarKodas" = $1 ORDER BY r."pateikimoData" DESC LIMIT 500`,
             [jk],
         ),
         // Top contracts where this org is the buyer
@@ -345,7 +347,7 @@ export async function expandOrg(jarKodas) {
                     seller."statusoKodas"         AS "tiekejoStatusoKodas"
              FROM   public."vpmSutartys" s
              LEFT JOIN public."vpmSutartysTipai" st ON st.id = s."tipasId"
-             LEFT JOIN public."jarAsmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
+             LEFT JOIN "rcJar"."asmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
              WHERE  s."perkanciosiosOrganizacijosKodas" = $1
                AND  st."tipas" <> 'SP'
                AND  s."numatomaVerte" IS NOT NULL
@@ -372,7 +374,7 @@ export async function expandOrg(jarKodas) {
                     buyer."statusoKodas"                AS "pirkejoStatusoKodas"
              FROM   public."vpmSutartys" s
              LEFT JOIN public."vpmSutartysTipai" st ON st.id = s."tipasId"
-             LEFT JOIN public."jarAsmenys" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+             LEFT JOIN "rcJar"."asmenys" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
              WHERE  s."pirmoTiekejoKodas" = $1
                AND  st."tipas" <> 'SP'
                AND  s."numatomaVerte" IS NOT NULL
@@ -386,7 +388,7 @@ export async function expandOrg(jarKodas) {
             `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas",
                     "paskelbimoData"::date              AS "paskelbimoData",
                     "pasiulymuPateikimoTerminas"::date  AS "pasiulymuPateikimoTerminas"
-             FROM   public."viesiejiPirkimai"
+             FROM   "eppsViesiejiPirkimai"."pirkimai"
              WHERE  "jarKodas" = $1
              ORDER BY "numatomaVerteEUR" DESC NULLS LAST
              LIMIT 20`,
@@ -406,7 +408,7 @@ export async function expandOrg(jarKodas) {
 
     const sodraRes = await postgres.query(
         `SELECT DISTINCT ON ("jarKodas") "jarKodas"::text AS "jarKodas", "draustieji", "draustieji2"
-         FROM "sodraMonthly"
+         FROM sodra."menesiniai"
          WHERE "jarKodas" = ANY($1::int[])
          ORDER BY "jarKodas", "data" DESC NULLS LAST`,
         [Array.from(contractOrgCodes)],
@@ -580,7 +582,7 @@ export async function expandProcurement(pirkimoId) {
                 MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
                              COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
          FROM   public."vpmSutartys" s
-         LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
+         LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
          WHERE  s."pirkimoNumeris" = $1
            AND  s.istrinta = false
          GROUP  BY s."pirmoTiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
@@ -625,7 +627,7 @@ export async function expandContract(pirkimoNumeris) {
             `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas",
                     "paskelbimoData"::date              AS "paskelbimoData",
                     "pasiulymuPateikimoTerminas"::date  AS "pasiulymuPateikimoTerminas"
-             FROM   public."viesiejiPirkimai"
+             FROM   "eppsViesiejiPirkimai"."pirkimai"
              WHERE  "pirkimoId" = $1
              LIMIT 1`,
             [pirkNr],
@@ -644,7 +646,7 @@ export async function expandContract(pirkimoNumeris) {
                     MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
                                  COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
              FROM   public."vpmSutartys" s
-             LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
+             LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
              WHERE  s."pirkimoNumeris" = $1
                AND  s.istrinta = false
              GROUP  BY s."pirmoTiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
@@ -658,9 +660,9 @@ export async function expandContract(pirkimoNumeris) {
                     j."registravimoData",
                     j."statusasNuo",
                     j."statusoKodas"
-             FROM   public."xlsxPPAdalyviai" d
-             JOIN   public."xlsxPPAataskaitos" a ON a."id" = d."ataskaitaId"
-             LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = d."kodas"
+             FROM   ppa."dalyviai" d
+             JOIN   ppa."ataskaitos" a ON a."id" = d."ataskaitaId"
+             LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = d."kodas"
              WHERE  a."pirkimoNumeris" = $1
                AND  d."salis" = 'LT'`,
             [pirkNr],
@@ -740,8 +742,8 @@ export async function expandSutartis(sutartiesUnikalusId) {
                 seller."statusasNuo"           AS "tiekejoStatusasNuo",
                 seller."statusoKodas"          AS "tiekejoStatusoKodas"
          FROM   public."vpmSutartys" s
-         LEFT JOIN public."jarAsmenys" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
-         LEFT JOIN public."jarAsmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
+         LEFT JOIN "rcJar"."asmenys" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
+         LEFT JOIN "rcJar"."asmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
          WHERE  s."unikalusId" = $1
          LIMIT  1`,
         [id],
@@ -818,8 +820,8 @@ export async function expandPirkimas(pirkimoId) {
                     j."registravimoData"                   AS "buyerRegistravimoData",
                     j."statusasNuo"                        AS "buyerStatusasNuo",
                     j."statusoKodas"                       AS "buyerStatusoKodas"
-             FROM   public."viesiejiPirkimai" vp
-             LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = vp."jarKodas"
+             FROM   "eppsViesiejiPirkimai"."pirkimai" vp
+             LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = vp."jarKodas"
              WHERE  vp."pirkimoId" = $1
              LIMIT  1`,
             [id],
@@ -868,7 +870,7 @@ export async function expandPirkimas(pirkimoId) {
  * SUTUOKTINIO_DARBOVIETE handler must detect which role the person plays to
  * avoid emitting a self-loop Spouse edge.
  *
- * @param {object[]} rows  Rows from pinregJuridiniaiRysiai
+ * @param {object[]} rows  Rows from pinreg."juridiniaiRysiai"
  * @param {string} rootPersonId  Stable node id of the searched person, e.g. "person:jonas jonaitis"
  * @param {string} vardas  First name (trimmed, original case)
  * @param {string} pavarde Last name (trimmed, original case)
@@ -983,10 +985,10 @@ export async function expandPerson(fullName) {
     const rootPersonId = personId(vardas, pavarde);
 
     const pinregRes = await postgres.query(
-        `SELECT * FROM public."pinregJuridiniaiRysiai"
-         WHERE (lower(trim(vardas)) || ' ' || lower(trim(pavarde)) = lower($1)
-                OR lower(trim("susijusioAsmensVardas")) || ' ' || lower(trim("susijusioAsmensPavarde")) = lower($1))
-         ORDER BY "pateikimoData" DESC LIMIT 500`,
+        `SELECT ${RYSIAI_SELECT} FROM ${RYSIAI_FROM}
+         WHERE (lower(trim(r.vardas)) || ' ' || lower(trim(r.pavarde)) = lower($1)
+                OR lower(trim(r."susijusioAsmensVardas")) || ' ' || lower(trim(r."susijusioAsmensPavarde")) = lower($1))
+         ORDER BY r."pateikimoData" DESC LIMIT 500`,
         [name.toLowerCase()],
     );
 

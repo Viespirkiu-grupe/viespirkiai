@@ -19,7 +19,7 @@ const count = asmuo.mvpAprasai?.count ?? 0;
     {rows.slice(0, mvpAprasaiLimit).map((aprasas: any) => (
       <div class="card mb-3">
         <div class="card-body">
-          <div class="font-bold mb-1">{aprasas.aprasymas}</div>
+          <div class="font-bold mb-1">{aprasas.pavadinimas}</div>
           <div class="text-muted text-sm mb-3">
             {aprasas.paskelbimoData && <>Paskelbta: <strong>{aprasas.paskelbimoData}</strong></>}
             {aprasas.vptGavimoData && <> &middot; VPT gavimo data: {aprasas.vptGavimoData}</>}

@@ -27,21 +27,21 @@ export async function upsertDictionaries(client) {
     await client.query(`
         INSERT INTO public."juridiniaiSavivaldybesPavadinimai" ("pavadinimas")
         SELECT DISTINCT "pavadinimas"
-        FROM public."arSavivaldybes"
+        FROM "adresuRegistras"."savivaldybes"
         ON CONFLICT ("pavadinimas") DO NOTHING
     `);
 
     await client.query(`
         INSERT INTO public."juridiniaiApskritysPavadinimai" ("pavadinimas")
         SELECT DISTINCT "pavadinimas"
-        FROM public."arApskritys"
+        FROM "adresuRegistras"."apskritys"
         ON CONFLICT ("pavadinimas") DO NOTHING
     `);
 
     await client.query(`
         INSERT INTO public."juridiniaiFormos" ("kodas", "pavadinimas", "viesasis")
         SELECT "kodas", "pavadinimas", "tipas" = 'Viešasis'
-        FROM public."jarFormos"
+        FROM "rcJar"."formos"
         ON CONFLICT ("kodas") DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas",
             "viesasis" = EXCLUDED."viesasis"
@@ -57,7 +57,7 @@ export async function upsertDictionaries(client) {
     await client.query(`
         INSERT INTO public."juridiniaiStatusai" ("kodas", "pavadinimas")
         SELECT "kodas", "pavadinimas"
-        FROM public."jarStatusai"
+        FROM "rcJar"."statusai"
         ON CONFLICT ("kodas") DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas"
         WHERE "juridiniaiStatusai"."pavadinimas"
@@ -68,7 +68,7 @@ export async function upsertDictionaries(client) {
         INSERT INTO public."juridiniaiEvrk" ("kodas", "skyrius", "pavadinimas")
         SELECT DISTINCT ON ("kodas")
             "kodas", left("kodas", 2), COALESCE("pavadinimas", "kodas")
-        FROM public."sodraMonthlyEvrk"
+        FROM sodra."evrk"
         WHERE "kodas" IS NOT NULL
         ORDER BY "kodas", ("pavadinimas" IS NULL), id DESC
         ON CONFLICT ("kodas") DO UPDATE SET
@@ -103,8 +103,8 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
             sav_dict."id" AS "savivaldybeId",
             aps_dict."id" AS "apskritisId",
             evrk_dict."kodas" AS "evrkKodas",
-            sodra."darbuotojai",
-            sodra."vidutinisAtlyginimas",
+            naujausiSodra."darbuotojai",
+            naujausiSodra."vidutinisAtlyginimas",
             vmi."suma" AS "vmiMokesciai",
             kapitalas."kapitalas" AS "istatinisKapitalas",
             COALESCE(sutartys."pirkimai", 0)::bigint AS "pirkimuKiekis",
@@ -119,7 +119,7 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
             ${JAR_LOCATION_SQL} AS "location"
         FROM batch j
         -- Bendram fragmentui reikia vienodo pagrindinės lentelės aliaso.
-        LEFT JOIN public."jarAsmenys" jar_person
+        LEFT JOIN "rcJar"."asmenys" jar_person
             ON jar_person."jarKodas" = j."jarKodas"
         ${JAR_ADDRESS_JOINS}
         LEFT JOIN LATERAL (
@@ -142,39 +142,44 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
                             THEN 0 ELSE sm.draustieji2 END
                     )
                 END AS "vidutinisAtlyginimas"
-            FROM public."sodraMonthly" sm
+            FROM sodra."menesiniai" sm
             WHERE sm."jarKodas" = j."jarKodas"
             ORDER BY sm."data" DESC
             LIMIT 1
-        ) sodra ON true
-        LEFT JOIN public."sodraMonthlyEvrk" evrk
-            ON evrk."id" = sodra."evrkId"
+        ) naujausiSodra ON true
+        LEFT JOIN sodra."evrk" evrk
+            ON evrk."id" = naujausiSodra."evrkId"
         LEFT JOIN public."juridiniaiEvrk" evrk_dict
             ON evrk_dict."kodas" = evrk."kodas"
+        -- VMI su juridiniu asmeniu siejasi per public."jar"._id, o ne per kodą:
+        -- buvęs mokesciai."jarKodas" buvo "id" dublikatas ir nesutapdavo su nė
+        -- vienu JAR kodu, tad šis stulpelis būdavo visada tuščias.
         LEFT JOIN LATERAL (
             SELECT m."suma"
-            FROM public."mokesciai" m
-            WHERE m."jarKodas" = j."jarKodas"::text
+            FROM public."jar" jr
+            JOIN "vmi"."mokesciai" m ON m."jarId" = jr."_id"
+            WHERE jr."jarKodas" = j."jarKodas"::text
             ORDER BY m."metai" DESC, m."menuo" DESC, m."duomenuData" DESC
             LIMIT 1
         ) vmi ON true
         LEFT JOIN LATERAL (
             SELECT k."kapitalas"
-            FROM public."jarKapitalas" k
+            FROM "rcJar"."kapitalas" k
             WHERE k."jarKodas" = j."jarKodas"
             ORDER BY k."kapitalasNuo" DESC, k."duomenuData" DESC
             LIMIT 1
         ) kapitalas ON true
         LEFT JOIN public."vpmSutartysSumos" sutartys
             ON sutartys."saliesKodas" = j."jarKodas"::text
-        LEFT JOIN public."teismoNuosprendziaiDalyviaiCounts" bylos
+        LEFT JOIN liteko."dalyviuCounts" bylos
             ON bylos."jarKodas" = j."jarKodas"::text
         LEFT JOIN LATERAL (
             SELECT count(*) AS "count"
-            FROM public."vdiPazeidimai" v
-            WHERE v."jarKodas" = j."jarKodas"::text
+            FROM vdi.pazeidimai v
+            JOIN vdi.subjektai s ON s.id = v."subjektoId"
+            WHERE s."jarKodas" = j."jarKodas"::integer
         ) vdi ON true
-        LEFT JOIN public."domenaiCounts" domenai
+        LEFT JOIN domenai.counts domenai
             ON domenai."savininkoKodas" = j."jarKodas"::text
         LEFT JOIN public."juridiniaiSavivaldybesPavadinimai" sav_dict
             ON sav_dict."pavadinimas" = jar_municipality."pavadinimas"
@@ -256,7 +261,7 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
 
 export const UPSERT_BATCH_SQL = buildJuridiniaiUpsertSql(
     `SELECT jar_person.*
-     FROM public."jarAsmenys" jar_person
+     FROM "rcJar"."asmenys" jar_person
      WHERE jar_person."jarKodas" > $1
      ORDER BY jar_person."jarKodas"
      LIMIT $2`,
@@ -321,7 +326,7 @@ export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}
             `DELETE FROM public."juridiniai" target
              WHERE target."jarKodas" ~ '^[0-9]{9}$'
                AND NOT EXISTS (
-                   SELECT 1 FROM public."jarAsmenys" source
+                   SELECT 1 FROM "rcJar"."asmenys" source
                    WHERE source."jarKodas"::text = target."jarKodas"
                )`,
         );

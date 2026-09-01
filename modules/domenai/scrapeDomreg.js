@@ -31,6 +31,40 @@ const TOR_CONTROL_TIMEOUT_MS = 10_000;
 
 const proxyAgent = new SocksProxyAgent(config.torAddress);
 
+// Tinklo klaidų kodai, kuriuos domreg'as grąžina blokuodamas exit node'ą.
+const RATE_LIMIT_ERROR_CODES = new Set([
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "EPIPE",
+    "ETIMEDOUT",
+]);
+
+/**
+ * Signalizuoja, kad domreg'as blokuoja dabartinį IP (captcha, 429, nutraukta
+ * jungtis). Domenas dėl to nežymimas klaida — reikia tik pakeisti Tor tapatybę.
+ */
+class RateLimitError extends Error {
+    /** @param {string} reason */
+    constructor(reason) {
+        super(reason);
+        this.name = "RateLimitError";
+    }
+}
+
+/**
+ * Ar HTTP atsakymas iš tikrųjų yra užmaskuotas rate limit'as.
+ * Domreg'as, pasiekus limitą, bando parodyti captcha; jų pačių paveiksliuko
+ * generatorius dažnai nulūžta ir vietoj `{"error":100}` grįžta HTTP 400 su
+ * `captchaImage generation failed`.
+ * @param {number} status
+ * @param {string} body
+ * @returns {boolean}
+ */
+function isRateLimitResponse(status, body) {
+    if (status === 429 || status === 403) return true;
+    return status === 400 && /captcha/i.test(body);
+}
+
 /**
  * @typedef {object} DbDomainRow
  * @property {number} id
@@ -44,15 +78,13 @@ const proxyAgent = new SocksProxyAgent(config.torAddress);
  * @property {object} domreg
  * @property {string | null} savininkas
  * @property {string | null} savininkasAdresas
- * @property {string | null} technikas
- * @property {string | null} technikasAdresas
  * @property {string | null} status
  * @property {string | null} created
  * @property {string | null} expired
  * @property {string | null} updated
  * @property {string[] | null} domregNs
  * @property {string | null} savininkoKodas
- * @property {number | null} savininkoKodasStatus
+ * @property {boolean | null} kodasIeskotas
  */
 
 /**
@@ -154,16 +186,31 @@ async function fetchDomainDetails(domain) {
             throw new Error(`Fetch timeout after ${FETCH_TIMEOUT_MS}ms for ${domain}`);
         }
 
+        const code = error.code ?? error.cause?.code;
+        if (RATE_LIMIT_ERROR_CODES.has(code)) {
+            throw new RateLimitError(`tinklo klaida ${code}`);
+        }
+
         throw error;
     } finally {
         clearTimeout(timeout);
     }
 
+    const body = await response.text();
+
     if (!response.ok) {
+        if (isRateLimitResponse(response.status, body)) {
+            throw new RateLimitError(`HTTP ${response.status} (captcha/blokas)`);
+        }
+
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return response.json();
+    try {
+        return JSON.parse(body);
+    } catch {
+        throw new Error(`Netinkamas JSON atsakymas (HTTP ${response.status})`);
+    }
 }
 
 /**
@@ -190,20 +237,20 @@ function buildSnapshot(domenas, data, scrapedAt, resolved) {
         domreg: data,
         savininkas: data.details?.registrant?.org ?? null,
         savininkasAdresas: data.details?.registrant?.addr ?? null,
-        technikas: data.details?.technical?.org ?? null,
-        technikasAdresas: data.details?.technical?.addr ?? null,
         status: data.domainstatus ?? null,
         created: data.details?.domain?.created ?? null,
         expired: data.details?.domain?.expired ?? null,
         updated: data.details?.domain?.updated ?? null,
         domregNs: data.details?.nameservers ?? null,
         savininkoKodas: resolved?.kodas ?? null,
-        savininkoKodasStatus: resolved?.status ?? null,
+        // `resolved.status` visada 2, taip pat ir tada, kai kodas nerastas —
+        // reikšmė reiškia „jau ieškota", ne „nustatyta".
+        kodasIeskotas: resolved == null ? null : true,
     };
 }
 
 /**
- * Updates public.domenai and inserts a full historical row into public."domenaiScrapes".
+ * Updates domenai.domenai and inserts a full historical row into domenai.scrapes.
  * @param {DbDomainRow} domenas
  * @param {object} data
  * @param {number} scrapeStatus
@@ -217,76 +264,63 @@ async function saveDomainData(domenas, data, scrapeStatus, scrapedAt) {
     const s = buildSnapshot(domenas, data, scrapedAt, resolved);
 
     await postgres.query(
-        `UPDATE public.domenai
+        `UPDATE domenai.domenai
          SET "domregNuskaitymas" = $1,
              "domregData" = $2,
-             domreg = $3,
-             savininkas = $4,
-             "savininkasAdresas" = $5,
-             technikas = $6,
-             "technikasAdresas" = $7,
-             status = $8,
-             created = $9,
-             expired = $10,
-             updated = $11,
-             "domregNs" = $12,
-             "savininkoKodas" = $13,
-             "savininkoKodasStatus" = $14
-         WHERE id = $15`,
+             "domregId" = domenai.domreg_id($3),
+             "savininkasId" = domenai.savininkas_id($4, $5, $6),
+             "busenaId" = domenai.busena_id($7),
+             created = $8,
+             expired = $9,
+             updated = $10,
+             "nsId" = domenai.ns_id($11),
+             "kodasIeskotas" = $12
+         WHERE id = $13`,
         [
             scrapeStatus,
             s.domregData,
             s.domreg,
             s.savininkas,
             s.savininkasAdresas,
-            s.technikas,
-            s.technikasAdresas,
+            s.savininkoKodas,
             s.status,
             s.created,
             s.expired,
             s.updated,
             s.domregNs,
-            s.savininkoKodas,
-            s.savininkoKodasStatus,
+            s.kodasIeskotas,
             domenas.id,
         ],
     );
 
     await postgres.query(
-        `INSERT INTO public."domenaiScrapes" (
+        `INSERT INTO domenai.scrapes (
             "domainId",
-            domain,
             "domregData",
-            domreg,
-            savininkas,
-            "savininkasAdresas",
-            technikas,
-            "technikasAdresas",
-            status,
+            "domregId",
+            "savininkasId",
+            "busenaId",
             created,
             expired,
             updated,
-            "domregNs",
-            "savininkoKodas",
-            "savininkoKodasStatus"
+            "nsId",
+            "kodasIeskotas"
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+         VALUES ($1, $2, domenai.domreg_id($3), domenai.savininkas_id($4, $5, $6),
+                 domenai.busena_id($7), $8, $9, $10, domenai.ns_id($11), $12)`,
         [
             domenas.id,
-            s.domain,
             s.domregData,
             s.domreg,
             s.savininkas,
             s.savininkasAdresas,
-            s.technikas,
-            s.technikasAdresas,
+            s.savininkoKodas,
             s.status,
             s.created,
             s.expired,
             s.updated,
             s.domregNs,
-            s.savininkoKodas,
-            s.savininkoKodasStatus,
+            s.kodasIeskotas,
         ],
     );
 
@@ -297,6 +331,25 @@ async function saveDomainData(domenas, data, scrapeStatus, scrapedAt) {
 }
 
 /**
+ * Pakeičia Tor tapatybę po rate limit'o ir palaukia, kol pakils naujas grandinės kelias.
+ * @param {string} domain
+ * @param {string} reason
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<void>}
+ */
+async function rotateAfterRateLimit(domain, reason, signal) {
+    logger.log(`Rate limited for ${domain} (${reason}); rotating Tor identity`);
+
+    try {
+        await newTorIdentity();
+    } catch (error) {
+        logger.log(`Tor identity rotation failed: ${error.message}`);
+    }
+
+    await sleep(TOR_WAIT_MS, signal);
+}
+
+/**
  * Scrapes and persists one oldest domain record.
  * @param {AbortSignal} [signal] Nutraukia rate limit retry ciklą per shutdown'ą.
  * @returns {Promise<boolean>} True when a domain was processed.
@@ -304,7 +357,7 @@ async function saveDomainData(domenas, data, scrapeStatus, scrapedAt) {
 export async function nuskaitytiDomregDomena(signal) {
     const result = await postgres.query(
         `SELECT id, domain
-         FROM public.domenai
+         FROM domenai.domenai
          WHERE COALESCE("domregNuskaitymas", 0) <> $1
          ORDER BY "domregData" ASC NULLS FIRST
          LIMIT 1`,
@@ -331,9 +384,7 @@ export async function nuskaitytiDomregDomena(signal) {
             const scrapedAt = now();
 
             if (data.error === 100) {
-                logger.log(`Rate limited for ${domenas.domain}; rotating Tor identity`);
-                await newTorIdentity();
-                await sleep(TOR_WAIT_MS, signal);
+                await rotateAfterRateLimit(domenas.domain, "error 100", signal);
                 continue;
             }
 
@@ -354,9 +405,14 @@ export async function nuskaitytiDomregDomena(signal) {
             logger.log(`Unexpected API error ${data.error} for ${domenas.domain}`);
             return true;
         } catch (error) {
+            if (error instanceof RateLimitError) {
+                await rotateAfterRateLimit(domenas.domain, error.message, signal);
+                continue;
+            }
+
             logger.log(`Fetch error for ${domenas.domain}: ${error.message}`);
             await postgres.query(
-                `UPDATE public.domenai
+                `UPDATE domenai.domenai
                  SET "domregNuskaitymas" = $1,
                      "domregData" = $2
                  WHERE id = $3`,

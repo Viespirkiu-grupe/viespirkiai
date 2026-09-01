@@ -47,7 +47,7 @@ export async function parsiustiFaila(options = {}) {
         `
     SELECT d.*, a."apiKey"
     FROM public.dezes d
-    JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+    JOIN auth."raktai" a ON a.id = d."apiRaktasId"
     WHERE d.used < d.max
     ORDER BY d."priority" DESC
     LIMIT 1

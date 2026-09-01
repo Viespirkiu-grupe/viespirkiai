@@ -72,9 +72,8 @@ describe("eSeimasTaskJobs", () => {
             runtime.jobs.scrapeHistorical(),
         ]);
 
-        expect(runtime.queue.enqueuePending.mock.calls.map(([kind]) => kind)).toEqual([
-            "document", "editions", "asr", "historical",
-        ]);
+        // Eilėje darbo buvo, tad progreso lentelės perrinkti neprireikė.
+        expect(runtime.queue.enqueuePending).not.toHaveBeenCalled();
         expect(runtime.scraper.scrapeDocument).toHaveBeenCalledWith("TAD", "ABC");
         expect(runtime.scraper.scrapeEditionList).toHaveBeenCalledWith("TAD", "ABC");
         expect(runtime.scraper.scrapeConsolidated).toHaveBeenCalledWith("TAD", "ABC");
@@ -92,8 +91,32 @@ describe("eSeimasTaskJobs", () => {
 
         await expect(runtime.jobs.scrapeDocument()).resolves.toBe(false);
 
+        // Tuščia eilė — sutikrinam su progreso lentele, bet naujo darbo nerandam.
+        expect(runtime.queue.enqueuePending).toHaveBeenCalledWith("document");
+        expect(runtime.queue.claimNext).toHaveBeenCalledTimes(1);
         expect(runtime.scraper.scrapeDocument).not.toHaveBeenCalled();
         expect(runtime.queue.complete).not.toHaveBeenCalled();
+    });
+
+    it("tuščią eilę papildo iš progreso lentelės ir bando imti dar kartą", async () => {
+        const runtime = makeRuntime();
+        runtime.queue.claimNext.mockResolvedValueOnce(null as never);
+        runtime.queue.enqueuePending.mockResolvedValueOnce(3 as never);
+
+        await expect(runtime.jobs.scrapeDocument()).resolves.toBe(true);
+
+        expect(runtime.queue.claimNext).toHaveBeenCalledTimes(2);
+        expect(runtime.queue.complete).toHaveBeenCalledOnce();
+    });
+
+    it("tuščios eilės sutikrinimo nekartoja dažniau nei kartą per minutę", async () => {
+        const runtime = makeRuntime();
+        runtime.queue.claimNext.mockResolvedValue(null as never);
+
+        await runtime.jobs.scrapeDocument();
+        await runtime.jobs.scrapeDocument();
+
+        expect(runtime.queue.enqueuePending).toHaveBeenCalledOnce();
     });
 
     it("scraper klaidą įrašo tik į paimto etapo eilės elementą", async () => {

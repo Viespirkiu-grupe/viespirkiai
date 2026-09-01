@@ -257,4 +257,26 @@ describe("TaskRunner", () => {
         await flush();
         expect(runner.activeJobCount()).toBe(0);
     });
+
+    it("neregistruoja darbų, patenkančių į disabledTasks šablonus", async () => {
+        const runner = new TaskRunner({ disabledTasks: ["eSeimas*", "tedFoo"] });
+        const ran = vi.fn();
+
+        runner.registerAll([
+            { name: "eSeimasScrapeDocuments", mode: "asap", job: ran },
+            { name: "tedFoo", mode: "asap", job: ran },
+            { name: "eTarScrape", mode: "asap", job: ran },
+        ]);
+
+        expect([...runner.taskNames()]).toEqual(["eTarScrape"]);
+        expect(runner.isTaskDisabled("eseimasscrapedocuments")).toBe(true);
+        expect(runner.isTaskDisabled("eTarScrape")).toBe(false);
+
+        // Dinaminiai valdytojai (dokNuskaitytojai) skalę keičia pagal vardą –
+        // išjungtam darbui tai turi būti tylus no-op, o ne klaida.
+        expect(() => runner.setWorkerCount("eSeimasScrapeDocuments", 2)).not.toThrow();
+        expect(() => runner.setWorkerCount("nezinomas", 1)).toThrow(/Unknown task/);
+
+        await runner.stop();
+    });
 });

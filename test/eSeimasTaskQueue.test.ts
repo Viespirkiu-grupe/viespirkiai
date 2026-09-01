@@ -26,7 +26,7 @@ describe("eSeimasTaskQueue", () => {
 
         const [sql, params] = mocks.query.mock.calls[0];
         expect(sql).toContain('s."editionsScrapedAt" IS NULL');
-        expect(sql).toContain('INSERT INTO public."eSeimasScrapeQueue"');
+        expect(sql).toContain('INSERT INTO "eSeimas"."scrapeQueue"');
         expect(sql).toContain('s."category"');
         expect(sql).toContain('ON CONFLICT (kind, "category", "legalActId", "editionToken")');
         expect(params).toEqual(["editions", 25]);
@@ -36,7 +36,7 @@ describe("eSeimasTaskQueue", () => {
         await enqueuePendingESeimasJobs("historical");
 
         const [sql] = mocks.query.mock.calls[0];
-        expect(sql).toContain('FROM public."eSeimasEdition" s');
+        expect(sql).toContain('FROM "eSeimas"."edition" s');
         expect(sql).toContain('s."editionToken"');
         expect(sql).toContain('s."scrapedAt" IS NULL');
     });

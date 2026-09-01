@@ -8,6 +8,6 @@ SELECT n.id           AS "bylosId",
        j.pavadinimas  AS "dalyvioPavadinimas",
        d.pavadinimas  AS "dalyvioVardasIrPavarde",
        d."bylojeKaip"
-FROM "teismoNuosprendziaiDalyviai" d
-         JOIN "teismoNuosprendziai" n ON n.id = d."nuosprendzioId"
-         LEFT JOIN "jarAsmenys" j ON j."jarKodas"::text = d.kodas
+FROM liteko."dalyviaiPilni" d
+         JOIN liteko."nuosprendziaiPilni" n ON n.id = d."nuosprendzioId"
+         LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = d.kodas

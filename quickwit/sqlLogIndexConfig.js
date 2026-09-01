@@ -25,7 +25,7 @@ export const SQL_LOG_INDEX_CONFIG = `# SQL užklausų logas – po vieną Quickw
 #     (\`pruneSqlLogIndexes()\`), o ne split'ų retention politika.
 #
 # Skirtingai nuo \`sutartys\`/\`dokumentai\`/\`juridiniai\`, čia NĖRA nei shard'ų, nei
-# \`quickwitLenteles\`/\`quickwitIndeksai\` versijavimo — dokumentai rašomi tiesiai.
+# \`quickwit.lenteles\`/\`quickwit.indeksai\` versijavimo — dokumentai rašomi tiesiai.
 #
 # Pakeitus šį failą jau sukurti indeksai NEPERSIKURIA; nauja schema pritaikoma
 # kitos dienos indeksui (arba per \`PUT /api/v1/indexes/<id>\`).

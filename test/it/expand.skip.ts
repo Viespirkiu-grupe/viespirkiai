@@ -91,7 +91,7 @@ describe('expandPerson (IT)', () => {
         // Pick a person who has at least one pinreg declaration.
         const res = await postgres.query<{ vardas: string; pavarde: string }>(
             `SELECT "vardas", "pavarde"
-             FROM public."pinregJuridiniaiRysiai"
+             FROM pinreg."juridiniaiRysiai"
              WHERE "vardas" IS NOT NULL AND "pavarde" IS NOT NULL
                AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'
              ORDER BY "pateikimoData" DESC NULLS LAST
@@ -203,7 +203,7 @@ describe('expandContract (IT)', () => {
         const res = await postgres.query<{ pirkimoNumeris: string }>(
             `SELECT s."pirkimoNumeris"
              FROM public."sutartys" s
-             JOIN public."viesiejiPirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
+             JOIN "eppsViesiejiPirkimai"."pirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
              WHERE s."pirkimoNumeris" IS NOT NULL
              GROUP BY s."pirkimoNumeris"
              ORDER BY COUNT(*) DESC
@@ -242,7 +242,7 @@ describe('expandPirkimas (IT)', () => {
         // Pick a procurement that has a buyer org and at least one winner contract.
         const res = await postgres.query<{ pirkimoId: string }>(
             `SELECT vp."pirkimoId"
-             FROM public."viesiejiPirkimai" vp
+             FROM "eppsViesiejiPirkimai"."pirkimai" vp
              JOIN public."sutartys" s ON s."pirkimoNumeris" = vp."pirkimoId"
              WHERE vp."jarKodas" IS NOT NULL
              GROUP BY vp."pirkimoId"

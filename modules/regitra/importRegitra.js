@@ -18,7 +18,7 @@ import { log } from "../../utils/log.js";
  * Siejama pagal antraštės pavadinimą, o ne poziciją — taip importas nesulūžtų,
  * jei Regitra sukeistų stulpelius vietomis. Tvarka čia yra ta pati kaip lentelėje
  * (`md5` pridedamas gale), nes nuo jos priklauso ir kanoninis JSON, ir
- * `INSERT INTO regitra SELECT * FROM "regitraImportas"`.
+ * `INSERT INTO regitra."priemoniuTipai" SELECT * FROM regitra."importas"`.
  */
 export const STULPELIAI = {
     MARKE: "marke",
@@ -180,7 +180,7 @@ async function iterptiPaketa(eilutes) {
         .join(", ");
 
     await postgres.query(
-        `INSERT INTO "regitraImportas" (${INSERT_STULPELIAI}) VALUES ${placeholderiai}`,
+        `INSERT INTO regitra."importas" (${INSERT_STULPELIAI}) VALUES ${placeholderiai}`,
         eilutes.flat(),
     );
 }
@@ -193,7 +193,7 @@ async function iterptiPaketa(eilutes) {
  * @returns {Promise<{eiluciuSkaicius: number, praleista: number}>}
  */
 export async function importuotiCsvIStaginga(csvKelias) {
-    await postgres.query(`TRUNCATE TABLE "regitraImportas"`);
+    await postgres.query(`TRUNCATE TABLE regitra."importas"`);
 
     let eilute = 0;
     let praleista = 0;

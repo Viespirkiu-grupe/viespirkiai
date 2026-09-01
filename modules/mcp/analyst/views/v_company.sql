@@ -28,35 +28,48 @@ SELECT j."jarKodas"::text,
        s."vidutinisAtlyginimas",
        s."imokuSuma",
        melagingas."nuo"                                                             AS "melagingisTiekejasNuo",
-       melagingas."iki"                                                             AS "melagingisTiekejasIki",
-       nepatikimas."nuo"                                                            AS "nepatikimasTiekejasNuo",
-       nepatikimas."iki"                                                            AS "nepatikimasTiekejasIki",
+       melagingas."iki"
+        nepatikimas."nuo"                                                            AS "nepatikimasTiekejasNuo",
+        nepatikimas."iki"
+        EXISTS(SELECT 1
+              FROM "vptJuodiejiSarasai"."tiekejai" m
+              JOIN "vptJuodiejiSarasai"."sarasai" ms ON ms."id" = m."sarasoId"
+              WHERE m."tiekejoJarKodas" = j."jarKodas"::text
+                AND ms."kodas" = 'melagingi'
+                AND (m."itrauktasIki" IS NULL OR m."itrauktasIki" >= CURRENT_DATE)) AS "melagingisTiekejas",
+       EXISTS(SELECT 1
+              FROM "vptJuodiejiSarasai"."tiekejai" n
+              JOIN "vptJuodiejiSarasai"."sarasai" ns ON ns."id" = n."sarasoId"
+              WHERE n."tiekejoJarKodas" = j."jarKodas"::text
+                AND ns."kodas" = 'nepatikimi'
+                AND (n."itrauktasIki" IS NULL OR n."itrauktasIki" >= CURRENT_DATE)) AS "nepatikimasTiekejas",
        (SELECT COUNT(*)
-        FROM "vdiPazeidimai" v
-        WHERE v."jarKodas" = j."jarKodas"::text)                                    AS "vdiPazeidimuSkaicius",
+        FROM vdi.pazeidimai v
+        JOIN vdi.subjektai s ON s.id = v."subjektoId"
+        WHERE s."jarKodas" = j."jarKodas"::integer)                                    AS "vdiPazeidimuSkaicius",
        (SELECT COUNT(*)
-        FROM "teismoNuosprendziaiDalyviai" d
+        FROM liteko."dalyviaiPilni" d
         WHERE d.kodas = j."jarKodas"::text)                                         AS "bylosSkaicius",
        (SELECT COUNT(*)
-        FROM domenai d
+        FROM domenai."domenaiPilni" d
         WHERE d."savininkoKodas" = j."jarKodas"::text)                              AS "domenaiSkaicius",
        (SELECT COUNT(*)
         FROM "neskelbiamosDerybos" nd
         WHERE nd."jarKodas" = j."jarKodas"::text)                                   AS "neskelbiamosDerybosSkaicius"
-FROM "jarAsmenys" j
-         LEFT JOIN "jarFormos" forma ON forma."kodas" = j."formosKodas"
-         LEFT JOIN "jarStatusai" statusas ON statusas."kodas" = j."statusoKodas"
-         LEFT JOIN "jarAsmenuAdresai" ja ON ja."jarKodas" = j."jarKodas"
-         LEFT JOIN "arPatalposAdresai" patalpa ON patalpa."patKodas" = ja."aobKodas"
-         LEFT JOIN "arPastataiSklypaiAdresai" pastatas
-                   ON pastatas."kodas" = COALESCE(patalpa."aobKodas", ja."aobKodas")
-         LEFT JOIN "arGatves" gatve ON gatve."kodas" = pastatas."gatKodas"
-         LEFT JOIN "arGyvenvietesRibos" gyv ON gyv."kodas" = pastatas."gyvKodas"
-         LEFT JOIN "arSavivaldybes" sav
+FROM "rcJar"."asmenys" j
+         LEFT JOIN "rcJar"."formos" forma ON forma."kodas" = j."formosKodas"
+         LEFT JOIN "rcJar"."statusai" statusas ON statusas."kodas" = j."statusoKodas"
+         LEFT JOIN "rcJar"."asmenuAdresai" ja ON ja."jarKodas" = j."jarKodas"
+         LEFT JOIN "adresuRegistras"."patalposAdresai" patalpa ON patalpa."patKodas" = ja."aobKodas"::int
+         LEFT JOIN "adresuRegistras"."pastataiSklypaiAdresai" pastatas
+                   ON pastatas."kodas" = COALESCE(patalpa."aobKodas", ja."aobKodas"::int)
+         LEFT JOIN "adresuRegistras"."gatves" gatve ON gatve."kodas" = pastatas."gatKodas"
+         LEFT JOIN "adresuRegistras"."gyvenvietesRibos" gyv ON gyv."kodas" = pastatas."gyvKodas"
+         LEFT JOIN "adresuRegistras"."savivaldybes" sav
                    ON sav."kodas" = COALESCE(pastatas."savKodas", gyv."savivaldybesKodas")
          LEFT JOIN LATERAL (
     SELECT draustieji, draustieji2, "vidutinisAtlyginimas", "imokuSuma", data
-    FROM "sodraMonthly"
+    FROM sodra."menesiniai"
     WHERE "jarKodas" = j."jarKodas"::integer
     ORDER BY data DESC NULLS LAST
     LIMIT 1

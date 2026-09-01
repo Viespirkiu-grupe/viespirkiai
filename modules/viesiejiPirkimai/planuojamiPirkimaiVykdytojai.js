@@ -13,8 +13,8 @@ async function reserveVykdytojas(db) {
         `
         WITH candidate AS (
           SELECT v.id
-          FROM public."planuojamiPirkimaiVykdytojai" v
-          JOIN public."planuojamiPirkimaiVykdytojaiAtnaujinimai" a
+          FROM "eppsPlanuojamiPirkimai"."vykdytojai" v
+          JOIN "eppsPlanuojamiPirkimai"."vykdytojaiAtnaujinimai" a
             ON a."vykdytojoId" = v.id
           WHERE a."jarNuskaitymoVersija" IS NULL
              OR (a."jarNuskaitymoVersija" >= 0
@@ -32,12 +32,12 @@ async function reserveVykdytojas(db) {
           FOR UPDATE OF a SKIP LOCKED
           LIMIT 1
         )
-        UPDATE public."planuojamiPirkimaiVykdytojaiAtnaujinimai" a
+        UPDATE "eppsPlanuojamiPirkimai"."vykdytojaiAtnaujinimai" a
         SET "jarNuskaitymoVersija" = -2,
             "jarNuskaitymoData" =
               (now() AT TIME ZONE 'Europe/Vilnius')
         FROM candidate c
-        JOIN public."planuojamiPirkimaiVykdytojai" v ON v.id = c.id
+        JOIN "eppsPlanuojamiPirkimai"."vykdytojai" v ON v.id = c.id
         WHERE a."vykdytojoId" = c.id
         RETURNING
           v.id,
@@ -47,7 +47,7 @@ async function reserveVykdytojas(db) {
             v."jarKodas",
             (
               SELECT known."jarKodas"
-              FROM public."viesiejiPirkimaiVykdytojai" known
+              FROM "eppsViesiejiPirkimai"."vykdytojai" known
               WHERE known.pavadinimas = v.pavadinimas
                 AND known."jarKodas" IS NOT NULL
               ORDER BY known."nuskaitymoData" DESC NULLS LAST
@@ -63,23 +63,23 @@ async function reserveVykdytojas(db) {
 async function refreshSearchForVykdytojas(vykdytojoId, db) {
     await db.query(
         `
-        UPDATE public."planuojamiPirkimaiSearch" search
+        UPDATE "eppsPlanuojamiPirkimai"."search" search
         SET "searchTsv" =
           setweight(to_tsvector('simple', COALESCE(p."pirkimoPavadinimas", '')), 'A') ||
           setweight(to_tsvector('simple', concat_ws(' ', v.pavadinimas, v."jarKodas")), 'B') ||
           setweight(to_tsvector('simple', concat_ws(' ', d.aprasymas,
             d."bvpzKodaiRaw", type.pavadinimas, directive.pavadinimas,
             method.pavadinimas)), 'C')
-        FROM public."planuojamiPirkimai" p
-        LEFT JOIN public."planuojamiPirkimaiDuomenys" d
+        FROM "eppsPlanuojamiPirkimai"."pirkimai" p
+        LEFT JOIN "eppsPlanuojamiPirkimai"."duomenys" d
           ON d."pirkimoId" = p.id
-        LEFT JOIN public."planuojamiPirkimaiVykdytojai" v
+        LEFT JOIN "eppsPlanuojamiPirkimai"."vykdytojai" v
           ON v.id = p."vykdytojoId"
-        LEFT JOIN public."planuojamiPirkimaiTipai" type
+        LEFT JOIN "eppsPlanuojamiPirkimai"."tipai" type
           ON type.id = p."pirkimoTipoId"
-        LEFT JOIN public."planuojamiPirkimaiDirektyvos" directive
+        LEFT JOIN "eppsPlanuojamiPirkimai"."direktyvos" directive
           ON directive.id = p."direktyvosId"
-        LEFT JOIN public."planuojamiPirkimaiBudai" method
+        LEFT JOIN "eppsPlanuojamiPirkimai"."budai" method
           ON method.id = p."pirkimoBudoId"
         WHERE search."pirkimoId" = p.id
           AND p."vykdytojoId" = $1;
@@ -115,12 +115,12 @@ export async function processNextPlanuojamuPirkimuVykdytojas({
         await db.query(
             `
             WITH updated_organization AS (
-              UPDATE public."planuojamiPirkimaiVykdytojai"
+              UPDATE "eppsPlanuojamiPirkimai"."vykdytojai"
               SET "jarKodas" = COALESCE($2, "jarKodas")
               WHERE id = $1
               RETURNING id
             )
-            UPDATE public."planuojamiPirkimaiVykdytojaiAtnaujinimai"
+            UPDATE "eppsPlanuojamiPirkimai"."vykdytojaiAtnaujinimai"
             SET "jarNuskaitymoVersija" = $3,
                 "jarNuskaitymoData" =
                   (now() AT TIME ZONE 'Europe/Vilnius')
@@ -137,7 +137,7 @@ export async function processNextPlanuojamuPirkimuVykdytojas({
     } catch (error) {
         await db.query(
             `
-            UPDATE public."planuojamiPirkimaiVykdytojaiAtnaujinimai"
+            UPDATE "eppsPlanuojamiPirkimai"."vykdytojaiAtnaujinimai"
             SET "jarNuskaitymoVersija" = -1,
                 "jarNuskaitymoData" =
                   (now() AT TIME ZONE 'Europe/Vilnius')

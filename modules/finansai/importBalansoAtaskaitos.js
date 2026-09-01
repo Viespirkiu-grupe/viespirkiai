@@ -107,33 +107,33 @@ async function insertBatch(rows) {
             VALUES ${placeholders}
         ),
         templates AS (
-            INSERT INTO "balansoAtaskaitosTemplatePavadinimai" ("templateId", "templateName")
+            INSERT INTO "adpFinansinesAtaskaitos"."balansoFormos" ("templateId", "templateName")
             SELECT DISTINCT "templateId", "templateName"
             FROM input
             WHERE "templateId" IS NOT NULL
             ON CONFLICT ("templateId") DO UPDATE
             SET "templateName" = EXCLUDED."templateName"
-            WHERE "balansoAtaskaitosTemplatePavadinimai"."templateName" IS DISTINCT FROM EXCLUDED."templateName"
+            WHERE "adpFinansinesAtaskaitos"."balansoFormos".templateName" IS DISTINCT FROM EXCLUDED."templateName"
         ),
         standards AS (
-            INSERT INTO "balansoAtaskaitosStandardPavadinimai" ("standardId", "standardName")
+            INSERT INTO "adpFinansinesAtaskaitos"."balansoStandartai" ("standardId", "standardName")
             SELECT DISTINCT "standardId", "standardName"
             FROM input
             WHERE "standardId" IS NOT NULL
             ON CONFLICT ("standardId") DO UPDATE
             SET "standardName" = EXCLUDED."standardName"
-            WHERE "balansoAtaskaitosStandardPavadinimai"."standardName" IS DISTINCT FROM EXCLUDED."standardName"
+            WHERE "adpFinansinesAtaskaitos"."balansoStandartai".standardName" IS DISTINCT FROM EXCLUDED."standardName"
         ),
         lines AS (
-            INSERT INTO "balansoAtaskaitosLinePavadinimai" ("lineTypeId", "lineName")
+            INSERT INTO "adpFinansinesAtaskaitos"."balansoEiluciuTipai" ("lineTypeId", "lineName")
             SELECT DISTINCT "lineTypeId", "lineName"
             FROM input
             WHERE "lineTypeId" IS NOT NULL
             ON CONFLICT ("lineTypeId") DO UPDATE
             SET "lineName" = EXCLUDED."lineName"
-            WHERE "balansoAtaskaitosLinePavadinimai"."lineName" IS DISTINCT FROM EXCLUDED."lineName"
+            WHERE "adpFinansinesAtaskaitos"."balansoEiluciuTipai".lineName" IS DISTINCT FROM EXCLUDED."lineName"
         )
-        INSERT INTO "balansoAtaskaitos" (
+        INSERT INTO "adpFinansinesAtaskaitos"."balansoEilutes" (
             "_id", "jarId", "formaId", "statusasId", "templateId", "standardId", "lineTypeId",
             "reiksme", "laikotarpisNuo", "laikotarpisIki", "duomenuData"
         )

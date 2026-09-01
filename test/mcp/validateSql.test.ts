@@ -61,11 +61,11 @@ describe("Layer 2 — table whitelist", () => {
     });
 
     it("accepts jarAsmenys (mixed-case)", () => {
-        expect(validateSql('SELECT * FROM "jarAsmenys"')).toBeNull();
+        expect(validateSql('SELECT * FROM "asmenys"')).toBeNull();
     });
 
     it("accepts XLSX PPA tables and rejects the pre-xlsx name", () => {
-        expect(validateSql('SELECT * FROM "xlsxPPAataskaitos"')).toBeNull();
+        expect(validateSql('SELECT * FROM "ataskaitos"')).toBeNull();
         expect(validateSql('SELECT * FROM "atn1ataskaitos"')).toBeTypeOf("string");
     });
 
@@ -145,7 +145,7 @@ describe("Layer 3 — function whitelist", () => {
     });
 
     it("accepts ::text cast (not a function)", () => {
-        expect(validateSql('SELECT "jarKodas"::text FROM "jarAsmenys"')).toBeNull();
+        expect(validateSql('SELECT "jarKodas"::text FROM "asmenys"')).toBeNull();
     });
 
     it("rejects pg_sleep", () => {
@@ -184,7 +184,7 @@ describe("Layer 4 — complexity limits", () => {
     function buildJoinQuery(n: number): string {
         let sql = 'SELECT s."tiekejoKodas" FROM vpmSutartys s';
         for (let i = 1; i <= n; i++) {
-            sql += ` JOIN "jarAsmenys" j${i} ON j${i}."jarKodas"::text = s."tiekejoKodas"`;
+            sql += ` JOIN "asmenys" j${i} ON j${i}."jarKodas"::text = s."tiekejoKodas"`;
         }
         return sql;
     }

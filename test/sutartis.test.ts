@@ -25,10 +25,10 @@ describe('loadSutartis', () => {
           }],
         });
       }
-      if (sql.includes('sutartysAtviriDuomenys')) return Promise.resolve({ rows: [] });
-      if (sql.includes('sutartysAtviriDuomenysImp')) return Promise.resolve({ rows: [] });
+      if (sql.includes('"vpmSutartys"."atviriDuomenys"')) return Promise.resolve({ rows: [] });
+      if (sql.includes('"vpmSutartys"."atviriDuomenysImp"')) return Promise.resolve({ rows: [] });
       if (sql.includes('public."vpmSutartys" s') && sql.includes('WHERE "sutartiesUnikalusId" != $1')) return Promise.resolve({ rows: [] });
-      if (sql.includes('FROM "sabisSutartys"')) return Promise.resolve({ rows: [] });
+      if (sql.includes('FROM sabis."sutartys"')) return Promise.resolve({ rows: [] });
       if (sql.includes('FROM public.files f')) return Promise.resolve({ rows: [] });
       throw new Error(`Netikėta užklausa: ${sql}`);
     });
@@ -41,7 +41,7 @@ describe('loadSutartis', () => {
 
     expect(sutartis?.pirkimoNumeris).toBe('BTGS027138');
     const sql = pgQuery.mock.calls.map(([query]) => String(query)).join('\n');
-    expect(sql).not.toContain('cvppViesiejiPirkimai');
+    expect(sql).not.toContain('cvpp."archyvoSkelbimai"');
     expect(sql).not.toContain('viesiejiPirkimai');
     expect(sql).not.toContain('cpvaProjektuSutartys');
   });

@@ -7,7 +7,7 @@ export async function loadQuickwitRowsFromPostgres(hits) {
 
     const { rows } = await postgres.query(
         `SELECT *
-         FROM public."viesiejiPirkimai"
+         FROM "eppsViesiejiPirkimai"."pirkimai"
          WHERE "pirkimoId" = ANY($1::int[])`,
         [ids],
     );

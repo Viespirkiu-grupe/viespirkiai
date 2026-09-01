@@ -14,8 +14,8 @@ export async function gautiRcPranesimusPagalJarKoda(jarKodas, options = {}) {
 
     const rcPranesimaiResult = await postgres.query(
         `SELECT *, ${WINDOW_COUNT_SQL}
-            FROM "rcInformaciniaiLeidiniaiPranesimai"
-            WHERE "jarKodas" = $1
+            FROM "rcInformaciniaiPranesimai"."pranesimaiPilni"
+            WHERE "jarKodas" = $1::integer
             ORDER BY "leidinioData" DESC
            ${useLimit ? "LIMIT $2" : ""};`,
         useLimit ? [jarKodas, limit] : [jarKodas],

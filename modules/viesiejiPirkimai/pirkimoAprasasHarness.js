@@ -1,6 +1,37 @@
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "stealth/ox-alpha";
 const DEFAULT_MAX_STEPS = 12;
+
+/*
+Numatytojo modelio čia SĄMONINGAI nėra.
+
+Anksčiau buvo `DEFAULT_MODEL = "stealth/ox-alpha"`. Kai OpenRouter tą stealth
+alias'ą pašalino, kodas liko rodyti į nebeegzistuojantį modelį, o vienintelė
+vieta, kur modelis iš tikrųjų tvarkomas (`ai."paskirtys"` DB lentelė), apie
+tai nieko nežinojo. Modelį privalo perduoti kviečiantysis — žr.
+`modules/openrouter/modelioVariantai.js` (`getPaskirtis` + `apiModel`).
+*/
+
+/**
+ * Aprašymo klaida su požymiu, ar ji YRA šio pirkimo kaltė.
+ *
+ * `infrastrukturine = true` reiškia „ne pirkimo, o aplinkos bėda": modelio
+ * nebėra, pasibaigė kreditai, nukrito tinklas, blogas raktas. Tokios klaidos
+ * NETURI deginti pirkimo bandymų (`attempts`) — priešingu atveju vienas
+ * modelio dingimas per kelias valandas negrįžtamai užmuša visą eilės backlog'ą
+ * (taip 2026-08-26 mirė 114 eilučių). Eilė tokias eilutes tik atideda.
+ */
+export class AprasoKlaida extends Error {
+    constructor(message, { infrastrukturine = false } = {}) {
+        super(message);
+        this.name = "AprasoKlaida";
+        this.infrastrukturine = infrastrukturine;
+    }
+}
+
+/** Aplinkos (ne pirkimo) klaida — eilė dėl jos nedidina `attempts`. */
+function infraKlaida(message) {
+    return new AprasoKlaida(message, { infrastrukturine: true });
+}
 
 export function pirkimoAprasoPrompt(pirkimoId) {
     return `Detaliai aprašyk viešojo pirkimo ${pirkimoId} turinį. Prašomas rezultatas – iki 10 sakinių paprastai aiškiai ir tiksliai aprašančių perkamą objektą. Apie patį pirkimą ar pirkėją rašyti nereikia. Sakinių numeruoti nereikia. Prieš rašant privalai perskaityti dokumentus. Tarp sakinių nedėk naujų eilučių, bet reikia skirstyti mintis į pastraipas. Na, tik ne kas sakinį. Galutiniame atsakyme nepasakok, ką darei, kokius dokumentus skaitei ar kaip priėjai prie išvados – pateik tik patį perkamo objekto aprašymą. Jei pirkimo turinio patikimai aprašyti nepavyksta, užbaik darbą ir grąžink tik {"success":false}.`;
@@ -41,9 +72,68 @@ function assistantMessage(message) {
     return result;
 }
 
+/*
+OpenRouter klaidos tekstas su tiekėjo detalėmis.
+
+`error.message` dažnai būna beverčio „Provider returned error" pavidalo –
+tikroji priežastis (konteksto limitas, blogas parametras, tiekėjo gedimas)
+guli `error.metadata.raw`, kur įdėtas neapdorotas tiekėjo atsakymas. Be jo
+`lastError` eilėje nieko nepasako ir klaidos neįmanoma taisyti.
+*/
 function errorMessage(status, body) {
-    const message = body?.error?.message || body?.message;
-    return `OpenRouter klaida (${status})${message ? `: ${message}` : ""}`;
+    const error = body?.error ?? body;
+    const dalys = [];
+    const message = error?.message || body?.message;
+    if (message) dalys.push(message);
+
+    const meta = error?.metadata;
+    if (meta?.provider_name) dalys.push(`tiekėjas: ${meta.provider_name}`);
+    if (meta?.reasons?.length) dalys.push(`priežastys: ${meta.reasons.join(", ")}`);
+
+    const raw = meta?.raw;
+    if (raw) {
+        const tekstas = typeof raw === "string" ? raw : JSON.stringify(raw);
+        dalys.push(`raw: ${tekstas.replace(/\s+/g, " ").slice(0, 400)}`);
+    } else if (meta && !meta.provider_name) {
+        dalys.push(`metadata: ${JSON.stringify(meta).slice(0, 400)}`);
+    }
+
+    if (error?.code && error.code !== status) dalys.push(`code: ${error.code}`);
+
+    return `OpenRouter klaida (${status})${dalys.length ? `: ${dalys.join(" · ")}` : ""}`;
+}
+
+/*
+Ar HTTP statusas reiškia aplinkos bėdą?
+
+400 – NE: tai priekaištas pačiai užklausai (per ilgas kontekstas, tiekėjui
+netinkamas parametras), tad kartojasi kiekvieną kartą su tuo pačiu pirkimu.
+Laikom pirkimo klaida, kad degintų `attempts` ir po penkių bandymų nustotų —
+kitaip eilutė kas 15 min. amžinai kartotų tą pačią apmokamą užklausą.
+
+Visa kita (401/402/403/404, 429, 5xx) – aplinka: raktas, kreditai, dingęs
+modelis, tiekėjo gedimas. Šitos praeina pačios ir bandymų deginti neturi.
+*/
+function arAplinkosStatusas(status) {
+    return status !== 400;
+}
+
+/*
+Ar tiekėjas atmetė priverstinį `tool_choice`?
+
+Dalis tiekėjų (per OpenRouter matyti bent Meta) palaiko tik
+`tool_choice: "auto"` ir konkretaus įrankio reikalavimą atmeta su 400. Tas pats
+modelio pavadinimas gali būti aptarnaujamas skirtingų tiekėjų, tad tai nėra
+nuspėjama iš anksto — belieka pabandyti ir, gavus šitą klaidą, nusileisti iki
+`"auto"`.
+
+Aprašymo teisingumui tai nekenkia: reikalavimą pirma perskaityti pirkimą ir
+dokumentus saugo `objektasPerskaitytas` / `dokumentasPerskaitytas` vartai, kurie
+neleidžia priimti galutinio atsakymo be jų. `tool_choice` buvo tik spartesnis
+kelias į tą patį.
+*/
+function arNepalaikomasToolChoice(klaida) {
+    return /tool_choice/i.test(klaida?.message ?? "");
 }
 
 function reasoningText(detail) {
@@ -65,13 +155,14 @@ function mergeToolCall(toolCalls, delta) {
 }
 
 async function readSse(response, onEvent) {
-    if (!response.body) throw new Error("OpenRouter negrąžino SSE atsakymo body.");
+    if (!response.body) throw infraKlaida("OpenRouter negrąžino SSE atsakymo body.");
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let content = "";
     let reasoning = "";
+    let finishReason = null;
     const reasoningDetails = [];
     const toolCalls = [];
 
@@ -94,13 +185,19 @@ async function readSse(response, onEvent) {
         try {
             chunk = JSON.parse(data);
         } catch {
-            throw new Error(`OpenRouter grąžino netaisyklingą SSE JSON: ${data}`);
+            throw infraKlaida(`OpenRouter grąžino netaisyklingą SSE JSON: ${data}`);
         }
-        if (chunk.error) throw new Error(errorMessage(chunk.error.code ?? 500, chunk));
+        if (chunk.error) {
+            const status = chunk.error.code ?? 500;
+            throw new AprasoKlaida(errorMessage(status, chunk), {
+                infrastrukturine: arAplinkosStatusas(status),
+            });
+        }
 
         if (chunk.usage) onEvent({ type: "usage", usage: chunk.usage });
         const choice = chunk.choices?.[0];
         if (choice?.finish_reason) {
+            finishReason = choice.finish_reason;
             onEvent({ type: "finish", reason: choice.finish_reason });
         }
         const delta = choice?.delta;
@@ -136,7 +233,9 @@ async function readSse(response, onEvent) {
     }
     if (buffer.trim()) processEvent(buffer);
 
-    const message = { role: "assistant", content: content || null };
+    // `finishReason` lieka tik vidiniam naudojimui — `assistantMessage` į
+    // OpenRouter siunčiamą žinutę perkelia tik content/tool_calls/reasoning.
+    const message = { role: "assistant", content: content || null, finishReason };
     if (reasoning) message.reasoning = reasoning;
     if (reasoningDetails.length) message.reasoning_details = reasoningDetails;
     if (toolCalls.length) message.tool_calls = toolCalls.filter(Boolean);
@@ -148,12 +247,32 @@ async function responseError(response) {
     try {
         payload = await response.json();
     } catch {
-        throw new Error(`OpenRouter grąžino ne JSON klaidą (${response.status}).`);
+        throw infraKlaida(`OpenRouter grąžino ne JSON klaidą (${response.status}).`);
     }
     return errorMessage(response.status, payload);
 }
 
 async function requestCompletion({ apiKey, body, fetchImpl, onEvent, beforeRequest }) {
+    /*
+    Kiekviena užklausa paskelbiama PRIEŠ išsiuntimą — su dydžiais, be turinio.
+
+    Kaina auga ne nuo žingsnių skaičiaus, o nuo to, kad kiekvienas žingsnis iš
+    naujo siunčia visą ligtolinį pokalbį su dokumentų tekstais. `zinutes` ir
+    `baitai` leidžia tai pamatyti nelaukiant sąskaitos ir nesirausiant po
+    dokumentų turinį (žr. `npm run pirkimas:auditas`).
+    */
+    const payload = JSON.stringify(body);
+    onEvent({
+        type: "request",
+        model: body.model,
+        zinutes: body.messages.length,
+        baitai: Buffer.byteLength(payload),
+        maxTokens: body.max_tokens,
+        toolChoice: typeof body.tool_choice === "string"
+            ? body.tool_choice
+            : body.tool_choice?.function?.name,
+    });
+
     for (let attempt = 0; attempt < 3; attempt++) {
         await beforeRequest();
         const response = await fetchImpl(OPENROUTER_URL, {
@@ -162,7 +281,7 @@ async function requestCompletion({ apiKey, body, fetchImpl, onEvent, beforeReque
                 Authorization: `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(body),
+            body: payload,
             signal: AbortSignal.timeout(120_000),
         });
 
@@ -172,7 +291,9 @@ async function requestCompletion({ apiKey, body, fetchImpl, onEvent, beforeReque
                 await new Promise((resolve) => setTimeout(resolve, 1000 * (2 ** attempt)));
                 continue;
             }
-            throw new Error(await responseError(response));
+            throw new AprasoKlaida(await responseError(response), {
+                infrastrukturine: arAplinkosStatusas(response.status),
+            });
         }
         return readSse(response, onEvent);
     }
@@ -189,7 +310,7 @@ export async function runPirkimoAprasas({
     fetchImpl = fetch,
     onToolCall = () => {},
     onEvent = () => {},
-    model = DEFAULT_MODEL,
+    model,
     reasoningEffort = "max",
     maxOutputTokens = 4000,
     temperature,
@@ -202,50 +323,97 @@ export async function runPirkimoAprasas({
     firstToolReminder = "Dar neperskaitei pirkimo duomenų. Naudok get_viesasis_pirkimas su pateiktu numeriu ir tik tada tęsk.",
     documentReminder = "Dar neįvykdei reikalavimo perskaityti pirkimo dokumentus. Pirmiausia naudok get_failas pasirinktiems turinį apibrėžiantiems dokumentams, o prireikus – get_failas_tekstas. Tik tada pateik galutinį aprašymą.",
 }) {
-    if (!apiKey) throw new Error("Nenustatytas OPENROUTER_API_KEY.");
+    if (!apiKey) throw infraKlaida("Nenustatytas OPENROUTER_API_KEY.");
+    if (!model) {
+        throw infraKlaida(
+            "Nenurodytas modelis. Jį reikia paimti iš `ai.\"paskirtys\"`"
+            + " (getPaskirtis + apiModel), o ne pasikliauti numatytąja reikšme.",
+        );
+    }
     if (!/^\d+$/.test(String(pirkimoId ?? ""))) {
         throw new Error("Pirkimo numeris turi būti sudarytas iš skaitmenų.");
     }
 
     const toolMap = new Map(tools.map((tool) => [tool.definition.function.name, tool]));
     if (!toolMap.has(firstToolName)) {
-        throw new Error(`Trūksta privalomo ${firstToolName} įrankio.`);
+        throw infraKlaida(`Trūksta privalomo ${firstToolName} įrankio.`);
     }
     const messages = [{ role: "user", content: promptFactory(String(pirkimoId)) }];
     let objektasPerskaitytas = false;
     let dokumentasPerskaitytas = false;
 
+    // Nusileidžiama į `"auto"`, jei tiekėjas priverstinio įrankio nepalaiko.
+    let priverstinisPirmasIrankis = true;
+
+    const kurtiBody = (step) => ({
+        model,
+        messages,
+        tools: tools.map((tool) => tool.definition),
+        tool_choice: step === 0 && priverstinisPirmasIrankis
+            ? { type: "function", function: { name: firstToolName } }
+            : "auto",
+        stream: true,
+        stream_options: { include_usage: true },
+        reasoning: reasoningEffort
+            ? { effort: reasoningEffort, exclude: false }
+            : undefined,
+        max_tokens: maxOutputTokens,
+        temperature,
+        top_p: topP,
+        top_k: topK,
+    });
+
     for (let step = 0; step < maxSteps; step++) {
         onEvent({ type: "step_start", step: step + 1 });
-        const message = await requestCompletion({
-            apiKey,
-            fetchImpl,
-            onEvent,
-            beforeRequest,
-            body: {
-                model,
-                messages,
-                tools: tools.map((tool) => tool.definition),
-                tool_choice: step === 0
-                    ? { type: "function", function: { name: firstToolName } }
-                    : "auto",
-                stream: true,
-                stream_options: { include_usage: true },
-                reasoning: reasoningEffort
-                    ? { effort: reasoningEffort, exclude: false }
-                    : undefined,
-                max_tokens: maxOutputTokens,
-                temperature,
-                top_p: topP,
-                top_k: topK,
-            },
-        });
+        let message;
+        try {
+            message = await requestCompletion({
+                apiKey,
+                fetchImpl,
+                onEvent,
+                beforeRequest,
+                body: kurtiBody(step),
+            });
+        } catch (error) {
+            if (!priverstinisPirmasIrankis || !arNepalaikomasToolChoice(error)) throw error;
+            priverstinisPirmasIrankis = false;
+            onEvent({ type: "tool_choice_fallback", priezastis: error.message });
+            message = await requestCompletion({
+                apiKey,
+                fetchImpl,
+                onEvent,
+                beforeRequest,
+                body: kurtiBody(step),
+            });
+        }
         messages.push(assistantMessage(message));
 
         const calls = message.tool_calls ?? [];
         if (!calls.length) {
             const text = typeof message.content === "string" ? message.content.trim() : "";
-            if (!text) throw new Error("Modelis negrąžino nei teksto, nei įrankio kvietimo.");
+            if (!text) {
+                /*
+                Tuščias atsakymas su `finish_reason = "length"` reiškia, kad
+                `max_tokens` biudžetą suėdė reasoning'as ir matomam atsakymui
+                nieko neliko. Užklausa pilnai apmokėta, o rezultato nėra —
+                todėl klaidos tekste iškart rodome, kurį nustatymą taisyti
+                (`ai."modeliuVariantai".maxOutputTokens` arba `reasoningEffort`).
+
+                Bandymus ši klaida DEGINA sąmoningai: jei biudžetas per mažas
+                sistemiškai, kartojimas kas kelias minutes tik krautų sąskaitą.
+                Penki bandymai su eksponentiniu atsitraukimu apriboja nuostolį,
+                o `lastError` lieka matomas apžiūrai.
+                */
+                if (message.finishReason === "length") {
+                    throw new Error(
+                        `Modelis išnaudojo visą ${maxOutputTokens} tokenų biudžetą`
+                        + " reasoning'ui ir negrąžino nei teksto, nei įrankio kvietimo."
+                        + ' Kelkite ai."modeliuVariantai".maxOutputTokens arba mažinkite'
+                        + " reasoningEffort.",
+                    );
+                }
+                throw new Error("Modelis negrąžino nei teksto, nei įrankio kvietimo.");
+            }
 
             // Sąmoninga modelio baigtis, kai pirkimo ar dokumentų nepakanka.
             // Ją priimame ir be sėkmingo dokumento perskaitymo, kad toks

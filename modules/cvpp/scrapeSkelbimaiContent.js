@@ -1,14 +1,14 @@
 // CVPP skelbimo (ViewNotice) detalės skreiperis.
 // https://pirkimai.eviesiejipirkimai.lt/ctm/Supplier/PublicTenders/ViewNotice/{skelbimoId}
 //
-// skelbimoId ir "link" gaunami iš cvppSkelbimai (užpildyti scrapePirkimai.js
+// skelbimoId ir "link" gaunami iš cvpp."skelbimai" (užpildyti scrapePirkimai.js
 // parseSkelbimai iš PublicPurchage #notices-table). Šis skreiperis eina per
 // "nuskaitymas" eilę ir papildo eilutę detalės puslapio laukais.
 //
 // Puslapio bendra „Informacija" panelė (ctm wrapper) vienoda visiems skelbimų
 // tipams; pats kūnas (span8) tipui specifinis, todėl laikomas "turinysHtml".
 //
-// Būsena valdoma cvppSkelbimai."nuskaitymas" (kaip scrapeNotice.js):
+// Būsena valdoma cvpp."skelbimai"."nuskaitymas" (kaip scrapeNotice.js):
 //   null -> dar nesuparsinta, >= 1 -> suparsinta ta versija, -1 -> klaida.
 import { createScraperFetch } from "../../utils/scrapeFetch.js";
 const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapeSkelbimaiContent" });
@@ -171,7 +171,7 @@ export function parseViewNotice(html) {
 
 async function setStatus(skelbimoId, status) {
     await postgres.query(
-        `UPDATE "cvppSkelbimai" SET nuskaitymas = $1 WHERE "skelbimoId" = $2;`,
+        `UPDATE cvpp."skelbimai" SET nuskaitymas = $1 WHERE "skelbimoId" = $2;`,
         [status, skelbimoId],
     );
 }
@@ -182,20 +182,20 @@ async function issaugotiTuriny(skelbimoId, content) {
     values.push(NUSKAITYMO_VERSIJA, skelbimoId);
 
     await postgres.query(
-        `UPDATE "cvppSkelbimai"
+        `UPDATE cvpp."skelbimai"
          SET ${setSql}, nuskaitymas = $${CONTENT_COLUMNS.length + 1}
          WHERE "skelbimoId" = $${CONTENT_COLUMNS.length + 2}`,
         values,
     );
 }
 
-// Paima vieną dar nesuparsintą (ar senesnės versijos / null) cvppSkelbimai eilutę,
+// Paima vieną dar nesuparsintą (ar senesnės versijos / null) cvpp."skelbimai" eilutę,
 // nuskaito ViewNotice puslapį, papildo eilutę. Grąžina false, kai eilučių nebeliko.
 export async function scrapeVienaSkelbima() {
     const tSelect = performance.now();
     const { rows } = await postgres.query(
         `SELECT "skelbimoId", "link"
-         FROM "cvppSkelbimai"
+         FROM cvpp."skelbimai"
          WHERE (nuskaitymas < $1 AND nuskaitymas >= 0) OR nuskaitymas IS NULL
          LIMIT 1;`,
         [NUSKAITYMO_VERSIJA],

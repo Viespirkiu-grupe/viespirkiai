@@ -9,7 +9,7 @@ export async function GET({ params, url }: { params: { id: string }, url: URL })
   const wanted = url.searchParams.get('v') ?? '';
 
   const actRes = await postgres.query(
-    `SELECT a."title" FROM "eTarLegalAct" a WHERE a."legalActId" = $1`,
+    `SELECT a."title" FROM "eTar"."legalAct" a WHERE a."legalActId" = $1`,
     [legalActId],
   );
   const act = actRes.rows[0];
@@ -17,8 +17,8 @@ export async function GET({ params, url }: { params: { id: string }, url: URL })
 
   const docRes = await postgres.query(
     `SELECT d."title", d."documentId", d."editionToken", v."code" AS "variantas"
-       FROM "eTarLegalActDocument" d
-       JOIN "eTarDocumentVariant" v USING ("documentVariantId")
+       FROM "eTar"."legalActDocument" d
+       JOIN "eTar"."documentVariant" v USING ("documentVariantId")
       WHERE d."legalActId" = $1
       ORDER BY (v."code" = 'original') DESC, d."documentId"`,
     [legalActId],
@@ -37,16 +37,16 @@ export async function GET({ params, url }: { params: { id: string }, url: URL })
     const [metaRes, fieldRes] = await Promise.all([
       postgres.query(
         `SELECT s."name" AS "statusas"
-           FROM "eTarDocumentMetadata" m
-           LEFT JOIN "eTarActStatus" s USING ("actStatusId")
+           FROM "eTar"."documentMetadata" m
+           LEFT JOIN "eTar"."actStatus" s USING ("actStatusId")
           WHERE m."documentId" = $1`,
         [doc.documentId],
       ),
       postgres.query(
         `SELECT k."code", f."valueText"
-           FROM "eTarMetadataField" f
-           JOIN "eTarMetadataFieldKey" k USING ("metadataFieldKeyId")
-           JOIN "eTarDocumentMetadata" m ON m."metadataId" = f."metadataId"
+           FROM "eTar"."metadataField" f
+           JOIN "eTar"."metadataFieldKey" k USING ("metadataFieldKeyId")
+           JOIN "eTar"."documentMetadata" m ON m."metadataId" = f."metadataId"
           WHERE m."documentId" = $1 AND k."code" IN ('act_type', 'adopted_by')
           ORDER BY k."metadataFieldKeyId"`,
         [doc.documentId],

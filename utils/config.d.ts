@@ -15,6 +15,8 @@ export interface Config {
     port: number;
     /** Į stderr rašyti struktūrizuotą kiekvienos HTTP užklausos žurnalą. */
     logRequests: boolean;
+    /** TaskRunner darbų vardai, kurių neregistruoti; leidžiami `*` pakaitos simboliai. */
+    taskRunnerDisabledTasks: string[];
     /** Rodyti CVPP / ATN-1 archyvo puslapius ir navigacijos nuorodą. */
     enableAtn1: boolean;
     /** Saugoti brangius paieškos maršrutus paprastu JavaScript slapuko patikrinimu. */
@@ -74,6 +76,8 @@ export interface Config {
      * `/api/v1/sidecar/<vardas>`. Naudojamas tik skaitymui.
      */
     sidecarRemote?: string;
+    /** Sidecar'ų skaitymo gijų skaičius; `1` – be gijų. Numatyta – 4. */
+    sidecarReadThreads: number;
 
     /** Stateless e-TAR HTML→JSON adapterio bazinis URL (`modules/eTar`). */
     eTarApiUrl: string;

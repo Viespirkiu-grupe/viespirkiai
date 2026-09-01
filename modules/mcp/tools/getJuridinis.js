@@ -125,8 +125,10 @@ export const schema = {
         .default(5)
         .describe("Sutarčių skaičius (maks. 50)"),
     pinregLimit: limitSchema
-        .default(3)
-        .describe("PINREG deklaracijų skaičius (maks. 50)"),
+        .default(10)
+        .describe(
+            "PINREG deklaracijų įrašų skaičius – imami naujausiai pateikti įrašai iš visų kategorijų bendrai (maks. 50)",
+        ),
     teismoNuosprendziaiLimit: limitSchema
         .default(5)
         .describe("Teismo nuosprendžių skaičius (maks. 50)"),
@@ -232,6 +234,12 @@ export async function handler({
     const asmuo = { ...result.asmuo };
     asmuo.sodra = aggregateSodra(asmuo.sodra);
     asmuo.finansai = aggregateFinansai(asmuo.finansai);
+    // `pinreg.irasai` – tik puslapio lentelei skirtas plokščias sąrašas; tie patys
+    // įrašai jau yra sugrupuoti, tad į atsakymą jų nekartojame.
+    if (asmuo.pinreg?.irasai) {
+        const { irasai, ...pinreg } = asmuo.pinreg;
+        asmuo.pinreg = pinreg;
+    }
 
     return {
         content: [{ type: "text", text: JSON.stringify(asmuo, null, 2) }],

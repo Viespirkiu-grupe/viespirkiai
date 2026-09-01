@@ -24,6 +24,9 @@ const configSchema = z.object({
     port: z.number().int().positive().default(9019),
     appEnv: z.enum(["dev", "prod"]).optional(),
     logRequests: z.boolean().default(false),
+    // TaskRunner darbų išjungimas be kodo keitimo: vardų sąrašas, kuriame
+    // leidžiami `*` pakaitos simboliai, pvz. `eSeimas*,tedScrape`.
+    taskRunnerDisabledTasks: z.array(z.string()).default([]),
     enableAtn1: z.boolean().default(false),
     enableBotChallenge: z.boolean().default(false),
 
@@ -86,6 +89,9 @@ const configSchema = z.object({
     // mazgai be lokalių failų skaito per vieną nuotolinį bazinį URL.
     sidecarDir: z.string().optional(),
     sidecarRemote: z.string().optional(),
+    // Kiek gijų aptarnauja sidecar'ų skaitymus. `1` — jokių gijų, skaitoma
+    // pagrindinėje gijoje (žr. utils/sqliteSidecarPoolas.js).
+    sidecarReadThreads: z.number().int().min(1).default(4),
 
     enableGraph: z.boolean().default(false),
 

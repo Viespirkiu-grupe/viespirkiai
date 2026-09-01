@@ -6,25 +6,25 @@ export const ETAR_QUEUE_KINDS = ["document", "editions", "asr", "historical"];
 
 const PENDING_SOURCES = {
     document: {
-        from: `public."eTarLegalActScrape" s`,
+        from: `"eTar"."legalActScrape" s`,
         pending: `s."documentScrapedAt" IS NULL`,
         token: `''`,
         order: `s."discoveredAt", s."legalActId"`,
     },
     editions: {
-        from: `public."eTarLegalActScrape" s`,
+        from: `"eTar"."legalActScrape" s`,
         pending: `s."editionsScrapedAt" IS NULL`,
         token: `''`,
         order: `s."discoveredAt", s."legalActId"`,
     },
     asr: {
-        from: `public."eTarLegalActScrape" s`,
+        from: `"eTar"."legalActScrape" s`,
         pending: `s."asrScrapedAt" IS NULL`,
         token: `''`,
         order: `s."discoveredAt", s."legalActId"`,
     },
     historical: {
-        from: `public."eTarEdition" s`,
+        from: `"eTar"."edition" s`,
         pending: `s."scrapedAt" IS NULL`,
         token: `s."editionToken"`,
         order: `s."legalActId", s.ordinal`,
@@ -44,13 +44,13 @@ function requireKind(kind) {
 export async function enqueuePendingETarJobs(kind, { limit = 1000 } = {}) {
     const source = requireKind(kind);
     const { rowCount } = await postgres.query(
-        `INSERT INTO public."eTarScrapeQueue" (kind, "legalActId", "editionToken")
+        `INSERT INTO "eTar"."scrapeQueue" (kind, "legalActId", "editionToken")
          SELECT $1, s."legalActId", ${source.token}
          FROM ${source.from}
          WHERE ${source.pending}
            AND NOT EXISTS (
                SELECT 1
-               FROM public."eTarScrapeQueue" q
+               FROM "eTar"."scrapeQueue" q
                WHERE q.kind = $1
                  AND q."legalActId" = s."legalActId"
                  AND q."editionToken" = ${source.token}
@@ -63,7 +63,7 @@ export async function enqueuePendingETarJobs(kind, { limit = 1000 } = {}) {
     const queued = rowCount ?? 0;
     if (queued > 0) {
         signalWork(WORK_SIGNALS.ETAR_SCRAPE_READY, {
-            source: "eTarScrapeQueue",
+            source: "eTar.scrapeQueue",
             kind,
             count: queued,
         });
@@ -88,7 +88,7 @@ export async function claimNextETarJob(kind, {
     const { rows: [row] } = await postgres.query(
         `WITH candidate AS (
              SELECT "queueId"
-             FROM public."eTarScrapeQueue"
+             FROM "eTar"."scrapeQueue"
              WHERE kind = $1
                AND "failureCount" < $2
                AND ("retryAfter" IS NULL OR "retryAfter" <= now())
@@ -97,7 +97,7 @@ export async function claimNextETarJob(kind, {
              FOR UPDATE SKIP LOCKED
              LIMIT 1
          )
-         UPDATE public."eTarScrapeQueue" q
+         UPDATE "eTar"."scrapeQueue" q
             SET "claimToken" = $3,
                 "claimedAt" = now(),
                 "leaseUntil" = now() + ($4 || ' minutes')::interval
@@ -112,7 +112,7 @@ export async function claimNextETarJob(kind, {
 
 export async function completeETarJob(job) {
     const { rowCount } = await postgres.query(
-        `DELETE FROM public."eTarScrapeQueue"
+        `DELETE FROM "eTar"."scrapeQueue"
          WHERE "queueId" = $1 AND "claimToken" = $2`,
         [job.queueId, job.claimToken],
     );
@@ -121,7 +121,7 @@ export async function completeETarJob(job) {
 
 export async function failETarJob(job, error, { backoffMinutes = 30 } = {}) {
     const { rowCount } = await postgres.query(
-        `UPDATE public."eTarScrapeQueue"
+        `UPDATE "eTar"."scrapeQueue"
             SET "failureCount" = "failureCount" + 1,
                 "lastError" = $3,
                 "retryAfter" = now() + ($4 * ("failureCount" + 1) || ' minutes')::interval,

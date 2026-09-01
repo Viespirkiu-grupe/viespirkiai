@@ -127,12 +127,16 @@ async function insertChunk(rows, db = postgres) {
             params.push(r[col]);
             return `$${params.length}`;
         });
-        return `(${placeholders.join(", ")})`;
+        const [kodas, tipas, pavadinimas, straipsnis, dalis, pirmaKarta] = placeholders;
+        return `(vdi.subjekto_id(${kodas}::integer, ${pavadinimas}, ${tipas}),`
+             + ` vdi.straipsnio_id(${straipsnis}, ${dalis}::smallint), ${pirmaKarta})`;
     });
 
-    const colList = cols.map((c) => `"${c}"`).join(", ");
+    // Subjektas ir straipsnis eina per žodynus — jų reikšmės nebekartojamos
+    // kiekvienoje eilutėje.
     await db.query(
-        `INSERT INTO "vdiPazeidimai" (${colList}) VALUES ${values.join(", ")}`,
+        `INSERT INTO vdi.pazeidimai ("subjektoId", "straipsnioId", "pirmaKarta")
+         VALUES ${values.join(", ")}`,
         params,
     );
 }
@@ -177,18 +181,22 @@ export async function updateVdiPazeidimai() {
         await client.query("BEGIN");
         await client.query(
             `CREATE TEMP TABLE old_vdi_counts ON COMMIT DROP AS
-             SELECT "jarKodas", count(*)::bigint AS count
-             FROM "vdiPazeidimai" GROUP BY "jarKodas"`,
+             SELECT s."jarKodas", count(*)::bigint AS count
+             FROM vdi.pazeidimai p
+             JOIN vdi.subjektai s ON s.id = p."subjektoId"
+             GROUP BY 1`,
         );
-        await client.query(`TRUNCATE TABLE "vdiPazeidimai"`);
+        await client.query(`TRUNCATE TABLE vdi.pazeidimai`);
 
         for (let offset = 0; offset < filtered.length; offset += CHUNK_SIZE) {
             await insertChunk(filtered.slice(offset, offset + CHUNK_SIZE), client);
         }
         const queued = await client.query(
             `WITH current_counts AS MATERIALIZED (
-                SELECT "jarKodas", count(*)::bigint AS count
-                FROM "vdiPazeidimai" GROUP BY "jarKodas"
+                SELECT s."jarKodas", count(*)::bigint AS count
+                FROM vdi.pazeidimai p
+                JOIN vdi.subjektai s ON s.id = p."subjektoId"
+                GROUP BY 1
              ), changed AS MATERIALIZED (
                 SELECT COALESCE(old."jarKodas", current."jarKodas") AS "jarKodas"
                 FROM old_vdi_counts old
@@ -196,8 +204,8 @@ export async function updateVdiPazeidimai() {
                 WHERE old.count IS DISTINCT FROM current.count
              )
              INSERT INTO public."juridiniaiRefreshQueue" ("jarKodas", "saltiniai")
-             SELECT "jarKodas"::integer, ARRAY['vdi']
-             FROM changed WHERE "jarKodas" ~ '^[0-9]{9}$'
+             SELECT "jarKodas", ARRAY['vdi']
+             FROM changed WHERE "jarKodas" BETWEEN 100000000 AND 999999999
              ON CONFLICT ("jarKodas") DO UPDATE SET
                 "saltiniai" = ARRAY(
                     SELECT DISTINCT value FROM unnest(

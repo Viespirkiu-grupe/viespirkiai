@@ -1,4 +1,5 @@
 import { postgres } from '../../postgres/postgres.js';
+import { gautiLenteliuDydzius } from "./lenteliuDydziai.js";
 import { convertUnit } from '../../utils/units.js';
 import '../../utils/linksniai.js';
 
@@ -69,14 +70,6 @@ export function buildSsePayload(h) {
       tup_deleted: Number(h.database.tup_deleted).toLocaleString('lt-LT'),
       tup_fetched: Number(h.database.tup_fetched).toLocaleString('lt-LT'),
     },
-    lenteles: h.lenteles.map((l) => ({
-      tableName: l.tableName,
-      dataSize: convertUnit(Number(l.dataSize), 'B'),
-      indexSize: convertUnit(Number(l.indexSize), 'B'),
-      totalSize: convertUnit(Number(l.totalSize), 'B'),
-      approxRowCount: Number(l.approxRowCount).toLocaleString('lt-LT'),
-      isTotal: l.tableName === 'Iš viso',
-    })),
     eiles: h.eiles.map((e) => ({
       tableName: e.tableName,
       approxRowCount: Number(e.approxRowCount).toLocaleString('lt-LT'),
@@ -294,10 +287,13 @@ export async function gautiStatistika() {
         COALESCE(SUM(pages), 0)            AS "puslapiuSuma",
         COALESCE(SUM(characters), 0)       AS "simboliuSuma"
       FROM public."filesStats";`),
-    postgres.query(`SELECT s.relname AS "tableName", pg_table_size(s.relid) AS "dataSize", pg_indexes_size(s.relid) AS "indexSize", pg_table_size(s.relid) + pg_indexes_size(s.relid) AS "totalSize", st.n_live_tup AS "approxRowCount" FROM pg_catalog.pg_statio_user_tables s JOIN pg_catalog.pg_stat_user_tables st ON s.relid = st.relid ORDER BY s.relname ASC;`),
+    // Užklausa gyvena modules/statistika/lenteliuDydziai.js – ja dalinasi ir
+    // /duomenys/lenteles. Filtruojam į `public`, kad dokumentacijos schema `dba`
+    // nepatektų į bendrą statistiką.
+    gautiLenteliuDydzius({ schemos: ["public"] }).then((rows) => ({ rows })),
     postgres.query(`SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`),
     postgres.query(`SELECT current_database() AS db, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, deadlocks, temp_files, temp_bytes, extract(epoch from now() - stats_reset) AS stats_age_seconds, extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds FROM pg_stat_database WHERE datname = current_database();`),
-    postgres.query(`SELECT * FROM "quickwitIndeksai" ORDER BY "lentele", "seq";`),
+    postgres.query(`SELECT * FROM "quickwit"."indeksai" ORDER BY "lentele", "seq";`),
     postgres.query(`SELECT client_addr::text AS client_addr, state, sent_lsn::text AS sent_lsn, write_lsn::text AS write_lsn, flush_lsn::text AS flush_lsn, replay_lsn::text AS replay_lsn, write_lag::text AS write_lag, flush_lag::text AS flush_lag, replay_lag::text AS replay_lag, extract(epoch from write_lag) AS write_lag_seconds, extract(epoch from flush_lag) AS flush_lag_seconds, extract(epoch from replay_lag) AS replay_lag_seconds, pg_current_wal_lsn()::text AS primary_current_lsn, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_behind FROM pg_stat_replication;`),
   ]);
 

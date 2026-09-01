@@ -22,6 +22,11 @@ SELECT a."pirkimoNumeris",
        p."daliesNumeris",
        p."eileNumeris",
        p."pasiulymoKaina",
+       p."atmetimoPriezastis"
+FROM ppa."ataskaitos" a
+         LEFT JOIN ppa."pirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
+         JOIN ppa."dalyviai" d ON d."ataskaitaId" = a.id
+         LEFT JOIN ppa."salys" salis ON salis.id = d."salisId"
        p."atmetimoPriezastis",
        p."atmetimoStatusas",
        p."atmetimoTeisinisPagrindas"
@@ -32,6 +37,10 @@ FROM "xlsxPPAataskaitos" a
          LEFT JOIN LATERAL (
              SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
                     e."eileNumeris"                                 AS "eileNumeris",
+                    e.kaina::numeric                                AS "pasiulymoKaina",
+                    apr.pavadinimas                                 AS "atmetimoPriezastis"
+             FROM ppa."pasiulymuEile" e
+                      FULL OUTER JOIN ppa."atmestiPasiulymai" ap
                     -- e.kaina (xlsxPPApasiulymuEile, "pasiūlymų eilė su kainomis") only
                     -- carries a price for a bid that made it into the price ranking.
                     -- ap.pasiulymoKaina (xlsxPPAatmestiPasiulymai) carries the same fact
@@ -48,7 +57,7 @@ FROM "xlsxPPAataskaitos" a
                                       ON ap."ataskaitaId" = e."ataskaitaId"
                                           AND ap."dalyvioKodas" = e."dalyvioKodas"
                                           AND ap."daliesNumeris" = e."daliesNumeris"
-                      LEFT JOIN "xlsxPPAatmetimoPriezastys" apr
+                      LEFT JOIN ppa."atmetimoPriezastys" apr
                                 ON apr.id = ap."atmetimoPriezastysId"
                       LEFT JOIN "xlsxPPAatmestuPasiulymuStatusai" aps
                                 ON aps.id = ap."statusasId"
@@ -57,4 +66,4 @@ FROM "xlsxPPAataskaitos" a
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas
          ) p ON true
-         LEFT JOIN "jarAsmenys" j ON j."jarKodas"::text = d.kodas
+         LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = d.kodas

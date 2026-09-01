@@ -157,7 +157,7 @@ export async function persistPirkimoTurinys(pirkimoId, result) {
         .digest("hex");
 
     const { rows } = await postgres.query(
-        `SELECT "turinysHash" FROM public."viesiejiPirkimaiKeys" WHERE "pirkimoId" = $1`,
+        `SELECT "turinysHash" FROM "eppsViesiejiPirkimai"."keys" WHERE "pirkimoId" = $1`,
         [pirkimoId],
     );
     if (rows[0]?.turinysHash === hash) return; // nepasikeitė — nieko neperrašom
@@ -176,7 +176,7 @@ export async function persistPirkimoTurinys(pirkimoId, result) {
             .map((c) => `${c} = EXCLUDED.${c}`)
             .join(", ");
         await client.query(
-            `INSERT INTO public."viesiejiPirkimaiKeys" (${cols.join(", ")})
+            `INSERT INTO "eppsViesiejiPirkimai"."keys" (${cols.join(", ")})
              VALUES (${placeholders.join(", ")})
              ON CONFLICT ("pirkimoId") DO UPDATE SET ${updates}`,
             params,
@@ -184,12 +184,12 @@ export async function persistPirkimoTurinys(pirkimoId, result) {
 
         // 2. Dalys (delete + insert)
         await client.query(
-            `DELETE FROM public."viesiejiPirkimaiDalys" WHERE "pirkimoId" = $1`,
+            `DELETE FROM "eppsViesiejiPirkimai"."dalys" WHERE "pirkimoId" = $1`,
             [pirkimoId],
         );
         for (const d of buildDalys(result)) {
             await client.query(
-                `INSERT INTO public."viesiejiPirkimaiDalys"
+                `INSERT INTO "eppsViesiejiPirkimai"."dalys"
                     ("pirkimoId", "rusis", "numeris", "pavadinimas")
                  VALUES ($1, $2, $3, $4)`,
                 [pirkimoId, d.rusis, d.numeris, d.pavadinimas],
@@ -198,7 +198,7 @@ export async function persistPirkimoTurinys(pirkimoId, result) {
 
         // 3. Failai (+ versijos per CASCADE) — delete + insert
         await client.query(
-            `DELETE FROM public."viesiejiPirkimaiFailai" WHERE "pirkimoId" = $1`,
+            `DELETE FROM "eppsViesiejiPirkimai"."failai" WHERE "pirkimoId" = $1`,
             [pirkimoId],
         );
         for (const f of Array.isArray(result.failai) ? result.failai : []) {
@@ -207,7 +207,7 @@ export async function persistPirkimoTurinys(pirkimoId, result) {
                     ? Number(f.dokumentasId)
                     : null;
             const { rows: fr } = await client.query(
-                `INSERT INTO public."viesiejiPirkimaiFailai"
+                `INSERT INTO "eppsViesiejiPirkimai"."failai"
                     ("pirkimoId", "dokumentasId", "papildymoId", "pavadinimas",
                      "dokumentasPavadinimas", "aprasymas", "kalba")
                  VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -225,7 +225,7 @@ export async function persistPirkimoTurinys(pirkimoId, result) {
             const failasId = fr[0].id;
             for (const v of Array.isArray(f.versijos) ? f.versijos : []) {
                 await client.query(
-                    `INSERT INTO public."viesiejiPirkimaiFailuVersijos"
+                    `INSERT INTO "eppsViesiejiPirkimai"."failuVersijos"
                         ("failasId", "versionId", "papildymoId", "pavadinimas",
                          "dokumentoVersija", "pakeitimai", "ikelimoData", "kalba",
                          "rengejas", "statusas")
@@ -250,12 +250,12 @@ export async function persistPirkimoTurinys(pirkimoId, result) {
 
         // 4. Skelbimai — delete + insert
         await client.query(
-            `DELETE FROM public."viesiejiPirkimaiSkelbimai" WHERE "pirkimoId" = $1`,
+            `DELETE FROM "eppsViesiejiPirkimai"."skelbimai" WHERE "pirkimoId" = $1`,
             [pirkimoId],
         );
         for (const s of Array.isArray(result.skelbimai) ? result.skelbimai : []) {
             await client.query(
-                `INSERT INTO public."viesiejiPirkimaiSkelbimai"
+                `INSERT INTO "eppsViesiejiPirkimai"."skelbimai"
                     ("pirkimoId", "tipas", "downloadHref", "externalId", "isLinked",
                      "ikelimoData", "kalba", "statusas", "paskelbimoData")
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,

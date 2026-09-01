@@ -5,7 +5,7 @@ import { createETarApi } from "./eTarApi.js";
 import { closeSqlite, openETarSidecar } from "./eTarSidecar.js";
 import { createRunner } from "./eTarScrape.js";
 
-// "eTarSourceAnomaly" perkratymas: kiekvienas ten užfiksuotas aktas nuskaitomas
+// "eTar"."sourceAnomaly" perkratymas: kiekvienas ten užfiksuotas aktas nuskaitomas
 // iš naujo ir žiūrima, ar šaltinio brokas dar yra.
 //
 //   node modules/eTar/eTarAnomalijos.js            — parodo, kas lentelėje
@@ -35,8 +35,8 @@ async function anomalijos() {
                 json_agg(json_build_object('kind', a."kind", 'ilgis', a."ilgis")
                          ORDER BY a."ilgis" DESC) AS "brokas",
                 max(t."title") AS "title"
-           FROM "eTarSourceAnomaly" a
-           LEFT JOIN "eTarLegalAct" t USING ("legalActId")
+           FROM "eTar"."sourceAnomaly" a
+           LEFT JOIN "eTar"."legalAct" t USING ("legalActId")
           GROUP BY a."legalActId"
           ORDER BY a."legalActId"`,
     );
@@ -56,20 +56,20 @@ async function perkratyti(runner, legalActId) {
 
     // Redakcijų sąrašas ką tik perrašytas, tad tokenai — švieži.
     const { rows: redakcijos } = await postgres.query(
-        `SELECT "legalActId", "editionToken" FROM "eTarEdition"
+        `SELECT "legalActId", "editionToken" FROM "eTar"."edition"
           WHERE "legalActId" = $1 ORDER BY "ordinal"`,
         [legalActId],
     );
     for (const redakcija of redakcijos) await runner.scrapeHistoricalEdition(redakcija);
 
     const { rows: istaisyta } = await postgres.query(
-        `DELETE FROM "eTarSourceAnomaly"
+        `DELETE FROM "eTar"."sourceAnomaly"
           WHERE "legalActId" = $1 AND "pastebeta" < $2
           RETURNING "kind"`,
         [legalActId, pradzia],
     );
     const { rows: liko } = await postgres.query(
-        `SELECT "kind", "ilgis" FROM "eTarSourceAnomaly"
+        `SELECT "kind", "ilgis" FROM "eTar"."sourceAnomaly"
           WHERE "legalActId" = $1 ORDER BY "ilgis" DESC`,
         [legalActId],
     );
@@ -79,7 +79,7 @@ async function perkratyti(runner, legalActId) {
 export async function perkratytiAnomalijas({ concurrency = DEFAULT_CONCURRENCY } = {}) {
     const aktai = await anomalijos();
     if (!aktai.length) {
-        log(`"eTarSourceAnomaly" tuščia — nėra ko perkratyti`);
+        log(`"eTar"."sourceAnomaly" tuščia — nėra ko perkratyti`);
         return { aktai: 0, istaisyta: 0, liko: 0, nepavyko: 0 };
     }
 
@@ -91,7 +91,7 @@ export async function perkratytiAnomalijas({ concurrency = DEFAULT_CONCURRENCY }
     let cursor = 0;
 
     // Aktai lygiagrečiai, bet VIENO akto etapai — griežtai iš eilės: redakcijų
-    // sąrašo perrašymas trina ir įrašo "eTarEdition" eilutes, tad tokenus imam
+    // sąrašo perrašymas trina ir įrašo "eTar"."edition" eilutes, tad tokenus imam
     // tik po jo.
     async function worker() {
         for (let i = cursor++; i < aktai.length; i = cursor++) {
@@ -127,7 +127,7 @@ export async function perkratytiAnomalijas({ concurrency = DEFAULT_CONCURRENCY }
 }
 
 const USAGE = `
-"eTarSourceAnomaly" perkratymas — kiekvienas aktas nuskaitomas iš naujo (--force),
+"eTar"."sourceAnomaly" perkratymas — kiekvienas aktas nuskaitomas iš naujo (--force),
 ir jei brokas nebepasikartoja, eilutė ištrinama.
 
   node modules/eTar/eTarAnomalijos.js             tik parodo lentelės turinį

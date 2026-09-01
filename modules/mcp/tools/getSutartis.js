@@ -29,7 +29,10 @@ export async function handler({ id }) {
 
     // Tiekėjo patikslinimas
     const atviri = await postgres.query(
-        `SELECT * FROM "sutartysAtviriDuomenys" WHERE "dokId" = $1 LIMIT 1`,
+        `SELECT d."tiekPavPatikslinimas", v."pavadinimas" AS "tiekSalis"
+           FROM "vpmSutartys"."atviriDuomenys" d
+           LEFT JOIN "vpmSutartys"."atviriValstybes" v ON v.id = d."valstybesId"
+          WHERE d."dokId" = $1 LIMIT 1`,
         [id],
     );
     if (atviri.rowCount > 0) {
@@ -41,7 +44,10 @@ export async function handler({ id }) {
     }
 
     const atviriImp = await postgres.query(
-        `SELECT * FROM "sutartysAtviriDuomenysImp" WHERE "dokId" = $1 LIMIT 1`,
+        `SELECT d."tiekSbjPatikslinimas", v."pavadinimas" AS "tiekSalis"
+           FROM "vpmSutartys"."atviriDuomenysImp" d
+           LEFT JOIN "vpmSutartys"."atviriValstybes" v ON v.id = d."valstybesId"
+          WHERE d."dokId" = $1 LIMIT 1`,
         [id],
     );
     if (atviriImp.rowCount > 0) {
@@ -102,7 +108,7 @@ export async function handler({ id }) {
 
     // SABIS sutartys su šalimis ir sąskaitomis
     const sabisRes = await postgres.query(
-        `SELECT * FROM "sabisSutartys" WHERE "vpId" = $1`,
+        `SELECT * FROM sabis."sutartys" WHERE "vpId" = $1`,
         [id],
     );
     sutartis.sabisSutartys = sabisRes.rows;
@@ -110,13 +116,13 @@ export async function handler({ id }) {
     await Promise.all(
         sutartis.sabisSutartys.map(async (sabisSutartis) => {
             const salysRes = await postgres.query(
-                `SELECT * FROM "sabisSutarciuSalys" WHERE "sutartiesId" = $1`,
+                `SELECT * FROM sabis."sutarciuSalys" WHERE "sutartiesId" = $1`,
                 [sabisSutartis.sutartiesId],
             );
             sabisSutartis.salys = salysRes.rows;
 
             const sąskaitosRes = await postgres.query(
-                `SELECT * FROM "sabisSaskaitos" WHERE "sutartiesUid" = $1`,
+                `SELECT * FROM sabis."saskaitos" WHERE "sutartiesUid" = $1`,
                 [sabisSutartis.sutartiesUid],
             );
             const saskaitos = sąskaitosRes.rows;
@@ -125,9 +131,9 @@ export async function handler({ id }) {
                 saskaitos.map(async (saskaita) => {
                     const itemRes = await postgres.query(
                         `SELECT ss.*, t.tipas, v."veiklosVieta"
-                         FROM "sabisSaskaituSalys" ss
-                         LEFT JOIN "sabisSaskaituSalysTipai" t ON t.id = ss."tipasId"
-                         LEFT JOIN "sabisSaskaituSalysVeiklosVieta" v ON v.id = ss."veiklosVietaId"
+                         FROM sabis."saskaituSalys" ss
+                         LEFT JOIN sabis."saskaituSalysTipai" t ON t.id = ss."tipasId"
+                         LEFT JOIN sabis."saskaituSalysVeiklosVieta" v ON v.id = ss."veiklosVietaId"
                          WHERE ss."sfId" = $1`,
                         [saskaita.sfId],
                     );
@@ -144,13 +150,13 @@ export async function handler({ id }) {
 
     // CVPP ir CVPIS pirkimai
     const cvppRes = await postgres.query(
-        `SELECT * FROM "cvppViesiejiPirkimai" WHERE "pirkimoNumeris" = $1`,
+        `SELECT * FROM cvpp."archyvoSkelbimai" WHERE "pirkimoNumeris" = $1`,
         [sutartis.pirkimoNumeris],
     );
     if (cvppRes.rowCount > 0) sutartis.cvppPirkimas = cvppRes.rows[0];
 
     const cvpisRes = await postgres.query(
-        `SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`,
+        `SELECT * FROM "eppsViesiejiPirkimai"."pirkimai" WHERE "pirkimoId" = $1`,
         [sutartis.pirkimoNumeris],
     );
     if (cvpisRes.rowCount > 0) sutartis.cvpisPirkimas = cvpisRes.rows[0];

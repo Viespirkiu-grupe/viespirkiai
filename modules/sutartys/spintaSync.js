@@ -132,14 +132,16 @@ export async function fetchActiveSutartysByIds(ids) {
     const { rows } = await postgres.query(
         `SELECT ${VPM_SUTARTIS_ROW_SELECT},
             a."tiekPavPatikslinimas",
-            a."tiekSalis",
+            av."pavadinimas" AS "tiekSalis",
             ai."tiekSbjPatikslinimas" AS "tiekPavPatikslinimasImp",
-            ai."tiekSalis" AS "tiekSalisImp"
+            aiv."pavadinimas" AS "tiekSalisImp"
          FROM ${VPM_SUTARTIS_ROW_FROM}
-         LEFT JOIN public."sutartysAtviriDuomenys" a
+         LEFT JOIN "vpmSutartys"."atviriDuomenys" a
            ON a."dokId" = s."unikalusId"
-         LEFT JOIN public."sutartysAtviriDuomenysImp" ai
+         LEFT JOIN "vpmSutartys"."atviriValstybes" av ON av.id = a."valstybesId"
+         LEFT JOIN "vpmSutartys"."atviriDuomenysImp" ai
            ON ai."dokId" = s."unikalusId"
+         LEFT JOIN "vpmSutartys"."atviriValstybes" aiv ON aiv.id = ai."valstybesId"
          WHERE s."unikalusId" = ANY($1::bigint[])
            AND s.istrinta = false`,
         [ids],

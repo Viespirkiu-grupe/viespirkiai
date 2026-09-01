@@ -21,9 +21,12 @@ export class TaskRunner {
     #dispatchPaused = false;
     #stopping = false;
     #stopPromise = null;
+    #disabledPatterns = [];       // RegExp[] iš disabledTasks
+    #disabledReported = new Set(); // kad tas pats vardas nebūtų logintas kartotinai
 
-    constructor({ maxConcurrentJobs = 20 } = {}) {
+    constructor({ maxConcurrentJobs = 20, disabledTasks = [] } = {}) {
         this.#maxConcurrentJobs = maxConcurrentJobs;
+        this.#disabledPatterns = compileTaskPatterns(disabledTasks);
     }
 
     // -------------------------------------------------------------------------
@@ -32,8 +35,20 @@ export class TaskRunner {
 
     register(taskDef) {
         const def = withDefaults(taskDef);
+        if (this.isTaskDisabled(def.name)) {
+            if (!this.#disabledReported.has(def.name)) {
+                this.#disabledReported.add(def.name);
+                log(`[TaskRunner] Task "${def.name}" išjungtas per TASKRUNNER_DISABLED_TASKS — neregistruojamas`);
+            }
+            return this;
+        }
         this.#tasks.set(def.name, def);
         return this;
+    }
+
+    /** Ar darbo vardas patenka į išjungtų sąrašą (TASKRUNNER_DISABLED_TASKS). */
+    isTaskDisabled(taskName) {
+        return this.#disabledPatterns.some((pattern) => pattern.test(taskName));
     }
 
     registerAll(taskDefs) {
@@ -106,6 +121,9 @@ export class TaskRunner {
      */
     setWorkerCount(taskName, count) {
         const def = this.#tasks.get(taskName);
+        // Išjungti darbai neregistruojami, todėl dinaminiams valdytojams
+        // (pvz. dokNuskaitytojai) tai tyli, o ne klaidą metanti operacija.
+        if (!def && this.isTaskDisabled(taskName)) return;
         if (!def) throw new Error(`Unknown task: ${taskName}`);
         const normalizedCount = typeof count === "string" && count.trim() !== ""
             ? Number(count)
@@ -315,6 +333,23 @@ export class TaskRunner {
         this.#cronTasks.add(task);
         log(`[TaskRunner] scheduled cron task: ${def.name} (${def.schedule})`);
     }
+}
+
+/**
+ * Iš vardų šablonų sąrašo padaro RegExp'us. Palaikomas tik `*` (bet kiek bet
+ * kokių simbolių), pvz. `eSeimas*`. Palyginimas neskiria raidžių dydžio.
+ */
+function compileTaskPatterns(patterns) {
+    const list = Array.isArray(patterns)
+        ? patterns
+        : String(patterns ?? "").split(",");
+    return list
+        .map((pattern) => String(pattern).trim())
+        .filter(Boolean)
+        .map((pattern) => {
+            const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*");
+            return new RegExp(`^${escaped}$`, "i");
+        });
 }
 
 function withDefaults(def) {

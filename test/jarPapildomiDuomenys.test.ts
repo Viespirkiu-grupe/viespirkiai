@@ -20,9 +20,9 @@ describe("papildomi RC duomenys juridinio asmens puslapiui", () => {
 
         const [sql, params] = db.query.mock.calls[0];
         expect(result).toBe(expected);
-        expect(sql).toContain('public."jarZymuTipai"');
-        expect(sql).toContain('public."jarJangisBusenos"');
-        expect(sql).toContain('public."jarDokumentuPotipiai"');
+        expect(sql).toContain('"rcJar"."zymuTipai"');
+        expect(sql).toContain('"rcJar"."jangisBusenos"');
+        expect(sql).toContain('"rcJar"."dokumentuPotipiai"');
         expect(params).toEqual(["110004884", 7]);
     });
 

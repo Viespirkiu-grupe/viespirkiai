@@ -15,8 +15,8 @@ export type Sutartis = Record<string, any>;
  * legal-form suffixes, or wrong country codes.  Two parallel "open data"
  * tables ship corrected values:
  *
- *   - `sutartysAtviriDuomenys`     — original open-data dump.
- *   - `sutartysAtviriDuomenysImp`  — imported / supplemental dump that may
+ *   - `vpmSutartys."atviriDuomenys"`     — original open-data dump.
+ *   - `vpmSutartys."atviriDuomenysImp"`  — imported / supplemental dump that may
  *                                    refine the original.
  *
  * Both are consulted; the second wins if it has a value, since it is
@@ -25,8 +25,20 @@ export type Sutartis = Record<string, any>;
  */
 async function applyTiekejasPatikslinimas(sutartis: Sutartis) {
   const [atviri, atviriImp] = await Promise.all([
-    postgres.query(`SELECT * FROM "sutartysAtviriDuomenys" WHERE "dokId" = $1 LIMIT 1`, [sutartis.sutartiesUnikalusId]),
-    postgres.query(`SELECT * FROM "sutartysAtviriDuomenysImp" WHERE "dokId" = $1 LIMIT 1`, [sutartis.sutartiesUnikalusId]),
+    postgres.query(
+      `SELECT d."tiekPavPatikslinimas", v."pavadinimas" AS "tiekSalis"
+         FROM "vpmSutartys"."atviriDuomenys" d
+         LEFT JOIN "vpmSutartys"."atviriValstybes" v ON v.id = d."valstybesId"
+        WHERE d."dokId" = $1 LIMIT 1`,
+      [sutartis.sutartiesUnikalusId],
+    ),
+    postgres.query(
+      `SELECT d."tiekSbjPatikslinimas", v."pavadinimas" AS "tiekSalis"
+         FROM "vpmSutartys"."atviriDuomenysImp" d
+         LEFT JOIN "vpmSutartys"."atviriValstybes" v ON v.id = d."valstybesId"
+        WHERE d."dokId" = $1 LIMIT 1`,
+      [sutartis.sutartiesUnikalusId],
+    ),
   ]);
   const a = atviri.rows[0];
   const ai = atviriImp.rows[0];
@@ -76,15 +88,15 @@ function groupBy(rows: any[], key: string) {
 }
 
 async function loadSabisSutartys(vpId: number) {
-  const sabis = await postgres.query(`SELECT * FROM "sabisSutartys" WHERE "vpId" = $1`, [vpId]).then((r: any) => r.rows);
+  const sabis = await postgres.query(`SELECT * FROM sabis."sutartys" WHERE "vpId" = $1`, [vpId]).then((r: any) => r.rows);
   if (sabis.length === 0) return sabis;
 
   const [sutarciuSalys, saskaitos] = await Promise.all([
-    postgres.query(`SELECT * FROM "sabisSutarciuSalys" WHERE "sutartiesId" = ANY($1)`, [sabis.map((s: any) => s.sutartiesId)]).then((r: any) => r.rows),
-    postgres.query(`SELECT * FROM "sabisSaskaitos" WHERE "sutartiesUid" = ANY($1) ORDER BY "israsymoData" DESC NULLS LAST`, [sabis.map((s: any) => s.sutartiesUid)]).then((r: any) => r.rows),
+    postgres.query(`SELECT * FROM sabis."sutarciuSalys" WHERE "sutartiesId" = ANY($1)`, [sabis.map((s: any) => s.sutartiesId)]).then((r: any) => r.rows),
+    postgres.query(`SELECT * FROM sabis."saskaitos" WHERE "sutartiesUid" = ANY($1) ORDER BY "israsymoData" DESC NULLS LAST`, [sabis.map((s: any) => s.sutartiesUid)]).then((r: any) => r.rows),
   ]);
   const saskaituSalys = saskaitos.length > 0
-    ? await postgres.query(`SELECT ss.*, t.tipas, v."veiklosVieta" FROM "sabisSaskaituSalys" ss LEFT JOIN "sabisSaskaituSalysTipai" t ON t.id = ss."tipasId" LEFT JOIN "sabisSaskaituSalysVeiklosVieta" v ON v.id = ss."veiklosVietaId" WHERE ss."sfId" = ANY($1)`, [saskaitos.map((sk: any) => sk.sfId)]).then((r: any) => r.rows)
+    ? await postgres.query(`SELECT ss.*, t.tipas, v."veiklosVieta" FROM sabis."saskaituSalys" ss LEFT JOIN sabis."saskaituSalysTipai" t ON t.id = ss."tipasId" LEFT JOIN sabis."saskaituSalysVeiklosVieta" v ON v.id = ss."veiklosVietaId" WHERE ss."sfId" = ANY($1)`, [saskaitos.map((sk: any) => sk.sfId)]).then((r: any) => r.rows)
     : [];
 
   const sutarciuSalysById = groupBy(sutarciuSalys, 'sutartiesId');

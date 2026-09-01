@@ -6,26 +6,27 @@ const DEFAULT_BATCH = 10_000;
 export async function auditETarDokumentai() {
     const { rows: [row] } = await postgres.query(
         `SELECT
-            (SELECT count(*) FROM public."eTarLegalActDocument") AS "eTarViso",
-            (SELECT count(*) FROM public.dokumentai
-              WHERE class = 'teisekura' AND source = 'etar') AS "dokumentaiViso",
+            (SELECT count(*) FROM "eTar"."legalActDocument") AS "eTarViso",
+            (SELECT count(*) FROM documents."sourceIds" si
+              WHERE si."sourceId" = documents.source_id('etar')) AS "dokumentaiViso",
             (SELECT count(*)
-               FROM public."eTarLegalActDocument" e
-               LEFT JOIN public.dokumentai d
-                 ON d.class = 'teisekura' AND d.source = 'etar'
-                AND d."saltinioId2" = e."documentId"::text
-              WHERE d.id IS NULL) AS truksta,
+               FROM "eTar"."legalActDocument" e
+               LEFT JOIN documents."sourceIds" si
+                 ON si."sourceId" = documents.source_id('etar')
+                AND si.id2 = e."documentId"::text
+              WHERE si."documentId" IS NULL) AS truksta,
             (SELECT count(*)
-               FROM public."eTarLegalActDocument" e
-               JOIN public.dokumentai d
-                 ON d.class = 'teisekura' AND d.source = 'etar'
-                AND d."saltinioId2" = e."documentId"::text
-              WHERE d.md5 IS DISTINCT FROM e.md5) AS pasene,
+               FROM "eTar"."legalActDocument" e
+               JOIN documents."sourceIds" si
+                 ON si."sourceId" = documents.source_id('etar')
+                AND si.id2 = e."documentId"::text
+               JOIN documents.documents d ON d.id = si."documentId"
+              WHERE d.md5 IS DISTINCT FROM decode(e.md5, 'hex')) AS pasene,
             (SELECT count(*)
-               FROM public.dokumentai d
-               LEFT JOIN public."eTarLegalActDocument" e
-                 ON e."documentId"::text = d."saltinioId2"
-              WHERE d.class = 'teisekura' AND d.source = 'etar'
+               FROM documents."sourceIds" si
+               LEFT JOIN "eTar"."legalActDocument" e
+                 ON e."documentId"::text = si.id2
+              WHERE si."sourceId" = documents.source_id('etar')
                 AND e."documentId" IS NULL) AS naslaiciai`,
     );
     return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value)]));
@@ -39,12 +40,12 @@ export async function enqueueETarDokumentai({ after = 0, limit = Infinity, batch
         const { rows } = await postgres.query(
             `WITH source AS (
                 SELECT "documentId"
-                FROM public."eTarLegalActDocument"
+                FROM "eTar"."legalActDocument"
                 WHERE "documentId" > $1
                 ORDER BY "documentId"
                 LIMIT $2
              ), queued AS (
-                INSERT INTO public."eTarDocumentsQueue" ("documentId", change)
+                INSERT INTO "eTar"."documentsQueue" ("documentId", change)
                 SELECT "documentId", 'insert' FROM source
                 RETURNING "documentId"
              )

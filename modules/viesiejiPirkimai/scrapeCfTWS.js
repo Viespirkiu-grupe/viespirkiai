@@ -83,13 +83,13 @@ async function refillQueue() {
             `
        WITH candidate AS (
          SELECT "pirkimoId"
-         FROM public."viesiejiPirkimaiAtnaujinimai"
+         FROM "eppsViesiejiPirkimai"."atnaujinimai"
          WHERE "typeId" = 1 -- CfTWS
            AND ("turinioNuskaitymas" IS NULL OR "turinioNuskaitymas" = 0)
          FOR UPDATE SKIP LOCKED
          LIMIT $1
        )
-       UPDATE public."viesiejiPirkimaiAtnaujinimai" v
+       UPDATE "eppsViesiejiPirkimai"."atnaujinimai" v
        SET "turinioNuskaitymas" = -2,
            "scrapeReservation" = NOW()
        FROM candidate
@@ -258,14 +258,14 @@ async function processCfTWSRecord(cft, options = {}) {
         if (result.pirkimoVykdytojasId) {
             await postgres.query(
                 `
-                INSERT INTO public."viesiejiPirkimaiVykdytojai" (id)
+                INSERT INTO "eppsViesiejiPirkimai"."vykdytojai" (id)
                 VALUES ($1)
                 ON CONFLICT (id) DO NOTHING
                 `,
                 [result.pirkimoVykdytojasId],
             );
             const { rows } = await postgres.query(
-                `SELECT "jarKodas" FROM public."viesiejiPirkimaiVykdytojai" WHERE id = $1`,
+                `SELECT "jarKodas" FROM "eppsViesiejiPirkimai"."vykdytojai" WHERE id = $1`,
                 [result.pirkimoVykdytojasId],
             );
             jarKodas = rows[0]?.jarKodas ?? null;
@@ -280,7 +280,7 @@ async function processCfTWSRecord(cft, options = {}) {
         // (IS DISTINCT FROM), kad nekintantis 12h perskaitymas nebloatintų eilutės.
         const purchaseChanged = await postgres.query(
             `
-            UPDATE public."viesiejiPirkimai"
+            UPDATE "eppsViesiejiPirkimai"."pirkimai"
             SET "numatomaVerteEUR" = $2,
                 "bvpzKodai" = $3,
                 "pirkimoObjektoTipas" = $4,
@@ -322,7 +322,7 @@ async function processCfTWSRecord(cft, options = {}) {
         // Nuskaitymo būsena/data visada į plonąją lentelę.
         await postgres.query(
             `
-            UPDATE public."viesiejiPirkimaiAtnaujinimai"
+            UPDATE "eppsViesiejiPirkimai"."atnaujinimai"
             SET "turinioNuskaitymas" = ${NUSKAITYMO_VERSIJA},
                 "turinioNuskaitymoData" = (now() AT TIME ZONE 'Europe/Vilnius'),
                 "scrapeReservation" = NULL
@@ -347,7 +347,7 @@ async function processCfTWSRecord(cft, options = {}) {
 
         await postgres.query(
             `
-      UPDATE public."viesiejiPirkimaiAtnaujinimai"
+      UPDATE "eppsViesiejiPirkimai"."atnaujinimai"
       SET "turinioNuskaitymas" = $1,
           "turinioNuskaitymoData" = NOW(),
           "scrapeReservation" = NULL
@@ -390,7 +390,7 @@ export async function processOldestCfTWSOffHours(options = {}) {
             -- iš dviejų šakų minimumų.
             WITH c_versija AS (
                 SELECT "pirkimoId", "turinioNuskaitymoData"
-                FROM public."viesiejiPirkimaiAtnaujinimai"
+                FROM "eppsViesiejiPirkimai"."atnaujinimai"
                 WHERE "typeId" = 1 -- CfTWS
                   AND "turinioNuskaitymas" != -2
                   AND "turinioNuskaitymas" >= 0
@@ -401,7 +401,7 @@ export async function processOldestCfTWSOffHours(options = {}) {
             ),
             c_sena AS (
                 SELECT "pirkimoId", "turinioNuskaitymoData"
-                FROM public."viesiejiPirkimaiAtnaujinimai"
+                FROM "eppsViesiejiPirkimai"."atnaujinimai"
                 WHERE "typeId" = 1 -- CfTWS
                   AND "turinioNuskaitymas" != -2
                   AND "turinioNuskaitymoData" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '12 hours'
@@ -419,7 +419,7 @@ export async function processOldestCfTWSOffHours(options = {}) {
                 ORDER BY "turinioNuskaitymoData" ASC NULLS LAST
                 LIMIT 1
             )
-            UPDATE public."viesiejiPirkimaiAtnaujinimai" v
+            UPDATE "eppsViesiejiPirkimai"."atnaujinimai" v
             SET "turinioNuskaitymas" = -2,
                 "scrapeReservation" = (now() AT TIME ZONE 'Europe/Vilnius')
             FROM candidate

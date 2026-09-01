@@ -4,7 +4,7 @@ export async function enqueueAddressLinkedJuridiniai(db, source) {
     const result = await db.query(
         `INSERT INTO public."juridiniaiRefreshQueue" ("jarKodas", "saltiniai")
          SELECT DISTINCT "jarKodas", ARRAY[$1::text]
-         FROM public."jarAsmenuAdresai"
+         FROM "rcJar"."asmenuAdresai"
          ON CONFLICT ("jarKodas") DO UPDATE SET
             "saltiniai" = ARRAY(
                 SELECT DISTINCT value

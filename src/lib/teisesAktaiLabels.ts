@@ -65,7 +65,7 @@ export const turinysLabel = (v: string) => TURINYS_LABEL[v] ?? v;
 
 /**
  * e-TAR informacinės lentelės laukai — uždaras 14 raktų rinkinys
- * ("eTarMetadataFieldKey"). Tvarka čia = tvarka akto puslapyje.
+ * ("eTar"."metadataFieldKey"). Tvarka čia = tvarka akto puslapyje.
  */
 export const METADATA_FIELD_LABEL: Record<string, string> = {
   act_type: 'Rūšis',
@@ -84,7 +84,7 @@ export const METADATA_FIELD_LABEL: Record<string, string> = {
   eurovoc_terms: 'EUROVOC terminai',
 };
 
-/** „Susijusi informacija" skiltys ("eTarRelatedSectionType"). */
+/** „Susijusi informacija" skiltys ("eTar"."relatedSectionType"). */
 export const RELATED_SECTION_LABEL: Record<string, string> = {
   attachments: 'Priedai',
   consolidated_edition_attachments: 'Suvestinės redakcijos priedai',
@@ -102,7 +102,7 @@ export const RELATED_SECTION_LABEL: Record<string, string> = {
 };
 
 /**
- * Ryšio tipas tarp aktų ("eTarRelationType"). Šaltinis duoda techninius kodus
+ * Ryšio tipas tarp aktų ("eTar"."relationType"). Šaltinis duoda techninius kodus
  * (`amending_change`), o ekrane turi būti žmogaus kalba. Nežinomą kodą
  * paverčiam į skaitomą sakinį, kad naujas e-TAR tipas nesugadintų puslapio.
  */

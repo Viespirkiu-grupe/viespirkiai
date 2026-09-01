@@ -92,7 +92,7 @@ async function insertBatch(rows) {
         .join(", ");
 
     const sql = `
-        INSERT INTO public."gyvenamosVietoves" (
+        INSERT INTO geografija."gyvenamosVietoves" (
             "_id", "gyvKodas", tipas, "tipoSantrumpa", "pavadinimasK", pavadinimas,
             seniunija, savivaldybe, "gyvNuo", "gyvIki"
         )

@@ -15,6 +15,8 @@ export {
     pickRecentDayToScrape,
     recordEditionFailure,
     recordFailure,
+    RESET_STAGES,
+    resetScrapeMarks,
     upsertDiscoveredActs,
 } from "./store/queue.js";
 export { saveDocument, saveEditionList } from "./store/documents.js";

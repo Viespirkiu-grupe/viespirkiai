@@ -216,28 +216,6 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
             </KeyValueList>
           </div>
         </div>
-        <h3 class="text-sm font-bold mb-3">Lentelės</h3>
-        <DataTable
-          sortable
-          bodyAttributes={{ id: 'lentelesBody' }}
-          columns={[
-            { label: 'Pavadinimas' },
-            { label: 'Duomenų dydis', headerClassName: 'cell-right' },
-            { label: 'Indekso dydis', headerClassName: 'cell-right' },
-            { label: 'Visas dydis', headerClassName: 'cell-right' },
-            { label: 'Eilutės *', headerClassName: 'cell-right' },
-          ]}
-        >
-          {statistika.lenteles.map((l: any) => (
-            <tr class={l.tableName === 'Iš viso' ? 'font-bold' : ''} data-sort-pin={l.tableName === 'Iš viso' ? 'last' : undefined}>
-              <td>{l.tableName}</td>
-              <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.dataSize), 'B')}</td>
-              <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.indexSize), 'B')}</td>
-              <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.totalSize), 'B')}</td>
-              <td class="cell-mono cell-right cell-nowrap">{Number(l.approxRowCount).toLocaleString('lt-LT')}</td>
-            </tr>
-          ))}
-        </DataTable>
       </div>
 
       <!-- Replikacija -->

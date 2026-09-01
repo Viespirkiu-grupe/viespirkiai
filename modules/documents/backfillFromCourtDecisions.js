@@ -1,0 +1,72 @@
+/*
+Backfill: įkelia jau nuskaitytus (ar dar ne) teismo nuosprendžius į dokumentų paiešką.
+
+Tekstas DB nesaugomas, todėl „backfill" reiškia turinio nuskaitymo (detalės puslapio)
+perleidimą per surastiNuosprendzioDalyvius — jis parašo sidecar + documents eilutę.
+
+  * be argumentų: nuskaito tik tuos, kurių dar nėra documents lentelėje
+    (atstato "turinioNuskaitymas"=0 toms eilutėms ir nudrenuoja).
+  * --refresh:     iš naujo nuskaito VISUS (atstato visų "turinioNuskaitymas"=0).
+
+Lygiagretumą valdo pats surastiNuosprendzioDalyvius (CONCURRENCY).
+*/
+
+import { postgres } from "../../postgres/postgres.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
+import { surastiNuosprendzioDalyvius } from "../liteko/scrapeContent.js";
+
+async function run() {
+    const refresh = process.argv.includes("--refresh");
+
+    if (refresh) {
+        const { rowCount } = await postgres.query(
+            `UPDATE liteko.nuosprendziai SET "turinioNuskaitymas" = 0`,
+        );
+        logger.log(`--refresh: atstatyta ${rowCount} eilučių pakartotiniam nuskaitymui`);
+    } else {
+        // Tik tie, kurių dar nėra documents (source='liteko') ir kurie nebuvo
+        // pažymėti klaida (-1). Klaidingus galima perleisti su --refresh.
+        const { rowCount } = await postgres.query(
+            // md5 nebesaugomas — jis yra md5(litekoId), tad skaičiuojamas vietoje.
+            `UPDATE liteko.nuosprendziai tn
+             SET "turinioNuskaitymas" = 0
+             WHERE COALESCE(tn."turinioNuskaitymas", 0::smallint) NOT IN (-1)
+               AND NOT EXISTS (
+                 SELECT 1 FROM documents.documents d
+                 WHERE d."sourceId" = documents.source_id('liteko')
+                   AND d.md5 = decode(md5(tn."litekoId"::text), 'hex')
+               )`,
+        );
+        logger.log(`Pažymėta ${rowCount} dar neįkeltų nuosprendžių nuskaitymui`);
+    }
+
+    const startTime = Date.now();
+    let batches = 0;
+
+    // surastiNuosprendzioDalyvius pats apdoroja paketą lygiagrečiai (CONCURRENCY),
+    // todėl čia tiesiog drenuojam, kol nebelieka ką nuskaityti.
+    while (await surastiNuosprendzioDalyvius()) {
+        batches++;
+        if (batches % 10 === 0) {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+            logger.log(`Apdorota ~${batches} paketų per ${elapsed}s`);
+        }
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.log(`Baigta. Apdorota ${batches} paketų per ${elapsed}s`);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+    run()
+        .then(async () => {
+            await postgres.end();
+            process.exit(0);
+        })
+        .catch(async (err) => {
+            console.error("Klaida:", err);
+            await postgres.end();
+            process.exit(1);
+        });
+}

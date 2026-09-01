@@ -1,4 +1,4 @@
-// Pereina per visas cvppAtaskaitos eilutes (kurioms dar neužpildytas
+// Pereina per visas cvpp."ataskaitos" eilutes (kurioms dar neužpildytas
 // "turinioMd5"), parsiunčia ataskaitos Details puslapį, minifina ir išsaugo į
 //   modules/cvpp/ataskaitos/<pirkimoNumeris || pirkimoVykdytojas>/<ataskaitosNumeris>.html
 // bei įrašo turinio MD5 į "turinioMd5" stulpelį.
@@ -194,7 +194,7 @@ export async function downloadAtaskaita(row) {
         // Klaida (dažn. pastoviai lūžtanti CVPP ataskaita): pažymim "turinioMd5"
         // reikšme "-404", kad kitą kartą nebandytume iš naujo, ir tęsiam.
         await postgres.query(
-            `UPDATE public."cvppAtaskaitos" SET "turinioMd5" = '-404' WHERE "ataskaitosNumeris" = $1`,
+            `UPDATE cvpp."ataskaitos" SET "turinioMd5" = '-404' WHERE "ataskaitosNumeris" = $1`,
             [row.ataskaitosNumeris],
         );
         return { file: null, md5: "-404", error: err.message };
@@ -210,7 +210,7 @@ export async function downloadAtaskaita(row) {
     await fs.writeFile(file, standalone);
 
     await postgres.query(
-        `UPDATE public."cvppAtaskaitos" SET "turinioMd5" = $1 WHERE "ataskaitosNumeris" = $2`,
+        `UPDATE cvpp."ataskaitos" SET "turinioMd5" = $1 WHERE "ataskaitosNumeris" = $2`,
         [md5, row.ataskaitosNumeris],
     );
 
@@ -220,7 +220,7 @@ export async function downloadAtaskaita(row) {
 export async function downloadVisasAtaskaitas() {
     const { rows } = await postgres.query(
         `SELECT "ataskaitosNumeris", "link", "formTypeId", "pirkimoNumeris", "pirkimoVykdytojas"
-         FROM public."cvppAtaskaitos"
+         FROM cvpp."ataskaitos"
          WHERE "turinioMd5" IS NULL
          ORDER BY "ataskaitosNumeris"`,
     );

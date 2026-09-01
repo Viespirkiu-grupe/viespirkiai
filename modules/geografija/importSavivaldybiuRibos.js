@@ -17,8 +17,8 @@ const convertCoords = (coords) => {
     return coords.map(convertCoords);
 };
 
-async function updateSavivaldybes() {
-    await postgres.query(`TRUNCATE "arSavivaldybes"`);
+export async function updateSavivaldybes() {
+    await postgres.query(`TRUNCATE "adresuRegistras"."savivaldybes"`);
 
     const sources = await getArDataSources();
     const entry = sources.adminUnits.find(
@@ -38,7 +38,7 @@ async function updateSavivaldybes() {
         };
 
         await postgres.query(
-            `INSERT INTO "arSavivaldybes" (kodas, pavadinimas, plotas, "apskritiesKodas", geometrija)
+            `INSERT INTO "adresuRegistras"."savivaldybes" (kodas, pavadinimas, plotas, "apskritiesKodas", geometrija)
        VALUES ($1, $2, $3, $4, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($5), 4326)))`,
             [
                 SAV_KODAS,

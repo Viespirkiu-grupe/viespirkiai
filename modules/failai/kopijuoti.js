@@ -96,7 +96,7 @@ async function getDezeByName(name) {
         `
         SELECT d.*, a."apiKey"
         FROM public.dezes d
-        JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+        JOIN auth."raktai" a ON a.id = d."apiRaktasId"
         WHERE d.pavadinimas = $1
         LIMIT 1
         `,
@@ -204,7 +204,7 @@ async function getDezesByNames(names) {
         `
         SELECT d.*, a."apiKey"
         FROM public.dezes d
-        JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+        JOIN auth."raktai" a ON a.id = d."apiRaktasId"
         WHERE d.pavadinimas = ANY($1::text[])
         `,
         [names],

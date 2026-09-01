@@ -32,10 +32,11 @@ const page = Math.max(1, parseInt(query.page) || 1);
 const started = performance.now();
 let results: any[] = [];
 let total = 0;
+let exactTotal = false;
 let facets: any = null;
 let searchError = '';
 try {
-  ({ results, total, facets } = await searchJuridiniai(query, { page, limit, includeFacets: true }));
+  ({ results, total, facets, exact: exactTotal } = await searchJuridiniai(query, { page, limit, includeFacets: true }));
 } catch (error) {
   console.error('Juridinių Quickwit paieškos klaida', error);
   searchError = 'Paieška šiuo metu nepasiekiama.';
@@ -50,7 +51,8 @@ const paramsWithoutPage = new URLSearchParams(Astro.url.searchParams);
 paramsWithoutPage.delete('page');
 const queryParams = paramsWithoutPage.toString() ? `&${paramsWithoutPage}` : '';
 const pageCount = Math.max(1, Math.ceil(total / limit));
-const numberOfResults = searchError || `${linksniuotiOnly(results.length, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${results.length} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} <span class="inline">(${(elapsed / 1000).toFixed(2)}s, Quickwit)</span>`;
+const apytiksliai = exactTotal ? '' : 'apie ';
+const numberOfResults = searchError || `${linksniuotiOnly(results.length, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${results.length} iš ${apytiksliai}${linksniuotiK(total, ['rezultato', 'rezultatų'])} <span class="inline">(${(elapsed / 1000).toFixed(2)}s, Quickwit)</span>`;
 
 const FACET_PARAMS = ['registracija', 'forma', 'statusas', 'apskritis', 'savivaldybe', 'evrk'];
 const selected: Record<string, string[]> = Object.fromEntries(FACET_PARAMS.map((key) => [

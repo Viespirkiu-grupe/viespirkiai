@@ -16,6 +16,8 @@ import {
     pickEditionsToScrape,
     recordEditionFailure,
     recordFailure,
+    RESET_STAGES,
+    resetScrapeMarks,
     saveDocument,
     saveEditionList,
     upsertDiscoveredActs,
@@ -23,8 +25,8 @@ import {
 
 // e-TAR scraper'is virš stateless e-TAR API adapterio.
 //
-// Penki etapai, kiekvienas su savo žyma DB (žr. "eTarScrapeDay",
-// "eTarLegalActScrape", "eTarEdition"."scrapedAt"), tad bet kurį galima nutraukti
+// Penki etapai, kiekvienas su savo žyma DB (žr. "eTar"."scrapeDay",
+// "eTar"."legalActScrape", "eTar"."edition"."scrapedAt"), tad bet kurį galima nutraukti
 // ir tęsti:
 //
 //   1 dienos   — paieška pagal priėmimo datą → atrandami aktų ID
@@ -249,7 +251,7 @@ function stageSpecs(runner, { rescrapeDays }) {
             label: "dienos",
             batchSize: 50,
             key: day => day,
-            // "eTarScrapeDay" klaidų skaitiklio neturi, tad nepavykusi diena
+            // "eTar"."scrapeDay" klaidų skaitiklio neturi, tad nepavykusi diena
             // lieka nepažymėta — pakartotinį ėmimą stabdo planuoklio `skipped`.
             pick: take => pickDaysToScrape({ limit: take, rescrapeOlderThanDays: rescrapeDays }),
             work: day => runner.scrapeDay(day),
@@ -477,7 +479,7 @@ function previousDay(date) {
  * kai tarp rezultatų pasirodo SENESNĖ diena, ji tampa nauja riba ir puslapiavimas
  * prasideda iš naujo nuo pirmo puslapio. Todėl niekada nenuklystam giliai į
  * puslapius (kur e-TAR ir taip neatiduotų), tuščios kalendorinės dienos
- * praleidžiamos be nė vienos užklausos, o į "eTarScrapeDay" patenka tik tos
+ * praleidžiamos be nė vienos užklausos, o į "eTar"."scrapeDay" patenka tik tos
  * dienos, kuriose aktų realiai buvo.
  *
  * Sustoja tik tada, kai užklausa nebegrąžina nieko — jokios metų ribos nėra.
@@ -616,7 +618,7 @@ function formatStatus(status, sidecar) {
     out.push(`  Aktų iš viso        ${nr(aktai)}`);
     if (status.suKlaidomis > 0) out.push(`  Su klaidomis        ${nr(status.suKlaidomis)}`);
     if (status.saltinioBrokas > 0) {
-        out.push(`  Šaltinio brokas     ${nr(status.saltinioBrokas)}  (SELECT * FROM "eTarSourceAnomaly")`);
+        out.push(`  Šaltinio brokas     ${nr(status.saltinioBrokas)}  (SELECT * FROM "eTar"."sourceAnomaly")`);
     }
     if (sidecar) {
         const ratio = sidecar.rawBytes > 0 ? (sidecar.rawBytes / sidecar.zstdBytes).toFixed(1) : "0";
@@ -639,9 +641,17 @@ e-TAR scraper (sidecar: <SIDECAR_DIR>/eTar.sqlite)
   node modules/eTar/eTarScrape.js --discover
   node modules/eTar/eTarScrape.js --act <legalActId>
   node modules/eTar/eTarScrape.js --status [--json]
+  node modules/eTar/eTarScrape.js --stage all --reset all --force
 
   --concurrency N   lygiagrečių užklausų (numatyta ${DEFAULT_CONCURRENCY})
   --force           perrašyti net jei md5 nepasikeitė (po normalizacijos pakeitimų)
+  --reset ETAPAI    nuvalyti „atlikta" žymas, kad įrašai grįžtų į eilę: „all"
+                    arba sąrašas per kablelį (${RESET_STAGES.join("|")}).
+                    Kartu su --stage — nuvalo ir iškart traukia iš naujo;
+                    vienas, be --stage — tik nuvalo (toliau nušluos TaskRunner).
+                    Ribojasi --act ID; --dry-run tik parodo, kiek grįžtų.
+                    Pilnam rescrape'ui po normalizacijos pakeitimų:
+                      --stage all --reset all --force
   --rescrape-days N iš naujo praeiti dienas, skaitytas seniau nei prieš N d.
                     (aktai registruojami vėliau nei priimami, tad kartą nušluota
                     diena laikui bėgant „prisipildo" naujų)
@@ -658,12 +668,46 @@ Konfigūracija (.env): ETAR_API_URL, ETAR_API_KEY, SIDECAR_DIR
 Prieš pirmą paleidimą: psql -f modules/eTar/schema.sql
 `;
 
+/** `--reset all` arba `--reset documents,asr` → etapų sąrašas. */
+function parseResetStages(value) {
+    if (value === true) throw new Error(`--reset reikalauja reikšmės: all arba ${RESET_STAGES.join(",")}`);
+    const stages = String(value) === "all"
+        ? [...RESET_STAGES]
+        : String(value).split(",").map(dalis => dalis.trim()).filter(Boolean);
+    const nežinomi = stages.filter(stage => !RESET_STAGES.includes(stage));
+    if (nežinomi.length) throw new Error(`--reset: nežinomi etapai ${nežinomi.join(", ")}`);
+    return stages;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
     const args = parseArgs(process.argv.slice(2));
 
-    if (args.help || (!args.stage && !args.act && !args.day && !args.status && !args.discover)) {
+    if (args.help || (!args.stage && !args.act && !args.day && !args.status && !args.discover && !args.reset)) {
         console.log(USAGE.trim());
         process.exit(args.help ? 0 : 1);
+    }
+
+    // `--reset` eina PRIEŠ visa kita: nuvalyti žymas ir tuoj pat traukti iš naujo
+    // yra vienas veiksmas, tad `--stage all --reset all --force` daro tai, ko ir
+    // tikimasi, o `--reset` vienas — tik atrakina eilę kitiems (TaskRunner'iui).
+    if (args.reset) {
+        const dryRun = Boolean(args["dry-run"]);
+        let stages;
+        try {
+            stages = parseResetStages(args.reset);
+        } catch (error) {
+            console.error(error.message);
+            process.exit(1);
+        }
+        const legalActId = typeof args.act === "string" ? args.act : null;
+        const counts = await resetScrapeMarks({ stages, legalActId, dryRun });
+        const suvestinė = Object.entries(counts).map(([stage, n]) => `${stage} ${nr(n)}`).join(", ");
+        log(
+            dryRun
+                ? `--dry-run: į eilę grįžtų ${suvestinė}${legalActId ? ` (aktas ${legalActId})` : ""}`
+                : `Žymos nuvalytos: ${suvestinė}${legalActId ? ` (aktas ${legalActId})` : ""}`,
+        );
+        if (dryRun || (!args.stage && !args.act && !args.day && !args.status)) process.exit(0);
     }
 
     if (args.status) {

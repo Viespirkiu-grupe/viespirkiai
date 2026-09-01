@@ -8,6 +8,13 @@ import { logToolCall } from "../mcpLogger.js";
 const COVERED_TABLES = new Set(Object.keys(COVERED_TABLES_BY_VIEWS));
 const TABLE_LIST = [...TABLE_WHITELIST].filter((t) => !COVERED_TABLES.has(t));
 const VIEW_LIST = [...VIEW_NAMES];
+// Analyst rolės search_path schemos — lentelės iškeltos iš `public` (domenai,
+// ppa, liteko, vdi, sodra, cvpp, rcJar, eppsViesiejiPirkimai) informacinėse
+// schemose randamos tik pagal savo schemą.
+const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "ppa", "sabis", "regitra", "jadis", "vmi", "uzt", "bvpz", "pinreg", "vptJuodiejiSarasai", "vpmSutartys",
+    "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", "liteko", "vdi", "sodra", "cvpp", "rcJar",
+    "rcInformaciniaiPranesimai"];
+const SCHEMA_ARRAY = `ARRAY[${ANALYST_SCHEMAS.map((s) => `'${s}'`).join(", ")}]`;
 const IDENTIFIER_CANDIDATES = [
     "id",
     "sutartiesUnikalusId",
@@ -36,7 +43,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         tags: ["capacity", "blacklist", "labor", "domains", "court"],
         keys: ["jarKodas", "pavadinimas", "darbuotojai", "nepatikimasTiekejasIki", "bylosSkaicius"],
         joins: [
-            ["jarKodas", "jarAsmenys.jarKodas", "strict"],
+            ["jarKodas", "asmenys.jarKodas", "strict"],
         ],
         columns: [
             "jarKodas: text",
@@ -367,7 +374,8 @@ async function listAll(): Promise<object> {
             `
             SELECT relname AS table_name, n_live_tup AS row_count_estimate
             FROM pg_stat_user_tables
-            WHERE relname = ANY($1::text[])
+            WHERE schemaname = ANY(${SCHEMA_ARRAY})
+              AND relname = ANY($1::text[])
             ORDER BY relname
         `,
             [TABLE_LIST]
@@ -376,7 +384,7 @@ async function listAll(): Promise<object> {
             `
             SELECT table_name, column_name
             FROM information_schema.columns
-            WHERE table_schema = 'public'
+            WHERE table_schema = ANY(${SCHEMA_ARRAY})
               AND table_name = ANY($1::text[])
             ORDER BY table_name, ordinal_position
         `,
@@ -523,7 +531,7 @@ async function describeTableDetail(tableName: string): Promise<object> {
             `
             SELECT column_name, data_type, is_nullable
             FROM information_schema.columns
-            WHERE table_schema = 'public'
+            WHERE table_schema = ANY(${SCHEMA_ARRAY})
               AND table_name = $1
             ORDER BY ordinal_position
         `,
@@ -537,7 +545,7 @@ async function describeTableDetail(tableName: string): Promise<object> {
               ON tc.constraint_name = kcu.constraint_name
              AND tc.table_schema = kcu.table_schema
             WHERE tc.constraint_type = 'PRIMARY KEY'
-              AND tc.table_schema = 'public'
+              AND tc.table_schema = ANY(${SCHEMA_ARRAY})
               AND tc.table_name = $1
         `,
             [tableName]
@@ -556,7 +564,7 @@ async function describeTableDetail(tableName: string): Promise<object> {
               ON ccu.constraint_name = tc.constraint_name
              AND ccu.constraint_schema = tc.constraint_schema
             WHERE tc.constraint_type = 'FOREIGN KEY'
-              AND tc.table_schema = 'public'
+              AND tc.table_schema = ANY(${SCHEMA_ARRAY})
               AND tc.table_name = $1
         `,
             [tableName]
@@ -619,7 +627,7 @@ async function describeTableColumns(tableName: string): Promise<object> {
 
     const colResult = await postgres.query(
         `SELECT column_name, data_type FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position`,
+         WHERE table_schema = ANY(${SCHEMA_ARRAY}) AND table_name = $1 ORDER BY ordinal_position`,
         [tableName]
     );
 
@@ -655,7 +663,7 @@ async function describeTableJoins(tableName: string): Promise<object> {
             `SELECT kcu.column_name FROM information_schema.table_constraints tc
              JOIN information_schema.key_column_usage kcu
                ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-             WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public' AND tc.table_name = $1`,
+             WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = ANY(${SCHEMA_ARRAY}) AND tc.table_name = $1`,
             [tableName]
         ),
         postgres.query(
@@ -665,7 +673,7 @@ async function describeTableJoins(tableName: string): Promise<object> {
                ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
              JOIN information_schema.constraint_column_usage ccu
                ON ccu.constraint_name = tc.constraint_name AND ccu.constraint_schema = tc.constraint_schema
-             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' AND tc.table_name = $1`,
+             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = ANY(${SCHEMA_ARRAY}) AND tc.table_name = $1`,
             [tableName]
         ),
     ]);
@@ -698,7 +706,7 @@ async function describeTableExamples(tableName: string): Promise<object> {
 
     const colResult = await postgres.query(
         `SELECT column_name, data_type FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position`,
+         WHERE table_schema = ANY(${SCHEMA_ARRAY}) AND table_name = $1 ORDER BY ordinal_position`,
         [tableName]
     );
 

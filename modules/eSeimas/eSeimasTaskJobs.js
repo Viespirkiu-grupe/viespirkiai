@@ -12,6 +12,8 @@ import { ensureRecentScrapeDays, pickRecentDayToScrape } from "./eSeimasStore.js
 const DEFAULT_RECENT_DAYS = 180;
 const DEFAULT_REFRESH_HOURS = 3;
 const DEFAULT_MAX_INFLIGHT = 6;
+/** Kaip retai eilė sutikrinama su progreso lentele, kai darbo joje neberandam. */
+const RECONCILE_MIN_INTERVAL_MS = 60_000;
 
 /**
  * Vienas bendras runtime visiems e-Seimas TaskRunner darbams: API srauto
@@ -40,9 +42,23 @@ export function createESeimasTaskJobs({
     let scraper = null;
     const getScraper = () => scraper ??= createScraper();
 
+    // Sutikrinimas su progreso lentele (`enqueuePending`) perrenka VISUS dar
+    // nenuskaitytus aktus, tad kainuoja šimtus ms net kai naujo darbo nėra.
+    // Prieš kiekvieną darbą jo daryti nereikia: eilė nusausinama tik iš čia, tad
+    // kol iš jos kas nors imasi, ji tikrai nėra tuščia. Sutikrinam tik tada, kai
+    // eilė tuščia, ir ne dažniau nei kartą per RECONCILE_MIN_INTERVAL_MS.
+    const lastReconcileAt = new Map();
+
+    async function reconcileQueue(kind) {
+        const now = Date.now();
+        if (now - (lastReconcileAt.get(kind) ?? 0) < RECONCILE_MIN_INTERVAL_MS) return 0;
+        lastReconcileAt.set(kind, now);
+        return await queue.enqueuePending(kind);
+    }
+
     async function runClaimed(kind, work) {
-        await queue.enqueuePending(kind);
-        const job = await queue.claimNext(kind);
+        let job = await queue.claimNext(kind);
+        if (!job && await reconcileQueue(kind) > 0) job = await queue.claimNext(kind);
         if (!job) return false;
 
         try {

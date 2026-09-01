@@ -15,7 +15,7 @@ if (!filename) {
 async function updateDomain(domain, lineNumber) {
     try {
         const res = await postgres.query(
-            `SELECT "domregNuskaitymas" FROM domenai WHERE domain = $1`,
+            `SELECT "domregNuskaitymas" FROM domenai.domenai WHERE domain = $1`,
             [domain],
         );
 
@@ -31,7 +31,7 @@ async function updateDomain(domain, lineNumber) {
         }
 
         const updated = await postgres.query(
-            `UPDATE domenai
+            `UPDATE domenai.domenai
              SET "domregNuskaitymas" = -404
              WHERE domain = $1`,
             [domain],

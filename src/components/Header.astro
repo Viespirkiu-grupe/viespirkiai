@@ -65,7 +65,12 @@ const secondaryMenu: NavMenuItem[] = [
     children: [
       { href: '/apie',      label: 'Apie',      desc: 'Apie projektą ir tikslus' },
       { href: '/kontaktai', label: 'Kontaktai', desc: 'Susisiekite su mumis' },
-      { href: '/duomenys',  label: 'Duomenys',  desc: 'Duomenų šaltiniai ir atsisiuntimas' },
+      {
+        href: '/duomenys', label: 'Duomenys', desc: 'Duomenų šaltiniai ir atsisiuntimas',
+        children: [
+          { href: '/duomenys/lenteles', label: 'Lentelės', desc: 'Duomenų bazės lentelių schema, ryšiai ir aprašymai' },
+        ],
+      },
       { href: '/mcp',       label: 'MCP',       desc: 'Duomenų prieiga per MCP serverį' },
     ],
   },

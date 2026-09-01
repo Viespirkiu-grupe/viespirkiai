@@ -96,10 +96,8 @@ describe("v_company", () => {
         expect("jarKodas" in row, "missing jarKodas").toBe(true);
         expect("pavadinimas" in row, "missing pavadinimas").toBe(true);
         expect("darbuotojai" in row, "missing darbuotojai").toBe(true);
-        expect("melagingisTiekejasNuo" in row, "missing melagingisTiekejasNuo").toBe(true);
-        expect("melagingisTiekejasIki" in row, "missing melagingisTiekejasIki").toBe(true);
-        expect("nepatikimasTiekejasNuo" in row, "missing nepatikimasTiekejasNuo").toBe(true);
-        expect("nepatikimasTiekejasIki" in row, "missing nepatikimasTiekejasIki").toBe(true);
+        expect("melagingisTiekejas" in row, "missing melagingisTiekejas").toBe(true);
+        expect("nepatikimasTiekejas" in row, "missing nepatikimasTiekejas").toBe(true);
     });
 });
 
@@ -124,7 +122,7 @@ describe("v_pirkimas", () => {
         expect(rows.length, "v_pirkimas returned no rows").toBeGreaterThan(0);
         const row = rows[0];
         expect("saltinis" in row, "missing saltinis").toBe(true);
-        expect("pirkimoNumeris" in row, "missing pirkimoNumeris").toBe(true);
+        expect("pirkimoId" in row, "missing pirkimoId").toBe(true);
         expect("jarKodasSaltinis" in row, "missing jarKodasSaltinis").toBe(true);
         expect("organizatorius" in row, "missing organizatorius (joined from viesiejiPirkimaiVykdytojai)").toBe(true);
         expect("numatomaVerteEUR" in row, "missing numatomaVerteEUR").toBe(true);
@@ -174,7 +172,7 @@ describe("v_pirkimas", () => {
         const client = await getClient();
         // @ts-ignore
         const { rows } = await client.query(
-            `SELECT "pirkimoNumeris", "jarKodas", "jarKodasSaltinis" FROM v_pirkimas
+            `SELECT "pirkimoId", "jarKodas", "jarKodasSaltinis" FROM v_pirkimas
              WHERE saltinis = 'cvpp' AND "jarKodasSaltinis" = 'sutartys-join' LIMIT 1`,
         );
         expect(rows.length, "expected at least one cvpp row enriched via sutartys join").toBeGreaterThan(0);
@@ -186,7 +184,7 @@ describe("v_pirkimas", () => {
         const { rows: sutartysRows } = await client.query(
             `SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM "vpmSutartys"
              WHERE "pirkimoNumeris" = $1 AND "perkanciosiosOrganizacijosKodas" IS NOT NULL`,
-            [row.pirkimoNumeris],
+            [row.pirkimoId],
         );
         const kodai = sutartysRows.map((r: { perkanciosiosOrganizacijosKodas: string }) => r.perkanciosiosOrganizacijosKodas);
         expect(kodai, "jarKodas should come from a matching sutartys row").toContain(row.jarKodas);
@@ -198,9 +196,9 @@ describe("v_pirkimas", () => {
         const { rows } = await client.query(`
             SELECT count(*) AS cnt FROM v_pirkimas v
             WHERE v.saltinis = 'cvpp'
-              -- v_pirkimas."pirkimoNumeris" yra text (cvpis int ir cvpp eilutė suvienodinti),
+              -- v_pirkimas."pirkimoId" yra text (cvpis int ir cvpp eilutė suvienodinti),
               -- tad lyginam taip pat, kaip pačiame view'e: p."pirkimoId"::text.
-              AND EXISTS (SELECT 1 FROM "viesiejiPirkimai" p WHERE p."pirkimoId"::text = v."pirkimoNumeris")
+              AND EXISTS (SELECT 1 FROM "eppsViesiejiPirkimai"."pirkimai" p WHERE p."pirkimoId"::text = v."pirkimoId")
         `);
         expect(Number(rows[0].cnt)).toBe(0);
     });
@@ -211,8 +209,8 @@ describe("v_pirkimas", () => {
         const { rows } = await client.query(`
             SELECT count(*) AS cnt FROM v_pirkimas v
             WHERE v.saltinis = 'cvpp'
-              AND v."pirkimoNumeris" NOT IN (
-                  SELECT "pirkimoNumeris" FROM "cvppViesiejiPirkimai" WHERE "skelbimoTipas" = 'Skelbimas apie pirkimą'
+              AND v."pirkimoId" NOT IN (
+                  SELECT "pirkimoNumeris" FROM cvpp."archyvoSkelbimai" WHERE "skelbimoTipas" = 'Skelbimas apie pirkimą'
               )
         `);
         expect(Number(rows[0].cnt)).toBe(0);
@@ -253,7 +251,7 @@ describe("v_dalyviai", () => {
                 GROUP BY 1, 2, 3, 4, 5
             ) x
         `);
-        // A handful of duplicate xlsxPPAataskaitos rows exist for the same pirkimoNumeris (re-scraped reports),
+        // A handful of duplicate ppa."ataskaitos" rows exist for the same pirkimoNumeris (re-scraped reports),
         // so small counts are expected. A cartesian fanout across lots would produce counts in the dozens/hundreds.
         expect(Number(rows[0].max_cnt), "unexpected large fanout for a (pirkimas, tiekejas, dalis, eile, atmetimas) combination").toBeLessThan(10);
     });

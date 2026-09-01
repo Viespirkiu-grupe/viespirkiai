@@ -16,8 +16,10 @@ import { gautiRegitrosDuomenis } from "../regitra/regitraDuomenys.js";
 import { gautiTeismoNuosprendzius } from "../liteko/teismoNuosprendziai.js";
 import { gautiIstatiniKapitala } from "../istatinisKapitalas/istatinisKapitalasDuomenys.js";
 import { gautiPinregDeklaracijasPagalJarKoda } from "../pinreg/pinregDeklaracijos.js";
-import { gautiNepatikimuTiekejuIrasusPagalJarKoda } from "../vptSarasai/nepatikimiTiekejai.js";
-import { gautiMelaginguTiekejuIrasusPagalJarKoda } from "../vptSarasai/melagingiTiekejai.js";
+import {
+    gautiNepatikimuTiekejuIrasusPagalJarKoda,
+    gautiMelaginguTiekejuIrasusPagalJarKoda,
+} from "../vptSarasai/juodiejiSarasai.js";
 import { gautiJadisDuomenis } from "../jadis/jadisDuomenys.js";
 import { gautiRcPranesimusPagalJarKoda } from "../registruCentrasPranesimai/rcPranesimai.js";
 import {
@@ -30,6 +32,7 @@ import { getEsInvesticijosByJar } from "../2014esinvesticijos/getEsInvesticijosB
 import { mvpAprasaiPagalJarKoda } from "../mvpTvarkosAprasai/getByJar.js";
 import { getVdiPazeidimai } from "../vdi/getPazeidimai.js";
 import { gautiJarPapildomusDuomenis } from "./jarPapildomiDuomenys.js";
+import { arBevardisAsmuo, spetiPavadinimaIsSutarciu } from "./spetiPavadinima.js";
 
 // Vienas asmens puslapis paleidžia ~40 lygiagrečių užklausų, o naršyklės
 // prefetch'as ar dvigubas užklausimas tą paketą pakartoja beveik tuo pačiu metu.
@@ -72,10 +75,10 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
                     ${JAR_ADDRESS_SQL} AS "adresas",
                     ST_X((${JAR_LOCATION_SQL})::geometry) AS lon,
                     ST_Y((${JAR_LOCATION_SQL})::geometry) AS lat
-                 FROM public."jarAsmenys" jar_person
-                 LEFT JOIN public."jarFormos" jar_form
+                 FROM "rcJar"."asmenys" jar_person
+                 LEFT JOIN "rcJar"."formos" jar_form
                     ON jar_form."kodas" = jar_person."formosKodas"
-                 LEFT JOIN public."jarStatusai" jar_status
+                 LEFT JOIN "rcJar"."statusai" jar_status
                     ON jar_status."kodas" = jar_person."statusoKodas"
                  ${JAR_ADDRESS_JOINS}
                  WHERE jar_person."jarKodas" = $1
@@ -105,6 +108,18 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
 
     // 404 — not found in any main registry table
     if (isregistruotasAsmuo) {
+        // Išregistruotų individualių įmonių pavadinimo registre irgi nėra, o jų
+        // yra dauguma — spėjimą rodome ir šiame ribotame puslapyje.
+        if (arBevardisAsmuo(isregistruotasAsmuo)) {
+            timings.start("spetasPavadinimas");
+            isregistruotasAsmuo.spetasPavadinimas =
+                await spetiPavadinimaIsSutarciu(
+                    jarKodas,
+                    isregistruotasAsmuo.pavadinimas,
+                ).catch(() => null);
+            timings.end("spetasPavadinimas");
+        }
+
         return {
             isregistruotas: true,
             isregistruotasAsmuo,
@@ -190,7 +205,7 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
             const { rows } = await postgres.query(
                 `SELECT EXISTS (
                     SELECT 1
-                    FROM "viesiejiPirkimai"
+                    FROM "eppsViesiejiPirkimai"."pirkimai"
                     WHERE "jarKodas" = $1
                 ) AS "turiViesujuPirkimu"`,
                 [jarKodas],
@@ -198,6 +213,13 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
             return rows[0]?.turiViesujuPirkimu === true;
         },
     };
+
+    // Individualių įmonių ir ūkinių bendrijų pavadinimo registre nėra — jį
+    // spėjame iš sutarčių, tad užklausa nereikalinga visiems kitiems asmenims.
+    if (arBevardisAsmuo(jar)) {
+        taskMap.spetasPavadinimas = async () =>
+            spetiPavadinimaIsSutarciu(jarKodas, jar.pavadinimas);
+    }
 
     // Run all tasks in parallel with timings
     const timedTasks = Object.fromEntries(

@@ -1,17 +1,17 @@
 const ZODYNAI = Object.freeze({
-    teisinisPagrindas: "xlsxPPAteisiniaiPagrindai",
-    ataskaitosTipas: "xlsxPPAataskaitosTipai",
-    pirkimoVerte: "xlsxPPApirkimoVertes",
-    perkanciosiosOrganizacijosTipas: "xlsxPPAperkanciosiosOrganizacijosTipai",
-    igaliotosiosTipas: "xlsxPPAigaliotosiosTipai",
-    pirkimoBudas: "xlsxPPApirkimoBudai",
-    atmestoPasiulymoStatusas: "xlsxPPAatmestuPasiulymuStatusai",
-    atmetimoTeisinisPagrindas: "xlsxPPAatmetimoTeisiniaiPagrindai",
-    atmetimoPriezastys: "xlsxPPAatmetimoPriezastys",
-    kainosIsraiska: "xlsxPPAkainosIsraiskos",
-    salis: "xlsxPPAsalys",
-    centralizacijosTipas: "xlsxPPAcentralizacijosTipai",
-    pirkimoObjektoRusis: "xlsxPPApirkimoObjektoRusys",
+    teisinisPagrindas: "teisiniaiPagrindai",
+    ataskaitosTipas: "ataskaitosTipai",
+    pirkimoVerte: "pirkimoVertes",
+    perkanciosiosOrganizacijosTipas: "perkanciosiosOrganizacijosTipai",
+    igaliotosiosTipas: "igaliotosiosTipai",
+    pirkimoBudas: "pirkimoBudai",
+    atmestoPasiulymoStatusas: "atmestuPasiulymuStatusai",
+    atmetimoTeisinisPagrindas: "atmetimoTeisiniaiPagrindai",
+    atmetimoPriezastys: "atmetimoPriezastys",
+    kainosIsraiska: "kainosIsraiskos",
+    salis: "salys",
+    centralizacijosTipas: "centralizacijosTipai",
+    pirkimoObjektoRusis: "pirkimoObjektoRusys",
 });
 
 function zodynoReiksme(rawValue) {
@@ -23,14 +23,14 @@ async function zodynoIds(client, lentele, rawValues) {
     if (!pavadinimai.length) return new Map();
 
     await client.query(
-        `INSERT INTO "${lentele}" (pavadinimas)
+        `INSERT INTO ppa."${lentele}" (pavadinimas)
          SELECT value FROM unnest($1::text[]) AS u(value)
          ORDER BY value
          ON CONFLICT (pavadinimas) DO NOTHING`,
         [pavadinimai],
     );
     const result = await client.query(
-        `SELECT id, pavadinimas FROM "${lentele}"
+        `SELECT id, pavadinimas FROM ppa."${lentele}"
          WHERE pavadinimas = ANY($1::text[])`,
         [pavadinimai],
     );
@@ -42,7 +42,7 @@ async function zodynoId(client, lentele, rawValue) {
     if (pavadinimas == null) return null;
 
     const existing = await client.query(
-        `SELECT id FROM "${lentele}" WHERE pavadinimas = $1`,
+        `SELECT id FROM ppa."${lentele}" WHERE pavadinimas = $1`,
         [pavadinimas],
     );
     if (existing.rowCount) return existing.rows[0].id;
@@ -50,7 +50,7 @@ async function zodynoId(client, lentele, rawValue) {
     // ON CONFLICT ... DO UPDATE patikimai grąžina id ir tada, kai tą pačią
     // naują žodyno reikšmę vienu metu pirmą kartą pamato keli workeriai.
     const inserted = await client.query(
-        `INSERT INTO "${lentele}" (pavadinimas)
+        `INSERT INTO ppa."${lentele}" (pavadinimas)
          VALUES ($1)
          ON CONFLICT (pavadinimas) DO UPDATE
          SET pavadinimas = EXCLUDED.pavadinimas
@@ -70,7 +70,7 @@ export async function upsertPpa(
     try {
         // delete existing (cascades to all child tables)
         await client.query(
-            `delete from "xlsxPPAataskaitos" where "failasId" = $1`,
+            `delete from ppa."ataskaitos" where "failasId" = $1`,
             [failasId],
         );
 
@@ -119,7 +119,7 @@ export async function upsertPpa(
 
         const ataskaitaResult = await client.query(
             `
-            insert into "xlsxPPAataskaitos" (
+            insert into ppa."ataskaitos" (
                 "failasId",
                 "teisinisPagrindasId", "ataskaitosTipasId", "pirkimoNumeris",
                 "pirkimoObjektoPavadinimas", "pirkimoVerteId",
@@ -242,7 +242,7 @@ export async function upsertPpa(
                 })
                 .join(",");
             await client.query(
-                `insert into "xlsxPPApirkimoDalys" ("ataskaitaId","daliesNumeris","daliesPavadinimas","pagrindinisKodasBvpz","papildomiKodaiBvpz") values ${vals}`,
+                `insert into ppa."pirkimoDalys" ("ataskaitaId","daliesNumeris","daliesPavadinimas","pagrindinisKodasBvpz","papildomiKodaiBvpz") values ${vals}`,
                 ppa.pirkimoDalys.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -261,7 +261,7 @@ export async function upsertPpa(
                 })
                 .join(",");
             await client.query(
-                `insert into "xlsxPPAdalyviai" ("ataskaitaId","fizinisAsmuo","kodas","pavadinimas","pavadinimoPatikslinimas","adresas","salisId","grupe","atrinktoPasirinkomoPriezastys") values ${vals}`,
+                `insert into ppa."dalyviai" ("ataskaitaId","fizinisAsmuo","kodas","pavadinimas","pavadinimoPatikslinimas","adresas","salisId","grupe","atrinktoPasirinkomoPriezastys") values ${vals}`,
                 ppa.dalyviai.flatMap((d) => [
                     ataskaitaId,
                     d.fizinisAsmuo,
@@ -281,7 +281,7 @@ export async function upsertPpa(
                 .map((_, i) => `($${i * 3 + 1},$${i * 3 + 2},$${i * 3 + 3})`)
                 .join(",");
             await client.query(
-                `insert into "xlsxPPAvertinimoKriterijai" ("ataskaitaId","daliesNumeris","vertinimoKriterijus") values ${vals}`,
+                `insert into ppa."vertinimoKriterijai" ("ataskaitaId","daliesNumeris","vertinimoKriterijus") values ${vals}`,
                 ppa.vertinimoKriterjai.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -298,7 +298,7 @@ export async function upsertPpa(
                 })
                 .join(",");
             await client.query(
-                `insert into "xlsxPPAatmestiPasiulymai" ("ataskaitaId","daliesNumeris","dalyvioKodas","dalyvioPavadinimas","statusasId","nepakviestoPriezastys","atsiemimoPriezastys","atmetimoTeisinisPagrindasId","atmetimoPriezastysId","pasiulymoKaina","kainosIsraiskaId") values ${vals}`,
+                `insert into ppa."atmestiPasiulymai" ("ataskaitaId","daliesNumeris","dalyvioKodas","dalyvioPavadinimas","statusasId","nepakviestoPriezastys","atsiemimoPriezastys","atmetimoTeisinisPagrindasId","atmetimoPriezastysId","pasiulymoKaina","kainosIsraiskaId") values ${vals}`,
                 ppa.atmestiPasiulymai.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -327,7 +327,7 @@ export async function upsertPpa(
                 })
                 .join(",");
             await client.query(
-                `insert into "xlsxPPApasiulymuEile" ("ataskaitaId","daliesNumeris","eileNumeris","dalyvioKodas","dalyvioPavadinimas","kainosSantykis","kaina","kainosIsraiskaId") values ${vals}`,
+                `insert into ppa."pasiulymuEile" ("ataskaitaId","daliesNumeris","eileNumeris","dalyvioKodas","dalyvioPavadinimas","kainosSantykis","kaina","kainosIsraiskaId") values ${vals}`,
                 ppa.pasiulymuEile.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -351,7 +351,7 @@ export async function upsertPpa(
                 })
                 .join(",");
             await client.query(
-                `insert into "xlsxPPAproceduruPabaiga" ("ataskaitaId","daliesNumeris","proceduruPabaiga","sprendimoPriemimoData","sprendimoPriezastys","nutraukimoPriezastys") values ${vals}`,
+                `insert into ppa."proceduruPabaiga" ("ataskaitaId","daliesNumeris","proceduruPabaiga","sprendimoPriemimoData","sprendimoPriezastys","nutraukimoPriezastys") values ${vals}`,
                 ppa.proceduruPabaiga.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -371,7 +371,7 @@ export async function upsertPpa(
                 })
                 .join(",");
             await client.query(
-                `insert into "xlsxPPAsutartys" ("ataskaitaId","daliesNumeriai","tiekejosKodas","teikejoPavadinimas","sutartisSudarymoData","sutartiesGaliojimas","sutartiesGaliojimoPastaba","sutartiesVerte","orientacineVerte","subrangosKetinama","subrangosInfo","centralizuotasPirkimas","centralizacijosTipasId","zaliasisPirkimas","energetiniaiReikalavimai","energetikosPriemones","inovatyvusProduktas","kelioTransportoPriemones") values ${vals}`,
+                `insert into ppa."ataskaituSutartys" ("ataskaitaId","daliesNumeriai","tiekejosKodas","teikejoPavadinimas","sutartisSudarymoData","sutartiesGaliojimas","sutartiesGaliojimoPastaba","sutartiesVerte","orientacineVerte","subrangosKetinama","subrangosInfo","centralizuotasPirkimas","centralizacijosTipasId","zaliasisPirkimas","energetiniaiReikalavimai","energetikosPriemones","inovatyvusProduktas","kelioTransportoPriemones") values ${vals}`,
                 ppa.sutartys.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,

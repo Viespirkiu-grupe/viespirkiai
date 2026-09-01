@@ -38,7 +38,7 @@ plausible
 tmp
 old
 backup
-dbSchema
+/dbSchema
 taskState
 s3backup/*.sqlite*
 

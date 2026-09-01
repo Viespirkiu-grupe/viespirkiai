@@ -1,9 +1,9 @@
 /*
 Nuskaito teismo nuosprendžio turinį iš Liteko sistemos:
-  * dalyvius (šalis)            -> teismoNuosprendziaiDalyviai (counts trigeris pats seka)
-  * kategorijas (kodus+vardus)  -> teismoNuosprendziaiKategorijos
-  * papildomus laukus           -> teismoNuosprendziai (teisminisProcesoNr, instancija, skyrius)
-  * pilną tekstą + metadata     -> dokumentų paieška (sidecar + public.dokumentai)
+  * dalyvius (šalis)            -> liteko."nuosprendziuDalyviai" (counts trigeris pats seka)
+  * kategorijas (kodus+vardus)  -> liteko."nuosprendziuKategorijos"
+  * papildomus laukus           -> liteko.nuosprendziai (teisminisProcesoNr, instancija, skyrius)
+  * pilną tekstą + metadata     -> dokumentų paieška (sidecar + documents.documents)
 
 Tekstas DB NESAUGOMAS — jis keliauja tik į dokumentų sidecar.
 */
@@ -13,7 +13,7 @@ const scrapeFetch = createScraperFetch("liteko", { operation: "scrapeContent" })
 import { parseHTML } from "linkedom";
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
-import { upsertNuosprendisToDokumentai } from "../dokumentai/upsertFromTeismoNuosprendziai.js";
+import { upsertNuosprendisToDocuments } from "../documents/upsertFromCourtDecisions.js";
 
 const LITEKO_BASE = "https://liteko.teismai.lt/viesasprendimupaieska/";
 
@@ -195,11 +195,11 @@ async function nuskaitytiNuosprendi(n) {
 
         // Idempotentiškumas pakartotinai nuskaitant — išvalom senus vaikus.
         await postgres.query(
-            `DELETE FROM "teismoNuosprendziaiDalyviai" WHERE "nuosprendzioId" = $1`,
+            `DELETE FROM liteko."nuosprendziuDalyviai" WHERE "nuosprendzioId" = $1`,
             [n.id],
         );
         await postgres.query(
-            `DELETE FROM "teismoNuosprendziaiKategorijos" WHERE "nuosprendzioId" = $1`,
+            `DELETE FROM liteko."nuosprendziuKategorijos" WHERE "nuosprendzioId" = $1`,
             [n.id],
         );
 
@@ -209,7 +209,8 @@ async function nuskaitytiNuosprendi(n) {
             const vals = dalyviai
                 .map(
                     (_, i) =>
-                        `($${i * 5 + 1},$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5})`,
+                        `($${i * 5 + 1}, liteko.dalyvis_id($${i * 5 + 2}, $${i * 5 + 3}),`
+                        + ` liteko.byloje_kaip_id($${i * 5 + 4}), $${i * 5 + 5})`,
                 )
                 .join(", ");
             const params = dalyviai.flatMap((s) => [
@@ -220,9 +221,12 @@ async function nuskaitytiNuosprendi(n) {
                 n.data,
             ]);
             await postgres.query(
-                `INSERT INTO "teismoNuosprendziaiDalyviai"
-                   ("nuosprendzioId","pavadinimas","kodas","bylojeKaip","data")
-                 VALUES ${vals}`,
+                // Dalyvis ir vaidmuo eina per žodynus; ON CONFLICT saugo nuo
+                // to paties dalyvio pasikartojimo toje pačioje byloje.
+                `INSERT INTO liteko."nuosprendziuDalyviai"
+                   ("nuosprendzioId","dalyvisId","bylojeKaipId","data")
+                 VALUES ${vals}
+                 ON CONFLICT ("nuosprendzioId","dalyvisId") DO NOTHING`,
                 params,
             );
         }
@@ -241,14 +245,18 @@ async function nuskaitytiNuosprendi(n) {
             // Pavadinimai dedublikuojami į atskirą lentelę; kategorijų lentelėje
             // laikoma tik nuoroda ("pavadinimoId").
             await postgres.query(
+                // Pavadinimai dedublikuojami kaip anksčiau, o (kodas, pavadinimoId)
+                // pora dabar pati yra žodyno įrašas — sąsajų lentelėje lieka tik
+                // nuoroda. ON CONFLICT saugo nuo tos pačios kategorijos
+                // pakartojimo (anksčiau 14% eilučių buvo dublikatai).
                 `WITH input AS (
-                     SELECT v.col1::bigint AS "nuosprendzioId",
-                            v.col2::text   AS "kodas",
-                            v.col3::text   AS "pavadinimas"
+                     SELECT v.col1::integer AS "nuosprendzioId",
+                            v.col2::text    AS "kodas",
+                            v.col3::text    AS "pavadinimas"
                      FROM (VALUES ${vals}) AS v(col1, col2, col3)
                  ),
                  upserted AS (
-                     INSERT INTO "teismoNuosprendziaiKategorijuPavadinimai" ("pavadinimas")
+                     INSERT INTO liteko."kategorijuPavadinimai" ("pavadinimas")
                      SELECT DISTINCT "pavadinimas" FROM input WHERE "pavadinimas" IS NOT NULL
                      ON CONFLICT ("pavadinimas") DO NOTHING
                      RETURNING "id", "pavadinimas"
@@ -257,38 +265,46 @@ async function nuskaitytiNuosprendi(n) {
                      SELECT "id", "pavadinimas" FROM upserted
                      UNION
                      SELECT p."id", p."pavadinimas"
-                     FROM "teismoNuosprendziaiKategorijuPavadinimai" p
+                     FROM liteko."kategorijuPavadinimai" p
                      WHERE p."pavadinimas" IN (SELECT "pavadinimas" FROM input WHERE "pavadinimas" IS NOT NULL)
                  )
-                 INSERT INTO "teismoNuosprendziaiKategorijos"
-                   ("nuosprendzioId","kodas","pavadinimoId")
-                 SELECT i."nuosprendzioId", i."kodas", p."id"
+                 INSERT INTO liteko."nuosprendziuKategorijos"
+                   ("nuosprendzioId","kategorijaId")
+                 SELECT i."nuosprendzioId",
+                        liteko.kategorija_id(i."kodas", p."id"::integer)
                  FROM input i
-                 LEFT JOIN pavadinimai p ON p."pavadinimas" = i."pavadinimas"`,
+                 LEFT JOIN pavadinimai p ON p."pavadinimas" = i."pavadinimas"
+                 ON CONFLICT ("nuosprendzioId","kategorijaId") DO NOTHING`,
                 params,
             );
         }
 
         // Papildomi laukai į šerdies lentelę + pažymim nuskaitymo versiją.
         await postgres.query(
-            `UPDATE "teismoNuosprendziai"
-             SET "teisminisProcesoNr" = COALESCE($2, "teisminisProcesoNr"),
-                 "skyrius"            = COALESCE($3, "skyrius"),
-                 "instancija"         = COALESCE($4, "instancija"),
+            // skyrius ir instancija yra teismo ketverto dalis, tad jie ne
+            // keičiami vietoje, o įrašas pernukreipiamas į ketvertą su naujomis
+            // reikšmėmis (jį prireikus sukuria liteko.teismas_id).
+            `UPDATE liteko.nuosprendziai n
+             SET "teisminisProcesoNr" = COALESCE($2, n."teisminisProcesoNr"),
+                 "teismasId"          = liteko.teismas_id(
+                                            t.teismas, t.rumai,
+                                            COALESCE($3, t.skyrius),
+                                            COALESCE($4, t.instancija)),
                  "turinioNuskaitymas" = $5,
                  "atnaujinta"         = now()
-             WHERE id = $1`,
+             FROM liteko.teismai t
+             WHERE t.id = n."teismasId" AND n.id = $1`,
             [n.id, detail.teisminisProcesoNr, detail.skyrius, instancija, TURINIO_VERSIJA],
         );
 
         // Tekstas + metadata į dokumentų paiešką (sidecar + dokumentai).
-        await upsertNuosprendisToDokumentai(
+        await upsertNuosprendisToDocuments(
             { ...n, teisminisProcesoNr: detail.teisminisProcesoNr, skyrius: detail.skyrius, instancija },
             detail,
         );
     } catch (e) {
         await postgres.query(
-            `UPDATE "teismoNuosprendziai" SET "turinioNuskaitymas" = -1 WHERE id = $1`,
+            `UPDATE liteko.nuosprendziai SET "turinioNuskaitymas" = -1 WHERE id = $1`,
             [n.id],
         );
         console.error(e);
@@ -312,9 +328,10 @@ export async function surastiNuosprendzioDalyvius(batchSize = CONCURRENCY) {
     // Imam nenuskaitytus (0/NULL) ir senesnės versijos (>0, bet < dabartinės) įrašus.
     // Klaidų (neigiamų) automatiškai nekartojam — juos galima atstatyti su backfill --refresh.
     const { rows: nuosprendziai } = await postgres.query(
-        `SELECT * FROM "teismoNuosprendziai"
-         WHERE COALESCE("turinioNuskaitymas", 0) >= 0
-           AND COALESCE("turinioNuskaitymas", 0) < $2
+        // View'as, nes tolesnis kelias naudoja md5, url ir fileHref.
+        `SELECT * FROM liteko."nuosprendziaiPilni"
+         WHERE COALESCE("turinioNuskaitymas", 0::smallint) >= 0
+           AND COALESCE("turinioNuskaitymas", 0::smallint) < $2
          LIMIT $1`,
         [batchSize, TURINIO_VERSIJA],
     );

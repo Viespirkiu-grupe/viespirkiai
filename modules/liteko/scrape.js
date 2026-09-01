@@ -5,20 +5,14 @@ Parsiunčia bylų metaduomenis iš Liteko sistemos ir įterpia jas į Postgres d
 import { createScraperFetch } from "../../utils/scrapeFetch.js";
 const scrapeFetch = createScraperFetch("liteko", { operation: "scrape" });
 import { parseHTML } from "linkedom";
-import { createHash } from "node:crypto";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 
-const LITEKO_BASE = "https://liteko.teismai.lt/viesasprendimupaieska/";
 
 /** LITEKO detalės puslapio UUID iš santykinės nuorodos (tekstas.aspx?id=<uuid>). */
 function litekoIdFromHref(fileHref) {
     const m = /[?&]id=([^&]+)/i.exec(fileHref || "");
     return m ? decodeURIComponent(m[1]) : fileHref;
-}
-
-function md5Hex(str) {
-    return createHash("md5").update(String(str)).digest("hex");
 }
 
 /**
@@ -237,19 +231,26 @@ async function insertBatch(rows) {
 
     // Tekstas DB nesaugomas — čia tik metaduomenys iš paieškos rezultatų puslapio.
     // teisminisProcesoNr / instancija / skyrius užpildomi vėliau, nuskaitant turinį.
+    // url, fileHref ir md5 DB nebesaugomi — jie vienareikšmiškai išvedami iš
+    // litekoId (žr. liteko."nuosprendziaiPilni"). Teismas ir bylos rūšis eina
+    // per žodynus.
     const cols = [
         "litekoId", "bylosNumeris", "bylosRusis", "data",
-        "teismas", "teismoRumai", "url", "fileHref", "md5",
+        "teismas", "teismoRumai",
     ];
     const sql = `
-         INSERT INTO "teismoNuosprendziai" (${cols.map((c) => `"${c}"`).join(", ")})
+         INSERT INTO liteko.nuosprendziai
+             ("litekoId", "bylosNumeris", "byluRusisId", data, "teismasId")
          VALUES ${rows
              .map(
                  (_, i) =>
-                     `(${cols.map((_, j) => `$${i * cols.length + j + 1}`).join(",")})`,
+                     `($${i * cols.length + 1}::uuid, $${i * cols.length + 2},`
+                     + ` liteko.bylu_rusis_id($${i * cols.length + 3}),`
+                     + ` $${i * cols.length + 4}::date,`
+                     + ` liteko.teismas_id($${i * cols.length + 5}, $${i * cols.length + 6}, NULL, NULL))`,
              )
              .join(", ")}
-         ON CONFLICT ("fileHref") DO NOTHING
+         ON CONFLICT ("litekoId") DO NOTHING
      `;
 
     const values = rows.flat();
@@ -284,9 +285,6 @@ async function importuotiDiena(date) {
                 byla.data,
                 byla.teismas,
                 byla.teismoRumai || null,
-                LITEKO_BASE + byla.fileHref,
-                byla.fileHref,
-                md5Hex(litekoId),
             ];
         });
 
@@ -303,7 +301,7 @@ async function scrapeAllDays(startDate) {
     if (!startDate) {
         // Check database for the last scraped date
         const { rows } = await postgres.query(
-            `SELECT MAX(data) AS "lastDate" FROM "teismoNuosprendziai"`,
+            `SELECT MAX(data) AS "lastDate" FROM liteko.nuosprendziai`,
         );
 
         if (rows[0].lastDate) {
@@ -344,7 +342,7 @@ async function scrapeAllDays(startDate) {
 export async function litekoScrapeLatestDays(days = 90) {
     // Check database for the last scraped date
     const { rows } = await postgres.query(
-        `SELECT MAX(data) AS "lastDate" FROM "teismoNuosprendziai"`,
+        `SELECT MAX(data) AS "lastDate" FROM liteko.nuosprendziai`,
     );
 
     let startDate;

@@ -1,0 +1,17 @@
+---
+// Individualių įmonių ir ūkinių bendrijų pavadinimo Registrų centras neskelbia —
+// rodome iš viešųjų pirkimų sutarčių atspėtą variantą, aiškiai pažymėtą kaip spėjimą.
+interface Props {
+  spetimas: { pavadinimas: string; kiek: number; isViso: number } | null | undefined;
+}
+
+const { spetimas } = Astro.props;
+---
+
+{spetimas && (
+  <>
+    <span title={`Registrų centras šios teisinės formos pavadinimo neskelbia. Tai dažniausias šio tiekėjo pavadinimas paskutinėse ${spetimas.isViso} viešųjų pirkimų sutartyse (${spetimas.kiek} iš ${spetimas.isViso}).`}>
+      Tikriausiai <strong>{spetimas.pavadinimas}</strong>
+    </span>
+  </>
+)}

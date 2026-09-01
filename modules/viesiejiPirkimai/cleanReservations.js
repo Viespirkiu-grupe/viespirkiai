@@ -34,7 +34,7 @@ export async function cleanReservations({
     const { rows } = await postgres.query(
         `
         WITH reset AS (
-            UPDATE public."viesiejiPirkimaiAtnaujinimai" v
+            UPDATE "eppsViesiejiPirkimai"."atnaujinimai" v
             SET "turinioNuskaitymas" = -1,
                 "scrapeReservation" = NULL
             WHERE v."typeId" = ANY($1::int[])

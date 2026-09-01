@@ -150,11 +150,16 @@ import Modal from '@design-system/components/Modal.astro';
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(map);
-      // Document density heatmap (precomputed tiles, postgres/gis) — same as the
-      // juridiniai overlay, blurred the same way (overlayBlurPx: 5).
+      // Document density heatmap — Quickwit `terms` agregacija per Morton
+      // raktus, kaip juridiniai overlay; blur toks pat (overlayBlurPx: 5).
+      //
+      // maxNativeZoom: 15, o ne 16 — Morton raktai skaičiuojami iki geo.z19
+      // (quickwit/morton.js), o langelis prie zoom z ima geo.z(z+4), tad
+      // aptarnaujamas paskutinis lygis yra 15. Toliau Leaflet pats išdidina
+      // z15 langelius, kaip ir juridiniuose.
       const overlay = createHeatmapLayer(L, '/dokumentai/map/tiles/{z}/{x}/{y}.json', {
         opacity: 0.6,
-        maxNativeZoom: 16,
+        maxNativeZoom: 15,
         maxZoom: 19,
       }).addTo(map);
       const blurContainer = () => { const c = overlay.getContainer(); if (c) c.style.filter = 'blur(5px)'; };

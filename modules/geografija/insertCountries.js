@@ -19,12 +19,12 @@ const COUNTRY_DATA_VERSION = 1;
 /**
  * Updates country boundaries in the database from the Overpass API.
  *
- * - Checks the current version in "geografiniaiPlotaiVersijos"; exits if up to date.
+ * - Checks the current version in geografija."plotuVersijos"; exits if up to date.
  * - Deletes existing country entries.
  * - Fetches new OSM data via Overpass API using a predefined query.
  * - Builds node and way maps, extracts outer and inner ways for each relation.
  * - Connects ways into closed rings and constructs MultiPolygon GeoJSON.
- * - Inserts new country geometries into "geografiniaiPlotai".
+ * - Inserts new country geometries into geografija."plotai".
  *
  * @async
  * @returns {Promise<boolean>} True when update completes successfully or if data is already up to date.
@@ -33,7 +33,7 @@ const COUNTRY_DATA_VERSION = 1;
 async function updateCountries() {
     const { rows } = await postgres.query(
         `SELECT versija
-       FROM "geografiniaiPlotaiVersijos"
+       FROM geografija."plotuVersijos"
        WHERE tipas = 'salis'`,
     );
     if (rows[0]?.versija >= COUNTRY_DATA_VERSION) {
@@ -44,7 +44,7 @@ async function updateCountries() {
     try {
         await client.query("BEGIN");
         await client.query(
-            `DELETE FROM "geografiniaiPlotai" WHERE tipas = 'salis'`,
+            `DELETE FROM geografija."plotai" WHERE tipas = 'salis'`,
         );
         const params = new URLSearchParams();
         params.append("data", overpassQuery);
@@ -73,14 +73,14 @@ async function updateCountries() {
             const multipolygon = outerRings.map((o) => [o, ...innerRings]);
             const geojson = { type: "MultiPolygon", coordinates: multipolygon };
             await client.query(
-                `INSERT INTO "geografiniaiPlotai" (tipas, pavadinimas, geometrija)
+                `INSERT INTO geografija."plotai" (tipas, pavadinimas, geometrija)
                  VALUES ($1, $2, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)))`,
                 [tipas, pavadinimas, JSON.stringify(geojson)],
             );
         }
 
         await client.query(
-            `INSERT INTO "geografiniaiPlotaiVersijos" (tipas, versija)
+            `INSERT INTO geografija."plotuVersijos" (tipas, versija)
              VALUES ('salis', $1)
              ON CONFLICT (tipas) DO UPDATE SET versija = EXCLUDED.versija`,
             [COUNTRY_DATA_VERSION],

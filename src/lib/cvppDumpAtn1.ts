@@ -172,7 +172,7 @@ export async function searchCvppDumpAtn1(
     postgres.query(
       `WITH page AS MATERIALIZED (
         SELECT c."ataskaitosNumeris"
-        FROM "public"."cvppAtaskaitos" c
+        FROM cvpp."ataskaitos" c
         ${whereSql}
         ORDER BY ${orderSql}
         LIMIT ${addParam(limit)}
@@ -207,14 +207,14 @@ export async function searchCvppDumpAtn1(
         0::integer AS "contractsCount",
         0::integer AS "tenderersCount"
       FROM page
-      JOIN "public"."cvppAtaskaitos" c
+      JOIN cvpp."ataskaitos" c
         ON c."ataskaitosNumeris" = page."ataskaitosNumeris"
       ORDER BY ${orderSql}`,
       params,
     ),
     postgres.query(
       `SELECT COUNT(*)::integer AS total
-       FROM "public"."cvppAtaskaitos" c
+       FROM cvpp."ataskaitos" c
        ${whereSql}`,
       params.slice(0, params.length - 2),
     ),
@@ -252,8 +252,8 @@ export async function loadCvppArchiveReport(
        c.turinys,
        (c."turinysHtml" IS NOT NULL) AS "hasHtml",
        a.id AS "dumpId"
-     FROM "public"."cvppAtaskaitos" c
-     LEFT JOIN "public"."cvppDumpAtn1" a
+     FROM cvpp."ataskaitos" c
+     LEFT JOIN "cvppDump"."atn1" a
        ON c."formTypeId" = 1
       AND a."epsRefNr" = c."ataskaitosNumeris"
      WHERE c."ataskaitosNumeris" = $1
@@ -270,7 +270,7 @@ export async function loadCvppDumpAtn1Report(
   if (!Number.isSafeInteger(id) || id <= 0) return null;
 
   const reportResult = await postgres.query(
-    `SELECT * FROM "public"."cvppDumpAtn1" WHERE id = $1 LIMIT 1`,
+    `SELECT * FROM "cvppDump"."atn1" WHERE id = $1 LIMIT 1`,
     [id],
   );
   const report = reportResult.rows[0];
@@ -289,44 +289,44 @@ export async function loadCvppDumpAtn1Report(
     unknownSubcontractors,
   ] = await Promise.all([
     postgres.query(
-      `SELECT * FROM "public"."cvppDumpAtn1Parts"
+      `SELECT * FROM "cvppDump"."atn1Parts"
        WHERE "atn1Id" = $1 ORDER BY item NULLS LAST, id`,
       [id],
     ),
     postgres.query(
-      `SELECT * FROM "public"."cvppDumpAtn1Tenderers"
+      `SELECT * FROM "cvppDump"."atn1Tenderers"
        WHERE "atn1Id" = $1 ORDER BY item NULLS LAST, id`,
       [id],
     ),
     postgres.query(
-      `SELECT * FROM "public"."cvppDumpAtn1RejectedCandidates"
+      `SELECT * FROM "cvppDump"."atn1RejectedCandidates"
        WHERE "atn1Id" = $1 ORDER BY item NULLS LAST, id`,
       [id],
     ),
     postgres.query(
-      `SELECT * FROM "public"."cvppDumpAtn1ContractedCandidates"
+      `SELECT * FROM "cvppDump"."atn1ContractedCandidates"
        WHERE "atn1Id" = $1 ORDER BY "partNo" NULLS LAST, "tenderId" NULLS LAST, id`,
       [id],
     ),
     postgres.query(
-      `SELECT * FROM "public"."cvppDumpAtn1ProcedureEnds"
+      `SELECT * FROM "cvppDump"."atn1ProcedureEnds"
        WHERE "atn1Id" = $1 ORDER BY item NULLS LAST, id`,
       [id],
     ),
     postgres.query(
-      `SELECT * FROM "public"."cvppDumpAtn1PreviousProcurements"
+      `SELECT * FROM "cvppDump"."atn1PreviousProcurements"
        WHERE "atn1Id" = $1 ORDER BY "seqNo" NULLS LAST, id`,
       [id],
     ),
     postgres.query(
-      `SELECT * FROM "public"."cvppDumpAtn1Contracts"
+      `SELECT * FROM "cvppDump"."atn1Contracts"
        WHERE "atn1Id" = $1 ORDER BY item NULLS LAST, id`,
       [id],
     ),
     postgres.query(
       `SELECT s.*
-       FROM "public"."cvppDumpAtn1ContractSubcontractors" s
-       JOIN "public"."cvppDumpAtn1Contracts" c
+       FROM "cvppDump"."atn1ContractSubcontractors" s
+       JOIN "cvppDump"."atn1Contracts" c
          ON c.id = s."atn1ContractListId"
        WHERE c."atn1Id" = $1
        ORDER BY s."atn1ContractListId", s.item NULLS LAST, s.id`,
@@ -334,15 +334,15 @@ export async function loadCvppDumpAtn1Report(
     ),
     postgres.query(
       `SELECT s.*
-       FROM "public"."cvppDumpAtn1ContractUnknownSubcontractors" s
-       JOIN "public"."cvppDumpAtn1Contracts" c
+       FROM "cvppDump"."atn1ContractUnknownSubcontractors" s
+       JOIN "cvppDump"."atn1Contracts" c
          ON c.id = s."atn1ContractListId"
        WHERE c."atn1Id" = $1
        ORDER BY s."atn1ContractListId", s.item NULLS LAST, s.id`,
       [id],
     ),
     postgres.query(
-      `SELECT * FROM "public"."cvppDumpAtn1UnknownSubcontractors"
+      `SELECT * FROM "cvppDump"."atn1UnknownSubcontractors"
        WHERE "atn1Id" = $1 ORDER BY item NULLS LAST, id`,
       [id],
     ),

@@ -16,7 +16,7 @@ const kesas = createTtlPromiseCache(30 * 60 * 1000);
 export async function gautiNaujausiaRegitrosData() {
     return kesas("naujausiaData", async () => {
         const { rows } = await postgres.query(
-            `SELECT max("atnaujinimoData")::text AS data FROM "regitraMatymai"`,
+            `SELECT max("atnaujinimoData")::text AS data FROM regitra."matymai"`,
         );
         return rows[0]?.data ?? null;
     });
@@ -58,16 +58,16 @@ export async function gautiRegitrosDuomenis(jarKodas, options = {}) {
         await Promise.all([
             postgres.query(
                 `SELECT COALESCE(SUM(m."kiekis"), 0) AS total
-           FROM regitra r
-           JOIN "regitraMatymai" m ON m."md5" = r."md5"
+           FROM regitra."priemoniuTipai" r
+           JOIN regitra."matymai" m ON m."md5" = r."md5"
            WHERE r."jarKodas" = $1
              AND m."atnaujinimoData" = $2;`,
                 [jarKodas, atnaujinimoData],
             ),
             postgres.query(
                 `SELECT r.*, m."kiekis", m."pirmaMatytaData", m."atnaujinimoData"
-           FROM regitra r
-           JOIN "regitraMatymai" m ON m."md5" = r."md5"
+           FROM regitra."priemoniuTipai" r
+           JOIN regitra."matymai" m ON m."md5" = r."md5"
            WHERE r."jarKodas" = $1
              AND m."atnaujinimoData" = $2
            ORDER BY r."pirmosiosRegistracijosData" ASC

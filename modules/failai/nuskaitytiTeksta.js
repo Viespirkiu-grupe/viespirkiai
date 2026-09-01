@@ -68,7 +68,7 @@ async function nuskaitytiDokNuskaitytojuje(
             `
             SELECT d.*, a."apiKey"
             FROM public."dokNuskaitytojai" d
-            JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+            JOIN auth."raktai" a ON a.id = d."apiRaktasId"
             WHERE d.id = $1
             AND d.enabled = true
             `,
@@ -85,7 +85,7 @@ async function nuskaitytiDokNuskaitytojuje(
             `
             SELECT d.*, a."apiKey"
             FROM public."dokNuskaitytojai" d
-            JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+            JOIN auth."raktai" a ON a.id = d."apiRaktasId"
             WHERE d.enabled = true
             ORDER BY RANDOM()
             LIMIT 1

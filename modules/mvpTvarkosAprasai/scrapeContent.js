@@ -7,6 +7,14 @@ import Timings from "../../utils/timings.js";
 import crypto from "node:crypto";
 import { irasytiFailus } from "../failai/failuIrasymas.js";
 
+/**
+ * Nuoroda -> kelias be protokolo ir hosto. Toks pat pavidalas saugomas
+ * "mvpAprasai"."tvarkos"."rinkmenos" ir public.files."sourceId0".
+ */
+function saltinioIdIsHref(href) {
+    return href.replace(/^https?:\/\/[^/]+/i, "").replace(/^\/+/, "");
+}
+
 export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
     let timings = options.timings || new Timings();
 
@@ -46,17 +54,12 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
 
         if (rinkmenos.length === 0) continue;
 
-        // extract stable id from first file
-        const idMatch = rinkmenos[0].match(/\/(\d+)\.(pdf|docx?|DOCX?)$/);
-        const id = idMatch ? idMatch[1] : `${sbjId}_${aprasai.length}`;
-
         const cleanDate = (txt) => {
             txt = txt.trim();
             return txt ? txt : null;
         };
 
         aprasai.push({
-            id,
             sbjId,
             aprasymas,
             rinkmenos,
@@ -75,7 +78,10 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
     const placeholders = [];
 
     aprasai.forEach((a) => {
-        // compute hash
+        // Hash'as skaičiuojamas iš NEapdorotų nuorodų – saugomos jos jau be
+        // hosto, tad iš lentelės turinio hash'as nebeperskaičiuojamas.
+        // Pakeitus šitą – visi seni aprašai atsirastų iš naujo (žr.
+        // mvpAprasaiSchema.sql).
         const hash = crypto
             .createHash("md5")
             .update([...a.rinkmenos, a.aprasymas, a.paskelbimoData].join("|"))
@@ -95,7 +101,7 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
             hash,
             a.sbjId,
             a.aprasymas,
-            a.rinkmenos,
+            a.rinkmenos.map(saltinioIdIsHref),
             a.vptGavimoData,
             a.paskelbimoData,
             a.galiojaIki,
@@ -104,13 +110,13 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
 
     await postgres.query(
         `
-        INSERT INTO "mvpTvarkosAprasai"
-            ("hash","sbjId","aprasymas","rinkmenos",
+        INSERT INTO "mvpAprasai"."tvarkos"
+            ("hash","subjektoId","pavadinimas","rinkmenos",
              "vptGavimoData","paskelbimoData","galiojaIki")
         VALUES
             ${placeholders.join(",")}
         ON CONFLICT ("hash") DO UPDATE SET
-            "aprasymas" = EXCLUDED."aprasymas",
+            "pavadinimas" = EXCLUDED."pavadinimas",
             "rinkmenos" = EXCLUDED."rinkmenos",
             "vptGavimoData" = EXCLUDED."vptGavimoData",
             "paskelbimoData" = EXCLUDED."paskelbimoData",
@@ -127,9 +133,7 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
             for (const href of a.rinkmenos) {
                 if (!href) continue;
 
-                // strip protocol+host if present, then leading slashes
-                const withoutHost = href.replace(/^https?:\/\/[^/]+/i, "");
-                const saltinioId = withoutHost.replace(/^\/+/, "");
+                const saltinioId = saltinioIdIsHref(href);
 
                 const pavadinimas = decodeURIComponent(
                     (saltinioId.split("/").pop() || "").trim(),
@@ -183,8 +187,8 @@ export async function nuskaitytiSeniausiaTvarkosAprasuSubjekta(options = {}) {
         // atomically claim one row
         const { rows } = await client.query(`
             SELECT *
-            FROM "mvpAprasaiSubjektai"
-            ORDER BY "lastScrape" ASC NULLS FIRST
+            FROM "mvpAprasai"."subjektai"
+            ORDER BY "paskutinisNuskaitymas" ASC NULLS FIRST
             FOR UPDATE SKIP LOCKED
             LIMIT 1
         `);
@@ -195,13 +199,13 @@ export async function nuskaitytiSeniausiaTvarkosAprasuSubjekta(options = {}) {
         }
 
         const sbjId = rows[0].id;
-        const lastScrape = rows[0].lastScrape;
+        const paskutinisNuskaitymas = rows[0].paskutinisNuskaitymas;
 
         // mark immediately so other workers don't retry if we crash late
         await client.query(
             `
-            UPDATE "mvpAprasaiSubjektai"
-            SET "lastScrape" = NOW() AT TIME ZONE 'Europe/Vilnius'
+            UPDATE "mvpAprasai"."subjektai"
+            SET "paskutinisNuskaitymas" = now()
             WHERE "id" = $1
         `,
             [sbjId],
@@ -215,7 +219,7 @@ export async function nuskaitytiSeniausiaTvarkosAprasuSubjekta(options = {}) {
         return {
             timings,
             sbjId,
-            lastScrape,
+            paskutinisNuskaitymas,
             rows: result.rows,
         };
     } catch (err) {
@@ -237,7 +241,12 @@ export async function scrapeMvmUntilNow() {
         }
 
         // if the row was already scraped after we started, stop
-        if (result.lastScrape && new Date(result.lastScrape) >= startTime) {
+        // (timestamptz, tad Date palyginimas teisingas – anksčiau laikas buvo
+        // saugomas be zonos ir šis patikrinimas šlubavo per zonos poslinkį)
+        if (
+            result.paskutinisNuskaitymas &&
+            new Date(result.paskutinisNuskaitymas) >= startTime
+        ) {
             break;
         }
     }

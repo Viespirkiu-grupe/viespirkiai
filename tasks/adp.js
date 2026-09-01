@@ -1,4 +1,7 @@
 import { syncAdpChanges } from "../modules/adp/syncChanges.js";
+// UŽT darbo vietos iškeltos į `uzt` schemą – vieną šaltinio eilutę reikia
+// išskaidyti į žodynus, darbdavį ir skelbimą, todėl aprašas gyvena moduly.
+import { DARBO_VIETU_SYNC } from "../modules/uzimtumoTarnyba/adpSync.js";
 
 const FINANSINES_ATASKAITOS_COLUMNS = [
     "_id",
@@ -14,7 +17,7 @@ const FINANSINES_ATASKAITOS_COLUMNS = [
     "duomenuData",
 ];
 
-async function upsertPavadinimai(postgres, table, idColumn, nameColumn, rows) {
+async function upsertPavadinimai(postgres, schema, table, idColumn, nameColumn, rows) {
     const filtered = rows.filter(
         (row) => row[idColumn] != null && row[nameColumn] !== undefined,
     );
@@ -30,36 +33,44 @@ async function upsertPavadinimai(postgres, table, idColumn, nameColumn, rows) {
 
     await postgres.query(
         `
-        INSERT INTO "${table}" ("${idColumn}", "${nameColumn}")
+        INSERT INTO "${schema}"."${table}" ("${idColumn}", "${nameColumn}")
         VALUES ${placeholders}
         ON CONFLICT ("${idColumn}") DO UPDATE
         SET "${nameColumn}" = EXCLUDED."${nameColumn}"
         WHERE EXCLUDED."${nameColumn}" IS NOT NULL
-          AND "${table}"."${nameColumn}" IS DISTINCT FROM EXCLUDED."${nameColumn}"
+          AND "${schema}"."${table}"."${nameColumn}" IS DISTINCT FROM EXCLUDED."${nameColumn}"
         `,
         values,
     );
 }
 
-function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
+// Finansinių ataskaitų lentelės gyvena "adpFinansinesAtaskaitos" schemoje
+// (DDL — adpFinansinesAtaskaitosSchema.sql); vardai nebeturi bendro prefikso,
+// tad žodynai nurodomi aiškiai.
+const FINANSINES_ATASKAITOS_SCHEMA = "adpFinansinesAtaskaitos";
+
+function finansinesAtaskaitosBeforeApply({ formos, standartai, eiluciuTipai, mainTable }) {
     return async ({ inserts, patches, postgres }) => {
         await upsertPavadinimai(
             postgres,
-            `${prefix}TemplatePavadinimai`,
+            FINANSINES_ATASKAITOS_SCHEMA,
+            formos,
             "templateId",
             "templateName",
             inserts,
         );
         await upsertPavadinimai(
             postgres,
-            `${prefix}StandardPavadinimai`,
+            FINANSINES_ATASKAITOS_SCHEMA,
+            standartai,
             "standardId",
             "standardName",
             inserts,
         );
         await upsertPavadinimai(
             postgres,
-            `${prefix}LinePavadinimai`,
+            FINANSINES_ATASKAITOS_SCHEMA,
+            eiluciuTipai,
             "lineTypeId",
             "lineName",
             inserts,
@@ -73,14 +84,16 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
 
         for (const patch of patches) {
             const currentRes = await postgres.query(
-                `SELECT "templateId", "standardId", "lineTypeId" FROM "${mainTable}" WHERE "_id" = $1`,
+                `SELECT "templateId", "standardId", "lineTypeId"
+                   FROM "${FINANSINES_ATASKAITOS_SCHEMA}"."${mainTable}" WHERE "_id" = $1`,
                 [patch._id],
             );
             const current = currentRes.rows[0];
             if (current) {
                 await upsertPavadinimai(
                     postgres,
-                    `${prefix}TemplatePavadinimai`,
+                    FINANSINES_ATASKAITOS_SCHEMA,
+                    formos,
                     "templateId",
                     "templateName",
                     [
@@ -94,7 +107,8 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
                 );
                 await upsertPavadinimai(
                     postgres,
-                    `${prefix}StandardPavadinimai`,
+                    FINANSINES_ATASKAITOS_SCHEMA,
+                    standartai,
                     "standardId",
                     "standardName",
                     [
@@ -108,7 +122,8 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
                 );
                 await upsertPavadinimai(
                     postgres,
-                    `${prefix}LinePavadinimai`,
+                    FINANSINES_ATASKAITOS_SCHEMA,
+                    eiluciuTipai,
                     "lineTypeId",
                     "lineName",
                     [
@@ -152,21 +167,22 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
 }
 
 // Normalizuoti string stulpeliai -> lookup lentelių ID (ADP ID neduoda,
-// juos generuojam patys, kaip balansoAtaskaitos pavadinimai).
+// juos generuojam patys, kaip balanso ataskaitų pavadinimai).
 const saskaituSalysTipaiCache = new Map();
 const saskaituSalysVeiklosVietaCache = new Map();
 
-async function ensureLookupId(postgres, { table, column, cache }, value) {
+async function ensureLookupId(postgres, { table, schema, column, cache }, value) {
     if (value == null) return null;
     if (cache.has(value)) return cache.get(value);
 
+    const lentele = schema ? `"${schema}"."${table}"` : `"${table}"`;
     await postgres.query(
-        `INSERT INTO "${table}" ("${column}")
+        `INSERT INTO ${lentele} ("${column}")
          VALUES ($1) ON CONFLICT ("${column}") DO NOTHING`,
         [value],
     );
     const { rows } = await postgres.query(
-        `SELECT id FROM "${table}" WHERE "${column}" = $1`,
+        `SELECT id FROM ${lentele} WHERE "${column}" = $1`,
         [value],
     );
     const id = rows[0]?.id ?? null;
@@ -175,12 +191,14 @@ async function ensureLookupId(postgres, { table, column, cache }, value) {
 }
 
 const SASKAITU_TIPAI = {
-    table: "sabisSaskaituSalysTipai",
+    table: "saskaituSalysTipai",
+    schema: "sabis",
     column: "tipas",
     cache: saskaituSalysTipaiCache,
 };
 const SASKAITU_VEIKLOS_VIETA = {
-    table: "sabisSaskaituSalysVeiklosVieta",
+    table: "saskaituSalysVeiklosVieta",
+    schema: "sabis",
     column: "veiklosVieta",
     cache: saskaituSalysVeiklosVietaCache,
 };
@@ -229,7 +247,7 @@ async function saskaituSalysBeforeApply({ inserts, patches, postgres }) {
         if (set.length) {
             values.push(patch._id);
             await postgres.query(
-                `UPDATE "sabisSaskaituSalys" SET ${set.join(", ")} WHERE "_id" = $${values.length}`,
+                `UPDATE sabis."saskaituSalys" SET ${set.join(", ")} WHERE "_id" = $${values.length}`,
                 values,
             );
         }
@@ -243,7 +261,8 @@ async function saskaituSalysBeforeApply({ inserts, patches, postgres }) {
 const ADP_DATASETS = [
     {
         name: "syncAdpSaskaitosSalys",
-        table: "sabisSaskaituSalys",
+        table: "saskaituSalys",
+        schema: "sabis",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SaskaituSalys",
         limit: 1000,
         columns: [
@@ -267,7 +286,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncJarFormos",
-        table: "jarFormos",
+        table: "formos",
+        schema: "rcJar",
         dataset: "datasets/gov/rc/jar/formos_statusai/Forma",
         limit: 1000,
         mapping: {
@@ -279,7 +299,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpSutartysSalys",
-        table: "sabisSutarciuSalys",
+        table: "sutarciuSalys",
+        schema: "sabis",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SutarciuSalys",
         limit: 1000,
         mapping: {
@@ -294,7 +315,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpSabisSaskaitos",
-        table: "sabisSaskaitos",
+        table: "saskaitos",
+        schema: "sabis",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Saskaitos",
         limit: 1000,
         mapping: {
@@ -313,7 +335,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpSabisSutartys",
-        table: "sabisSutartys",
+        table: "sutartys",
+        schema: "sabis",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Sutartys",
         limit: 500,
         mapping: {
@@ -329,14 +352,17 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpBalansoAtaskaitos",
-        table: "balansoAtaskaitos",
+        table: "balansoEilutes",
+        schema: FINANSINES_ATASKAITOS_SCHEMA,
         dataset: "datasets/gov/rc/jar/balanso_ataskaitos/BalansoAtaskaita",
         limit: 2500,
         columns: FINANSINES_ATASKAITOS_COLUMNS,
-        beforeApply: finansinesAtaskaitosBeforeApply(
-            "balansoAtaskaitos",
-            "balansoAtaskaitos",
-        ),
+        beforeApply: finansinesAtaskaitosBeforeApply({
+            formos: "balansoFormos",
+            standartai: "balansoStandartai",
+            eiluciuTipai: "balansoEiluciuTipai",
+            mainTable: "balansoEilutes",
+        }),
         mapping: {
             _id: "_id",
             "juridinis_asmuo._id": "jarId", "forma._id": "formaId",
@@ -352,6 +378,7 @@ const ADP_DATASETS = [
     {
         name: "syncAdpGyvenamojiVietove",
         table: "gyvenamosVietoves",
+        schema: "geografija",
         dataset: "datasets/gov/rc/ar/gyvenamojivietove/GyvenamojiVietove",
         limit: 1000,
         columns: ["_id", "gyvKodas", "tipas", "tipoSantrumpa", "pavadinimasK", "pavadinimas", "seniunija", "savivaldybe", "gyvNuo", "gyvIki"],
@@ -403,14 +430,17 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpPelnoNuostoliuAtaskaitos",
-        table: "pelnoNuostoliuAtaskaitos",
+        table: "pelnoNuostoliuEilutes",
+        schema: FINANSINES_ATASKAITOS_SCHEMA,
         dataset: "datasets/gov/rc/jar/pelno_ataskaitos/PelnoAtaskaita",
         limit: 1000,
         columns: FINANSINES_ATASKAITOS_COLUMNS,
-        beforeApply: finansinesAtaskaitosBeforeApply(
-            "pelnoNuostoliuAtaskaitos",
-            "pelnoNuostoliuAtaskaitos",
-        ),
+        beforeApply: finansinesAtaskaitosBeforeApply({
+            formos: "pelnoNuostoliuFormos",
+            standartai: "pelnoNuostoliuStandartai",
+            eiluciuTipai: "pelnoNuostoliuEiluciuTipai",
+            mainTable: "pelnoNuostoliuEilutes",
+        }),
         mapping: {
             _id: "_id",
             "juridinis_asmuo._id": "jarId", "forma._id": "formaId",
@@ -423,55 +453,7 @@ const ADP_DATASETS = [
             reg_date: "duomenuData",
         },
     },
-    {
-        name: "syncAdpDarboVieta",
-        table: "darboVieta",
-        dataset: "datasets/gov/uzt/ldv/Vieta",
-        limit: 1000,
-        mapping: {
-            _id: "_id", _revision: "_revision",
-            darbo_vietos_id: "darbo_vietos_id", statusas: "statusas",
-            ikelimo_data: "ikelimo_data", galioja_nuo: "galioja_nuo",
-            galioja_iki: "galioja_iki",
-            imones_iregistravimas: "imones_iregistravimas",
-            prelim_darbo_uzmokestis: "prelim_darbo_uzmokestis",
-            vid_darbo_uzmokestis: "vid_darbo_uzmokestis",
-            maks_darbo_uzmokestis: "maks_darbo_uzmokestis",
-            valiuta: "valiuta",
-            uzmokescio_komentaras_lt: "uzmokescio_komentaras_lt",
-            profesijos_pareigybes_pav: "profesijos_pareigybes_pav",
-            darbo_aprasymas_lt: "darbo_aprasymas_lt",
-            ar_aktuali_siandien: "ar_aktuali_siandien",
-            ar_uzpildyta: "ar_uzpildyta",
-            ar_papildomai_remia: "ar_papildomai_remia",
-            ar_darbina_po_mokymu: "ar_darbina_po_mokymu",
-            ar_apmoka_keliones: "ar_apmoka_keliones",
-            ar_apgyvendina: "ar_apgyvendina",
-            ar_maitina: "ar_maitina",
-            pageidaujama_darbo_pradzia: "pageidaujama_darbo_pradzia",
-            darbo_vietu_skaicius: "darbo_vietu_skaicius",
-            darbo_vietos_adresas: "darbo_vietos_adresas",
-            darbo_vietos_sav_pav: "darbo_vietos_sav_pav",
-            registravimo_pagrindo_pav: "registravimo_pagrindo_pav",
-            registravimo_budo_pav: "registravimo_budo_pav",
-            pageidavimo_pateikimo_pav: "pageidavimo_pateikimo_pav",
-            rizikos_lt: "rizikos_lt",
-            jar_kodas: "jar_kodas", darbdavys: "darbdavys",
-            teisinio_statuso_pav: "teisinio_statuso_pav",
-            teisines_formos_pav: "teisines_formos_pav",
-            darbdavio_bustine: "darbdavio_bustine",
-            darbdavio_kontaktinis_asmuo: "darbdavio_kontaktinis_asmuo",
-            susisiekimo_budas: "susisiekimo_budas",
-            darbdavio_tel_nr: "darbdavio_tel_nr",
-            darbdavio_mob_nr: "darbdavio_mob_nr",
-            darbdavio_el_pastas: "darbdavio_el_pastas",
-            reik_darbo_patirtis: "reik_darbo_patirtis",
-            reik_kompetencijos_lt: "reik_kompetencijos_lt",
-            reik_gebejimai: "reik_gebejimai",
-            reik_issilavinimo_pav: "reik_issilavinimo_pav",
-            reik_mok_progr_pav: "reik_mok_progr_pav",
-        },
-    },
+    DARBO_VIETU_SYNC,
 ];
 
 export default ADP_DATASETS.map((cfg) => ({

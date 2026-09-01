@@ -5,6 +5,7 @@ import KeyValueList from '@design-system/components/KeyValueList.astro';
 import Button from '@design-system/components/Button.astro';
 import Badge from '@design-system/components/Badge.astro';
 import config from '../../lib/config.ts';
+import SpetasPavadinimas from './SpetasPavadinimas.astro';
 
 interface Props {
   isregistruotasAsmuo: any;
@@ -25,6 +26,11 @@ const { isregistruotasAsmuo: isr, colorScheme = 'auto', font = 'ubuntu' } = Astr
   <main>
     <PageHeader>
       {isr.pavadinimas || isr.jarKodas}
+      {isr.spetasPavadinimas && (
+        <Fragment slot="titleNote">
+          <SpetasPavadinimas spetimas={isr.spetasPavadinimas} />
+        </Fragment>
+      )}
       <Fragment slot="actions">
         <Button href={`/pirkejas/${isr.jarKodas}`} variant="outline" size="sm">↗ Pirkimai</Button>
         <Button href={`/tiekejas/${isr.jarKodas}`} variant="outline" size="sm">↗ Pardavimai</Button>

@@ -15,10 +15,10 @@ export async function gautiSodrosDuomenis(jarKodas) {
              m.draustieji2,
              m."imokuSuma",
              to_char(m.data, 'YYYY-MM') AS data
-         FROM "sodraMonthly" m
-         LEFT JOIN "sodraMonthlyPavadinimai" p  ON p.id  = m."pavadinimasId"
-         LEFT JOIN "sodraMonthlySavivaldybes" sv ON sv.id = m."savivaldybeId"
-         LEFT JOIN "sodraMonthlyEvrk" e          ON e.id  = m."evrkId"
+         FROM sodra."menesiniai" m
+         LEFT JOIN sodra."pavadinimai" p  ON p.id  = m."pavadinimasId"
+         LEFT JOIN sodra."savivaldybes" sv ON sv.id = m."savivaldybeId"
+         LEFT JOIN sodra."evrk" e          ON e.id  = m."evrkId"
          WHERE m."jarKodas" = $1::integer
          ORDER BY m.data ASC`,
         [jarKodas],

@@ -1,4 +1,4 @@
-// Laikinas skriptas: kurių Dokumentas.csv id nėra "eTarLegalAct" lentelėje.
+// Laikinas skriptas: kurių Dokumentas.csv id nėra "eTar"."legalAct" lentelėje.
 //
 // CSV — vieno stulpelio (antraštė `dokumento_id`). Tikrinam pakuotėmis po 1000:
 // vienas `= ANY($1)` klausimas grąžina, kurie iš tos tūkstantinės DB YRA, o
@@ -69,7 +69,7 @@ async function main() {
     for (let nuo = 0; nuo < viso; nuo += PAKUOTE) {
         const pakuote = id.slice(nuo, nuo + PAKUOTE);
         const { rows } = await postgres.query(
-            `SELECT "legalActId" FROM "eTarLegalAct" WHERE "legalActId" = ANY($1)`,
+            `SELECT "legalActId" FROM "eTar"."legalAct" WHERE "legalActId" = ANY($1)`,
             [pakuote],
         );
         const yra = new Set(rows.map(r => r.legalActId));

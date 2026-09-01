@@ -51,7 +51,7 @@ async function sukeltiUuid(failoPavadinimas) {
  */
 async function insertBatch(batch) {
     const placeholders = batch.map((_, i) => `($${i + 1})`).join(", ");
-    const query = `INSERT INTO pinreg (uuid) VALUES ${placeholders} ON CONFLICT DO NOTHING;`;
+    const query = `INSERT INTO pinreg."deklaracijos" (uuid) VALUES ${placeholders} ON CONFLICT DO NOTHING;`;
     await postgres.query(query, batch);
 }
 

@@ -1,9 +1,9 @@
 export const COVERED_TABLES_BY_VIEWS: Record<string, string> = {
-    jarAsmenys:             "v_company",
+    asmenys:                "v_company",
     vpmSutartys:            "v_sutartys",
-    viesiejiPirkimai:       "v_pirkimas",
-    pinregJuridiniaiRysiai: "v_person_links",
-    xlsxPPAataskaitos:     "v_dalyviai",
+    pirkimai:               "v_pirkimas",
+    juridiniaiRysiaiPilni:  "v_person_links",
+    ataskaitos:             "v_dalyviai",
 
     teismoNuosprendziaiDalyviai: "v_bylos",
 };

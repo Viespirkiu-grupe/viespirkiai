@@ -21,8 +21,8 @@ const [sutartys, pirkimai, failai, asmenys] = await Promise.all([
     `SELECT "unikalusId" FROM "vpmSutartys" WHERE istrinta = false LIMIT 3`,
   ),
   randomIds(
-    `SELECT "pirkimoId" FROM "viesiejiPirkimai" TABLESAMPLE SYSTEM (0.1) LIMIT 3`,
-    `SELECT "pirkimoId" FROM "viesiejiPirkimai" LIMIT 3`,
+    `SELECT "pirkimoId" FROM "eppsViesiejiPirkimai"."pirkimai" TABLESAMPLE SYSTEM (0.1) LIMIT 3`,
+    `SELECT "pirkimoId" FROM "eppsViesiejiPirkimai"."pirkimai" LIMIT 3`,
   ),
   randomIds(
     `SELECT id FROM public.files TABLESAMPLE SYSTEM (0.01) WHERE "filenameId" IS NOT NULL LIMIT 2`,

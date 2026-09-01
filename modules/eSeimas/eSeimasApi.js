@@ -150,7 +150,7 @@ export function createESeimasApi({
 
     // Nepavykusi užklausa NĖRA kartojama čia — klaida grąžinama iškart, o kada
     // bandyti iš naujo, sprendžia DB (`failureCount`/`retryAfter` ant
-    // "eSeimasLegalActScrape" ir "eSeimasEdition"). Anksčiau čia sukosi 4 bandymai su
+    // "eSeimas"."legalActScrape" ir "eSeimas"."edition"). Anksčiau čia sukosi 4 bandymai su
     // 5/10/15 s pauzėmis, ir nuolat lūžtantis elementas (pvz. adapterio 502
     // „Requested consolidated edition is unavailable" — jis lūžta ir po 15 s
     // lygiai taip pat) pusę minutės laikė darbininką ir be reikalo triskart

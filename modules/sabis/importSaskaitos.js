@@ -35,7 +35,7 @@ async function insertBatch(rows) {
         .join(", ");
 
     const sql = `
-    INSERT INTO "sabisSaskaitos" (
+    INSERT INTO sabis."saskaitos" (
       "_id", "_revision", "id", "sfId", "israsymoData", "sfPozymis",
       "sfTipas", "sfNumeris", "sutartiesUid", "sutartiesNumeris", "cpvKodas",
       "cpvPav", "sfApmokejimoTerminas", "pvm", "sumaBePvm", "sumaPvm",

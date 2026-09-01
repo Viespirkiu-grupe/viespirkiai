@@ -9,12 +9,12 @@ export async function ensureLegalActStubs(client, category, ids) {
     const unique = [...new Set(ids.filter(Boolean))];
     if (!unique.length) return;
     await client.query(
-        `INSERT INTO "eSeimasLegalAct" ("category", "legalActId")
+        `INSERT INTO "eSeimas"."legalAct" ("category", "legalActId")
          SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING`,
         [category, unique],
     );
     await client.query(
-        `INSERT INTO "eSeimasLegalActScrape" ("category", "legalActId")
+        `INSERT INTO "eSeimas"."legalActScrape" ("category", "legalActId")
          SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING`,
         [category, unique],
     );
@@ -30,7 +30,7 @@ export async function markInTransaction(client, category, legalActId, mark) {
         }[mark.stage];
         if (!column) throw new Error(`Nežinomas etapas: ${mark.stage}`);
         await client.query(
-            `UPDATE "eSeimasLegalActScrape"
+            `UPDATE "eSeimas"."legalActScrape"
                 SET "${column}" = now(), "failureCount" = 0, "lastError" = NULL, "retryAfter" = NULL
               WHERE "category" = $1 AND "legalActId" = $2`,
             [category, legalActId],
@@ -38,7 +38,7 @@ export async function markInTransaction(client, category, legalActId, mark) {
     }
     if (mark.editionToken) {
         await client.query(
-            `UPDATE "eSeimasEdition"
+            `UPDATE "eSeimas"."edition"
                 SET "scrapedAt" = now(), "failureCount" = 0, "lastError" = NULL, "retryAfter" = NULL
               WHERE "category" = $1 AND "legalActId" = $2 AND "editionToken" = $3`,
             [category, legalActId, mark.editionToken],
@@ -58,7 +58,7 @@ export async function insertMetadata(client, owner, metadata, vocab, fixed) {
 
     const registration = metadata.fields?.registration_details?.value ?? {};
     const { rows: [{ metadataId }] } = await client.query(
-        `INSERT INTO "eSeimasDocumentMetadata" (
+        `INSERT INTO "eSeimas"."documentMetadata" (
             "profile", "documentId", "editionListId", "actStatusId", "statusPresenceId",
             "effectiveFrom", "effectiveTo", "effectiveNote", "effectiveUntilNote",
             "registrationText", "registrationDate", "registrationNumber"
@@ -83,7 +83,7 @@ export async function insertMetadata(client, owner, metadata, vocab, fixed) {
     await insertMetadataFields(client, metadataId, metadata.fields ?? {}, vocab, fixed);
 
     await insertRows(client, {
-        table: "eSeimasChronologyEvent",
+        table: "chronologyEvent",
         columns: ["metadataId", "ordinal", "eventDate", "event"],
         rows: (metadata.chronology ?? []).map((event, index) => ({
             metadataId,
@@ -111,7 +111,7 @@ async function insertMetadataFields(client, metadataId, fields, vocab, fixed) {
     if (!present.length) return;
 
     const returned = await insertRows(client, {
-        table: "eSeimasMetadataField",
+        table: "metadataField",
         columns: ["metadataId", "metadataFieldKeyId", "valueText"],
         rows: present.map(([code, field]) => {
             const key = requireLookup(fixed.metadataFieldKey, code, "metadataFieldKey");
@@ -149,12 +149,12 @@ async function insertMetadataFields(client, metadataId, fields, vocab, fixed) {
     }
 
     await insertRows(client, {
-        table: "eSeimasMetadataFieldLink",
+        table: "metadataFieldLink",
         columns: ["metadataFieldId", "ordinal", "linkText", "url"],
         rows: links,
     });
     await insertRows(client, {
-        table: "eSeimasMetadataFieldEurovocTerm",
+        table: "metadataFieldEurovocTerm",
         columns: ["metadataFieldId", "ordinal", "eurovocTermId"],
         rows: terms,
     });
@@ -170,7 +170,7 @@ export async function insertRelatedInformation(client, owner, related, vocab, fi
         const type = requireLookup(fixed.relatedSectionType, code, "related_information skiltis");
 
         const { rows: [{ relatedSectionId }] } = await client.query(
-            `INSERT INTO "eSeimasRelatedSection" ("documentId", "editionListId", "relatedSectionTypeId", "sourceLabel")
+            `INSERT INTO "eSeimas"."relatedSection" ("documentId", "editionListId", "relatedSectionTypeId", "sourceLabel")
              VALUES ($1,$2,$3,$4) RETURNING "relatedSectionId"`,
             [owner.documentId ?? null, owner.editionListId ?? null, type.id, section.source_label],
         );
@@ -185,7 +185,7 @@ export async function insertRelatedInformation(client, owner, related, vocab, fi
 
 async function insertAttachments(client, relatedSectionId, items, vocab) {
     const returned = await insertRows(client, {
-        table: "eSeimasAttachment",
+        table: "attachment",
         columns: ["relatedSectionId", "ordinal", "filename", "attachmentName"],
         rows: items.map((item, index) => ({
             relatedSectionId,
@@ -212,7 +212,7 @@ async function insertAttachments(client, relatedSectionId, items, vocab) {
     });
 
     await insertRows(client, {
-        table: "eSeimasAttachmentResource",
+        table: "attachmentResource",
         columns: ["attachmentId", "ordinal", "resourceFormatId", "url"],
         rows: resources,
     });
@@ -220,7 +220,7 @@ async function insertAttachments(client, relatedSectionId, items, vocab) {
 
 async function insertRelations(client, relatedSectionId, items, vocab) {
     const returned = await insertRows(client, {
-        table: "eSeimasLegalActRelation",
+        table: "legalActRelation",
         columns: [
             "relatedSectionId", "ordinal", "relationTypeId", "targetLegalActId",
             "actTypeId", "documentNumber", "adoptedAt", "title", "url",
@@ -253,7 +253,7 @@ async function insertRelations(client, relatedSectionId, items, vocab) {
     });
 
     await insertRows(client, {
-        table: "eSeimasLegalActRelationInstitution",
+        table: "legalActRelationInstitution",
         columns: ["relationId", "ordinal", "institutionId"],
         rows: institutions,
     });

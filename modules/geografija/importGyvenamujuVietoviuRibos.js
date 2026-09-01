@@ -15,8 +15,8 @@ const convertCoords = (coords) => {
     return coords.map(convertCoords);
 };
 
-async function updateGyvenvietesRibos() {
-    await postgres.query(`TRUNCATE "arGyvenvietesRibos"`);
+export async function updateGyvenvietesRibos() {
+    await postgres.query(`TRUNCATE "adresuRegistras"."gyvenvietesRibos"`);
 
     const sources = await getArDataSources();
     const entry = sources.adminUnits.find(
@@ -36,10 +36,10 @@ async function updateGyvenvietesRibos() {
         };
 
         await postgres.query(
-            `INSERT INTO "arGyvenvietesRibos" ("kodas", "pavadinimas", "plotas", "savivaldybesKodas", "geometrija")
+            `INSERT INTO "adresuRegistras"."gyvenvietesRibos" ("kodas", "pavadinimas", "plotas", "savivaldybesKodas", "geometrija")
        VALUES ($1, $2, $3, $4, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($5), 4326)))`,
             [
-                String(GYV_KODAS),
+                GYV_KODAS,
                 GYV_PAV,
                 PLOTAS,
                 SAV_KODAS,

@@ -64,7 +64,7 @@ async function upsertCFTS(cfts) {
     });
 
     const query = `
-        INSERT INTO "viesiejiPirkimai"
+        INSERT INTO "eppsViesiejiPirkimai"."pirkimai"
         ("pavadinimas", "pirkimoId", "pirkimoVykdytojas", "informacija", "paskelbimoData", "pasiulymuPateikimoTerminas", "pirkimoBudas", "statusas", "numatomaBendraPirkimoVerte", "zingsnis", "type")
         VALUES ${placeholders.join(", ")}
         ON CONFLICT ("pirkimoId") DO UPDATE SET
@@ -86,7 +86,7 @@ async function upsertCFTS(cfts) {
         count: cfts.length,
     });
 
-    // Nuskaitymo/rezervacijos metaduomenys gyvena plonojoje "viesiejiPirkimaiAtnaujinimai"
+    // Nuskaitymo/rezervacijos metaduomenys gyvena plonojoje "eppsViesiejiPirkimai"."atnaujinimai"
     // lentelėje. Naujiems pirkimams sukuriame eilutę (turinioNuskaitymas lieka NULL, tad
     // pateks į skaitymo eilę); esamiems tik atnaujiname denormalizuotą type, nepaliesdami
     // skaitymo būsenos.
@@ -98,7 +98,7 @@ async function upsertCFTS(cfts) {
     });
     await postgres.query(
         `
-        INSERT INTO public."viesiejiPirkimaiAtnaujinimai" ("pirkimoId", "typeId")
+        INSERT INTO "eppsViesiejiPirkimai"."atnaujinimai" ("pirkimoId", "typeId")
         VALUES ${atnPlaceholders.join(", ")}
         ON CONFLICT ("pirkimoId") DO UPDATE SET "typeId" = EXCLUDED."typeId";
         `,

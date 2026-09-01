@@ -287,7 +287,7 @@ describe('addSpouseEdge', () => {
 
 // ── buildPersonGraphFromRows ──────────────────────────────────────────────────
 
-// Helpers to build minimal pinregJuridiniaiRysiai row fixtures.
+// Helpers to build minimal pinreg."juridiniaiRysiai" row fixtures.
 function darbovieteRow(vardas: string, pavarde: string, jarKodas: string, pavadinimas: string, pareigos: string | null = null) {
     return { irasoTipas: 'DEKLARUOJANCIO_DARBOVIETE', vardas, pavarde, jarKodas, pavadinimas, jaTeisinesFormosKodas: null, pareigos, rysioPradzia: null, susijusioAsmensVardas: null, susijusioAsmensPavarde: null, rysioPobudzioPavadinimas: null, deklaracija: null };
 }

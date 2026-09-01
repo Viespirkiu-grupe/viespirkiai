@@ -131,8 +131,10 @@ export function buildPartsExcluding(
     parts.push(`happenedAt:[${from} TO ${to}}`);
   }
   if (bbox) {
-    parts.push(`lat:[${bbox.minLat} TO ${bbox.maxLat}]`);
-    parts.push(`lon:[${bbox.minLon} TO ${bbox.maxLon}]`);
+    // Koordinatės gyvena `geo` JSON lauke kartu su Morton raktais (geo.zN),
+    // kuriais sudaromi žemėlapio langeliai — žr. quickwit/morton.js.
+    parts.push(`geo.lat:[${bbox.minLat} TO ${bbox.maxLat}]`);
+    parts.push(`geo.lon:[${bbox.minLon} TO ${bbox.maxLon}]`);
   }
   if (textQuery && textQuery !== '*') {
     const folded = qwUserText(foldLithuanian(textQuery), { phrase: opts.phrase });
@@ -143,13 +145,13 @@ export function buildPartsExcluding(
       // OR nariu, kad likusieji nariai rinkinį tik PLĖSTŲ: `title:(a b)` reikalauja
       // visų terminų viename lauke, tad vien per-lauko OR nutrauktų atitiktį,
       // kai „a" yra pavadinime, o „b" — tekste.
-      const clauses = [`(${folded})`, `title:(${folded})^${TITLE_BOOST}`];
-      // `title` ir `author` indeksuojami NEsulietuvinti (skirtingai nei `text`,
-      // žr. modules/dokumentai/quickwitProcessIndexQueue.js buildDoc), o
-      // Quickwit `default` tokenizatorius diakritikos nenuima — tad sulietuvinta
-      // užklausa jų nepasiekia. Pridedam žalią formą.
+      // `titleAscii` ir `authorAscii` indeksuojami sulietuvinti, kaip ir
+      // `text`, tad viena sulietuvinta užklausa pasiekia visus tris laukus.
+      // Žalios formos sąlygos nebereikia — `title` su diakritika lieka tik
+      // rodymui ir tiksliai frazei.
+      const clauses = [`(${folded})`, `titleAscii:(${folded})^${TITLE_BOOST}`];
       if (raw && raw !== folded) {
-        clauses.push(`title:(${raw})^${TITLE_BOOST}`, `author:(${raw})`);
+        clauses.push(`title:(${raw})^${TITLE_BOOST}`);
       }
       parts.push(`(${clauses.join(' OR ')})`);
     }

@@ -112,7 +112,7 @@ function isTraukiLaukus(document) {
 
 async function setStatus(planuojamoPirkimoId, status) {
     await postgres.query(
-        `UPDATE "cvppPlanuojamiPirkimai" SET nuskaitymas = $1 WHERE "planuojamoPirkimoId" = $2;`,
+        `UPDATE cvpp."planuojamiPirkimai" SET nuskaitymas = $1 WHERE "planuojamoPirkimoId" = $2;`,
         [status, planuojamoPirkimoId],
     );
 }
@@ -125,7 +125,7 @@ async function issaugotiTuriny(planuojamoPirkimoId, content) {
     values.push(NUSKAITYMO_VERSIJA, planuojamoPirkimoId);
 
     await postgres.query(
-        `UPDATE "cvppPlanuojamiPirkimai"
+        `UPDATE cvpp."planuojamiPirkimai"
          SET ${setSql}, nuskaitymas = $${CONTENT_COLUMNS.length + 1}
          WHERE "planuojamoPirkimoId" = $${CONTENT_COLUMNS.length + 2}`,
         values,
@@ -135,7 +135,7 @@ async function issaugotiTuriny(planuojamoPirkimoId, content) {
 export async function scrapeVienaPlanuojamaPirkima() {
     const { rows } = await postgres.query(
         `SELECT "planuojamoPirkimoId", "link"
-         FROM "cvppPlanuojamiPirkimai"
+         FROM cvpp."planuojamiPirkimai"
          WHERE (nuskaitymas < $1 AND nuskaitymas >= 0) OR nuskaitymas IS NULL
          LIMIT 1;`,
         [NUSKAITYMO_VERSIJA],

@@ -11,10 +11,12 @@ export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
     }
 
     const aprasaiRes = await postgres.query(
-        `SELECT a.*, s."jarKodas", s."pavadinimas" AS "subjektoPavadinimas",
+        `SELECT a."id", a."subjektoId", a."pavadinimas", a."rinkmenos",
+                a."vptGavimoData", a."paskelbimoData", a."galiojaIki",
+                s."jarKodas", s."pavadinimas" AS "subjektoPavadinimas",
                 ${WINDOW_COUNT_SQL}
-         FROM "mvpTvarkosAprasai" a
-         JOIN "mvpAprasaiSubjektai" s ON s."id" = a."sbjId"
+         FROM "mvpAprasai"."tvarkos" a
+         JOIN "mvpAprasai"."subjektai" s ON s."id" = a."subjektoId"
          WHERE s."jarKodas" = $1
          ORDER BY a."paskelbimoData" DESC NULLS LAST
          LIMIT $2`,
@@ -34,7 +36,7 @@ export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
         }
     }
 
-    // Batch-fetch parsiustas status from files (mvpAprasai saltinioId nedalinamas → sourceId0)
+    // Batch-fetch parsiustas status from files (rinkmenos jau saugomos be hosto → sourceId0)
     const failaiMap = new Map();
     if (allSaltinioIds.size > 0) {
         const failaiRes = await postgres.query(
@@ -76,9 +78,9 @@ export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
 
     const aprasai = aprasaiRows.map((row) => ({
         id: row.id,
-        sbjId: row.sbjId,
+        subjektoId: row.subjektoId,
         subjektoPavadinimas: row.subjektoPavadinimas,
-        aprasymas: row.aprasymas,
+        pavadinimas: row.pavadinimas,
         rinkmenos: (row.rinkmenos || []).map(resolveLink).filter(Boolean),
         vptGavimoData: row.vptGavimoData,
         paskelbimoData: row.paskelbimoData,

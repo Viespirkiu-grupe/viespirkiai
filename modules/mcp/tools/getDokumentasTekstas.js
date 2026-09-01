@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { postgres } from "../../../postgres/postgres.js";
-import { readDokumentasFs } from "../../dokumentai/dokumentaiFs.js";
+import { readDocumentFs } from "../../documents/documentsFs.js";
 import { normalizeDocText } from "../../../src/lib/dokumentai/snippet.js";
 
 const DEFAULT_CHARS = 12_000;
@@ -66,11 +66,12 @@ function error(text) {
 
 export async function handler({ id, pozicija = 0, kiekis = DEFAULT_CHARS }) {
     const { rows } = await postgres.query(
-        `SELECT d.id, d.md5, d.type, d.source, d.pavadinimas, d.url, d."failasId",
+        `SELECT d.id, d.md5, d.type, d.source, d.title AS pavadinimas, d.url,
+                d."fileId" AS "failasId",
                 EXISTS (
-                    SELECT 1 FROM public."filesHidden" h WHERE h.id = d."failasId"
+                    SELECT 1 FROM public."filesHidden" h WHERE h.id = d."fileId"
                 ) AS pasleptas
-         FROM public.dokumentai d
+         FROM documents."documentsFull" d
          WHERE d.id = $1
          LIMIT 1`,
         [id],
@@ -85,7 +86,7 @@ export async function handler({ id, pozicija = 0, kiekis = DEFAULT_CHARS }) {
         return error(`Dokumentas su ID ${id} neturi teksto saugyklos rakto (MD5).`);
     }
 
-    const sidecar = await readDokumentasFs(dokumentas.md5);
+    const sidecar = await readDocumentFs(dokumentas.md5);
     if (!sidecar) {
         return error(`Dokumento su ID ${id} tekstas saugykloje nerastas.`);
     }

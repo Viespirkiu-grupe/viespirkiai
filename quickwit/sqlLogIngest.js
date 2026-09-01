@@ -6,7 +6,7 @@ import { SQL_LOG_INDEX_CONFIG } from "./sqlLogIndexConfig.js";
  * SQL logo rašymas TIESIAI į Quickwit – be Postgres, be shard'ų, be versijų.
  *
  * Sąmoningai atsietas nuo `quickwit/quickwit.js`: tas API kiekvienam įrašui
- * eina per `quickwitLenteles`/`quickwitIndeksai`/`quickwitEilutes`, o čia to
+ * eina per `quickwit.lenteles`/`quickwit.indeksai`/`quickwit.eilutes`, o čia to
  * nereikia. Kiekviena diena turi savo indeksą (`sqlLogV2_2026-08-01`), tad
  * senienų valymas yra paprastas indekso ištrynimas, o ne split'ų retention.
  *

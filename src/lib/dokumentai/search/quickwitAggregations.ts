@@ -2,7 +2,7 @@ import { QW_URL } from '@/quickwit/qwHttp.js';
 import type { FacetOption } from './types.ts';
 import { canonSource } from './query.ts';
 
-export const DOKUMENTAI_INDEX = 'dokumentai';
+export const DOKUMENTAI_INDEX = 'documents';
 
 export async function fetchAggregations(
   query: string,

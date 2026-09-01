@@ -88,7 +88,7 @@ Default is `"inventory"` when no `table` is given; `"detail"` when a `table` is 
         "jarKodas",
         "pavadinimas",
         "darbuotojai",
-        "nepatikimasTiekejasIki",
+        "melagingisTiekejas",
         "bylosSkaicius"
       ]
     },
@@ -155,7 +155,7 @@ rather than reasoning from prose descriptions.
     ],
     [
       "pirkimoNumeris",
-      "v_pirkimas.pirkimoNumeris",
+      "v_pirkimas.pirkimoId",
       "semantic"
     ]
   ],
@@ -172,8 +172,8 @@ rather than reasoning from prose descriptions.
 | `"sparse"`   | FK exists but large fraction of rows have no match |
 
 This prevents incorrect multi-table inferences in risk investigations (e.g. `v_sutartys.pirkimoNumeris →
-v_pirkimas.pirkimoNumeris` is semantic — contracts imported from the old CVP IS do not have a matching
-`viesiejiPirkimai` row).
+v_pirkimas.pirkimoId` is semantic — contracts imported from the old CVP IS do not have a matching `"eppsViesiejiPirkimai"."pirkimai"`
+row).
 
 ### View metadata
 
@@ -184,10 +184,10 @@ fails fast rather than silently returning incomplete schema.
 
 ### Covered-table redirect
 
-Tables that are fully covered by a view (`jarAsmenys`, `sutartys`, `viesiejiPirkimai`, `pinregJuridiniaiRysiai`,
-`xlsxPPAataskaitos`, `bylosDalyviai`) return a redirect message instead of raw column data:
+Tables that are fully covered by a view (`asmenys`, `sutartys`, `pirkimai`, `juridiniaiRysiaiPilni`,
+`ppa."ataskaitos"`, `bylosDalyviai`) return a redirect message instead of raw column data:
 
-> *"Table 'jarAsmenys' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
+> *"Table 'asmenys' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
 > and an example query."*
 
 The mapping is defined in [`tempViews.js`](../../modules/mcp/analyst/tempViews.js) as `COVERED_TABLES_BY_VIEWS`.
@@ -355,11 +355,11 @@ recursive graph traversal where full schema control is needed.
 
 | View             | Tags                                                      | Main table               | Key additions                                                       |
 |------------------|-----------------------------------------------------------|--------------------------|---------------------------------------------------------------------|
-| `v_company`      | capacity, blacklist, labor, domains, court                | `jarAsmenys`                 | Latest Sodra snapshot (LATERAL), compliance flags, count subqueries |
+| `v_company`      | capacity, blacklist, labor, domains, court                | `asmenys` (rcJar)            | Latest Sodra snapshot (LATERAL), compliance flags, count subqueries |
 | `v_sutartys`     | contracts, buyer-supplier, cpv, value, timing, frameworks | `sutartys`               | Buyer + seller names denormalized; `::text` cast on `jarKodas`      |
-| `v_pirkimas`     | procedures, criteria, lot-count, single-bidder            | `viesiejiPirkimai`       | Organizer name, municipality, short code                            |
-| `v_person_links` | conflict-of-interest, directors, beneficial-owners        | `pinregJuridiniaiRysiai` | Company name joined; `irasoTipas` distinguishes role type           |
-| `v_dalyviai`     | bid-ranking, rejections, co-bidding, single-bidder        | `xlsxPPAataskaitos`     | Full bidder list with rank, bid amount, rejection reason            |
+| `v_pirkimas`     | procedures, criteria, lot-count, single-bidder            | `pirkimai`               | Organizer name, municipality, short code                            |
+| `v_person_links` | conflict-of-interest, directors, beneficial-owners        | `pinreg."juridiniaiRysiai"` | Company name joined; `irasoTipas` distinguishes role type           |
+| `v_dalyviai`     | bid-ranking, rejections, co-bidding, single-bidder        | `ppa."ataskaitos"`      | Full bidder list with rank, bid amount, rejection reason            |
 | `v_bylos`        | court, litigation, enforcement                            | `bylosDalyviai`          | Case metadata joined; company name denormalized                     |
 
 `v_dalyviai` is the **only source of non-winner participants** in a procurement. `sutartys` records winners only;
@@ -372,7 +372,7 @@ Raw tables used directly (no covering view):
 | `cpvaProjektuSutartys`   | CPVA subcontractor data — join shape varies per query |
 | `domenai`                | Domain pair queries need flexible self-join           |
 | `neskelbiamosDerybos`    | Single-table lookup, no join needed                   |
-| `pinregJuridiniaiRysiai` | Revolving-door queries need self-join on date ranges  |
+| `pinreg."juridiniaiRysiai"` | Revolving-door queries need self-join on date ranges |
 
 ---
 
@@ -381,26 +381,27 @@ Raw tables used directly (no covering view):
 All tables accessible to `execute_query` (Layer 2) and queryable by the analyst PostgreSQL role:
 
 ```
-sutartys, sutartysAtviriDuomenys, sutartysAtviriDuomenysImp
-jarAsmenys, jar
-viesiejiPirkimai, viesiejiPirkimaiVykdytojai
-pinregJuridiniaiRysiai, pinreg
+sutartys | vpmSutartys: atviriDuomenys, atviriDuomenysImp, atviriDuomenysPilni, atviriDuomenysImpPilni, atviriTiekejai, atviriPirkejai, atviriCpvKodai, atviriObjektai, atviriValstybes, atviriPirkimoBudai
+rcJar: asmenys | public: jar
+eppsViesiejiPirkimai: pirkimai, vykdytojai
+pinreg: deklaracijos, juridiniaiRysiai, juridiniaiRysiaiPilni, rysiuPobudziai, teisinesFormos
 failai
-sabisSutartys, sabisSutarciuSalys, sabisSaskaitos, sabisSaskaituSalys
+sabis: sutartys, sutarciuSalys, saskaitos, saskaituSalys
 cpvaProjektuSutartys, cpvaProjektuSarasas
-cvppViesiejiPirkimai
-eiluciuSkaiciai, bvpzKodai
-sodra, regitra
-nepatikimiTiekejai, melagingiTiekejai
-jadis, rcInformaciniaiLeidiniaiPranesimai
+cvpp: archyvoSkelbimai (CVPP archyvas)
+eiluciuSkaiciai | bvpz: kodai (BVPŽ/CPV)
+sodra | regitra: priemoniuTipai, matymai, atnaujinimai
+vptJuodiejiSarasai: tiekejai, pagrindimai, sarasai (VPT juodieji sąrašai)
+jadis: suvestine, dalyviuSkaiciai, dalyviuSarasai, valstybesDalyviai | rcInformaciniaiPranesimai: pranesimai, pranesimaiPilni, juridiniuPavadinimai, leidiniai
 domenai, kotis
-balansoAtaskaitos, pelnoNuostoliuAtaskaitos
-darboVieta, istatinisKapitalas
-xlsxPPAataskaitos, xlsxPPAdalyviai, xlsxPPApasiulymuEile, xlsxPPAatmestiPasiulymai
+adpFinansinesAtaskaitos: balansoEilutes, pelnoNuostoliuEilutes
+istatinisKapitalas
+uzt: darboVietos, darboVietosPilnos, darbdaviai, profesijos, profesijuGrupes, issilavinimai, mokymoProgramos
+ppa: ataskaitos, dalyviai, pasiulymuEile, atmestiPasiulymai
 neskelbiamosDerybos
 vdiPazeidimai
 bylos, bylosDalyviai
-mokesciai
+vmi: mokesciai, mokesciaiPilni
 ```
 
 Plus the six TEMP view names. The in-code `TABLE_WHITELIST` in
@@ -449,8 +450,8 @@ SELECT "jarKodas",
        pavadinimas,
        darbuotojai,
        "vidutinisAtlyginimas",
-       "melagingisTiekejasNuo", "melagingisTiekejasIki",
-       "nepatikimasTiekejasNuo", "nepatikimasTiekejasIki",
+       "melagingisTiekejas",
+       "nepatikimasTiekejas",
        "vdiPazeidimuSkaicius",
        "bylosSkaicius"
 FROM v_company
@@ -480,10 +481,10 @@ ORDER BY metai
 ## Auditing
 
 Every tool call is logged via the existing `logToolCall` wrapper in `server.js`, which writes to the
-`mcpToolCalls` table. That table holds only facts (`durationMs`, `success`, `createdAt`) plus references
-into the dictionary tables `mcpToolCallsToolName`, `mcpToolCallsUserAgent` and `mcpToolCallsErrorMsg`, so
-reading the audit log means joining those three (see `modules/mcp/sql/mcpToolCallsSplit1.sql`). Each row
-is also queued for Quickwit indexing in `mcpToolCallsQuickwitIndexQueue`. The `purpose` field from
+`mcp."toolCalls"` table. That table holds only facts (`durationMs`, `success`, `createdAt`) plus references
+into the dictionary tables `mcp."toolName"`, `mcp."userAgent"` and `mcp."errorMsg"`, so
+reading the audit log means joining those three (DDL: `mcpSchema.sql`). Each row
+is also queued for Quickwit indexing in `mcp."indexQueue"`. The `purpose` field from
 `execute_query` becomes a human-readable narrative of the investigation in the audit log. No additional
 audit infrastructure is needed.
 
@@ -524,27 +525,59 @@ REVOKE ALL ON SCHEMA public FROM analyst;
 -- Prieiga prie DB ir schemos
 GRANT CONNECT, TEMPORARY ON DATABASE viespirkiai TO analyst;
 GRANT USAGE ON SCHEMA public TO analyst;
+GRANT USAGE ON SCHEMA sodra TO analyst;   -- kaip ir domenai/liteko/vdi
+GRANT USAGE ON SCHEMA ppa TO analyst;
+GRANT USAGE ON SCHEMA cvpp TO analyst;
+GRANT USAGE ON SCHEMA "eppsViesiejiPirkimai" TO analyst;
+GRANT USAGE ON SCHEMA "rcJar" TO analyst;
+GRANT USAGE ON SCHEMA sabis TO analyst;
+GRANT USAGE ON SCHEMA regitra TO analyst;
+GRANT USAGE ON SCHEMA "rcInformaciniaiPranesimai" TO analyst;
+GRANT USAGE ON SCHEMA jadis TO analyst;
+GRANT USAGE ON SCHEMA "adpFinansinesAtaskaitos" TO analyst;
+GRANT USAGE ON SCHEMA vmi TO analyst;
+GRANT USAGE ON SCHEMA uzt TO analyst;
+GRANT USAGE ON SCHEMA "vptJuodiejiSarasai" TO analyst;
+GRANT USAGE ON SCHEMA "vpmSutartys" TO analyst;
+GRANT USAGE ON SCHEMA bvpz TO analyst;
+GRANT USAGE ON SCHEMA pinreg TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
-    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp", "jarAsmenys",
-    "jar", "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai", "pinregJuridiniaiRysiai",
-    "pinreg", "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos",
-    "sabisSaskaituSalys", "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
-    "cpvaProjektuSutartys", "cpvaProjektuSarasas", "cvppViesiejiPirkimai",
-    "eiluciuSkaiciai", "bvpzKodai",
-    "sodraMonthly", "sodraMonthlyEvrk", "sodraMonthlyImportai",
-    "sodraMonthlyPavadinimai", "sodraMonthlySavivaldybes",
-    "regitra", "regitraMatymai", "regitraAtnaujinimai",
-    "nepatikimiTiekejai", "melagingiTiekejai",
-    "jadis", "rcInformaciniaiLeidiniaiPranesimai",
+    "vpmSutartys", "rcJar"."asmenys",
+    "vpmSutartys"."atviriDuomenys", "vpmSutartys"."atviriDuomenysImp",
+    "vpmSutartys"."atviriDuomenysPilni", "vpmSutartys"."atviriDuomenysImpPilni",
+    "vpmSutartys"."atviriTiekejai", "vpmSutartys"."atviriPirkejai",
+    "vpmSutartys"."atviriCpvKodai", "vpmSutartys"."atviriObjektai",
+    "vpmSutartys"."atviriValstybes", "vpmSutartys"."atviriPirkimoBudai",
+    "jar", "eppsViesiejiPirkimai"."pirkimai", "eppsViesiejiPirkimai"."vykdytojai",
+    pinreg."deklaracijos", pinreg."juridiniaiRysiai", pinreg."juridiniaiRysiaiPilni",
+    pinreg."rysiuPobudziai", pinreg."teisinesFormos", sabis."sutartys", sabis."sutarciuSalys", sabis."saskaitos",
+    sabis."saskaituSalys", sabis."saskaituSalysTipai", sabis."saskaituSalysVeiklosVieta",
+    "cpvaProjektuSutartys", "cpvaProjektuSarasas", cvpp."archyvoSkelbimai",
+    "eiluciuSkaiciai", bvpz."kodai",
+    sodra."menesiniai", sodra."evrk", sodra."importai",
+    sodra."pavadinimai", sodra."savivaldybes",
+    regitra."priemoniuTipai", regitra."matymai", regitra."atnaujinimai",
+    "vptJuodiejiSarasai"."tiekejai", "vptJuodiejiSarasai"."pagrindimai",
+    "vptJuodiejiSarasai"."sarasai",
+    jadis."suvestine", jadis."dalyviuSkaiciai", jadis."dalyviuSarasai", jadis."valstybesDalyviai",
+    "rcInformaciniaiPranesimai"."pranesimai", "rcInformaciniaiPranesimai"."pranesimaiPilni",
+    "rcInformaciniaiPranesimai"."juridiniuPavadinimai", "rcInformaciniaiPranesimai"."leidiniai",
     "domenai", "kotis",
-    "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
-    "darboVieta", "istatinisKapitalas",
+    "adpFinansinesAtaskaitos"."balansoEilutes", "adpFinansinesAtaskaitos"."pelnoNuostoliuEilutes",
+    "istatinisKapitalas",
+    uzt."darboVietos", uzt."darboVietosPilnos", uzt."darbdaviai",
+    uzt."profesijos", uzt."profesijuGrupes", uzt."savivaldybes",
+    uzt."issilavinimai", uzt."mokymoProgramos", uzt."statusai", uzt."valiutos",
+    uzt."registravimoPagrindai", uzt."registravimoBudai", uzt."pageidavimoBudai",
+    uzt."susisiekimoBudai", uzt."rizikos", uzt."gebejimai",
+    uzt."teisiniaiStatusai", uzt."teisinesFormos", uzt."kontraktuTipai",
     "neskelbiamosDerybos", "vdiPazeidimai",
-    "teismoNuosprendziai", "teismoNuosprendziaiDalyviai", "mokesciai",
-    "xlsxPPAataskaitos", "xlsxPPAdalyviai", "xlsxPPAsutartys",
-    "xlsxPPApasiulymuEile", "xlsxPPAatmestiPasiulymai"
+    "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
+    vmi."mokesciai", vmi."mokesciaiPilni",
+    ppa."ataskaitos", ppa."dalyviai", ppa."ataskaituSutartys",
+    ppa."pasiulymuEile", ppa."atmestiPasiulymai"
 TO analyst;
 
 -- v_* view'us sukuria ir SELECT teises jiems suteikia ensureViews.ts (admin pool'u).
@@ -557,4 +590,7 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 
 -- (Pasirinktinai) griežtesnis pool-wide timeout
 ALTER ROLE analyst SET statement_timeout = '180s';
+
+-- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, bvpz, pinreg, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
 ```

@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
 import { searchAll } from "../../quickwit/quickwit.js";
 
-const LENTELE = "dokumentai";
+const LENTELE = "documents"; // Quickwit indekso vardas, ne DB lentelė
 const PPA_TIPAS = "PPA";
 const BATCH_SIZE = 1_000;
 const SEARCH_QUERY = '(extension:"xlsx") AND "VII.3 PASIULYMU VERTINIMAS"';
@@ -49,11 +49,11 @@ export function buildCursorQuery(afterId) {
 async function loadFileIds(documentIds) {
     if (!documentIds.length) return [];
     const { rows } = await postgres.query(
-        `SELECT id, "failasId"
-         FROM public.dokumentai
-         WHERE id = ANY($1::bigint[])
+        `SELECT id, "fileId" AS "failasId"
+         FROM documents."documentsFull"
+         WHERE id = ANY($1::int[])
            AND extension = 'xlsx'
-           AND "failasId" IS NOT NULL`,
+           AND "fileId" IS NOT NULL`,
         [documentIds],
     );
     return rows.map((row) => Number(row.failasId)).filter(Number.isSafeInteger);

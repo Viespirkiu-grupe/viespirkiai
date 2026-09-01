@@ -25,6 +25,7 @@ import { processSuggestionQueue } from "../modules/searchSuggestion/processSugge
 import { deleteDeadIndexes } from "../quickwit/deleteDeadIndexes.js";
 import { processDomenaiAdpQueue } from "../modules/domenai/processAdpQueue.js";
 import { processJuridiniaiIndexQueue } from "../modules/juridiniai/quickwitProcessIndexQueue.js";
+import { processJuridiniaiTypesenseQueue } from "../modules/juridiniai/typesenseProcessIndexQueue.js";
 import { processMcpToolCallsIndexQueue } from "../modules/mcp/quickwitProcessIndexQueue.js";
 import { processJuridiniaiRefreshQueue } from "../modules/juridiniai/processRefreshQueue.js";
 import { atnaujintiJarCsv } from "../modules/juridiniai/updateJarCsv.js";
@@ -250,7 +251,23 @@ export default [
         job: processJuridiniaiIndexQueue,
     },
     {
-        // mcpToolCalls -> quickwit (iš mcpToolCallsQuickwitIndexQueue)
+        // juridiniai -> typesense (iš juridiniaiTypesenseQueue). Typesense lieka
+        // dėl typo tolerancijos: nuo jo priklauso findSingleJuridinis, kuriuo
+        // scraperiai pavadinimą verčia jarKodas-u.
+        name: "juridiniaiTypesenseProcessIndexQueue",
+        mode: "asap",
+        priority: 6,
+        // Eilė imama su FOR UPDATE SKIP LOCKED, bet lygiagretūs workeriai gali
+        // to paties kodo įvykius apdoroti ne iš eilės, tad indeksas atsiliktų.
+        concurrency: 1,
+        cooldown: 30,
+        errorCooldown: 30,
+        // Tas pats signalas kaip Quickwit eilei – abi pildo tas pats trigeris.
+        wakeOn: [WORK_SIGNALS.JURIDINIAI_INDEX_READY],
+        job: processJuridiniaiTypesenseQueue,
+    },
+    {
+        // mcp."toolCalls" -> quickwit (iš mcp."indexQueue")
         name: "mcpToolCallsQuickwitProcessIndexQueue",
         mode: "asap",
         // MCP logas nėra skubus – žemesnis prioritetas nei duomenų srautai.

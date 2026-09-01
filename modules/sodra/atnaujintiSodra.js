@@ -12,7 +12,7 @@ Kadangi failas keičiasi retai, naktinė patikra yra pigus HEAD — siunčiama t
 kai pasikeičia `Last-Modified` / `ETag` / dydis. Parsiųsto ZIP md5 yra antra apsauga
 tam atvejui, jei serveris pakeistų antraštes nepakeitęs turinio.
 
-Kiekviena patikra įrašoma į `sodraAtnaujinimai` (DDL — modules/sodra/schema.sql).
+Kiekviena patikra įrašoma į `sodra."atnaujinimai"` (DDL — sodraSchema.sql).
 
 Rankinis paleidimas:
     npm run sodra:atnaujinti
@@ -71,7 +71,7 @@ export function tikrinamiMetai(dabar = new Date()) {
 async function paskutinisImportas(metai) {
     const { rows } = await postgres.query(
         `SELECT "etag", "pakeitimoData", "dydis", "zipMd5"
-           FROM "sodraAtnaujinimai"
+           FROM sodra."atnaujinimai"
           WHERE "busena" = 'importuota' AND "metai" = $1
           ORDER BY "id" DESC
           LIMIT 1`,
@@ -96,7 +96,7 @@ async function irasytiPatikra({
     busena,
 }) {
     const { rows } = await postgres.query(
-        `INSERT INTO "sodraAtnaujinimai"
+        `INSERT INTO sodra."atnaujinimai"
              ("metai", "failoVardas", "etag", "pakeitimoData", "dydis", "zipMd5", "busena")
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING "id"`,
@@ -220,14 +220,14 @@ export async function atnaujintiSodrosMetus(metai, { force = false } = {}) {
         log(`Parsiųsta ${dydis} baitų, md5 ${zipMd5}`);
 
         await postgres.query(
-            `UPDATE "sodraAtnaujinimai" SET "zipMd5" = $1, "dydis" = $2 WHERE "id" = $3`,
+            `UPDATE sodra."atnaujinimai" SET "zipMd5" = $1, "dydis" = $2 WHERE "id" = $3`,
             [zipMd5, dydis, patikrosId],
         );
 
         // Antra apsauga: antraštės pasikeitė, bet turinys — ne.
         if (ankstesnis?.zipMd5 === zipMd5 && !force) {
             await postgres.query(
-                `UPDATE "sodraAtnaujinimai" SET "busena" = 'nepakito' WHERE "id" = $1`,
+                `UPDATE sodra."atnaujinimai" SET "busena" = 'nepakito' WHERE "id" = $1`,
                 [patikrosId],
             );
             await istrinti(zipKelias);
@@ -242,12 +242,12 @@ export async function atnaujintiSodrosMetus(metai, { force = false } = {}) {
         log(`Išpakuota ${pavadinimas} (${csvDydis} baitų)`);
 
         // Importo vardas — visada `monthly-<metai>.csv`, kad kartotiniai to paties
-        // failo importai liktų prie to paties `sodraMonthlyImportai` įrašo.
+        // failo importai liktų prie to paties `sodra."importai"` įrašo.
         const { eiluciuSkaicius, praleista, irasyta, naujausiasMenuo } =
             await importuotiSodrosCsv(csvKelias, { importFile: failoVardas });
 
         await postgres.query(
-            `UPDATE "sodraAtnaujinimai"
+            `UPDATE sodra."atnaujinimai"
                 SET "busena" = 'importuota',
                     "eiluciuSkaicius" = $1,
                     "praleistaSkaicius" = $2,
@@ -268,7 +268,7 @@ export async function atnaujintiSodrosMetus(metai, { force = false } = {}) {
         return { metai, busena: "importuota", eiluciuSkaicius, naujausiasMenuo };
     } catch (err) {
         await postgres.query(
-            `UPDATE "sodraAtnaujinimai" SET "busena" = 'klaida', "klaida" = $1 WHERE "id" = $2`,
+            `UPDATE sodra."atnaujinimai" SET "busena" = 'klaida', "klaida" = $1 WHERE "id" = $2`,
             [err.message, patikrosId],
         );
         await istrinti(zipKelias);

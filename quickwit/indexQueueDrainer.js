@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import { postgres } from "../postgres/postgres.js";
 import { indexDocs } from "./quickwit.js";
 import { fmtBytes } from "../utils/units.js";
@@ -16,7 +17,7 @@ pasiimama su `SELECT ... FOR UPDATE SKIP LOCKED`, atliekamos šalutinės operaci
 tik po sėkmingo `indexDocs` eilutės ištrinamos bei `COMMIT`'inama. Bet kokia klaida →
 `ROLLBACK`, eilutės lieka eilėje ir bus apdorotos pakartotinai (duomenys neprarandami).
 
-Sakinių tvarka šioje tranzakcijoje NĖRA laisva: nieko, kas paima `quickwitIndeksai`
+Sakinių tvarka šioje tranzakcijoje NĖRA laisva: nieko, kas paima `quickwit.indeksai`
 eilutės lock'ą, negalima daryti prieš `indexDocs` — plačiau žr. komentarą prie
 trynimų žemiau.
 */
@@ -24,16 +25,38 @@ trynimų žemiau.
 /** Kuris eilės įrašas nusveria, kai tam pačiam raktui susikaupė keli keitimai. */
 const PRIORITY = { delete: 0, patch: 1, insert: 2 };
 
+const ms = (value) => `${Math.round(value)}ms`;
+
+/**
+ * Porcijos etapų suvestinė. Iki šiol logas rodė tik `indexDocs` trukmę, todėl
+ * viskas, kas vyksta prieš jį — eilės pasiėmimas, SELECT ir `buildDoc` su
+ * sidecar'ų skaitymu — buvo nematomas tarpas tarp dviejų eilučių. Būtent ten
+ * dažniausiai ir dingsta laikas.
+ */
+function summarize(phases) {
+    const total = Object.values(phases).reduce((sum, value) => sum + value, 0);
+    const [topName, topValue] = Object.entries(phases)
+        .sort(([, a], [, b]) => b - a)[0] ?? ["-", 0];
+    const parts = Object.entries(phases)
+        .filter(([, value]) => value >= 1)
+        .map(([name, value]) => `${name} ${ms(value)}`)
+        .join(" ");
+    const share = total > 0 ? Math.round((topValue / total) * 100) : 0;
+    return { total, parts, top: `${topName} ${share}%` };
+}
+
 /**
  * Nusausina vieną indeksavimo eilės porciją į Quickwit.
  *
  * @param {object} cfg
  * @param {string} cfg.lentele - Quickwit lentelės vardas („sutartys", „dokumentai", …).
  * @param {string} cfg.queueTable - eilės lentelė, pvz. `vpmSutartysIndexQueue`.
+ * @param {string} [cfg.queueSchema] - eilės schema, pagal nutylėjimą `public`.
  * @param {string} cfg.keyColumn - rakto stulpelis eilėje, pvz. `unikalusId`.
+ * @param {string} [cfg.changeColumn] - keitimo stulpelis, pagal nutylėjimą `keitimas`.
  * @param {number} cfg.batchSize - kiek eilės įrašų imti vienu kartu.
  * @param {"auto"|"force"} [cfg.commit] - Quickwit ingest commit režimas.
- * @param {(id: string) => string} [cfg.toEilutesId] - raktas → `quickwitEilutes.eilutesId`.
+ * @param {(id: string) => string} [cfg.toEilutesId] - raktas → `quickwit.eilutes.eilutesId`.
  * @param {(client: import("pg").ClientBase, ids: string[]) => Promise<object[]>} cfg.fetchRows
  * @param {(row: object) => object|Promise<object>} cfg.buildDoc
  * @param {(row: object) => string|number} cfg.rowId - eilutė → jos raktas (dedupui).
@@ -49,7 +72,9 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
     const {
         lentele,
         queueTable,
+        queueSchema = "public",
         keyColumn,
+        changeColumn = "keitimas",
         batchSize,
         commit = "auto",
         toEilutesId = String,
@@ -61,6 +86,16 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
 
     const sharded = shardCount > 1;
     const zyme = sharded ? `[${shard}/${shardCount}]` : "";
+
+    /** Etapų trukmės (ms); išvedamos viena suvestine porcijos gale. */
+    const phases = { claim: 0, fetch: 0, build: 0, index: 0, delete: 0, dequeue: 0 };
+    let mark = performance.now();
+    const lap = (name) => {
+        const now = performance.now();
+        phases[name] += now - mark;
+        mark = now;
+    };
+
     const client = await postgres.connect();
 
     try {
@@ -68,15 +103,19 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
 
         // Pasiimam seniausią porciją, užrakindami eilutes (gretimi darbininkai jas
         // praleidžia). Eilutės lieka eilėje iki COMMIT.
+        // Schemą prirašom tik ne `public` atveju — kitoms eilėms SQL nesikeičia.
+        const queueRef = queueSchema && queueSchema !== "public"
+            ? `"${queueSchema}"."${queueTable}"`
+            : `"${queueTable}"`;
         const claim = sharded
-            ? `SELECT id, "${keyColumn}" AS raktas, keitimas
-               FROM "${queueTable}"
+            ? `SELECT id, "${keyColumn}" AS raktas, "${changeColumn}" AS keitimas
+               FROM ${queueRef}
                WHERE abs(hashtext("${keyColumn}"::text)::bigint) % $2 = $3
                ORDER BY id
                LIMIT $1
                FOR UPDATE SKIP LOCKED`
-            : `SELECT id, "${keyColumn}" AS raktas, keitimas
-               FROM "${queueTable}"
+            : `SELECT id, "${keyColumn}" AS raktas, "${changeColumn}" AS keitimas
+               FROM ${queueRef}
                ORDER BY id
                LIMIT $1
                FOR UPDATE SKIP LOCKED`;
@@ -84,6 +123,7 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
             claim,
             sharded ? [batchSize, shardCount, shard] : [batchSize],
         );
+        lap("claim");
 
         if (!queue.length) {
             // Tuščios eilės sąmoningai neloginam: šias funkcijas TaskRunner kviečia
@@ -91,8 +131,6 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
             await client.query("COMMIT");
             return false;
         }
-
-        logger.log(`${queueTable}${zyme}: paimta ${queue.length} eil.`);
 
         const claimedIds = queue.map((row) => row.id);
 
@@ -117,26 +155,30 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
 
         /** @type {string[]} */
         let vanished = [];
+        let indexed = null;
 
         if (toIndex.length) {
             const rows = await fetchRows(client, toIndex);
+            lap("fetch");
 
             // Objektai, kurių insert/patch metu šaltinio lentelėje jau nebėra —
-            // traktuojam kaip delete. Kitaip jų quickwitEilutes įrašas liktų
+            // traktuojam kaip delete. Kitaip jų quickwit.eilutes įrašas liktų
             // našlaitis: niekas jo nebeišvalytų, o gyvosEilutes rodytų jį gyvą.
             const found = new Set(rows.map((row) => String(rowId(row))));
             vanished = toIndex.filter((id) => !found.has(id));
 
             if (rows.length) {
+                // Visi `buildDoc` sukasi kartu, tad atskirų trukmių čia
+                // nematuojam: jos persidengia, o „lėčiausias" tereikštų, kuris
+                // baigė paskutinis — t. y. viso etapo trukmę. Prasmę turi tik
+                // bendras langas ir jo vidurkis vienam dokumentui.
                 const items = await Promise.all(
                     rows.map(async (row) => ({
                         eilutesId: toEilutesId(String(rowId(row))),
                         doc: await buildDoc(row),
                     })),
                 );
-
-                const t0 = Date.now();
-                logger.log(`${lentele}${zyme}: indeksuojama ${items.length}…`);
+                lap("build");
 
                 // Ne tranzakcinis, bet idempotentiškas: insert/patch pagal doc id,
                 // tad pakartotinis indeksavimas (po ROLLBACK/crash) yra saugus.
@@ -145,31 +187,35 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
                     items,
                     { commit },
                 );
+                lap("index");
 
-                const elapsedMs = Date.now() - t0;
                 const avgBytes = Math.round(totalBytes / items.length);
-                const mbPerSec = totalBytes / 1024 / 1024 / (elapsedMs / 1000);
-                logger.log(
-                    `${lentele}${zyme}: suindeksuota ${items.length} | vid. ${fmtBytes(avgBytes)} / dok. | viso ${fmtBytes(totalBytes)} per ${elapsedMs}ms = ${mbPerSec.toFixed(2)} MiB/s`,
-                );
+                const mbPerSec = totalBytes / 1024 / 1024 / (phases.index / 1000);
+                indexed = {
+                    count: items.length,
+                    avgBytes,
+                    totalBytes,
+                    mbPerSec,
+                    avgBuildMs: phases.build / items.length,
+                };
             }
         }
 
-        // Trynimai — nuimam quickwitEilutes žemėlapį. Paieškos filterLive() po to
+        // Trynimai — nuimam quickwit.eilutes žemėlapį. Paieškos filterLive() po to
         // nustoja matyti našlaitį Quickwit dokumentą (jis guli shard'e, kol
-        // deleteDeadIndexes išveda visą shard'ą). quickwitEilutesGyvosDel trigeris
+        // deleteDeadIndexes išveda visą shard'ą). quickwit.gyvos_eilutes_del() trigeris
         // sumažina gyvosEilutes, o generuotas mirusiosEilutes pakyla — skaitiklių
         // rankomis liesti nereikia.
         //
         // SĄMONINGAI po `indexDocs`, ne prieš jį. Tas trigeris daro
-        // `UPDATE "quickwitIndeksai"` ir paima aktyvaus shard'o eilutės lock'ą,
+        // `UPDATE "quickwit"."indeksai"` ir paima aktyvaus shard'o eilutės lock'ą,
         // kurį ši tranzakcija laikytų iki COMMIT. `indexDocs` gi dirba ATSKIROJE
         // pool'o jungtyje ir toje pačioje eilutėje bumpina `iterptosEilutes` —
         // t. y. lauktų lock'o, kurį laiko jį iškvietusi tranzakcija. Postgres to
         // neaptinka kaip deadlock'o (pusė ciklo yra Node'e: išorinis backend'as
         // būna `idle in transaction` / ClientRead, nelaukdamas jokio lock'o), tad
         // abi jungtys kabo neribotai ir prikala globalų xmin horizontą — vacuum'as
-        // nustoja valyti visą duomenų bazę. Kol niekas iš `quickwitIndeksai` eilutės
+        // nustoja valyti visą duomenų bazę. Kol niekas iš `quickwit.indeksai` eilutės
         // lock'ų nepaimamas prieš `indexDocs`, ciklas nesusidaro.
         //
         // `vanished` — NE po `if (rows.length)`: jei dingo visa porcija, žemėlapius
@@ -179,19 +225,33 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
         // trynimų perkėlimas į galą rezultato nekeičia.
         if (toDelete.length) {
             await deleteEilutes(client, lentele, toDelete.map(toEilutesId));
-            logger.log(`${lentele}${zyme}: ištrinta ${toDelete.length} iš Quickwit`);
         }
         if (vanished.length) {
             await deleteEilutes(client, lentele, vanished.map(toEilutesId));
-            logger.log(`${lentele}${zyme}: ištrinta ${vanished.length} dingusių iš Quickwit`);
         }
+        lap("delete");
 
         // Tik dabar, kai visos šalutinės operacijos pavyko, pašalinam porciją.
         await client.query(
-            `DELETE FROM "${queueTable}" WHERE id = ANY($1::bigint[])`,
+            `DELETE FROM ${queueRef} WHERE id = ANY($1::bigint[])`,
             [claimedIds],
         );
         await client.query("COMMIT");
+        lap("dequeue");
+
+        const { total, parts, top } = summarize(phases);
+        const kiekis = indexed
+            ? `${indexed.count} dok.`
+            : `${queue.length} eil.`;
+        const trynimai = toDelete.length + vanished.length;
+        const apimtis = indexed
+            ? ` | ${fmtBytes(indexed.avgBytes)}/dok. ${indexed.mbPerSec.toFixed(2)} MiB/s` +
+              ` | build ${ms(indexed.avgBuildMs)}/dok.`
+            : "";
+        logger.log(
+            `${lentele}${zyme}: ${kiekis}${trynimai ? ` (+${trynimai} trinta)` : ""}` +
+            ` per ${ms(total)} | stabdo ${top} | ${parts}${apimtis}`,
+        );
         return true;
     } catch (error) {
         await client.query("ROLLBACK").catch(() => {});
@@ -203,8 +263,8 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
 
 async function deleteEilutes(client, lentele, eilutesIds) {
     await client.query(
-        `DELETE FROM "quickwitEilutes"
-         WHERE "lentelesId" = (SELECT id FROM "quickwitLenteles" WHERE "lentele" = $1)
+        `DELETE FROM "quickwit"."eilutes"
+         WHERE "lentelesId" = (SELECT id FROM "quickwit"."lenteles" WHERE "lentele" = $1)
            AND "eilutesId" = ANY($2::bigint[])`,
         [lentele, eilutesIds],
     );

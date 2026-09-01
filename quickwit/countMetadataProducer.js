@@ -9,7 +9,7 @@ const producer = args.filter((arg) => arg !== "--prefix").join(" ") || "FREE PDF
 const queryValue = producer.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 const query = `metadata.producer:"${queryValue}"${prefix ? "*" : ""}`;
 
-const result = await searchIndexPattern("dokumentai_*", { query, max_hits: 0 });
+const result = await searchIndexPattern("documents_*", { query, max_hits: 0 });
 const elapsedMs = Number(result.elapsed_time_micros ?? 0) / 1_000;
 
 console.log(`Producer: ${producer}`);

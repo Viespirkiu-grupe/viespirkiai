@@ -19,7 +19,7 @@ const CVPP_DOWNLOAD_RE = /DownloadPublicDocument\('(\w+)','(\w+)','(\w+)'\)/;
 
 async function setNoticeStatus(skelbimoKodas, status) {
     await postgres.query(
-        `UPDATE "cvppViesiejiPirkimai" SET nuskaitymas = $1 WHERE "skelbimoKodas" = $2;`,
+        `UPDATE cvpp."archyvoSkelbimai" SET nuskaitymas = $1 WHERE "skelbimoKodas" = $2;`,
         [status, skelbimoKodas],
     );
 }
@@ -226,7 +226,7 @@ async function syncCvppFiles(files, notice) {
 
 async function scrapeCvppNotice() {
     const noticeResult = await postgres.query(
-        `SELECT * FROM "cvppViesiejiPirkimai" WHERE (nuskaitymas < $1 AND nuskaitymas >= 0) OR nuskaitymas IS NULL LIMIT 1;`,
+        `SELECT * FROM cvpp."archyvoSkelbimai" WHERE (nuskaitymas < $1 AND nuskaitymas >= 0) OR nuskaitymas IS NULL LIMIT 1;`,
         [NUSKAITYMO_VERSIJA],
     );
 

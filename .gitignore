@@ -51,8 +51,9 @@ dist
 .astro
 
 # Misc
-dbSchema
+/dbSchema
 modules/cvpp/ataskaitos
+modules/vptXlsxApjungtosAtaskaitos/data
 tmp/*
 old
 backup

@@ -7,7 +7,6 @@ import { eta, nf, pctOf, secs } from "../../utils/progress.js";
 import { closeSqlite, removeSqlite } from "../../utils/sqlite.js";
 import { runPool, setUvThreadpoolSize } from "../../utils/workerPool.js";
 import { readFailaiFs } from "../failai/failaiFs.js";
-import { splitSaltinioId } from "../dokumentai/upsertFromFailai.js";
 import { chunkTekstas, getBgeM3Tokenizer } from "./bgeM3Chunkinimas.js";
 import {
     createFailaiVektoriaiWriter,
@@ -60,9 +59,7 @@ function tekstasToString(tekstas) {
 // PK lookup'ai) = akimirksnis.
 async function fetchPage(cursor, pageSize) {
     const { rows } = await postgres.query(
-        `SELECT f."id",
-                f."sourceId0" || '/' || f."sourceId1" || '/' || f."sourceId2" AS "saltinioId",
-                NULL::int AS "dokId", NULL::int AS "fileId"
+        `SELECT f."id", f."sourceId0", f."sourceId1", f."sourceId2"
          FROM public.files f
          JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
          WHERE st.title = 'cvpIs'
@@ -137,10 +134,11 @@ async function processBatch(rows, tokenizer, stats) {
             }
 
             const chunks = await getChunks(row.failasHash, tekstas, tokenizer, chunkCache, stats);
-            const [pid, pfid, pfvid] = splitSaltinioId("cvpIs", row.saltinioId, row.dokId, row.fileId);
-            const pirkimoId = toInt(pid);
-            const pirkimoFailoId = toInt(pfid);
-            const pirkimoFailoVersijosId = toInt(pfvid);
+            // cvpIs šaltinio ID `files` jau laiko išskaidytą po stulpelius:
+            // sourceId0 = pirkimo ID, sourceId1 = failo ID, sourceId2 = versijos ID.
+            const pirkimoId = toInt(row.sourceId0);
+            const pirkimoFailoId = toInt(row.sourceId1);
+            const pirkimoFailoVersijosId = toInt(row.sourceId2);
 
             for (const c of chunks) {
                 gabalai.push({ hash: c.hash, tekstas: c.tekstas, tokenai: c.tokenai });

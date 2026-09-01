@@ -1,4 +1,5 @@
 import { TaskRunner } from "../runner/TaskRunner.js";
+import config from "../utils/config.js";
 import { startDokNuskaitytojai } from "./dokNuskaitytojai.js";
 import { postgres } from "../postgres/postgres.js";
 import { closeNats } from "../utils/natsHub.js";
@@ -6,7 +7,7 @@ import { closeNats } from "../utils/natsHub.js";
 import tedTasks from "./ted.js";
 import sutartysTasks from "./sutartys.js";
 import failaiTasks from "./failai.js";
-import dokumentaiTasks from "./dokumentai.js";
+import documentsTasks from "./documents.js";
 import viesiejiPirkimaiTasks from "./viesiejiPirkimai.js";
 import adpTasks from "./adp.js";
 import miscTasks from "./misc.js";
@@ -14,13 +15,18 @@ import eTarTasks from "./eTar.js";
 import eSeimasTasks from "./eSeimas.js";
 
 // Pool size - 2 reserved for cron jobs and admin queries
-const runner = new TaskRunner({ maxConcurrentJobs: 18 });
+const runner = new TaskRunner({
+    maxConcurrentJobs: 18,
+    // TASKRUNNER_DISABLED_TASKS=eSeimas*,tedScrape — leidžia išjungti darbus
+    // per .env, nekomentuojant jų kode.
+    disabledTasks: config.taskRunnerDisabledTasks,
+});
 
 runner.registerAll([
     ...tedTasks,
     ...sutartysTasks,
     ...failaiTasks,
-    ...dokumentaiTasks,
+    ...documentsTasks,
     ...viesiejiPirkimaiTasks,
     ...adpTasks,
     ...miscTasks,

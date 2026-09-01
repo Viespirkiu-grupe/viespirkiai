@@ -66,9 +66,9 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
   const { rows } = await postgres.query(
     `SELECT p.*, a."turinioNuskaitymoData", a."turinioNuskaitymas",
             v.pavadinimas AS "vykdytojoPavadinimas", v."jarKodas"
-       FROM public."viesiejiPirkimai" p
-       LEFT JOIN public."viesiejiPirkimaiAtnaujinimai" a ON a."pirkimoId" = p."pirkimoId"
-       LEFT JOIN public."viesiejiPirkimaiVykdytojai" v ON v.id = p."pirkimoVykdytojasId"
+       FROM "eppsViesiejiPirkimai"."pirkimai" p
+       LEFT JOIN "eppsViesiejiPirkimai"."atnaujinimai" a ON a."pirkimoId" = p."pirkimoId"
+       LEFT JOIN "eppsViesiejiPirkimai"."vykdytojai" v ON v.id = p."pirkimoVykdytojasId"
       WHERE p."pirkimoId" = $1`,
     [pirkimoId],
   );
@@ -87,7 +87,7 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
   await annotateTedSkelbimai(pirkimas.turinys);
 
   // pirkimoId dabar int — paieškos/filtrų parametrus paduodam kaip string
-  // (sutartys.pirkimoNumeris, xlsxPPAataskaitos.pirkimoNumeris yra text stulpeliai).
+  // (sutartys.pirkimoNumeris, ppa."ataskaitos".pirkimoNumeris yra text stulpeliai).
   const sutartysRes = await searchSutartys({ pirkimoNumeris: String(pirkimas.pirkimoId) });
   pirkimas.sutartys = sutartysRes.results;
 
@@ -143,8 +143,8 @@ export async function loadPirkimoAiSantrauka(pirkimoId: string): Promise<{ apras
     `SELECT a."aprasymas", a."sukurta",
             CASE WHEN v.modelis LIKE '%/%' THEN v.modelis ELSE v.tiekejas || '/' || v.modelis END AS modelis,
             v.link
-       FROM public."viesiejiPirkimaiAprasymai" a
-       JOIN public."aiModelVariants" v ON v.id = a."modelioVariantasId"
+       FROM "eppsViesiejiPirkimai"."aprasymai" a
+       JOIN "ai"."modeliuVariantai" v ON v.id = a."modelioVariantasId"
       WHERE a."pirkimoId" = $1 AND a.success = true AND a."aprasymas" IS NOT NULL
       ORDER BY a."sukurta" DESC
       LIMIT 1`,

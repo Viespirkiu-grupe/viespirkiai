@@ -22,14 +22,14 @@ async function resolveIds(values, { table, column, cache }) {
 
     const placeholders = unknown.map((_, i) => `($${i + 1})`).join(", ");
     await postgres.query(
-        `INSERT INTO "${table}" ("${column}")
+        `INSERT INTO sabis."${table}" ("${column}")
          VALUES ${placeholders}
          ON CONFLICT ("${column}") DO NOTHING`,
         unknown,
     );
 
     const { rows } = await postgres.query(
-        `SELECT id, "${column}" AS val FROM "${table}" WHERE "${column}" = ANY($1)`,
+        `SELECT id, "${column}" AS val FROM sabis."${table}" WHERE "${column}" = ANY($1)`,
         [unknown],
     );
     for (const row of rows) cache.set(row.val, row.id);
@@ -57,7 +57,7 @@ async function insertBatch(rows) {
 
     // tipas (idx 4) -> tipasId
     await resolveIds(rows.map((r) => r[4]), {
-        table: "sabisSaskaituSalysTipai",
+        table: "saskaituSalysTipai",
         column: "tipas",
         cache: tipaiCache,
     });
@@ -65,7 +65,7 @@ async function insertBatch(rows) {
 
     // veiklosVieta (idx 11) -> veiklosVietaId
     await resolveIds(rows.map((r) => r[11]), {
-        table: "sabisSaskaituSalysVeiklosVieta",
+        table: "saskaituSalysVeiklosVieta",
         column: "veiklosVieta",
         cache: veiklosVietaCache,
     });
@@ -82,7 +82,7 @@ async function insertBatch(rows) {
         .join(", ");
 
     const sql = `
-        INSERT INTO "sabisSaskaituSalys" (
+        INSERT INTO sabis."saskaituSalys" (
             "_id", "_revision", "id", "sfId", "tipasId",
             "validusAsmensKodas", "validusJarKodas", "kitasKodas", "kitasKodasPaaiskinimas",
             "pavadinimas", "nePvmMoketojas", "veiklosVietaId", "data"

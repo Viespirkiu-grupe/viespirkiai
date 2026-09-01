@@ -16,7 +16,7 @@ import { syncJuridiniaiDictionaries } from "./syncDictionaries.js";
 async function lastSuccessful(file, db) {
     const { rows } = await db.query(
         `SELECT "etag", "lastModified", "size", "sha256"
-         FROM public."jarCsvAtnaujinimai"
+         FROM "rcJar"."csvAtnaujinimai"
          WHERE "failas" = $1 AND "busena" = 'importuota'
          ORDER BY "id" DESC LIMIT 1`,
         [file],
@@ -38,7 +38,7 @@ export function metadataUnchanged(previous, current) {
 
 async function recordCheck(file, status, values, db) {
     await db.query(
-        `INSERT INTO public."jarCsvAtnaujinimai"
+        `INSERT INTO "rcJar"."csvAtnaujinimai"
             ("failas", "busena", "etag", "lastModified", "size", "sha256",
              "eiluciuSkaicius", "pakeistuSkaicius")
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,

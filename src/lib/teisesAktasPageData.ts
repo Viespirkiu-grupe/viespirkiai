@@ -153,8 +153,8 @@ function redakcijosBusena(
  * Sulieja dokumentus (turim tekstą) su redakcijų sąrašu (turim datas) į vieną
  * eilę perjungikliui.
  *
- * Dvi lentelės apie tą patį dalyką: "eTarLegalActDocument" žino, kurių
- * redakcijų tekstą esam nuskaitę, o "eTarEdition" — nuo kada iki kada kiekviena
+ * Dvi lentelės apie tą patį dalyką: "eTar"."legalActDocument" žino, kurių
+ * redakcijų tekstą esam nuskaitę, o "eTar"."edition" — nuo kada iki kada kiekviena
  * galiojo. Naudotojui rūpi tik laikotarpis, tad rikiuojam iš datų pusės, o
  * dokumentus prikabinam pagal `editionToken`.
  */
@@ -250,7 +250,7 @@ function groupBy<T>(rows: T[], key: (row: T) => string | number): Map<string, T[
  */
 export async function loadTeisesAktasPage(legalActId: string, versija = '') {
   const { rows: actRows } = await postgres.query(
-    `SELECT "legalActId", "title", "firstSeenAt", "fetchedAt" FROM "eTarLegalAct" WHERE "legalActId" = $1`,
+    `SELECT "legalActId", "title", "firstSeenAt", "fetchedAt" FROM "eTar"."legalAct" WHERE "legalActId" = $1`,
     [legalActId],
   );
   const act = actRows[0];
@@ -259,9 +259,9 @@ export async function loadTeisesAktasPage(legalActId: string, versija = '') {
   const { rows: docRows } = await postgres.query(
     `SELECT d."documentId", v."code" AS "variantas", d."editionToken", d."sourceUrl", d."title",
             p."code" AS "turinioBusena", d."contentMessage", d."md5", d."fetchedAt"
-       FROM "eTarLegalActDocument" d
-       JOIN "eTarDocumentVariant" v USING ("documentVariantId")
-       JOIN "eTarPresenceState" p ON p."presenceStateId" = d."contentPresenceId"
+       FROM "eTar"."legalActDocument" d
+       JOIN "eTar"."documentVariant" v USING ("documentVariantId")
+       JOIN "eTar"."presenceState" p ON p."presenceStateId" = d."contentPresenceId"
       WHERE d."legalActId" = $1
       ORDER BY v."documentVariantId", d."editionToken"`,
     [legalActId],
@@ -294,39 +294,39 @@ export async function loadTeisesAktasPage(legalActId: string, versija = '') {
       `SELECT m."metadataId", s."name" AS "statusas", ps."code" AS "statusPresence",
               m."effectiveFrom", m."effectiveTo", m."effectiveNote", m."effectiveUntilNote",
               m."registrationText", m."registrationDate", m."registrationNumber"
-         FROM "eTarDocumentMetadata" m
-         JOIN "eTarPresenceState" ps ON ps."presenceStateId" = m."statusPresenceId"
-         LEFT JOIN "eTarActStatus" s USING ("actStatusId")
+         FROM "eTar"."documentMetadata" m
+         JOIN "eTar"."presenceState" ps ON ps."presenceStateId" = m."statusPresenceId"
+         LEFT JOIN "eTar"."actStatus" s USING ("actStatusId")
         WHERE m."documentId" = $1`,
       [documentId],
     ),
     documentId == null ? { rows: [] } : postgres.query(
       `SELECT s."relatedSectionId", t."code", t."payloadKind", s."sourceLabel"
-         FROM "eTarRelatedSection" s
-         JOIN "eTarRelatedSectionType" t USING ("relatedSectionTypeId")
+         FROM "eTar"."relatedSection" s
+         JOIN "eTar"."relatedSectionType" t USING ("relatedSectionTypeId")
         WHERE s."documentId" = $1
         ORDER BY t."relatedSectionTypeId"`,
       [documentId],
     ),
     postgres.query(
       `SELECT e."editionId", e."editionToken", e."effectiveFrom", e."effectiveTo", e."url", e."scrapedAt"
-         FROM "eTarEdition" e WHERE e."legalActId" = $1 ORDER BY e."ordinal"`,
+         FROM "eTar"."edition" e WHERE e."legalActId" = $1 ORDER BY e."ordinal"`,
       [legalActId],
     ),
     documentId == null ? { rows: [] } : postgres.query(
       `SELECT f."name" AS "formatas", r."url"
-         FROM "eTarOfficialTextResource" r
-         JOIN "eTarResourceFormat" f USING ("resourceFormatId")
+         FROM "eTar"."officialTextResource" r
+         JOIN "eTar"."resourceFormat" f USING ("resourceFormatId")
         WHERE r."documentId" = $1 ORDER BY r."ordinal"`,
       [documentId],
     ),
     postgres.query(
-      `SELECT "kind", "ilgis", "pavyzdys" FROM "eTarSourceAnomaly" WHERE "legalActId" = $1 ORDER BY "ilgis" DESC`,
+      `SELECT "kind", "ilgis", "pavyzdys" FROM "eTar"."sourceAnomaly" WHERE "legalActId" = $1 ORDER BY "ilgis" DESC`,
       [legalActId],
     ).catch(() => ({ rows: [] })),   // lentelės gali dar nebūti
     postgres.query(
       `SELECT "documentScrapedAt", "editionsScrapedAt", "asrScrapedAt", "failureCount", "lastError", "retryAfter"
-         FROM "eTarLegalActScrape" WHERE "legalActId" = $1`,
+         FROM "eTar"."legalActScrape" WHERE "legalActId" = $1`,
       [legalActId],
     ),
   ]);
@@ -340,8 +340,8 @@ export async function loadTeisesAktasPage(legalActId: string, versija = '') {
   if (metadata) {
     const { rows: fieldRows } = await postgres.query(
       `SELECT f."metadataFieldId", k."code", k."valueKind", f."valueText"
-         FROM "eTarMetadataField" f
-         JOIN "eTarMetadataFieldKey" k USING ("metadataFieldKeyId")
+         FROM "eTar"."metadataField" f
+         JOIN "eTar"."metadataFieldKey" k USING ("metadataFieldKeyId")
         WHERE f."metadataId" = $1
         ORDER BY k."metadataFieldKeyId"`,
       [metadata.metadataId],
@@ -350,19 +350,19 @@ export async function loadTeisesAktasPage(legalActId: string, versija = '') {
 
     const [linkRes, termRes, chronoRes] = await Promise.all([
       fieldIds.length ? postgres.query(
-        `SELECT "metadataFieldId", "linkText", "url" FROM "eTarMetadataFieldLink"
+        `SELECT "metadataFieldId", "linkText", "url" FROM "eTar"."metadataFieldLink"
           WHERE "metadataFieldId" = ANY($1) ORDER BY "ordinal"`,
         [fieldIds],
       ) : { rows: [] },
       fieldIds.length ? postgres.query(
         `SELECT e."metadataFieldId", t."term"
-           FROM "eTarMetadataFieldEurovocTerm" e
-           JOIN "eTarEurovocTerm" t USING ("eurovocTermId")
+           FROM "eTar"."metadataFieldEurovocTerm" e
+           JOIN "eTar"."eurovocTerm" t USING ("eurovocTermId")
           WHERE e."metadataFieldId" = ANY($1) ORDER BY e."ordinal"`,
         [fieldIds],
       ) : { rows: [] },
       postgres.query(
-        `SELECT "eventDate", "event" FROM "eTarChronologyEvent"
+        `SELECT "eventDate", "event" FROM "eTar"."chronologyEvent"
           WHERE "metadataId" = $1 ORDER BY "ordinal"`,
         [metadata.metadataId],
       ),
@@ -393,16 +393,16 @@ export async function loadTeisesAktasPage(legalActId: string, versija = '') {
     const [attRes, relRes] = await Promise.all([
       postgres.query(
         `SELECT a."attachmentId", a."relatedSectionId", a."filename", a."attachmentName"
-           FROM "eTarAttachment" a WHERE a."relatedSectionId" = ANY($1) ORDER BY a."ordinal"`,
+           FROM "eTar"."attachment" a WHERE a."relatedSectionId" = ANY($1) ORDER BY a."ordinal"`,
         [sectionIds],
       ),
       postgres.query(
         `SELECT r."relationId", r."relatedSectionId", rt."name" AS "rysioTipas",
                 r."targetLegalActId", at."name" AS "aktoRusis", r."documentNumber",
                 r."adoptedAt", r."title", r."url"
-           FROM "eTarLegalActRelation" r
-           JOIN "eTarRelationType" rt USING ("relationTypeId")
-           LEFT JOIN "eTarActType" at USING ("actTypeId")
+           FROM "eTar"."legalActRelation" r
+           JOIN "eTar"."relationType" rt USING ("relationTypeId")
+           LEFT JOIN "eTar"."actType" at USING ("actTypeId")
           WHERE r."relatedSectionId" = ANY($1) ORDER BY r."ordinal"`,
         [sectionIds],
       ),
@@ -414,15 +414,15 @@ export async function loadTeisesAktasPage(legalActId: string, versija = '') {
     const [attResourceRes, relInstRes] = await Promise.all([
       attachments.length ? postgres.query(
         `SELECT r."attachmentId", f."name" AS "formatas", r."url"
-           FROM "eTarAttachmentResource" r
-           JOIN "eTarResourceFormat" f USING ("resourceFormatId")
+           FROM "eTar"."attachmentResource" r
+           JOIN "eTar"."resourceFormat" f USING ("resourceFormatId")
           WHERE r."attachmentId" = ANY($1) ORDER BY r."ordinal"`,
         [attachments.map(a => a.attachmentId)],
       ) : { rows: [] },
       relations.length ? postgres.query(
         `SELECT ri."relationId", i."name"
-           FROM "eTarLegalActRelationInstitution" ri
-           JOIN "eTarInstitution" i USING ("institutionId")
+           FROM "eTar"."legalActRelationInstitution" ri
+           JOIN "eTar"."institution" i USING ("institutionId")
           WHERE ri."relationId" = ANY($1) ORDER BY ri."ordinal"`,
         [relations.map(r => r.relationId)],
       ) : { rows: [] },
@@ -469,7 +469,7 @@ export async function loadTeisesAktasPage(legalActId: string, versija = '') {
   if (editions.length) {
     const { rows: changeRows } = await postgres.query(
       `SELECT c."editionId", c."amendingActId", c."adoptedAt", c."linkText", c."url"
-         FROM "eTarEditionChange" c WHERE c."editionId" = ANY($1) ORDER BY c."ordinal"`,
+         FROM "eTar"."editionChange" c WHERE c."editionId" = ANY($1) ORDER BY c."ordinal"`,
       [editions.map(e => e.editionId)],
     );
     const byEdition = groupBy(changeRows as any[], c => c.editionId);

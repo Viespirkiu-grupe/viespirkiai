@@ -7,10 +7,14 @@ import { signalWork, WORK_SIGNALS } from "../utils/taskSignals.js";
 // `signal` – NATS signalas, kuriuo po commit'o pažadinamas atitinkamas
 // taskRunner'io indeksavimo eilės darbas (žr. tasks/*.js `wakeOn`).
 const TABLES = {
-  dokumentai: {
-    queue: "dokumentaiIndexQueue",
-    queueId: "dokumentoId",
-    source: "dokumentai",
+  // Eilės keitimo stulpelis čia vadinasi „change", o ne „keitimas".
+  documents: {
+    queue: "indexQueue",
+    queueSchema: "documents",
+    queueId: "documentId",
+    changeColumn: "change",
+    source: "documents",
+    sourceSchema: "documents",
     sourceId: "id",
     signal: WORK_SIGNALS.DOCUMENTS_INDEX_READY,
   },
@@ -22,13 +26,15 @@ const TABLES = {
     signal: WORK_SIGNALS.SUTARTYS_CHANGED,
   },
   viesiejiPirkimai: {
-    queue: "viesiejiPirkimaiIndexQueue",
+    queue: "indexQueue",
+    queueSchema: "eppsViesiejiPirkimai",
     queueId: "pirkimoId",
-    source: "viesiejiPirkimai",
+    source: "pirkimai",
+    sourceSchema: "eppsViesiejiPirkimai",
     sourceId: "pirkimoId",
     signal: WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED,
   },
-  // jarKodas yra text, o quickwitEilutes."eilutesId" – bigint, tad reikia ::text.
+  // jarKodas yra text, o quickwit.eilutes."eilutesId" – bigint, tad reikia ::text.
   juridiniai: {
     queue: "juridiniaiIndexQueue",
     queueId: "jarKodas",
@@ -38,14 +44,25 @@ const TABLES = {
     sourceValue: `e."eilutesId"::text`,
     signal: WORK_SIGNALS.JURIDINIAI_INDEX_READY,
   },
+  // Raktas – `quickwit.indeksai."lentele"` reikšmė (Quickwit indekso etiketė);
+  // pačios lentelės gyvena `mcp` schemoje.
   mcpToolCalls: {
-    queue: "mcpToolCallsQuickwitIndexQueue",
+    queue: "indexQueue",
+    queueSchema: "mcp",
     queueId: "mcpToolCallId",
-    source: "mcpToolCalls",
+    source: "toolCalls",
+    sourceSchema: "mcp",
     sourceId: "id",
     signal: WORK_SIGNALS.MCP_TOOL_CALLS_INDEX_READY,
   },
 };
+
+// Schemą prirašom tik tada, kai ji ne `public`: taip užklausos toms lentelėms,
+// kurios visada gyveno public, lieka žodis žodin tokios pačios.
+const ref = (schema, name) =>
+    schema && schema !== "public" ? `"${schema}"."${name}"` : `"${name}"`;
+const queueRef = (table) => ref(table.queueSchema, table.queue);
+const sourceRef = (table) => ref(table.sourceSchema, table.source);
 
 const HELP = `Perkelia pasirinktų Quickwit indeksų gyvas eilutes į indeksavimo eilę.
 Apdorojus eilę pasirinkti indeksai turės 0 gyvų eilučių (100% mirusių).
@@ -53,15 +70,15 @@ Apdorojus eilę pasirinkti indeksai turės 0 gyvų eilučių (100% mirusių).
 Naudojimas:
   npm run quickwit:requeue-live -- [QUICKWIT_INDEKSO_PAVADINIMAS ...] [parinktys]
 
-Indeksą nurodykite stulpelio „quickwit_indeksas“ reikšme, pvz. dokumentai_32.
-Šaltinio lentelės įrašo ID ir vidinis quickwitIndeksai.id čia nenaudojami.
+Indeksą nurodykite stulpelio „quickwit_indeksas“ reikšme, pvz. documents_32.
+Šaltinio lentelės įrašo ID ir vidinis quickwit.indeksai.id čia nenaudojami.
 
 Pasirinkimas:
   --top N             N indeksų, turinčių daugiausia mirusių eilučių
   --top-ratio N       N indeksų, turinčių didžiausią mirusių eilučių procentą
   --all               visi filtrus atitinkantys indeksai
   --list              tik parodyti indeksus
-  --lentele PAV       filtruoti pagal dokumentai, sutartys, viesiejiPirkimai arba juridiniai
+  --lentele PAV       filtruoti pagal documents, sutartys, viesiejiPirkimai arba juridiniai
   --min-dead N        tik turintys bent N mirusių eilučių
   --min-dead-ratio N  tik turintys bent N% mirusių eilučių
 
@@ -74,7 +91,7 @@ Be pasirinkimo argumentų terminale atidaromas interaktyvus pasirinkimas. Jame
 Nenurodžius --lentele rodomi visų lentelių Quickwit indeksai.
 
 Pavyzdžiai:
-  npm run quickwit:requeue-live -- dokumentai_12 dokumentai_18
+  npm run quickwit:requeue-live -- documents_12 documents_18
   npm run quickwit:requeue-live -- --top 3 --min-dead 100000
   npm run quickwit:requeue-live -- --top-ratio 5 --dry-run
   npm run quickwit:requeue-live -- --all --min-dead-ratio 80`;
@@ -120,7 +137,7 @@ export function parseArgs(argv) {
   if (numericIndex) {
     throw new Error(
       `„${numericIndex}“ yra tik skaičius. Komandinėje eilutėje nurodykite Quickwit indekso ` +
-      `pavadinimą iš stulpelio „quickwit_indeksas“ (pvz. dokumentai_32); ` +
+      `pavadinimą iš stulpelio „quickwit_indeksas“ (pvz. documents_32); ` +
       "sąrašo numeriai naudojami tik interaktyviame pasirinkime",
     );
   }
@@ -135,7 +152,7 @@ async function getIndexes({ lentele, minDead, minDeadRatio }) {
             i."gyvosEilutes", i."mirusiosEilutes", i."iterptosEilutes",
             CASE WHEN i."iterptosEilutes" = 0 THEN 0
                  ELSE 100.0 * i."mirusiosEilutes" / i."iterptosEilutes" END AS "deadRatio"
-     FROM "quickwitIndeksai" i
+     FROM "quickwit"."indeksai" i
      WHERE ($1::text IS NULL OR i."lentele" = $1) AND i."mirusiosEilutes" >= $2
        AND CASE WHEN i."iterptosEilutes" = 0 THEN 0
                 ELSE 100.0 * i."mirusiosEilutes" / i."iterptosEilutes" END >= $3
@@ -260,7 +277,7 @@ export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, [lentele]);
     const { rows: countRows } = await client.query(
       `SELECT COUNT(*)::int AS total
-       FROM "quickwitEilutes"
+       FROM "quickwit"."eilutes"
        WHERE "indeksaiId" = ANY($1::int[])`,
       [indexIds],
     );
@@ -270,27 +287,27 @@ export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres
     }
 
     // Otherwise re-indexed rows could land back in a selected current shard.
-    await client.query(`UPDATE "quickwitIndeksai" SET "current" = false WHERE "lentele" = $1 AND "indeksas" = ANY($2::text[])`, [lentele, names]);
+    await client.query(`UPDATE "quickwit"."indeksai" SET "current" = false WHERE "lentele" = $1 AND "indeksas" = ANY($2::text[])`, [lentele, names]);
     const { rowCount: replacedQueueRows } = await client.query(
-      `DELETE FROM "${table.queue}" q USING "quickwitEilutes" e
+      `DELETE FROM ${queueRef(table)} q USING "quickwit"."eilutes" e
        WHERE e."indeksaiId" = ANY($1::int[])
          AND q."${table.queueId}" = ${table.queueValue ?? `e."eilutesId"::bigint`}`,
       [indexIds],
     );
 
     const { rowCount: queuedPatches } = await client.query(
-      `INSERT INTO "${table.queue}" ("${table.queueId}", "keitimas")
+      `INSERT INTO ${queueRef(table)} ("${table.queueId}", "${table.changeColumn ?? "keitimas"}")
        SELECT ${table.queueValue ?? `e."eilutesId"::bigint`}, 'patch'
-       FROM "quickwitEilutes" e
-       JOIN "${table.source}" s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
+       FROM "quickwit"."eilutes" e
+       JOIN ${sourceRef(table)} s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
        WHERE e."indeksaiId" = ANY($1::int[])`,
       [indexIds],
     );
     const { rowCount: queuedDeletes } = await client.query(
-      `INSERT INTO "${table.queue}" ("${table.queueId}", "keitimas")
+      `INSERT INTO ${queueRef(table)} ("${table.queueId}", "${table.changeColumn ?? "keitimas"}")
        SELECT ${table.queueValue ?? `e."eilutesId"::bigint`}, 'delete'
-       FROM "quickwitEilutes" e
-       LEFT JOIN "${table.source}" s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
+       FROM "quickwit"."eilutes" e
+       LEFT JOIN ${sourceRef(table)} s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
        WHERE e."indeksaiId" = ANY($1::int[]) AND s."${table.sourceId}" IS NULL`,
       [indexIds],
     );

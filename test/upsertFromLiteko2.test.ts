@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../modules/dokumentai/dokumentaiFs.js", () => ({
-    saveDokumentasFs: vi.fn(),
+vi.mock("../modules/documents/documentsFs.js", () => ({
+    saveDocumentFs: vi.fn(),
 }));
 
-import { saveDokumentasFs } from "../modules/dokumentai/dokumentaiFs.js";
-import { upsertLiteko2ToDokumentai } from "../modules/dokumentai/upsertFromLiteko2.js";
+import { saveDocumentFs } from "../modules/documents/documentsFs.js";
+import { upsertLiteko2ToDocuments } from "../modules/documents/upsertFromLiteko2.js";
 
-describe("LITEKO2 propagavimas į dokumentai", () => {
+describe("LITEKO2 propagavimas į documents", () => {
     beforeEach(() => vi.clearAllMocks());
 
     it("įrašo dokumentų sidecar ir paieškos eilutę", async () => {
-        const db = { query: vi.fn().mockResolvedValue({ rowCount: 1 }) };
+        const db = { query: vi.fn().mockResolvedValue({ rows: [{ documentId: 7 }] }) };
         const sprendimas = {
             md5: "abc123",
             liteko2Id: "09002713826d0048",
@@ -33,41 +33,51 @@ describe("LITEKO2 propagavimas į dokumentai", () => {
             metadata: { sprendimoData: "2026-08-03T07:36:38Z", busena: "decs_published" },
         };
 
-        await upsertLiteko2ToDokumentai(sprendimas, sidecar, db);
+        await upsertLiteko2ToDocuments(sprendimas, sidecar, db);
 
-        expect(saveDokumentasFs).toHaveBeenCalledWith("abc123", sidecar);
+        expect(saveDocumentFs).toHaveBeenCalledWith("abc123", sidecar);
         expect(db.query).toHaveBeenCalledOnce();
         const [sql, params] = db.query.mock.calls[0];
-        expect(sql).toContain("ON CONFLICT (md5) WHERE source = 'liteko2'");
+        expect(sql).toContain('ON CONFLICT ("sourceId", md5) WHERE md5 IS NOT NULL');
         expect(params).toEqual([
-            "abc123",
             "teise",
             "teismoNuosprendis",
             "liteko2",
-            "https://liteko-api-pub.teismas.lt/v1/decisions/09002713826d0048",
-            "1-01-1-32513-2022-3",
-            "T-1212-718/2026",
-            "09002713826d0048",
+            "https",
+            "liteko-api-pub.teismas.lt",
+            null,
+            "/v1/decisions/09002713826d0048",
+            "abc123",
             "T-1212-718/2026 — Klaipėdos apylinkės teismas",
+            "lt",
             "html",
             "text/html",
-            "lt",
+            null,
             42,
             300,
             "2026-08-03T07:36:38Z",
+            null,
+            null,
+            null,
+            "1-01-1-32513-2022-3",
+            "T-1212-718/2026",
+            "09002713826d0048",
+            null,
+            null,
+            null,
         ]);
     });
 
     it("atmeta nesutampantį sidecar raktą", async () => {
         const db = { query: vi.fn() };
 
-        await expect(upsertLiteko2ToDokumentai(
+        await expect(upsertLiteko2ToDocuments(
             { md5: "vienas", liteko2Id: "id" },
             { md5: "kitas" },
             db,
         )).rejects.toThrow("sidecar md5 nesutampa");
 
-        expect(saveDokumentasFs).not.toHaveBeenCalled();
+        expect(saveDocumentFs).not.toHaveBeenCalled();
         expect(db.query).not.toHaveBeenCalled();
     });
 });

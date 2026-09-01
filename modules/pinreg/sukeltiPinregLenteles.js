@@ -13,7 +13,7 @@ async function sukeltiPinregLenteles() {
         const res = await postgres.query(
             `
             SELECT *
-            FROM pinreg
+            FROM pinreg."deklaracijos"
             WHERE uuid > $1
             ORDER BY uuid
             LIMIT 1000
@@ -40,7 +40,7 @@ async function sukeltiPinregLenteles() {
 
                     // Delete old entries for this declaration
                     await postgres.query(
-                        `DELETE FROM "pinregJuridiniaiRysiai" WHERE "deklaracija" = $1`,
+                        `DELETE FROM pinreg."juridiniaiRysiai" WHERE "deklaracija" = $1`,
                         [deklaracija.accessUuid],
                     );
 

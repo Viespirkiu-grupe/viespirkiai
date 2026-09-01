@@ -1,5 +1,5 @@
 /**
- * Maps a pinreg declaration JSON to pinregJuridiniaiRysiai rows.
+ * Maps a pinreg declaration JSON to pinreg."juridiniaiRysiai" rows.
  * @param {object} deklaracija - Parsed declaration JSON
  * @returns {Array} - Array of row objects
  */
@@ -28,7 +28,6 @@ export function deklaracijaToRysiai(deklaracija) {
             susijusioAsmensVardas: null,
             susijusioAsmensPavarde: null,
             pareigos: null,
-            teisejoKodas: null,
             darbovietesTipas: null,
             pateikimoData: deklaracija.pateikimoData,
         })),
@@ -51,7 +50,6 @@ export function deklaracijaToRysiai(deklaracija) {
                 uzpildytaAutomatiskai: d.uzpildytaAutomatiskai,
                 jaTeisinesFormosPavadinimas: d.jaTeisinesFormosPavadinimas,
                 pareigos: p.pareigos,
-                teisejoKodas: p.teisejoKodas,
                 darbovietesTipas: d.darbovietesTipas,
                 jaTeisinesFormosKodas: null,
                 kienoRysys: null,
@@ -79,7 +77,6 @@ export function deklaracijaToRysiai(deklaracija) {
                 uzpildytaAutomatiskai: d.uzpildytaAutomatiskai,
                 jaTeisinesFormosPavadinimas: d.jaTeisinesFormosPavadinimas,
                 pareigos: p.pareigos,
-                teisejoKodas: p.teisejoKodas,
                 darbovietesTipas: d.darbovietesTipas,
                 jaTeisinesFormosKodas: null,
                 susijusioAsmensVardas: null,
@@ -95,6 +92,9 @@ export function deklaracijaToRysiai(deklaracija) {
     ];
 }
 
+// Rašytojo laukai. `rysioPobudzioPavadinimas` ir teisinės formos kodas /
+// pavadinimas čia lieka tekstu – id jiems parenka SQL (žodynai `pinreg`
+// schemoje). `teisejoKodas` išmestas: šaltinis jo neduoda nė vienoje eilutėje.
 const COLUMNS = [
     "irasoTipas",
     "jarKodas",
@@ -112,7 +112,6 @@ const COLUMNS = [
     "susijusioAsmensVardas",
     "susijusioAsmensPavarde",
     "pareigos",
-    "teisejoKodas",
     "darbovietesTipas",
     "kienoRysys",
     "pastabos",
@@ -123,19 +122,20 @@ const COLUMNS = [
 ];
 
 /**
- * Replaces all pinregJuridiniaiRysiai rows for a declaration, within a transaction.
+ * Replaces all pinreg."juridiniaiRysiai" rows for a declaration, within a transaction.
  * @param {object} client - pg pool client
  * @param {string} accessUuid
  * @param {Array} allRows
  */
 export async function upsertRysiai(client, accessUuid, allRows) {
     await client.query(
-        `DELETE FROM "pinregJuridiniaiRysiai" WHERE "deklaracija" = $1`,
+        `DELETE FROM pinreg."juridiniaiRysiai" WHERE "deklaracija" = $1`,
         [accessUuid],
     );
 
     if (!allRows.length) return;
 
+    const stulpeliai = COLUMNS.map((c) => `"${c}"`).join(", ");
     const valuesPlaceholders = allRows
         .map(
             (_, idx) =>
@@ -145,9 +145,62 @@ export async function upsertRysiai(client, accessUuid, allRows) {
 
     const params = allRows.flatMap((r) => COLUMNS.map((c) => r[c] ?? null));
 
+    // Žodynai papildomi ir id parenkami tame pačiame sakinyje – be kešo ir be
+    // atskirų kreipinių kiekvienai deklaracijai.
     await client.query(
-        `INSERT INTO "pinregJuridiniaiRysiai" (${COLUMNS.map((c) => `"${c}"`).join(",")})
-         VALUES ${valuesPlaceholders}`,
+        `WITH incoming AS (
+             SELECT * FROM (VALUES ${valuesPlaceholders}) AS x(${stulpeliai})
+         ), ins_pobudziai AS (
+             INSERT INTO pinreg."rysiuPobudziai" ("pavadinimas")
+             SELECT DISTINCT nullif(btrim("rysioPobudzioPavadinimas"), '') FROM incoming
+             WHERE nullif(btrim("rysioPobudzioPavadinimas"), '') IS NOT NULL
+             ON CONFLICT ("pavadinimas") DO NOTHING RETURNING "id", "pavadinimas"
+         ), ins_formos AS (
+             INSERT INTO pinreg."teisinesFormos" ("kodas", "pavadinimas")
+             SELECT DISTINCT nullif(btrim("jaTeisinesFormosKodas"), ''),
+                             nullif(btrim("jaTeisinesFormosPavadinimas"), '')
+             FROM incoming
+             WHERE nullif(btrim("jaTeisinesFormosKodas"), '') IS NOT NULL
+                OR nullif(btrim("jaTeisinesFormosPavadinimas"), '') IS NOT NULL
+             ON CONFLICT ("kodas", "pavadinimas") DO NOTHING RETURNING "id", "kodas", "pavadinimas"
+         )
+         INSERT INTO pinreg."juridiniaiRysiai" (
+             "deklaracija", "irasoTipas", "vardas", "pavarde",
+             "susijusioAsmensVardas", "susijusioAsmensPavarde", "jarKodas",
+             "pavadinimas", "registruotaLietuvoje", "teisinesFormosId", "pareigos",
+             "darbovietesTipas", "rysioPobudzioId", "kienoRysys", "rysioPradzia",
+             "rysioPabaiga", "uzpildytaAutomatiskai", "duomenuSaltinis",
+             "dalyvaujaViesuosePirkimuose", "dalyvavimoVpInformacija", "pastabos",
+             "pateikimoData"
+         )
+         SELECT
+             i."deklaracija"::uuid,
+             i."irasoTipas"::pinreg."irasoTipas",
+             i."vardas", i."pavarde", i."susijusioAsmensVardas",
+             i."susijusioAsmensPavarde", i."jarKodas", i."pavadinimas",
+             i."registruotaLietuvoje"::boolean,
+             (SELECT "id" FROM pinreg."teisinesFormos"
+               WHERE COALESCE("kodas", '') = COALESCE(nullif(btrim(i."jaTeisinesFormosKodas"), ''), '')
+                 AND COALESCE("pavadinimas", '') = COALESCE(nullif(btrim(i."jaTeisinesFormosPavadinimas"), ''), '')
+               UNION ALL
+              SELECT "id" FROM ins_formos
+               WHERE COALESCE("kodas", '') = COALESCE(nullif(btrim(i."jaTeisinesFormosKodas"), ''), '')
+                 AND COALESCE("pavadinimas", '') = COALESCE(nullif(btrim(i."jaTeisinesFormosPavadinimas"), ''), '')
+               LIMIT 1),
+             i."pareigos",
+             nullif(btrim(i."darbovietesTipas"), '')::pinreg."darbovietesTipas",
+             (SELECT "id" FROM pinreg."rysiuPobudziai"
+               WHERE "pavadinimas" = nullif(btrim(i."rysioPobudzioPavadinimas"), '')
+               UNION ALL
+              SELECT "id" FROM ins_pobudziai
+               WHERE "pavadinimas" = nullif(btrim(i."rysioPobudzioPavadinimas"), '')
+               LIMIT 1),
+             nullif(btrim(i."kienoRysys"), '')::pinreg."kienoRysys",
+             i."rysioPradzia"::date, i."rysioPabaiga"::date,
+             i."uzpildytaAutomatiskai"::boolean, i."duomenuSaltinis"::jsonb,
+             i."dalyvaujaViesuosePirkimuose"::boolean, i."dalyvavimoVpInformacija",
+             i."pastabos", i."pateikimoData"::timestamptz
+         FROM incoming i`,
         params,
     );
 }

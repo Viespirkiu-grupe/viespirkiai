@@ -82,15 +82,16 @@ export async function loadLegalActDocument(teisesAktoId, versijosId = "original"
     // o dokumentų lentelėje – e-TAR varianto kodu.
     if (versijosId === "asr") versijosId = "consolidated_edition";
     const { rows } = await postgres.query(
-        `SELECT d.id, d.md5, d.type, d.source, d.pavadinimas, d.url, d."failasId",
+        `SELECT d.id, d.md5, d.type, d.source, d.title AS pavadinimas, d.url,
+                d."fileId" AS "failasId",
                 EXISTS (
-                    SELECT 1 FROM public."filesHidden" h WHERE h.id = d."failasId"
+                    SELECT 1 FROM public."filesHidden" h WHERE h.id = d."fileId"
                 ) AS pasleptas
-           FROM public.dokumentai d
+           FROM documents."documentsFull" d
           WHERE d.class = 'teisekura'
-            AND d."saltinioId0" = $1
-            AND (d."saltinioId3" = $2 OR d."saltinioId1" = $2)
-          ORDER BY CASE WHEN d."saltinioId3" = $2 THEN 0 ELSE 1 END
+            AND d."sourceId0" = $1
+            AND (d."sourceId3" = $2 OR d."sourceId1" = $2)
+          ORDER BY CASE WHEN d."sourceId3" = $2 THEN 0 ELSE 1 END
           LIMIT 1`,
         [teisesAktoId, versijosId],
     );

@@ -18,11 +18,11 @@ const { rows, skelbimai } = asmuo.darboSkelbimai;
   {skelbimai.map((s: any) => (
     <ResultCardShell>
       <dl slot="meta" class="result-card-meta">
-        <div><dt class="sr-only">Paskelbta</dt><dd>Paskelbta {s.ikelimo_data}</dd></div>
-        <div><dt class="sr-only">Galioja</dt><dd>{s.galioja_nuo || 'nežinoma'} – {s.galioja_iki || 'nežinoma'}</dd></div>
+        <div><dt class="sr-only">Paskelbta</dt><dd>Paskelbta {s.ikelimoData}</dd></div>
+        <div><dt class="sr-only">Galioja</dt><dd>{s.galiojaNuo || 'nežinoma'} – {s.galiojaIki || 'nežinoma'}</dd></div>
       </dl>
-      <h3 slot="title" class="result-card-title">{s.profesijos_pareigybes_pav || 'Profesijos pareigybės pavadinimas nenurodytas'}</h3>
-      <p class="text-sm text-muted mt-2 line-clamp-4">{s.darbo_aprasymas_lt || 'Darbo aprašymas nenurodytas'}</p>
+      <h3 slot="title" class="result-card-title">{s.profesija || 'Profesijos pareigybės pavadinimas nenurodytas'}</h3>
+      <p class="text-sm text-muted mt-2 line-clamp-4">{s.darboAprasymas || 'Darbo aprašymas nenurodytas'}</p>
     </ResultCardShell>
   ))}
 </ResultSection>

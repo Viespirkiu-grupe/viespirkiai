@@ -105,33 +105,33 @@ async function insertBatch(rows) {
             VALUES ${placeholders}
         ),
         templates AS (
-            INSERT INTO "pelnoNuostoliuAtaskaitosTemplatePavadinimai" ("templateId", "templateName")
+            INSERT INTO "adpFinansinesAtaskaitos"."pelnoNuostoliuFormos" ("templateId", "templateName")
             SELECT DISTINCT "templateId", "templateName"
             FROM input
             WHERE "templateId" IS NOT NULL
             ON CONFLICT ("templateId") DO UPDATE
             SET "templateName" = EXCLUDED."templateName"
-            WHERE "pelnoNuostoliuAtaskaitosTemplatePavadinimai"."templateName" IS DISTINCT FROM EXCLUDED."templateName"
+            WHERE "adpFinansinesAtaskaitos"."pelnoNuostoliuFormos".templateName" IS DISTINCT FROM EXCLUDED."templateName"
         ),
         standards AS (
-            INSERT INTO "pelnoNuostoliuAtaskaitosStandardPavadinimai" ("standardId", "standardName")
+            INSERT INTO "adpFinansinesAtaskaitos"."pelnoNuostoliuStandartai" ("standardId", "standardName")
             SELECT DISTINCT "standardId", "standardName"
             FROM input
             WHERE "standardId" IS NOT NULL
             ON CONFLICT ("standardId") DO UPDATE
             SET "standardName" = EXCLUDED."standardName"
-            WHERE "pelnoNuostoliuAtaskaitosStandardPavadinimai"."standardName" IS DISTINCT FROM EXCLUDED."standardName"
+            WHERE "adpFinansinesAtaskaitos"."pelnoNuostoliuStandartai".standardName" IS DISTINCT FROM EXCLUDED."standardName"
         ),
         lines AS (
-            INSERT INTO "pelnoNuostoliuAtaskaitosLinePavadinimai" ("lineTypeId", "lineName")
+            INSERT INTO "adpFinansinesAtaskaitos"."pelnoNuostoliuEiluciuTipai" ("lineTypeId", "lineName")
             SELECT DISTINCT "lineTypeId", "lineName"
             FROM input
             WHERE "lineTypeId" IS NOT NULL
             ON CONFLICT ("lineTypeId") DO UPDATE
             SET "lineName" = EXCLUDED."lineName"
-            WHERE "pelnoNuostoliuAtaskaitosLinePavadinimai"."lineName" IS DISTINCT FROM EXCLUDED."lineName"
+            WHERE "adpFinansinesAtaskaitos"."pelnoNuostoliuEiluciuTipai".lineName" IS DISTINCT FROM EXCLUDED."lineName"
         )
-        INSERT INTO "pelnoNuostoliuAtaskaitos" (
+        INSERT INTO "adpFinansinesAtaskaitos"."pelnoNuostoliuEilutes" (
             "_id", "jarId", "formaId", "statusasId", "templateId", "standardId", "lineTypeId",
             "reiksme", "laikotarpisNuo", "laikotarpisIki", "duomenuData"
         )

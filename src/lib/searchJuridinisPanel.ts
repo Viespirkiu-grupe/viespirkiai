@@ -1,3 +1,4 @@
+import { JAR_LOCATION_JOINS, JAR_LOCATION_SQL } from '@/modules/juridiniai/jarReadSql.js';
 import { searchJar } from '@/modules/juridiniai/search.js';
 import { gautiSodrosDuomenis } from '@/modules/sodra/sodraDuomenys.js';
 import { gautiSutarciuDuomenisPagalJarKoda } from '@/modules/sutartys/pagalJarKoda.js';
@@ -51,15 +52,10 @@ export async function findSingleJuridinisPanel(q: string): Promise<JuridinisPane
       `SELECT
          CASE WHEN resolved.location IS NULL THEN NULL ELSE ST_Y(resolved.location::geometry) END AS lat,
          CASE WHEN resolved.location IS NULL THEN NULL ELSE ST_X(resolved.location::geometry) END AS lon
-       FROM public."jarAsmenys" jar_person
-       LEFT JOIN public."jarAsmenuAdresai" jar_address
-         ON jar_address."jarKodas" = jar_person."jarKodas"
-       LEFT JOIN public."arPatalposAdresai" jar_room
-         ON jar_room."patKodas" = jar_address."aobKodas"
-       LEFT JOIN public."arAdresai" jar_ar
-         ON jar_ar."kodas" = COALESCE(jar_room."aobKodas", jar_address."aobKodas")
+       FROM "rcJar"."asmenys" jar_person
+       ${JAR_LOCATION_JOINS}
        CROSS JOIN LATERAL (
-         SELECT COALESCE(jar_ar."geometrija", jar_address."fallbackLocation") AS location
+         SELECT ${JAR_LOCATION_SQL} AS location
        ) resolved
        WHERE jar_person."jarKodas" = $1
        LIMIT 1`,

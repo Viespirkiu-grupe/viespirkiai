@@ -14,7 +14,7 @@ export async function getVdiPazeidimai(jarKodas, options = {}) {
     }
 
     const res = await postgres.query(
-        `SELECT *, ${WINDOW_COUNT_SQL} FROM "vdiPazeidimai" WHERE "jarKodas" = $1 ORDER BY "straipsnis" LIMIT $2`,
+        `SELECT *, ${WINDOW_COUNT_SQL} FROM vdi."pazeidimaiPilni" WHERE "jarKodas" = $1::integer ORDER BY "straipsnis" LIMIT $2`,
         [jarKodas, limit],
     );
     const { rows: pazeidimai, viso } = splitWindowCount(res.rows);

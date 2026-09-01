@@ -183,11 +183,12 @@ export async function importuotiMelagingusTiekejus() {
 
         await postgres.query(
             `
-     INSERT INTO "melagingiTiekejai" (
+     INSERT INTO "vptJuodiejiSarasai"."tiekejai" (
+       "sarasoId",
        "atvejoNr",
        "pirkimoNumeris",
        "tiekejoPasalinimoData",
-       "dataNuoKuriosSkaiciuojamasTerminas",
+       "terminoPradzia",
        "itrauktasIki",
        "irasymoPagrindas",
        "duomenuIvedimoData",
@@ -198,12 +199,14 @@ export async function importuotiMelagingusTiekejus() {
        "teismoSprendimoLink",
        "metai",
        "paskutiniKartaMatytaSarase"
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-     ON CONFLICT ("tiekejoJarKodas", "pirkimoNumeris")
+     ) VALUES (
+       (SELECT "id" FROM "vptJuodiejiSarasai"."sarasai" WHERE "kodas" = 'melagingi'),
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     ON CONFLICT ("sarasoId", "tiekejoJarKodas", "pirkimoNumeris")
      DO UPDATE SET
        "atvejoNr" = EXCLUDED."atvejoNr",
        "tiekejoPasalinimoData" = EXCLUDED."tiekejoPasalinimoData",
-       "dataNuoKuriosSkaiciuojamasTerminas" = EXCLUDED."dataNuoKuriosSkaiciuojamasTerminas",
+       "terminoPradzia" = EXCLUDED."terminoPradzia",
        "itrauktasIki" = EXCLUDED."itrauktasIki",
        "irasymoPagrindas" = EXCLUDED."irasymoPagrindas",
        "duomenuIvedimoData" = EXCLUDED."duomenuIvedimoData",
@@ -241,7 +244,8 @@ export async function importuotiMelagingusTiekejus() {
 
         await postgres.query(
             `
-      INSERT INTO "melagingiTiekejaiPagrindimai" (
+      INSERT INTO "vptJuodiejiSarasai"."pagrindimai" (
+        "sarasoId",
         "duomenuIvedimoData",
         "pirkimoVykdytojoPavadinimas",
         "tiekejoPavadinimas",
@@ -252,8 +256,10 @@ export async function importuotiMelagingusTiekejus() {
         "tiekejoPasalinimoData",
         "irasymoPagrindas",
         "tiekejoPaaiskinimas"
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-      ON CONFLICT ("tiekejoJarKodas", "pirkimoNumeris")
+      ) VALUES (
+        (SELECT "id" FROM "vptJuodiejiSarasai"."sarasai" WHERE "kodas" = 'melagingi'),
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      ON CONFLICT ("sarasoId", "tiekejoJarKodas", "pirkimoNumeris")
       DO UPDATE SET
         "duomenuIvedimoData" = EXCLUDED."duomenuIvedimoData",
         "pirkimoVykdytojoPavadinimas" = EXCLUDED."pirkimoVykdytojoPavadinimas",

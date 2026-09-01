@@ -113,7 +113,7 @@ export const viesiejiPirkimaiFilter = new FilterBuilder({
                         return `(code >= ${addParam(prefix.padEnd(8, "0"))} AND code < ${addParam(end.padEnd(8, "0"))})`;
                     });
                 if (!ors.length) return null;
-                return `"bvpzKodai" && ARRAY(SELECT code FROM "bvpzKodai" WHERE ${ors.join(" OR ")})`;
+                return `"bvpzKodai" && ARRAY(SELECT code FROM bvpz."kodai" WHERE ${ors.join(" OR ")})`;
             },
         },
     ],

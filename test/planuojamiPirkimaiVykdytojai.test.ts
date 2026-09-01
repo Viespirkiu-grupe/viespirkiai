@@ -46,7 +46,7 @@ describe("planuojamų pirkimų vykdytojų JAR nustatymas", () => {
             1,
         ]);
         expect(db.query.mock.calls[2][0]).toContain(
-            'UPDATE public."planuojamiPirkimaiSearch"',
+            'UPDATE "eppsPlanuojamiPirkimai"."search"',
         );
     });
 

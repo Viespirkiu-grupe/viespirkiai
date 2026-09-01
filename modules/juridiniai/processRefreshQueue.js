@@ -8,7 +8,7 @@ const DEFAULT_BATCH_SIZE = 1_000;
 
 export const REFRESH_BATCH_SQL = buildJuridiniaiUpsertSql(
     `SELECT jar_person.*
-     FROM public."jarAsmenys" jar_person
+     FROM "rcJar"."asmenys" jar_person
      WHERE jar_person."jarKodas" = ANY($1::integer[])`,
     `SELECT
         (SELECT count(*)::integer FROM batch) AS "found",
@@ -63,7 +63,7 @@ export async function processJuridiniaiRefreshQueue(
             `DELETE FROM public."juridiniai" j
              WHERE j."jarKodas" = ANY($1::text[])
                AND NOT EXISTS (
-                   SELECT 1 FROM public."jarAsmenys" source
+                   SELECT 1 FROM "rcJar"."asmenys" source
                    WHERE source."jarKodas"::text = j."jarKodas"
                )`,
             [codes.map(String)],

@@ -9,7 +9,7 @@ export type Ppa = {
   pasiulymuEile: Record<string, any>[];
   proceduruPabaiga: Record<string, any>[];
   sutartys: Record<string, any>[];
-  /** `xlsxPPAsutartys.id` → the matching `vpmSutartys` record, when one was found. */
+  /** `ppa."ataskaituSutartys".id` → the matching `vpmSutartys` record, when one was found. */
   sutarciuAtitikmenys: Record<string, PpaSutartiesAtitikmuo>;
 };
 
@@ -37,8 +37,8 @@ async function loadPpaSutarciuAtitikmenys(ataskaitaId: string | number): Promise
     `WITH ppa AS (
        SELECT s.id, s."tiekejosKodas", s."sutartiesVerte", s."sutartisSudarymoData",
               a."pirkimoNumeris", a."perkanciosiosOrganizacijosKodas"
-       FROM "xlsxPPAsutartys" s
-       JOIN "xlsxPPAataskaitos" a ON a.id = s."ataskaitaId"
+       FROM ppa."ataskaituSutartys" s
+       JOIN ppa."ataskaitos" a ON a.id = s."ataskaitaId"
        WHERE s."ataskaitaId" = $1
      ), kand AS (
        SELECT p.id AS "ppaId", v."unikalusId", v."sutartiesNumeris",
@@ -81,7 +81,7 @@ async function loadPpaSutarciuAtitikmenys(ataskaitaId: string | number): Promise
 /**
  * Load a parsed PPA procurement report (and all its child rows) for a given
  * `failai.id`. Returns `null` when the file has not been parsed into the
- * `xlsxPPA*` tables yet.
+ * `ppa` schema tables yet.
  */
 export async function loadPpaByFailasId(failasId: string | number): Promise<Ppa | null> {
   const { rows } = await postgres.query(
@@ -93,14 +93,14 @@ export async function loadPpaByFailasId(failasId: string | number): Promise<Ppa 
             it.pavadinimas AS "igaliotosiosTipas",
             pb.pavadinimas AS "pirkimoBudas",
             por.pavadinimas AS "pirkimoObjektoRusis"
-     FROM "xlsxPPAataskaitos" a
-     LEFT JOIN "xlsxPPAteisiniaiPagrindai" tp ON tp.id = a."teisinisPagrindasId"
-     LEFT JOIN "xlsxPPAataskaitosTipai" atp ON atp.id = a."ataskaitosTipasId"
-     LEFT JOIN "xlsxPPApirkimoVertes" pv ON pv.id = a."pirkimoVerteId"
-     LEFT JOIN "xlsxPPAperkanciosiosOrganizacijosTipai" pot ON pot.id = a."perkanciosiosOrganizacijosTipasId"
-     LEFT JOIN "xlsxPPAigaliotosiosTipai" it ON it.id = a."igaliotosiosTipasId"
-     LEFT JOIN "xlsxPPApirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
-     LEFT JOIN "xlsxPPApirkimoObjektoRusys" por ON por.id = a."pirkimoObjektoRusisId"
+     FROM ppa."ataskaitos" a
+     LEFT JOIN ppa."teisiniaiPagrindai" tp ON tp.id = a."teisinisPagrindasId"
+     LEFT JOIN ppa."ataskaitosTipai" atp ON atp.id = a."ataskaitosTipasId"
+     LEFT JOIN ppa."pirkimoVertes" pv ON pv.id = a."pirkimoVerteId"
+     LEFT JOIN ppa."perkanciosiosOrganizacijosTipai" pot ON pot.id = a."perkanciosiosOrganizacijosTipasId"
+     LEFT JOIN ppa."igaliotosiosTipai" it ON it.id = a."igaliotosiosTipasId"
+     LEFT JOIN ppa."pirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
+     LEFT JOIN ppa."pirkimoObjektoRusys" por ON por.id = a."pirkimoObjektoRusisId"
      WHERE a."failasId" = $1
      ORDER BY a."sukurtaAt" DESC
      LIMIT 1`,
@@ -112,13 +112,13 @@ export async function loadPpaByFailasId(failasId: string | number): Promise<Ppa 
   const id = ataskaita.id;
   const [pirkimoDalys, dalyviai, vertinimoKriterjai, atmestiPasiulymai, pasiulymuEile, proceduruPabaiga, sutartys, sutarciuAtitikmenys] =
     await Promise.all([
-      postgres.query(`SELECT * FROM "xlsxPPApirkimoDalys" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
-      postgres.query(`SELECT d.*, s.pavadinimas AS salis FROM "xlsxPPAdalyviai" d LEFT JOIN "xlsxPPAsalys" s ON s.id = d."salisId" WHERE d."ataskaitaId" = $1 ORDER BY d.id`, [id]),
-      postgres.query(`SELECT * FROM "xlsxPPAvertinimoKriterijai" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
-      postgres.query(`SELECT ap.*, st.pavadinimas AS statusas, tp.pavadinimas AS "atmetimoTeisinisPagrindas", pr.pavadinimas AS "atmetimoPriezastys", ki.pavadinimas AS "kainosIsraiska" FROM "xlsxPPAatmestiPasiulymai" ap LEFT JOIN "xlsxPPAatmestuPasiulymuStatusai" st ON st.id = ap."statusasId" LEFT JOIN "xlsxPPAatmetimoTeisiniaiPagrindai" tp ON tp.id = ap."atmetimoTeisinisPagrindasId" LEFT JOIN "xlsxPPAatmetimoPriezastys" pr ON pr.id = ap."atmetimoPriezastysId" LEFT JOIN "xlsxPPAkainosIsraiskos" ki ON ki.id = ap."kainosIsraiskaId" WHERE ap."ataskaitaId" = $1 ORDER BY ap.id`, [id]),
-      postgres.query(`SELECT e.*, ki.pavadinimas AS "kainosIsraiska" FROM "xlsxPPApasiulymuEile" e LEFT JOIN "xlsxPPAkainosIsraiskos" ki ON ki.id = e."kainosIsraiskaId" WHERE e."ataskaitaId" = $1 ORDER BY e.id`, [id]),
-      postgres.query(`SELECT * FROM "xlsxPPAproceduruPabaiga" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
-      postgres.query(`SELECT s.*, ct.pavadinimas AS "centralizacijosTipas" FROM "xlsxPPAsutartys" s LEFT JOIN "xlsxPPAcentralizacijosTipai" ct ON ct.id = s."centralizacijosTipasId" WHERE s."ataskaitaId" = $1 ORDER BY s.id`, [id]),
+      postgres.query(`SELECT * FROM ppa."pirkimoDalys" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
+      postgres.query(`SELECT d.*, s.pavadinimas AS salis FROM ppa."dalyviai" d LEFT JOIN ppa."salys" s ON s.id = d."salisId" WHERE d."ataskaitaId" = $1 ORDER BY d.id`, [id]),
+      postgres.query(`SELECT * FROM ppa."vertinimoKriterijai" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
+      postgres.query(`SELECT ap.*, st.pavadinimas AS statusas, tp.pavadinimas AS "atmetimoTeisinisPagrindas", pr.pavadinimas AS "atmetimoPriezastys", ki.pavadinimas AS "kainosIsraiska" FROM ppa."atmestiPasiulymai" ap LEFT JOIN ppa."atmestuPasiulymuStatusai" st ON st.id = ap."statusasId" LEFT JOIN ppa."atmetimoTeisiniaiPagrindai" tp ON tp.id = ap."atmetimoTeisinisPagrindasId" LEFT JOIN ppa."atmetimoPriezastys" pr ON pr.id = ap."atmetimoPriezastysId" LEFT JOIN ppa."kainosIsraiskos" ki ON ki.id = ap."kainosIsraiskaId" WHERE ap."ataskaitaId" = $1 ORDER BY ap.id`, [id]),
+      postgres.query(`SELECT e.*, ki.pavadinimas AS "kainosIsraiska" FROM ppa."pasiulymuEile" e LEFT JOIN ppa."kainosIsraiskos" ki ON ki.id = e."kainosIsraiskaId" WHERE e."ataskaitaId" = $1 ORDER BY e.id`, [id]),
+      postgres.query(`SELECT * FROM ppa."proceduruPabaiga" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
+      postgres.query(`SELECT s.*, ct.pavadinimas AS "centralizacijosTipas" FROM ppa."ataskaituSutartys" s LEFT JOIN ppa."centralizacijosTipai" ct ON ct.id = s."centralizacijosTipasId" WHERE s."ataskaitaId" = $1 ORDER BY s.id`, [id]),
       loadPpaSutarciuAtitikmenys(id),
     ]);
 
@@ -188,7 +188,7 @@ export function grupuotiPagalDalis<T extends Record<string, any>>(
 ): PpaGrupe<T>[] {
   const grupes = new Map<string, { eilute: T; numeriai: unknown[] }>();
   for (const row of rows) {
-    const raktas = laukai.map((k) => JSON.stringify(row[k] ?? null)).join(' ');
+    const raktas = laukai.map((k) => JSON.stringify(row[k] ?? null)).join('\u0000');
     const esama = grupes.get(raktas);
     if (esama) esama.numeriai.push(row[daliesLaukas]);
     else grupes.set(raktas, { eilute: row, numeriai: [row[daliesLaukas]] });
@@ -239,22 +239,22 @@ export type PpaSantrauka = {
 
 /**
  * Lightweight lookup for a procurement page: finds the PPA report tied to a
- * `viesiejiPirkimai.pirkimoId` (matched on `xlsxPPAataskaitos.pirkimoNumeris`) and
+ * `viesiejiPirkimai.pirkimoId` (matched on `ppa."ataskaitos".pirkimoNumeris`) and
  * returns the participant list and the offer queue as separate lists, plus the
  * source file id for a "view full report" link. Returns `null` for procurements
  * without an PPA (e.g. CVPP).
  */
 export async function loadPpaForPirkimas(pirkimoNumeris: string): Promise<PpaSantrauka | null> {
   const { rows } = await postgres.query(
-    `SELECT id, "failasId" FROM "xlsxPPAataskaitos" WHERE "pirkimoNumeris" = $1 ORDER BY "sukurtaAt" DESC LIMIT 1`,
+    `SELECT id, "failasId" FROM ppa."ataskaitos" WHERE "pirkimoNumeris" = $1 ORDER BY "sukurtaAt" DESC LIMIT 1`,
     [pirkimoNumeris],
   );
   const ataskaita = rows[0];
   if (!ataskaita) return null;
 
   const [dalyviaiRes, eileRes] = await Promise.all([
-    postgres.query(`SELECT d.*, s.pavadinimas AS salis FROM "xlsxPPAdalyviai" d LEFT JOIN "xlsxPPAsalys" s ON s.id = d."salisId" WHERE d."ataskaitaId" = $1 ORDER BY d.id`, [ataskaita.id]),
-    postgres.query(`SELECT e.*, ki.pavadinimas AS "kainosIsraiska" FROM "xlsxPPApasiulymuEile" e LEFT JOIN "xlsxPPAkainosIsraiskos" ki ON ki.id = e."kainosIsraiskaId" WHERE e."ataskaitaId" = $1 ORDER BY e."daliesNumeris", e."eileNumeris"`, [ataskaita.id]),
+    postgres.query(`SELECT d.*, s.pavadinimas AS salis FROM ppa."dalyviai" d LEFT JOIN ppa."salys" s ON s.id = d."salisId" WHERE d."ataskaitaId" = $1 ORDER BY d.id`, [ataskaita.id]),
+    postgres.query(`SELECT e.*, ki.pavadinimas AS "kainosIsraiska" FROM ppa."pasiulymuEile" e LEFT JOIN ppa."kainosIsraiskos" ki ON ki.id = e."kainosIsraiskaId" WHERE e."ataskaitaId" = $1 ORDER BY e."daliesNumeris", e."eileNumeris"`, [ataskaita.id]),
   ]);
 
   return { failasId: ataskaita.failasId, dalyviai: dalyviaiRes.rows, pasiulymuEile: eileRes.rows };

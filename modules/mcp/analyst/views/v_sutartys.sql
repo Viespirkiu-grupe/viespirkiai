@@ -15,14 +15,14 @@ SELECT s."unikalusId" AS "sutartiesUnikalusId",
        s."faktineVerte"::numeric AS "faktineIvykdimoVerte",
        s.pavadinimas,
        COALESCE(
-           b.code || CASE WHEN NULLIF(b.checksum, '') IS NULL THEN '' ELSE '-' || b.checksum END,
+           b.code || CASE WHEN b.checksum IS NULL THEN '' ELSE '-' || b.checksum END,
            s."bvpzKodas"::text
        ) AS "bvpzKodas",
        b.pavadinimas AS "bvpzPavadinimas",
        COALESCE(eb.kodai, '{}'::text[]) AS "papildomiBvpzKodai",
        COALESCE(eb.pavadinimai, '{}'::text[]) AS "papildomiBvpzPavadinimai",
        ARRAY[COALESCE(
-           b.code || CASE WHEN NULLIF(b.checksum, '') IS NULL THEN '' ELSE '-' || b.checksum END,
+           b.code || CASE WHEN b.checksum IS NULL THEN '' ELSE '-' || b.checksum END,
            s."bvpzKodas"::text
        )] || COALESCE(eb.kodai, '{}'::text[]) AS "bvpzKodai",
        ARRAY[b.pavadinimas] || COALESCE(eb.pavadinimai, '{}'::text[]) AS "bvpzPavadinimai",
@@ -61,20 +61,20 @@ LEFT JOIN "vpmSutartysTipai" t ON t.id = s."tipasId"
 LEFT JOIN "vpmSutartysKategorijos" k ON k.id = s."kategorijaId"
 LEFT JOIN LATERAL (
     SELECT code.code, code.checksum, code.pavadinimas
-    FROM "bvpzKodai" code
+    FROM bvpz."kodai" code
     WHERE code.code = s."bvpzKodas"::text
     LIMIT 1
 ) b ON true
-LEFT JOIN "jarAsmenys" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-LEFT JOIN "jarAsmenys" tb ON tb."jarKodas"::text = s."pirmoTiekejoKodas"
+LEFT JOIN "rcJar"."asmenys" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+LEFT JOIN "rcJar"."asmenys" tb ON tb."jarKodas"::text = s."pirmoTiekejoKodas"
 LEFT JOIN LATERAL (
     SELECT array_agg(COALESCE(
-               b2.code || CASE WHEN NULLIF(b2.checksum, '') IS NULL THEN '' ELSE '-' || b2.checksum END,
+               b2.code || CASE WHEN b2.checksum IS NULL THEN '' ELSE '-' || b2.checksum END,
                x."bvpzKodas"::text
            ) ORDER BY x.id) AS kodai,
            array_agg(b2.pavadinimas ORDER BY x.id) AS pavadinimai
     FROM "vpmSutartysPapildomiBvpzKodai" x
-    LEFT JOIN "bvpzKodai" b2 ON b2.code = x."bvpzKodas"::text
+    LEFT JOIN bvpz."kodai" b2 ON b2.code = x."bvpzKodas"::text
     WHERE x."unikalusId" = s."unikalusId"
 ) eb ON true
 LEFT JOIN LATERAL (

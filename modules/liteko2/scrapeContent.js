@@ -1,14 +1,14 @@
 /*
 LITEKO2 sprendimo turinys:
-  * detalūs metaduomenys  -> liteko2Sprendimai (teismoId, procesoNr, būsena, …)
-  * šalys                 -> liteko2SprendimuDalyviai
-  * teisėjai              -> liteko2SprendimuTeisejai
-  * kategorijos           -> liteko2SprendimuKategorijos
-  * failų sąrašas         -> liteko2SprendimuFailai
+  * detalūs metaduomenys  -> liteko2.sprendimai (teismoId, procesoNr, būsena, …)
+  * šalys                 -> liteko2.sprendimuDalyviai
+  * teisėjai              -> liteko2.sprendimuTeisejai
+  * kategorijos           -> liteko2.sprendimuKategorijos
+  * failų sąrašas         -> liteko2.sprendimuFailai
   * pilnas API atsakymas + HTML + tekstas -> sidecar (modules/liteko2/sidecar.js)
 
 Tekstas ir HTML į DB NEPATENKA — tik į sidecar. Sidecar'o forma tokia pati kaip
-`public.dokumentai` sidecar'ų, kad propagavimas į dokumentus būtų plonas sluoksnis.
+`documents.documents` sidecar'ų, kad propagavimas į dokumentus būtų plonas sluoksnis.
 
     npm run liteko2:turinys
     node modules/liteko2/scrapeContent.js --limit 50
@@ -22,7 +22,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { limitArg, numArg, parseArgs } from "../../utils/cliArgs.js";
 import { runPool } from "../../utils/workerPool.js";
-import { upsertLiteko2ToDokumentai } from "../dokumentai/upsertFromLiteko2.js";
+import { upsertLiteko2ToDocuments } from "../documents/upsertFromLiteko2.js";
 
 // Turinio nuskaitymo versija (kaip liteko1 teismoNuosprendziai.turinioNuskaitymas).
 // 0/NULL = nenuskaityta; >0 = sėkmingo nuskaitymo versija; -1 = klaida; -2 = vykdoma.
@@ -86,7 +86,7 @@ async function paimtiPaketa(limit) {
     const { rows } = await postgres.query(
         `WITH claimed AS (
             SELECT id
-            FROM public."liteko2Sprendimai"
+            FROM liteko2."sprendimai"
             WHERE "atsauktas" = false
               AND (
                    ("turinioNuskaitymas" >= 0 AND "turinioNuskaitymas" < $2)
@@ -97,7 +97,7 @@ async function paimtiPaketa(limit) {
             LIMIT $1
             FOR UPDATE SKIP LOCKED
          )
-         UPDATE public."liteko2Sprendimai" s
+         UPDATE liteko2."sprendimai" s
          SET "turinioNuskaitymas" = -2
          FROM claimed
          WHERE s.id = claimed.id
@@ -109,7 +109,7 @@ async function paimtiPaketa(limit) {
 
 async function irasytiDalyvius(sprendimoId, dalyviai, sprendimoData) {
     await postgres.query(
-        `DELETE FROM public."liteko2SprendimuDalyviai" WHERE "sprendimoId" = $1`,
+        `DELETE FROM liteko2."sprendimuDalyviai" WHERE "sprendimoId" = $1`,
         [sprendimoId],
     );
     if (!dalyviai.length) return;
@@ -118,7 +118,7 @@ async function irasytiDalyvius(sprendimoId, dalyviai, sprendimoData) {
     const vaidmenys = [...new Set(dalyviai.map((d) => valyti(d.partyType)).filter(Boolean))];
     if (vaidmenys.length) {
         await postgres.query(
-            `INSERT INTO public."liteko2Vaidmenys" ("pavadinimas")
+            `INSERT INTO liteko2."vaidmenys" ("pavadinimas")
              SELECT unnest($1::text[])
              ON CONFLICT ("pavadinimas") DO NOTHING`,
             [vaidmenys],
@@ -129,13 +129,13 @@ async function irasytiDalyvius(sprendimoId, dalyviai, sprendimoData) {
         .map((_, i) => {
             const p = (n) => `$${i * 6 + n}`;
             return `(${p(1)}, ${p(2)}, ${p(3)},
-                (SELECT "id" FROM public."liteko2Vaidmenys" WHERE "pavadinimas" = ${p(4)}),
+                (SELECT "id" FROM liteko2."vaidmenys" WHERE "pavadinimas" = ${p(4)}),
                 ${p(5)}, ${p(6)}, $${dalyviai.length * 6 + 1}::timestamptz::date)`;
         })
         .join(", ");
 
     await postgres.query(
-        `INSERT INTO public."liteko2SprendimuDalyviai"
+        `INSERT INTO liteko2."sprendimuDalyviai"
             ("sprendimoId","liteko2Id","saltinioId","vaidmuoId","pavadinimas","kodas","data")
          VALUES ${values}`,
         [
@@ -154,7 +154,7 @@ async function irasytiDalyvius(sprendimoId, dalyviai, sprendimoData) {
 
 async function irasytiTeisejus(sprendimoId, teisejai) {
     await postgres.query(
-        `DELETE FROM public."liteko2SprendimuTeisejai" WHERE "sprendimoId" = $1`,
+        `DELETE FROM liteko2."sprendimuTeisejai" WHERE "sprendimoId" = $1`,
         [sprendimoId],
     );
 
@@ -168,7 +168,7 @@ async function irasytiTeisejus(sprendimoId, teisejai) {
     const ids = [...unikalus.keys()];
     // Teisėjų klasifikatoriaus API neturi — žodyną pildom iš pačių sprendimų.
     await postgres.query(
-        `INSERT INTO public."liteko2Teisejai" ("liteko2Id","kodas","vardas")
+        `INSERT INTO liteko2."teisejai" ("liteko2Id","kodas","vardas")
          SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
          ON CONFLICT ("liteko2Id") DO UPDATE SET
             "kodas" = EXCLUDED."kodas",
@@ -182,7 +182,7 @@ async function irasytiTeisejus(sprendimoId, teisejai) {
     );
 
     await postgres.query(
-        `INSERT INTO public."liteko2SprendimuTeisejai" ("sprendimoId","teisejoId")
+        `INSERT INTO liteko2."sprendimuTeisejai" ("sprendimoId","teisejoId")
          SELECT $1, unnest($2::text[])
          ON CONFLICT DO NOTHING`,
         [sprendimoId, ids],
@@ -191,16 +191,16 @@ async function irasytiTeisejus(sprendimoId, teisejai) {
 
 async function irasytiKategorijas(sprendimoId, kategorijos) {
     await postgres.query(
-        `DELETE FROM public."liteko2SprendimuKategorijos" WHERE "sprendimoId" = $1`,
+        `DELETE FROM liteko2."sprendimuKategorijos" WHERE "sprendimoId" = $1`,
         [sprendimoId],
     );
 
     const ids = [...new Set(kategorijos.map((k) => valyti(k.liteko2Id)).filter(Boolean))];
     if (!ids.length) return;
 
-    // Pavadinimų nerašom — jie gyvena `liteko2Kategorijos` klasifikatoriuje.
+    // Pavadinimų nerašom — jie gyvena `liteko2.kategorijos` klasifikatoriuje.
     await postgres.query(
-        `INSERT INTO public."liteko2SprendimuKategorijos" ("sprendimoId","kategorijosId")
+        `INSERT INTO liteko2."sprendimuKategorijos" ("sprendimoId","kategorijosId")
          SELECT $1, unnest($2::text[])
          ON CONFLICT DO NOTHING`,
         [sprendimoId, ids],
@@ -209,7 +209,7 @@ async function irasytiKategorijas(sprendimoId, kategorijos) {
 
 async function irasytiFailus(sprendimoId, failai) {
     await postgres.query(
-        `DELETE FROM public."liteko2SprendimuFailai" WHERE "sprendimoId" = $1`,
+        `DELETE FROM liteko2."sprendimuFailai" WHERE "sprendimoId" = $1`,
         [sprendimoId],
     );
     if (!failai.length) return;
@@ -219,7 +219,7 @@ async function irasytiFailus(sprendimoId, failai) {
         .map((_, i) => `($${i * 5 + 1},$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5})`)
         .join(", ");
     await postgres.query(
-        `INSERT INTO public."liteko2SprendimuFailai"
+        `INSERT INTO liteko2."sprendimuFailai"
             ("sprendimoId","failoVardas","dydis","contentType","md5")
          VALUES ${values}
          ON CONFLICT ("sprendimoId","failoVardas") DO NOTHING`,
@@ -234,8 +234,8 @@ async function irasytiFailus(sprendimoId, failai) {
 }
 
 /**
- * Suformuoja sidecar'ą tokios pat formos, kokią naudoja `public.dokumentai`
- * sidecar'ai (žr. modules/dokumentai/upsertFromTeismoNuosprendziai.js).
+ * Suformuoja sidecar'ą tokios pat formos, kokią naudoja `documents.documents`
+ * sidecar'ai (žr. modules/documents/upsertFromCourtDecisions.js).
  */
 export function sudarytiSidecar(sprendimas, detail, { tekstas, html }) {
     const dalyviai = detail.caseParties ?? [];
@@ -328,7 +328,7 @@ async function nuskaitytiSprendima(sprendimas) {
         if (!detail) {
             // 404 — sprendimas nebeviešinamas (paprastai atšauktas).
             await postgres.query(
-                `UPDATE public."liteko2Sprendimai"
+                `UPDATE liteko2."sprendimai"
                  SET "turinioNuskaitymas" = -1, "klaida" = 'API 404'
                  WHERE id = $1`,
                 [sprendimas.id],
@@ -368,7 +368,7 @@ async function nuskaitytiSprendima(sprendimas) {
         // Pavadinimų (teismo, rūmų, rūšies, tipo) čia nerašom — detalės duoda
         // tiesiogiai id, o pavadinimai gyvena klasifikatorių lentelėse.
         await postgres.query(
-            `UPDATE public."liteko2Sprendimai"
+            `UPDATE liteko2."sprendimai"
              SET "saltinioId"         = COALESCE($2, "saltinioId"),
                  "teismoId"           = COALESCE($3, "teismoId"),
                  "rumuId"             = COALESCE($4, "rumuId"),
@@ -398,9 +398,9 @@ async function nuskaitytiSprendima(sprendimas) {
             ],
         );
 
-        // Sidecar + public.dokumentai. Lentelės trigeris pats įdeda pakeitimą į
-        // dokumentaiIndexQueue, iš kurios jį pasiima Quickwit darbininkas.
-        await upsertLiteko2ToDokumentai(
+        // Sidecar + documents.documents. Lentelės trigeris pats įdeda pakeitimą į
+        // documents."indexQueue", iš kurios jį pasiima Quickwit darbininkas.
+        await upsertLiteko2ToDocuments(
             {
                 ...sprendimas,
                 md5: sidecar.md5,
@@ -416,7 +416,7 @@ async function nuskaitytiSprendima(sprendimas) {
         );
     } catch (error) {
         await postgres.query(
-            `UPDATE public."liteko2Sprendimai"
+            `UPDATE liteko2."sprendimai"
              SET "turinioNuskaitymas" = -1, "klaida" = $2
              WHERE id = $1`,
             [sprendimas.id, String(error?.message ?? error).slice(0, 4000)],

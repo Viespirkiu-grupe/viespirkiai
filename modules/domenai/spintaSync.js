@@ -114,7 +114,7 @@ async function fetchLocal(domain) {
     const { rows } = await postgres.query(
         `SELECT id, domain, status, created, expired, updated,
                 "domregNs", savininkas, "savininkoKodas"
-         FROM public.domenai
+         FROM domenai."domenaiPilni"
          WHERE domain = $1`,
         [domain],
     );
@@ -123,7 +123,7 @@ async function fetchLocal(domain) {
     const scrapeResult = await postgres.query(
         `SELECT "scrapeId", "domainId", domain, "domregData", status, expired,
                 "domregNs", savininkas, "savininkoKodas"
-         FROM public."domenaiScrapes"
+         FROM domenai."scrapesPilni"
          WHERE "domainId" = $1
          ORDER BY "scrapeId"`,
         [row.id],

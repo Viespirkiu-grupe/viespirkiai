@@ -8,13 +8,21 @@ const CONCURRENCY = 16;
 
 async function nextSavininkuBatch(limit) {
     let res = await postgres.query(
-        `SELECT DISTINCT savininkas FROM domenai WHERE savininkas IS NOT NULL AND ("savininkoKodasStatus" IS NULL OR ("savininkoKodasStatus" >= 0 AND "savininkoKodasStatus" < 2)) LIMIT $1;`,
+        `SELECT DISTINCT sv.vardas AS savininkas
+           FROM domenai.domenai d
+           JOIN domenai.savininkai sv ON sv.id = d."savininkasId"
+          WHERE sv.vardas IS NOT NULL AND d."kodasIeskotas" IS NOT TRUE
+          LIMIT $1;`,
         [limit],
     );
     if (res.rowCount > 0) return res.rows.map((r) => r.savininkas);
 
     res = await postgres.query(
-        `SELECT DISTINCT savininkas FROM "domenaiScrapes" WHERE savininkas IS NOT NULL AND ("savininkoKodasStatus" IS NULL OR ("savininkoKodasStatus" >= 0 AND "savininkoKodasStatus" < 2)) LIMIT $1;`,
+        `SELECT DISTINCT sv.vardas AS savininkas
+           FROM domenai.scrapes s
+           JOIN domenai.savininkai sv ON sv.id = s."savininkasId"
+          WHERE sv.vardas IS NOT NULL AND s."kodasIeskotas" IS NOT TRUE
+          LIMIT $1;`,
         [limit],
     );
     return res.rows.map((r) => r.savininkas);
@@ -33,7 +41,11 @@ async function processSavininkas(savininkas) {
     }
 
     const updated = await postgres.query(
-        `UPDATE domenai SET "savininkoKodas" = $1, "savininkoKodasStatus" = 2 WHERE savininkas = $2;`,
+        `UPDATE domenai.domenai d
+            SET "savininkasId" = domenai.savininkas_id(sv.vardas, sv.adresas, $1),
+                "kodasIeskotas" = true
+           FROM domenai.savininkai sv
+          WHERE sv.id = d."savininkasId" AND sv.vardas = $2;`,
         [jarKodas, savininkas],
     );
     if (updated.rowCount > 0) {
@@ -43,7 +55,11 @@ async function processSavininkas(savininkas) {
         });
     }
     await postgres.query(
-        `UPDATE "domenaiScrapes" SET "savininkoKodas" = $1, "savininkoKodasStatus" = 2 WHERE savininkas = $2;`,
+        `UPDATE domenai.scrapes s
+            SET "savininkasId" = domenai.savininkas_id(sv.vardas, sv.adresas, $1),
+                "kodasIeskotas" = true
+           FROM domenai.savininkai sv
+          WHERE sv.id = s."savininkasId" AND sv.vardas = $2;`,
         [jarKodas, savininkas],
     );
 }

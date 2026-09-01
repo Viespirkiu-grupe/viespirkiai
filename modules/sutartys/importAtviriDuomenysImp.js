@@ -1,7 +1,7 @@
 import path from "node:path";
 import { parseCSV } from "../../utils/csv.js";
-import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import { irasytiAtvirusDuomenisImp, tuscia } from "./atviriDuomenysIrasymas.js";
 
 const BATCH_SIZE = 1000;
 
@@ -20,19 +20,18 @@ function normalizeRow(row) {
         tiekKodas: row.TIEK_KODAS || null,
         tiekPav: row.TIEK_PAV || null,
         tiekSbjPatikslinimas: row.TIEK_SBJ_PATIKSLINIMAS || null,
-        tiekSalis: row.TIEK_SALIS === "NULL" ? null : row.TIEK_SALIS,
-        dokSutVerte:
-            row.DOK_SUT_VERTE === "NULL" ? null : String(row.DOK_SUT_VERTE),
+        tiekSalis: tuscia(row.TIEK_SALIS === "NULL" ? null : row.TIEK_SALIS),
+        verte: row.DOK_SUT_VERTE === "NULL" ? null : tuscia(String(row.DOK_SUT_VERTE)),
         dokSudarymoData: row.DOK_SUDARYMO_DATA || null,
         dokSutGaliojimoData: row.DOK_SUT_GALIOJIMO_DATA || null,
         dokSutTipas: row.DOK_SUT_TIPAS ? Number(row.DOK_SUT_TIPAS) : null,
         dokFormosTipas: row.DOK_FORMOS_TIPAS
             ? Number(row.DOK_FORMOS_TIPAS)
             : null,
-        dokFaktSutIvykVerte:
+        faktineVerte:
             row.DOK_FAKT_SUT_IVYK_VERTE === "NULL"
                 ? null
-                : Number(row.DOK_FAKT_SUT_IVYK_VERTE),
+                : tuscia(String(row.DOK_FAKT_SUT_IVYK_VERTE)),
         dokFaktSutIvykData: row.DOK_FAKT_SUT_IVYK_DATA || null,
     };
 }
@@ -42,77 +41,9 @@ let inserted = 0;
 async function insertBatch(batch) {
     if (batch.length === 0) return;
 
-    const values = [];
-    const placeholders = batch
-        .map((row, i) => {
-            const offset = i * 21;
-            values.push(
-                row.dokId,
-                row.dokSysRegData,
-                row.dokSutNumeris,
-                row.dokPirkNumeris,
-                row.dokSutObjPav,
-                row.dokSutObjRusis,
-                row.mcpvKodas,
-                row.mcpvPav,
-                row.pvKodas,
-                row.pvPav,
-                row.tiekKodas,
-                row.tiekPav,
-                row.tiekSbjPatikslinimas,
-                row.tiekSalis,
-                row.dokSutVerte,
-                row.dokSudarymoData,
-                row.dokSutGaliojimoData,
-                row.dokSutTipas,
-                row.dokFormosTipas,
-                row.dokFaktSutIvykVerte,
-                row.dokFaktSutIvykData,
-            );
-            const params = Array.from(
-                { length: 21 },
-                (_, j) => `$${offset + j + 1}`,
-            );
-            return `(${params.join(",")})`;
-        })
-        .join(",");
-
-    const sql = `
-        INSERT INTO public."sutartysAtviriDuomenysImp" (
-            "dokId","dokSysRegData","dokSutNumeris","dokPirkNumeris","dokSutObjPav",
-            "dokSutObjRusis","mcpvKodas","mcpvPav","pvKodas","pvPav",
-            "tiekKodas","tiekPav","tiekSbjPatikslinimas","tiekSalis",
-            "dokSutVerte","dokSudarymoData","dokSutGaliojimoData","dokSutTipas",
-            "dokFormosTipas","dokFaktSutIvykVerte","dokFaktSutIvykData"
-        )
-        VALUES ${placeholders}
-        ON CONFLICT ("dokId") DO UPDATE SET
-            "dokSysRegData" = EXCLUDED."dokSysRegData",
-            "dokSutNumeris" = EXCLUDED."dokSutNumeris",
-            "dokPirkNumeris" = EXCLUDED."dokPirkNumeris",
-            "dokSutObjPav" = EXCLUDED."dokSutObjPav",
-            "dokSutObjRusis" = EXCLUDED."dokSutObjRusis",
-            "mcpvKodas" = EXCLUDED."mcpvKodas",
-            "mcpvPav" = EXCLUDED."mcpvPav",
-            "pvKodas" = EXCLUDED."pvKodas",
-            "pvPav" = EXCLUDED."pvPav",
-            "tiekKodas" = EXCLUDED."tiekKodas",
-            "tiekPav" = EXCLUDED."tiekPav",
-            "tiekSbjPatikslinimas" = EXCLUDED."tiekSbjPatikslinimas",
-            "tiekSalis" = EXCLUDED."tiekSalis",
-            "dokSutVerte" = EXCLUDED."dokSutVerte",
-            "dokSudarymoData" = EXCLUDED."dokSudarymoData",
-            "dokSutGaliojimoData" = EXCLUDED."dokSutGaliojimoData",
-            "dokSutTipas" = EXCLUDED."dokSutTipas",
-            "dokFormosTipas" = EXCLUDED."dokFormosTipas",
-            "dokFaktSutIvykVerte" = EXCLUDED."dokFaktSutIvykVerte",
-            "dokFaktSutIvykData" = EXCLUDED."dokFaktSutIvykData"
-    `;
-
+    await irasytiAtvirusDuomenisImp(batch);
     inserted += batch.length;
     log(`Inserted/Updated: ${inserted}`);
-
-    await postgres.query(sql, values);
 }
 
 if (process.argv[1] === path.resolve(process.argv[1])) {
