@@ -65,6 +65,6 @@ SELECT p."tiekejoKodasA" || ':' || p."tiekejoKodasB" AS "porosRaktas",
        min(p."ataskaitosData")                        AS "pirmasKartas",
        max(p."ataskaitosData")                        AS "paskutinisKartas"
 FROM poros p
-         LEFT JOIN "jarAsmenys" ja ON ja."jarKodas"::text = p."tiekejoKodasA"
-         LEFT JOIN "jarAsmenys" jb ON jb."jarKodas"::text = p."tiekejoKodasB"
+         LEFT JOIN "rcJar"."asmenys" ja ON ja."jarKodas"::text = p."tiekejoKodasA"
+         LEFT JOIN "rcJar"."asmenys" jb ON jb."jarKodas"::text = p."tiekejoKodasB"
 GROUP BY 1, 2, 3, 4, 5

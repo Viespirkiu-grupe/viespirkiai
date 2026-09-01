@@ -22,46 +22,37 @@ SELECT a."pirkimoNumeris",
        p."daliesNumeris",
        p."eileNumeris",
        p."pasiulymoKaina",
-       p."atmetimoPriezastis"
+       p."atmetimoPriezastis",
+       p."atmetimoStatusas",
+       p."atmetimoTeisinisPagrindas"
 FROM ppa."ataskaitos" a
          LEFT JOIN ppa."pirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
          JOIN ppa."dalyviai" d ON d."ataskaitaId" = a.id
          LEFT JOIN ppa."salys" salis ON salis.id = d."salisId"
-       p."atmetimoPriezastis",
-       p."atmetimoStatusas",
-       p."atmetimoTeisinisPagrindas"
-FROM "xlsxPPAataskaitos" a
-         LEFT JOIN "xlsxPPApirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
-         JOIN "xlsxPPAdalyviai" d ON d."ataskaitaId" = a.id
-         LEFT JOIN "xlsxPPAsalys" salis ON salis.id = d."salisId"
          LEFT JOIN LATERAL (
              SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
                     e."eileNumeris"                                 AS "eileNumeris",
-                    e.kaina::numeric                                AS "pasiulymoKaina",
-                    apr.pavadinimas                                 AS "atmetimoPriezastis"
-             FROM ppa."pasiulymuEile" e
-                      FULL OUTER JOIN ppa."atmestiPasiulymai" ap
-                    -- e.kaina (xlsxPPApasiulymuEile, "pasiūlymų eilė su kainomis") only
+                    -- e.kaina (ppa."pasiulymuEile", "pasiūlymų eilė su kainomis") only
                     -- carries a price for a bid that made it into the price ranking.
-                    -- ap.pasiulymoKaina (xlsxPPAatmestiPasiulymai) carries the same fact
+                    -- ap.pasiulymoKaina (ppa."atmestiPasiulymai") carries the same fact
                     -- for a bid that never was, recorded at rejection time — without this
                     -- fallback a disqualified bid's price is populated for ~1% of
                     -- disqualified bids instead of ~40% (see LT-AWD-02's README).
-                    COALESCE(e.kaina::numeric,
-                             NULLIF(ap."pasiulymoKaina", '')::numeric)                     AS "pasiulymoKaina",
+                    COALESCE(NULLIF(e.kaina, '')::numeric,
+                             NULLIF(ap."pasiulymoKaina", '')::numeric)              AS "pasiulymoKaina",
                     apr.pavadinimas                                 AS "atmetimoPriezastis",
                     aps.pavadinimas                                 AS "atmetimoStatusas",
                     atp.pavadinimas                                 AS "atmetimoTeisinisPagrindas"
-             FROM "xlsxPPApasiulymuEile" e
-                      FULL OUTER JOIN "xlsxPPAatmestiPasiulymai" ap
+             FROM ppa."pasiulymuEile" e
+                      FULL OUTER JOIN ppa."atmestiPasiulymai" ap
                                       ON ap."ataskaitaId" = e."ataskaitaId"
                                           AND ap."dalyvioKodas" = e."dalyvioKodas"
                                           AND ap."daliesNumeris" = e."daliesNumeris"
                       LEFT JOIN ppa."atmetimoPriezastys" apr
                                 ON apr.id = ap."atmetimoPriezastysId"
-                      LEFT JOIN "xlsxPPAatmestuPasiulymuStatusai" aps
+                      LEFT JOIN ppa."atmestuPasiulymuStatusai" aps
                                 ON aps.id = ap."statusasId"
-                      LEFT JOIN "xlsxPPAatmetimoTeisiniaiPagrindai" atp
+                      LEFT JOIN ppa."atmetimoTeisiniaiPagrindai" atp
                                 ON atp.id = ap."atmetimoTeisinisPagrindasId"
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas

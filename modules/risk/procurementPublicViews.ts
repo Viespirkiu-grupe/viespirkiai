@@ -55,7 +55,7 @@ const VIEWS: Readonly<Record<PublicViewName, { body: string; dependsOn: readonly
         dependsOn: ["v_dalyviai_v2"],
     },
     // v_pirkimo_pabaiga_v2.sql has no dependency on any other view — it reads
-    // xlsxPPAataskaitos/xlsxPPAproceduruPabaiga directly.
+    // ppa."ataskaitos"/ppa."proceduruPabaiga" directly.
     v_pirkimo_pabaiga_v2: { body: loadViewBody("v_pirkimo_pabaiga_v2.sql"), dependsOn: [] },
     // v_pirkimo_sutartys_v2.sql likewise has no dependency on any other view —
     // it reads vpmSutartys directly.
@@ -86,7 +86,7 @@ const VIEW_ORDER: readonly PublicViewName[] = [
  * disk, then filtered, because no predicate could be pushed through a
  * materialised CTE. Naming only what a query reads restores inlining, and
  * with it pushdown of both the dataAsOf cutoff and the subjects scope down to
- * xlsxPPAataskaitos' own pirkimoNumeris index.
+ * ppa."ataskaitos"' own pirkimoNumeris index.
  */
 export function publicViewsCte(names: readonly PublicViewName[]): string {
     const required = new Set<PublicViewName>();

@@ -28,14 +28,14 @@ SELECT p.id::text                            AS "planoRaktas",
        d."preliminariPirkimoSukurimoData",
        COALESCE(k.kodai, '{}'::text[])       AS "bvpzKodai",
        COALESCE(array_length(k.kodai, 1), 0) AS "bvpzKoduSkaicius"
-FROM "planuojamiPirkimai" p
-         LEFT JOIN "planuojamiPirkimaiDuomenys" d ON d."pirkimoId" = p.id
-         LEFT JOIN "planuojamiPirkimaiVykdytojai" v ON v.id = p."vykdytojoId"
-         LEFT JOIN "planuojamiPirkimaiTipai" tipas ON tipas.id = p."pirkimoTipoId"
-         LEFT JOIN "planuojamiPirkimaiBudai" budas ON budas.id = p."pirkimoBudoId"
-         LEFT JOIN "planuojamiPirkimaiDirektyvos" direktyva ON direktyva.id = p."direktyvosId"
+FROM "eppsPlanuojamiPirkimai"."pirkimai" p
+         LEFT JOIN "eppsPlanuojamiPirkimai"."duomenys" d ON d."pirkimoId" = p.id
+         LEFT JOIN "eppsPlanuojamiPirkimai"."vykdytojai" v ON v.id = p."vykdytojoId"
+         LEFT JOIN "eppsPlanuojamiPirkimai"."tipai" tipas ON tipas.id = p."pirkimoTipoId"
+         LEFT JOIN "eppsPlanuojamiPirkimai"."budai" budas ON budas.id = p."pirkimoBudoId"
+         LEFT JOIN "eppsPlanuojamiPirkimai"."direktyvos" direktyva ON direktyva.id = p."direktyvosId"
          LEFT JOIN LATERAL (
              SELECT array_agg(b."bvpzKodas"::text) AS kodai
-             FROM "planuojamiPirkimaiBvpzKodai" b
+             FROM "eppsPlanuojamiPirkimai"."bvpzKodai" b
              WHERE b."pirkimoId" = p.id
          ) k ON true

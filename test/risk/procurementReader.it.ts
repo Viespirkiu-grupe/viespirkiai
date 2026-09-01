@@ -38,14 +38,14 @@ const DATA_AS_OF = "2026-08-12T00:00:00.000Z";
 
 async function insertViesiejiPirkimai(pirkimoId: number, pirkimoBudas = "Atviras konkursas"): Promise<void> {
     await riskDb.query(
-        `INSERT INTO public."viesiejiPirkimai" ("pirkimoId", "pavadinimas", "pirkimoBudas") VALUES ($1, $2, $3)`,
+        `INSERT INTO "eppsViesiejiPirkimai"."pirkimai" ("pirkimoId", "pavadinimas", "pirkimoBudas") VALUES ($1, $2, $3)`,
         [pirkimoId, `Fixture ${pirkimoId}`, pirkimoBudas],
     );
 }
 
 async function insertDeclaredLot(pirkimoId: number, numeris: number, pavadinimas: string): Promise<void> {
     await riskDb.query(
-        `INSERT INTO public."viesiejiPirkimaiDalys" ("pirkimoId", rusis, numeris, pavadinimas)
+        `INSERT INTO "eppsViesiejiPirkimai"."dalys" ("pirkimoId", rusis, numeris, pavadinimas)
          VALUES ($1, 'dalis', $2, $3)`,
         [pirkimoId, numeris, pavadinimas],
     );
@@ -364,7 +364,7 @@ describe("ProcurementReader bid-grain rows (Lot.bids)", () => {
         });
         await insertDalyvis({ ataskaitaId, kodas: "B1" });
         // Same bidder rejected twice under the same lot — a real data-quality
-        // issue observed in the warehouse (duplicate xlsxPPAatmestiPasiulymai
+        // issue observed in the warehouse (duplicate ppa."atmestiPasiulymai"
         // rows with identical ataskaitosData).
         await insertAtmestasPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B1", statusas: WITHDRAWN_STATUS });
         await insertAtmestasPasiulymas({ ataskaitaId, daliesNumeris: "1", dalyvioKodas: "B1", statusas: WITHDRAWN_STATUS });
@@ -518,8 +518,8 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
 
     it("is still collected when a report has no participant rows — the 'no bids received' case", async () => {
         // No insertDalyvis call: this is exactly the case v_dalyviai/v_dalyviai_v2
-        // cannot see (their JOIN on xlsxPPAdalyviai drops it), and the reason
-        // v_pirkimo_pabaiga_v2 reads xlsxPPAataskaitos/xlsxPPAproceduruPabaiga
+        // cannot see (their JOIN on ppa."dalyviai" drops it), and the reason
+        // v_pirkimo_pabaiga_v2 reads ppa."ataskaitos"/ppa."proceduruPabaiga"
         // directly instead.
         await insertViesiejiPirkimai(970004);
         const ataskaitaId = await insertAtaskaita({
@@ -563,7 +563,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         ]);
     });
 
-    it("carries preliminariSutartis: true (LT-PRI-06) from xlsxPPAataskaitos.preliminariSutartis", async () => {
+    it("carries preliminariSutartis: true (LT-PRI-06) from ppa.ataskaitos.preliminariSutartis", async () => {
         await insertViesiejiPirkimai(970006);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970006",
@@ -650,7 +650,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         expect(procurement.procedureOutcome!.preliminariSutartis).toBeNull();
     });
 
-    it("carries pretenzijaPateikta: true (LT-TRA-07) from xlsxPPAataskaitos.pretenzijaPateikta", async () => {
+    it("carries pretenzijaPateikta: true (LT-TRA-07) from ppa.ataskaitos.pretenzijaPateikta", async () => {
         await insertViesiejiPirkimai(970011);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970011",
@@ -737,7 +737,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         expect(procurement.procedureOutcome!.pretenzijaPateikta).toBeNull();
     });
 
-    it("carries ieskinysTeismui: true (LT-TRA-08) from xlsxPPAataskaitos.ieskinysTeismui", async () => {
+    it("carries ieskinysTeismui: true (LT-TRA-08) from ppa.ataskaitos.ieskinysTeismui", async () => {
         await insertViesiejiPirkimai(970015);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970015",
@@ -824,7 +824,7 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         expect(procurement.procedureOutcome!.ieskinysTeismui).toBeNull();
     });
 
-    it("carries elektroninisPirkimas: true (LT-TRA-09) from xlsxPPAataskaitos.elektroninisPirkimas", async () => {
+    it("carries elektroninisPirkimas: true (LT-TRA-09) from ppa.ataskaitos.elektroninisPirkimas", async () => {
         await insertViesiejiPirkimai(970019);
         const ataskaitaId = await insertAtaskaita({
             pirkimoNumeris: "970019",

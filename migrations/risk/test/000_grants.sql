@@ -4,6 +4,18 @@
 -- ever gets SELECT on it via risk_calc (risk-service-architecture.md §1.2).
 GRANT ALL ON SCHEMA public TO risk_rw;
 
+-- Also local-only: the _v2 views the test setup applies read their source
+-- tables schema-qualified — ppa.* (ATN-1/PPA reports), "eppsViesiejiPirkimai".*
+-- (CVP IS notices), cvpp."archyvoSkelbimai" and "rcJar"."asmenys" — because the
+-- real database moved them out of `public`. risk_rw has no CREATE on this
+-- database, so the schemas are created here (as admin) and 001_public_test_tables.sql
+-- only creates tables inside them.
+CREATE SCHEMA IF NOT EXISTS "ppa";
+CREATE SCHEMA IF NOT EXISTS "eppsViesiejiPirkimai";
+CREATE SCHEMA IF NOT EXISTS "cvpp";
+CREATE SCHEMA IF NOT EXISTS "rcJar";
+GRANT ALL ON SCHEMA "ppa", "eppsViesiejiPirkimai", "cvpp", "rcJar" TO risk_rw;
+
 -- Also local-only: lets test suites DELETE their own fixture rows between
 -- runs. Under the upsert model risk_rw holds no production DELETE at all —
 -- rows are overwritten, never removed — so both grants below are entirely

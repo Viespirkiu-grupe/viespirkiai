@@ -1,14 +1,14 @@
 import { riskDb } from "../../../../postgres/riskDb.js";
 
 // Shared row-insertion helpers for integration tests against the real
-// xlsxPPA* tables (public.v_dalyviai's real source — see
+// ppa.* tables (public.v_dalyviai's real source — see
 // migrations/risk/test/001_public_test_tables.sql).
-// xlsxPPApirkimoBudai/xlsxPPAatmetimoPriezastys are lookup tables: a fixture
+// ppa."pirkimoBudai"/ppa."atmetimoPriezastys" are lookup tables: a fixture
 // names a value, and these helpers resolve-or-create the row backing it.
 
 async function lookupOrInsertId(table: string, pavadinimas: string): Promise<number> {
     const { rows } = await riskDb.query<{ id: number }>(
-        `INSERT INTO public."${table}" (pavadinimas)
+        `INSERT INTO ppa."${table}" (pavadinimas)
          VALUES ($1)
          ON CONFLICT (pavadinimas) DO UPDATE SET pavadinimas = EXCLUDED.pavadinimas
          RETURNING id`,
@@ -18,24 +18,24 @@ async function lookupOrInsertId(table: string, pavadinimas: string): Promise<num
 }
 
 export function lookupOrInsertPirkimoBudas(pavadinimas: string): Promise<number> {
-    return lookupOrInsertId("xlsxPPApirkimoBudai", pavadinimas);
+    return lookupOrInsertId("pirkimoBudai", pavadinimas);
 }
 
 export function lookupOrInsertAtmetimoPriezastis(pavadinimas: string): Promise<number> {
-    return lookupOrInsertId("xlsxPPAatmetimoPriezastys", pavadinimas);
+    return lookupOrInsertId("atmetimoPriezastys", pavadinimas);
 }
 
 export function lookupOrInsertAtmestoPasiulymoStatusas(pavadinimas: string): Promise<number> {
-    return lookupOrInsertId("xlsxPPAatmestuPasiulymuStatusai", pavadinimas);
+    return lookupOrInsertId("atmestuPasiulymuStatusai", pavadinimas);
 }
 
 export function lookupOrInsertAtmetimoTeisinisPagrindas(pavadinimas: string): Promise<number> {
-    return lookupOrInsertId("xlsxPPAatmetimoTeisiniaiPagrindai", pavadinimas);
+    return lookupOrInsertId("atmetimoTeisiniaiPagrindai", pavadinimas);
 }
 
 // The one status label public.v_dalyviai(_v2) currently recognises as a
 // self-withdrawal (LT-COM-20's trigger) rather than a buyer-side rejection —
-// see xlsxPPAatmestuPasiulymuStatusai id 7 in the real database.
+// see ppa."atmestuPasiulymuStatusai" id 7 in the real database.
 export const WITHDRAWN_STATUS =
     "Dalyvis (kandidatas) pasiūlymus (galutinius pasiūlymus) atsiėmė iki pasiūlymų eilės sudarymo";
 
@@ -44,18 +44,18 @@ export async function insertAtaskaita(params: {
     pirkimoBudas: string;
     daliuSkaicius: number;
     sukurtaAt: string;
-    /** xlsxPPAataskaitos.preliminariSutartis — LT-PRI-06 reads this. Defaults to null (not reported). */
+    /** ppa."ataskaitos".preliminariSutartis — LT-PRI-06 reads this. Defaults to null (not reported). */
     preliminariSutartis?: boolean | null;
-    /** xlsxPPAataskaitos.pretenzijaPateikta — LT-TRA-07 reads this. Defaults to null (not reported). */
+    /** ppa."ataskaitos".pretenzijaPateikta — LT-TRA-07 reads this. Defaults to null (not reported). */
     pretenzijaPateikta?: boolean | null;
-    /** xlsxPPAataskaitos.ieskinysTeismui — LT-TRA-08 reads this. Defaults to null (not reported). */
+    /** ppa."ataskaitos".ieskinysTeismui — LT-TRA-08 reads this. Defaults to null (not reported). */
     ieskinysTeismui?: boolean | null;
-    /** xlsxPPAataskaitos.elektroninisPirkimas — LT-TRA-09 reads this. Defaults to null (not reported). */
+    /** ppa."ataskaitos".elektroninisPirkimas — LT-TRA-09 reads this. Defaults to null (not reported). */
     elektroninisPirkimas?: boolean | null;
 }): Promise<number> {
     const pirkimoBudasId = await lookupOrInsertPirkimoBudas(params.pirkimoBudas);
     const { rows } = await riskDb.query<{ id: number }>(
-        `INSERT INTO public."xlsxPPAataskaitos" ("pirkimoNumeris", "pirkimoBudasId", "daliuSkaicius", "sukurtaAt", "preliminariSutartis", "pretenzijaPateikta", "ieskinysTeismui", "elektroninisPirkimas")
+        `INSERT INTO ppa."ataskaitos" ("pirkimoNumeris", "pirkimoBudasId", "daliuSkaicius", "sukurtaAt", "preliminariSutartis", "pretenzijaPateikta", "ieskinysTeismui", "elektroninisPirkimas")
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
         [
@@ -73,7 +73,7 @@ export async function insertAtaskaita(params: {
 }
 
 export async function insertDalyvis(params: { ataskaitaId: number; kodas: string | null }): Promise<void> {
-    await riskDb.query(`INSERT INTO public."xlsxPPAdalyviai" ("ataskaitaId", "kodas") VALUES ($1, $2)`, [
+    await riskDb.query(`INSERT INTO ppa."dalyviai" ("ataskaitaId", "kodas") VALUES ($1, $2)`, [
         params.ataskaitaId,
         params.kodas,
     ]);
@@ -88,7 +88,7 @@ export async function insertPasiulymas(params: {
     kaina?: string;
 }): Promise<void> {
     await riskDb.query(
-        `INSERT INTO public."xlsxPPApasiulymuEile" ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "eileNumeris", "kaina")
+        `INSERT INTO ppa."pasiulymuEile" ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "eileNumeris", "kaina")
          VALUES ($1, $2, $3, $4, $5)`,
         [params.ataskaitaId, params.daliesNumeris, params.dalyvioKodas, params.eileNumeris ?? null, params.kaina ?? "1000"],
     );
@@ -103,15 +103,15 @@ export async function insertAtmestasPasiulymas(params: {
     /** The structured rejection status (e.g. WITHDRAWN_STATUS) — LT-COM-20 reads this, not priezastis. */
     statusas?: string;
     /**
-     * xlsxPPAatmestiPasiulymai.pasiulymoKaina — the price this bidder offered before being
-     * rejected, recorded on the rejection row itself (distinct from xlsxPPApasiulymuEile.kaina,
+     * ppa."atmestiPasiulymai".pasiulymoKaina — the price this bidder offered before being
+     * rejected, recorded on the rejection row itself (distinct from ppa."pasiulymuEile".kaina,
      * which only exists for a bid that made it into the price ranking). LT-AWD-02 reads this via
      * v_dalyviai_v2's COALESCE fallback. Undefined leaves it unset, mirroring most real rejection
      * rows.
      */
     kaina?: string;
     /**
-     * xlsxPPAatmestiPasiulymai.atmetimoTeisinisPagrindasId — the structured (dropdown) legal-basis
+     * ppa."atmestiPasiulymai".atmetimoTeisinisPagrindasId — the structured (dropdown) legal-basis
      * label for the rejection, e.g. a VPĮ/KSPĮ article citation, or "Kita" when none was cited.
      * LT-AWD-03 reads this. Undefined leaves it unset, mirroring a rejection with no legal basis
      * recorded.
@@ -124,7 +124,7 @@ export async function insertAtmestasPasiulymas(params: {
         ? await lookupOrInsertAtmetimoTeisinisPagrindas(params.teisinisPagrindas)
         : null;
     await riskDb.query(
-        `INSERT INTO public."xlsxPPAatmestiPasiulymai"
+        `INSERT INTO ppa."atmestiPasiulymai"
              ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "atmetimoPriezastysId", "statusasId",
               "atmetimoTeisinisPagrindasId", "pasiulymoKaina")
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -146,11 +146,11 @@ export async function insertProceduruPabaiga(params: {
     daliesNumeris: string | null;
     proceduruPabaiga: string;
     sprendimoPriemimoData?: string;
-    /** xlsxPPAproceduruPabaiga.sprendimoPriezastys — LT-TRA-06 reads this. Defaults to null (not reported). */
+    /** ppa."proceduruPabaiga".sprendimoPriezastys — LT-TRA-06 reads this. Defaults to null (not reported). */
     sprendimoPriezastys?: string | null;
 }): Promise<void> {
     await riskDb.query(
-        `INSERT INTO public."xlsxPPAproceduruPabaiga" ("ataskaitaId", "daliesNumeris", "proceduruPabaiga", "sprendimoPriemimoData", "sprendimoPriezastys")
+        `INSERT INTO ppa."proceduruPabaiga" ("ataskaitaId", "daliesNumeris", "proceduruPabaiga", "sprendimoPriemimoData", "sprendimoPriezastys")
          VALUES ($1, $2, $3, $4, $5)`,
         [
             params.ataskaitaId,

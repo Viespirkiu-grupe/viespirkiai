@@ -35,7 +35,7 @@ SELECT 'cvpis:' || s.id::text        AS "skelbimoRaktas",
        s."ikelimoData",
        s.statusas,
        s."downloadHref"              AS nuoroda
-FROM "viesiejiPirkimaiSkelbimai" s
+FROM "eppsViesiejiPirkimai"."skelbimai" s
 
 UNION ALL
 
@@ -68,4 +68,4 @@ SELECT 'cvpp:' || c."skelbimoId"::text AS "skelbimoRaktas",
        NULL::timestamp                 AS "ikelimoData",
        c.busena                        AS statusas,
        c.link                          AS nuoroda
-FROM "cvppSkelbimai" c
+FROM cvpp."skelbimai" c

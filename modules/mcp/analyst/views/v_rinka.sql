@@ -32,11 +32,11 @@ FROM (
            count(DISTINCT k.kodas)             AS "bvpzKoduSkaicius",
            min(p."paskelbimoData")             AS "pirmasPirkimas",
            max(p."paskelbimoData")             AS "paskutinisPirkimas"
-    FROM "viesiejiPirkimai" p
+    FROM "eppsViesiejiPirkimai"."pirkimai" p
              CROSS JOIN LATERAL unnest(p."bvpzKodai") AS k(kodas)
     WHERE k.kodas ~ '^[0-9]{8}'
     GROUP BY 1
 ) r
     -- BVPŽ žodyne skyrių atitinka kodas XX000000; jei jo nėra, pavadinimas
     -- lieka NULL, o rinka vis tiek egzistuoja.
-         LEFT JOIN "bvpzKodai" b ON b.code = r.skyrius || '000000'
+         LEFT JOIN bvpz."kodai" b ON b.code = r.skyrius || '000000'

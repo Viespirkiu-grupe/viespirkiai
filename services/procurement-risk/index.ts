@@ -28,7 +28,7 @@ function resolveCodeCommit(): string {
 /**
  * `--limit N`'s sample: the first N distinct ATN-1 procurement ids, ordered
  * by id, so a test-flight run can be repeated and its numbers compared.
- * Every deployed indicator today reads `xlsxPPAataskaitos` (via
+ * Every deployed indicator today reads `ppa."ataskaitos"` (via
  * public.v_dalyviai, LT-COM-01/02/03) and filters $2 against its
  * `pirkimoNumeris`, so this is the shared subject universe to cap. An
  * indicator over a different source table would need its own sampling —
@@ -37,7 +37,7 @@ function resolveCodeCommit(): string {
  */
 async function sampleAtn1Subjects(limit: number): Promise<readonly string[]> {
     const { rows } = await postgres.query<{ pirkimoNumeris: string }>(
-        `SELECT DISTINCT "pirkimoNumeris" FROM "xlsxPPAataskaitos" ORDER BY "pirkimoNumeris" LIMIT $1`,
+        `SELECT DISTINCT "pirkimoNumeris" FROM ppa."ataskaitos" ORDER BY "pirkimoNumeris" LIMIT $1`,
         [limit],
     );
     return rows.map((row) => row.pirkimoNumeris);

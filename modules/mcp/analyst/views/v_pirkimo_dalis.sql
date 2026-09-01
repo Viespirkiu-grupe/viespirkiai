@@ -30,8 +30,8 @@ WITH deklaruotos AS (
            d.pavadinimas                   AS "daliesPavadinimas",
            vp."pirkimoBudas",
            vp."paskelbimoData"::timestamp  AS "paskelbimoData"
-    FROM "viesiejiPirkimaiDalys" d
-             JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = d."pirkimoId"
+    FROM "eppsViesiejiPirkimai"."dalys" d
+             JOIN "eppsViesiejiPirkimai"."pirkimai" vp ON vp."pirkimoId" = d."pirkimoId"
     WHERE d.rusis = 'dalis'
       AND d.numeris IS NOT NULL
 ), stebetos AS (
@@ -86,14 +86,14 @@ FROM (
            CASE
                WHEN s."pirkimoNumeris" ~ '^[0-9]+$'
                    AND EXISTS (SELECT 1
-                               FROM "viesiejiPirkimai" vp
+                               FROM "eppsViesiejiPirkimai"."pirkimai" vp
                                WHERE vp."pirkimoId"::text = s."pirkimoNumeris")
                    THEN 'cvpis'
                -- EXISTS rather than a join: cvppViesiejiPirkimai is keyed by
                -- skelbimoKodas, so one pirkimoNumeris can match more than one
                -- row there.
                WHEN EXISTS (SELECT 1
-                            FROM "cvppViesiejiPirkimai" c
+                            FROM cvpp."archyvoSkelbimai" c
                             WHERE c."pirkimoNumeris" = s."pirkimoNumeris"
                               AND c."skelbimoTipas" = 'Skelbimas apie pirkimą')
                    THEN 'cvpp'

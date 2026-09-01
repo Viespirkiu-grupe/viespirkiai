@@ -40,8 +40,8 @@ SELECT 'cvpis' AS saltinis,
        p."esFinansavimas",
        p."bvpzKodai",
        p.informacija
-FROM "viesiejiPirkimai" p
-         LEFT JOIN "viesiejiPirkimaiVykdytojai" o ON o.id = p."pirkimoVykdytojasId"
+FROM "eppsViesiejiPirkimai"."pirkimai" p
+         LEFT JOIN "eppsViesiejiPirkimai"."vykdytojai" o ON o.id = p."pirkimoVykdytojasId"
 UNION ALL
 SELECT 'cvpp' AS saltinis,
        c."pirkimoNumeris" AS "pirkimoNumeris",
@@ -62,7 +62,7 @@ SELECT 'cvpp' AS saltinis,
        NULL AS "esFinansavimas",
        NULL AS "bvpzKodai",
        c.link AS informacija
-FROM "cvppViesiejiPirkimai" c
+FROM cvpp."archyvoSkelbimai" c
          LEFT JOIN LATERAL (
              SELECT s."perkanciosiosOrganizacijosKodas"
              FROM "vpmSutartys" s
@@ -73,6 +73,6 @@ FROM "cvppViesiejiPirkimai" c
          ) sj ON true
 WHERE c."skelbimoTipas" = 'Skelbimas apie pirkimą'
   AND NOT EXISTS (
-      SELECT 1 FROM "viesiejiPirkimai" p
+      SELECT 1 FROM "eppsViesiejiPirkimai"."pirkimai" p
       WHERE p."pirkimoId"::text = c."pirkimoNumeris"
   )

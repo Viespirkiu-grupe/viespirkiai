@@ -5,7 +5,9 @@ export const COVERED_TABLES_BY_VIEWS: Record<string, string> = {
     juridiniaiRysiaiPilni:  "v_person_links",
     ataskaitos:             "v_dalyviai",
 
-    teismoNuosprendziaiDalyviai: "v_bylos",
+    // LITEKO teismo nuosprendžiai iškelti į `liteko` schemą; buvęs
+    // public."teismoNuosprendziaiDalyviai" nekvalifikuotai yra `dalyviaiPilni`.
+    dalyviaiPilni:          "v_bylos",
 };
 
 // Views that stand in for a raw ingestion table above; get_schema redirects the

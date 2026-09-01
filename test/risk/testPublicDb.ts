@@ -18,10 +18,11 @@ import { riskDb } from "../../postgres/riskDb.js";
 // v_pirkimo_pabaiga_v2 has no shared analyst counterpart at all — see its
 // own header comment.
 //
-// v_dalyviai_v2.sql reads xlsxPPA*-named tables — the real database renamed
-// these from an earlier atn1*-named schema (see git history on
-// modules/mcp/analyst/views/v_dalyviai.sql); the fixture tables below and in
-// 001_public_test_tables.sql follow the current, real names.
+// The _v2 views read schema-qualified source tables — ppa.* (ATN-1/PPA
+// reports), "eppsViesiejiPirkimai".* (CVP IS notices), cvpp."archyvoSkelbimai"
+// and "rcJar"."asmenys" — since the real database moved them out of `public`.
+// The fixture tables below and in 001_public_test_tables.sql follow those
+// current, real names; only public."vpmSutartys" is still a public table.
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -38,18 +39,18 @@ const VIEW_FILES = [
 ];
 
 const TEST_TABLES = [
-    '"xlsxPPAatmestiPasiulymai"',
-    '"xlsxPPAatmestuPasiulymuStatusai"',
-    '"xlsxPPApasiulymuEile"',
-    '"xlsxPPAproceduruPabaiga"',
-    '"xlsxPPAdalyviai"',
-    '"xlsxPPAataskaitos"',
-    '"viesiejiPirkimaiDalys"',
-    '"vpmSutartys"',
-    '"cvppViesiejiPirkimai"',
-    '"viesiejiPirkimaiVykdytojai"',
-    '"viesiejiPirkimai"',
-    '"jarAsmenys"',
+    'ppa."atmestiPasiulymai"',
+    'ppa."atmestuPasiulymuStatusai"',
+    'ppa."pasiulymuEile"',
+    'ppa."proceduruPabaiga"',
+    'ppa."dalyviai"',
+    'ppa."ataskaitos"',
+    '"eppsViesiejiPirkimai"."dalys"',
+    'public."vpmSutartys"',
+    'cvpp."archyvoSkelbimai"',
+    '"eppsViesiejiPirkimai"."vykdytojai"',
+    '"eppsViesiejiPirkimai"."pirkimai"',
+    '"rcJar"."asmenys"',
 ] as const;
 
 const VIEW_NAMES = VIEW_FILES.map((viewFile) => path.basename(viewFile, ".sql"));

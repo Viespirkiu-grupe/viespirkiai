@@ -38,8 +38,8 @@ WITH deklaruotos AS (
            d.pavadinimas                   AS "daliesPavadinimas",
            vp."pirkimoBudas",
            vp."paskelbimoData"::timestamp  AS "paskelbimoData"
-    FROM "viesiejiPirkimaiDalys" d
-             JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = d."pirkimoId"
+    FROM "eppsViesiejiPirkimai"."dalys" d
+             JOIN "eppsViesiejiPirkimai"."pirkimai" vp ON vp."pirkimoId" = d."pirkimoId"
     WHERE d.rusis = 'dalis'
       AND d.numeris IS NOT NULL
 ), stebetos AS (
@@ -108,10 +108,10 @@ FROM (
            END AS saltinis
     FROM sujungta s
              LEFT JOIN (SELECT DISTINCT vp."pirkimoId"::text AS "pirkimoNumeris"
-                        FROM "viesiejiPirkimai" vp) cvpis
+                        FROM "eppsViesiejiPirkimai"."pirkimai" vp) cvpis
                        ON cvpis."pirkimoNumeris" = s."pirkimoNumeris"
              LEFT JOIN (SELECT DISTINCT c."pirkimoNumeris"
-                        FROM "cvppViesiejiPirkimai" c
+                        FROM cvpp."archyvoSkelbimai" c
                         WHERE c."skelbimoTipas" = 'Skelbimas apie pirkimą') cvpp
                        ON cvpp."pirkimoNumeris" = s."pirkimoNumeris"
 ) l

@@ -73,7 +73,7 @@ async function resolvePirkimoNumeriai(): Promise<readonly string[]> {
         `
         ${publicViewsCte(["v_pirkimas_v2"])}
         SELECT DISTINCT a."pirkimoNumeris"
-        FROM "xlsxPPAataskaitos" a
+        FROM ppa."ataskaitos" a
         JOIN v_pirkimas_v2 p ON p."pirkimoNumeris" = a."pirkimoNumeris"
         ORDER BY a."pirkimoNumeris"
         LIMIT $1

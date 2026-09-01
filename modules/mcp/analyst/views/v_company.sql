@@ -28,25 +28,13 @@ SELECT j."jarKodas"::text,
        s."vidutinisAtlyginimas",
        s."imokuSuma",
        melagingas."nuo"                                                             AS "melagingisTiekejasNuo",
-       melagingas."iki"
-        nepatikimas."nuo"                                                            AS "nepatikimasTiekejasNuo",
-        nepatikimas."iki"
-        EXISTS(SELECT 1
-              FROM "vptJuodiejiSarasai"."tiekejai" m
-              JOIN "vptJuodiejiSarasai"."sarasai" ms ON ms."id" = m."sarasoId"
-              WHERE m."tiekejoJarKodas" = j."jarKodas"::text
-                AND ms."kodas" = 'melagingi'
-                AND (m."itrauktasIki" IS NULL OR m."itrauktasIki" >= CURRENT_DATE)) AS "melagingisTiekejas",
-       EXISTS(SELECT 1
-              FROM "vptJuodiejiSarasai"."tiekejai" n
-              JOIN "vptJuodiejiSarasai"."sarasai" ns ON ns."id" = n."sarasoId"
-              WHERE n."tiekejoJarKodas" = j."jarKodas"::text
-                AND ns."kodas" = 'nepatikimi'
-                AND (n."itrauktasIki" IS NULL OR n."itrauktasIki" >= CURRENT_DATE)) AS "nepatikimasTiekejas",
+       melagingas."iki"                                                             AS "melagingisTiekejasIki",
+       nepatikimas."nuo"                                                            AS "nepatikimasTiekejasNuo",
+       nepatikimas."iki"                                                            AS "nepatikimasTiekejasIki",
        (SELECT COUNT(*)
         FROM vdi.pazeidimai v
-        JOIN vdi.subjektai s ON s.id = v."subjektoId"
-        WHERE s."jarKodas" = j."jarKodas"::integer)                                    AS "vdiPazeidimuSkaicius",
+        JOIN vdi.subjektai vs ON vs.id = v."subjektoId"
+        WHERE vs."jarKodas" = j."jarKodas"::integer)                                AS "vdiPazeidimuSkaicius",
        (SELECT COUNT(*)
         FROM liteko."dalyviaiPilni" d
         WHERE d.kodas = j."jarKodas"::text)                                         AS "bylosSkaicius",
@@ -80,17 +68,26 @@ FROM "rcJar"."asmenys" j
          -- against nuo/iki), not get an answer baked in against today's wall clock.
          -- A company can have more than one entry (one per case); this picks the
          -- most current one -- open-ended (iki IS NULL) first, else the latest iki.
+         --
+         -- Both juodieji sąrašai now live in one "vptJuodiejiSarasai"."tiekejai"
+         -- table keyed by "sarasoId"; the per-list start date (buvę
+         -- "dataNuoKuriosSkaiciuojamasTerminas" ir "dataNuoKuriosSkaiciuojama")
+         -- normalised into the shared "terminoPradzia" column.
          LEFT JOIN LATERAL (
-    SELECT "dataNuoKuriosSkaiciuojamasTerminas" AS "nuo", "itrauktasIki" AS "iki"
-    FROM "melagingiTiekejai"
-    WHERE "tiekejoJarKodas" = j."jarKodas"::text
-    ORDER BY ("itrauktasIki" IS NULL) DESC, "itrauktasIki" DESC, "dataNuoKuriosSkaiciuojamasTerminas" DESC
+    SELECT m."terminoPradzia" AS "nuo", m."itrauktasIki" AS "iki"
+    FROM "vptJuodiejiSarasai"."tiekejai" m
+    JOIN "vptJuodiejiSarasai"."sarasai" ms ON ms."id" = m."sarasoId"
+    WHERE m."tiekejoJarKodas" = j."jarKodas"::text
+      AND ms."kodas" = 'melagingi'
+    ORDER BY (m."itrauktasIki" IS NULL) DESC, m."itrauktasIki" DESC, m."terminoPradzia" DESC
     LIMIT 1
     ) melagingas ON true
          LEFT JOIN LATERAL (
-    SELECT "dataNuoKuriosSkaiciuojama" AS "nuo", "itrauktaIki" AS "iki"
-    FROM "nepatikimiTiekejai"
-    WHERE "tiekejoJarKodas" = j."jarKodas"::text
-    ORDER BY ("itrauktaIki" IS NULL) DESC, "itrauktaIki" DESC, "dataNuoKuriosSkaiciuojama" DESC
+    SELECT n."terminoPradzia" AS "nuo", n."itrauktasIki" AS "iki"
+    FROM "vptJuodiejiSarasai"."tiekejai" n
+    JOIN "vptJuodiejiSarasai"."sarasai" ns ON ns."id" = n."sarasoId"
+    WHERE n."tiekejoJarKodas" = j."jarKodas"::text
+      AND ns."kodas" = 'nepatikimi'
+    ORDER BY (n."itrauktasIki" IS NULL) DESC, n."itrauktasIki" DESC, n."terminoPradzia" DESC
     LIMIT 1
     ) nepatikimas ON true

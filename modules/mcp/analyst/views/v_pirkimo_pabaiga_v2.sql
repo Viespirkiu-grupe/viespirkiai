@@ -51,7 +51,7 @@ SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
        a."pretenzijaPateikta"                AS "pretenzijaPateikta",
        a."ieskinysTeismui"                   AS "ieskinysTeismui",
        a."elektroninisPirkimas"              AS "elektroninisPirkimas"
-FROM "xlsxPPAataskaitos" a
-         JOIN "xlsxPPAproceduruPabaiga" pb ON pb."ataskaitaId" = a.id
+FROM ppa."ataskaitos" a
+         JOIN ppa."proceduruPabaiga" pb ON pb."ataskaitaId" = a.id
 WHERE pb."proceduruPabaiga" IS NOT NULL
   AND pb."proceduruPabaiga" != ''
