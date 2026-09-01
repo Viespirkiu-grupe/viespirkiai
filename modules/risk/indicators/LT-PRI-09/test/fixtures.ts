@@ -98,3 +98,28 @@ export const winnerMissingPrice: readonly Bid[] = [
     bid({ tiekejoKodas: "B1", eileNumeris: 1 }),
     bid({ tiekejoKodas: "B2", pasiulymoKaina: 9000, eileNumeris: 2 }),
 ];
+
+// The offer ranking is the award ranking, not a price ranking: under a
+// MEAT award the #1-ranked bid can legitimately cost more than a valid
+// competitor. There is no discount to measure, so the concept does not
+// apply — see decision.ts's isLowestValidPricedBid.
+export const winnerNotCheapest: readonly Bid[] = [
+    bid({ tiekejoKodas: "B1", pasiulymoKaina: 9000, eileNumeris: 1 }),
+    bid({ tiekejoKodas: "B2", pasiulymoKaina: 1000, eileNumeris: 2 }),
+];
+
+// Only a *valid* cheaper competitor takes the concept away: a cheaper bid
+// that was disqualified was never a real alternative, so the winner is
+// still the lowest valid price and the lot stays comparable.
+export const cheaperCompetitorDisqualified: readonly Bid[] = [
+    bid({ tiekejoKodas: "B1", pasiulymoKaina: 1000, eileNumeris: 1 }),
+    bid({ tiekejoKodas: "B2", pasiulymoKaina: 400, atmetimoPriezastis: "Neatitiko kvalifikacijos" }),
+    bid({ tiekejoKodas: "B3", pasiulymoKaina: 2500, eileNumeris: 2 }),
+];
+
+// A tie for the lowest valid price still leaves the winner *a* lowest
+// valid bid — comparable, and a relative discount of exactly 0.
+export const winnerTiedForLowest: readonly Bid[] = [
+    bid({ tiekejoKodas: "B1", pasiulymoKaina: 1000, eileNumeris: 1 }),
+    bid({ tiekejoKodas: "B2", pasiulymoKaina: 1000, eileNumeris: 2 }),
+];

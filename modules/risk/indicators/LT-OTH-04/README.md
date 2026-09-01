@@ -24,6 +24,23 @@ comes from `modules/risk/procurementReader.ts`'s `PROCEDURE_OUTCOME_SQL`, the sa
 (`modules/mcp/analyst/views/v_pirkimo_sutartys_v2.sql`) added for this indicator, reading `vpmSutartys` directly
 rather than forking the whole, much wider `public.v_sutartys` shape (which no risk-service indicator needs yet).
 
+## One entry per lot, not per report revision
+
+`v_pirkimo_pabaiga_v2`'s header calls its grain "(pirkimoNumeris, daliesNumeris)", but a procurement can carry more
+than one ATN-1 report and the view emits a row per revision — its real grain is (report, lot): 12,275 rows for
+10,841 lots warehouse-wide, with 445 procurements carrying more than one report and one carrying 14. Until run 676
+`PROCEDURE_OUTCOME_SQL` aggregated those raw, so `procedureOutcome.lots` could arrive with a lot's entry repeated
+once per revision — 34 entries for a two-lot procurement (`cvpis:7213562`), and up to 74 in one `rawValue`.
+`PROCEDURE_OUTCOME_SQL` now keeps each lot's most recent revision only (`row_number()` over
+`(pirkimoNumeris, daliesNumeris)` ordered by `ataskaitosData DESC`, with deterministic tie-breaks so a re-run
+reproduces the same row). `proceduruPabaigos` and the `bool_or`'d report-level flags still deliberately span every
+revision — only `lots` is narrowed.
+
+Same effect here as in `LT-OTH-03`: `rawValue.periods` repeated a lot's award-to-signature period once per
+revision, and a superseded revision's own `sprendimoPriemimoData` could pair against a contract signature to
+produce a period the current revision does not support. Run 719 dropped **5 triggers** (283 → 278), with the
+evaluable population going 4,484 → 4,452.
+
 ## Why "nearest contract signed on or after the decision", not a simple min/max pairing
 
 `v_sutartys` carries no `daliesNumeris` — a contract cannot be matched to a *specific* lot the way LT-OTH-03 matches

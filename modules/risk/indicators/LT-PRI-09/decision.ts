@@ -23,11 +23,42 @@ function isValid(bid: Bid): boolean {
 }
 
 // The domain model's own winner inference (domain-model.md §3): first in
-// the price ranking and not rejected. Not recorded as such anywhere in the
-// source data, so this is an approximation — see definition.ts's
-// limitationLt — not a verified "this bid was awarded the contract" fact.
+// the offer ranking (pasiūlymų eilė) and not rejected. Not recorded as such
+// anywhere in the source data, so this is an approximation — see
+// definition.ts's limitationLt — not a verified "this bid was awarded the
+// contract" fact.
 function isWinner(bid: Bid): boolean {
     return bid.eileNumeris === 1 && isValid(bid);
+}
+
+// Whether no other valid, usably-priced bid in the lot undercuts the
+// winner. The offer ranking is the *award* ranking, not a price ranking:
+// under an economically-most-advantageous-tender (MEAT) award the buyer
+// scores quality alongside price, so the bid ranked #1 legitimately need
+// not be the cheapest one. Measured against the full batch (run 676),
+// 495 of 4,267 comparable lots — 11.6% — have a valid competitor priced
+// below the winner, and those lots are three times likelier to carry a
+// scoring column (ppa."pasiulymuEile"."kainosSantykis") than the lots
+// where the winner is cheapest, which is what a MEAT award looks like in
+// this data.
+//
+// OCP-R058's statistic — "(second-lowest valid bid − winning bid) /
+// winning bid" — presupposes the winner *is* the price leader; where it is
+// not, there is no discount to measure and the subtraction just yields a
+// negative number that can never trigger. Gating those lots out (see
+// isEligible) rather than letting them resolve to not_triggered keeps the
+// indicator from asserting "evaluated, no red flag" about a lot whose
+// premise it never satisfied — and makes assessRisk's
+// `secondLowestValidPrice` genuinely the *second*-lowest valid price,
+// since the winner is then provably the lowest.
+function isLowestValidPricedBid(bid: Bid & { pasiulymoKaina: number }, lot: BidSubject["lot"]): boolean {
+    return !lot.bids.some(
+        (other) =>
+            other.tiekejoKodas !== bid.tiekejoKodas &&
+            isValid(other) &&
+            isUsablePrice(other) &&
+            other.pasiulymoKaina < bid.pasiulymoKaina,
+    );
 }
 
 export class LtPri09Decision extends ABidIndicatorDecision<typeof ltPri09Definition> {
@@ -68,6 +99,11 @@ export class LtPri09Decision extends ABidIndicatorDecision<typeof ltPri09Definit
             };
         }
 
+        // hasRequiredData just proved the winner's own price is usable.
+        if (!isLowestValidPricedBid(subject.bid as Bid & { pasiulymoKaina: number }, subject.lot)) {
+            return { eligible: false, signal: this.signalFor(subject, { state: "not_applicable" }) };
+        }
+
         return { eligible: true };
     }
 
@@ -100,6 +136,9 @@ export class LtPri09Decision extends ABidIndicatorDecision<typeof ltPri09Definit
         // lot.bids is already one row per distinct tiekejoKodas (the
         // Procurement Reader's LOT_BIDS_SQL is DISTINCT ON tiekejoKodas), so
         // this excludes exactly the winner itself, never double-counts it.
+        // isEligible has already proved the winner is the lowest valid
+        // priced bid, so the cheapest of the others is the *second*-lowest
+        // valid price in the lot, and relativeDiscount is never negative.
         const otherValidPrices = validPricedBids
             .filter((b) => b.tiekejoKodas !== bid.tiekejoKodas)
             .map((b) => b.pasiulymoKaina);

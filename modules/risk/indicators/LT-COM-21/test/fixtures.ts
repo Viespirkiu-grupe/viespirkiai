@@ -12,6 +12,8 @@ export const NON_CONFORMING_BASIS = "VPĮ 45 str. 1 d. 1 p.";
 export const UNQUALIFIED_BASIS = "VPĮ 45 str. 1 d. 3 p.";
 export const UNCLARIFIED_BASIS = "VPĮ 45 str. 1 d. 4 p.";
 export const PRICE_BASIS = "VPĮ 45 str. 1 d. 5 p.";
+// The utilities-sector law's point-for-point twin of NON_CONFORMING_BASIS.
+export const UTILITIES_NON_CONFORMING_BASIS = "KSPĮ 58 str. 1 d. 1 p.";
 
 // The plain triggered case: disqualified as not conforming to the tender
 // documents' own requirements.
@@ -97,5 +99,80 @@ export const noOutcomeBid: Bid = {
     atmetimoPriezastis: null,
     atmetimoStatusas: null,
     atmetimoTeisinisPagrindas: null,
+    reportedAt: REPORTED_AT,
+};
+
+// A utilities-sector buyer citing KSPĮ 58 str. 1 d. 1 p. — the same ground
+// as VPĮ 45 str. 1 d. 1 p. under the parallel procurement regime.
+export const utilitiesNonConformingBid: Bid = {
+    tiekejoKodas: "B8",
+    eileNumeris: null,
+    pasiulymoKaina: null,
+    atmetimoPriezastis: "Pasiūlymas neatitinka pirkimo dokumentuose nustatytų reikalavimų",
+    atmetimoStatusas: "Dalyvio pasiūlymas buvo atmestas",
+    atmetimoTeisinisPagrindas: UTILITIES_NON_CONFORMING_BASIS,
+    reportedAt: REPORTED_AT,
+};
+
+// The utilities-sector price ground — KSPĮ 58 str. 1 d. 5 p., out of scope
+// exactly as its VPĮ twin is.
+export const utilitiesPriceRejectedBid: Bid = {
+    tiekejoKodas: "B9",
+    eileNumeris: null,
+    pasiulymoKaina: null,
+    atmetimoPriezastis: "Pasiūlyta per didelė, perkančiajam subjektui nepriimtina kaina",
+    atmetimoStatusas: "Dalyvio pasiūlymas buvo atmestas",
+    atmetimoTeisinisPagrindas: "KSPĮ 58 str. 1 d. 5 p.",
+    reportedAt: REPORTED_AT,
+};
+
+// Real dictionary spellings that carry the same citation as
+// NON_CONFORMING_BASIS but differ as display strings — the law's name
+// spelled out with no trailing full stop, and the citation embedded in a
+// buyer's own prose alongside a tender-conditions clause number.
+export const spelledOutLawBid: Bid = {
+    tiekejoKodas: "B10",
+    eileNumeris: null,
+    pasiulymoKaina: null,
+    atmetimoPriezastis: "Neatitiko pirkimo dokumentų reikalavimų",
+    atmetimoStatusas: "Dalyvio pasiūlymas buvo atmestas",
+    atmetimoTeisinisPagrindas: "Viešųjų pirkimų įstatymo 45 str. 1 d. 1 p",
+    reportedAt: REPORTED_AT,
+};
+
+export const citationInProseBid: Bid = {
+    tiekejoKodas: "B11",
+    eileNumeris: null,
+    pasiulymoKaina: null,
+    atmetimoPriezastis: "Neatitiko pirkimo dokumentų reikalavimų",
+    atmetimoStatusas: "Dalyvio pasiūlymas buvo atmestas",
+    atmetimoTeisinisPagrindas:
+        "Vadovaujantis Viešųjų pirkimų įstatymo 45 str. 1 d. 1 p. ir Bendrųjų Pirkimo sąlygų 18.1.7. p. " +
+        "„pasiūlymas neatitinka pirkimo dokumentų reikalavimų“, atmestas pateiktas pasiūlymas.",
+    reportedAt: REPORTED_AT,
+};
+
+// The price ground written without its trailing full stop — one character
+// away from NON_CONFORMING_BASIS's spelling, and the case a normaliser that
+// merely stripped punctuation would get wrong.
+export const priceRejectedNoTrailingStopBid: Bid = {
+    tiekejoKodas: "B12",
+    eileNumeris: null,
+    pasiulymoKaina: null,
+    atmetimoPriezastis: "Pasiūlyta per didelė kaina",
+    atmetimoStatusas: "Dalyvio pasiūlymas buvo atmestas",
+    atmetimoTeisinisPagrindas: "VPĮ 45 str. 1 d. 5 p",
+    reportedAt: REPORTED_AT,
+};
+
+// Disqualified with a free-text ground that cites no norm at all — the
+// dictionary really does hold values like this. LT-AWD-03's concept.
+export const disqualifiedFreeTextGroundBid: Bid = {
+    tiekejoKodas: "B13",
+    eileNumeris: null,
+    pasiulymoKaina: null,
+    atmetimoPriezastis: "Pasiūlymų atmetimas",
+    atmetimoStatusas: "Dalyvio pasiūlymas buvo atmestas",
+    atmetimoTeisinisPagrindas: "Pasiūlymas neatitinka pirkimo dokumentuose nustatytų reikalavimų",
     reportedAt: REPORTED_AT,
 };

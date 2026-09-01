@@ -33,3 +33,22 @@ The parameter timeline applies to every `pirkimoBudas`. Narrowing to competitive
 
 `maximumValidBids: 1` is the catalogue definition. It is a parameter rather than a literal so a revised threshold
 can be added as a new effective-dated entry rather than a new implementation version.
+
+## Zero valid bids is a different concept
+
+The trigger is `1 ≤ validBids ≤ maximumValidBids`, not just `validBids ≤ maximumValidBids`. A lot where *every* bid
+was rejected has no winner at all — that is a failed procedure, which `LT-OTH-05` ("procedure unsuccessful or award
+not contracted") and `LT-AWD-04` ("excessive share of disqualified bids") are the concepts for. OCP-R018 is about a
+single supplier facing no competition *for a contract it went on to win*, so a zero-valid-bid lot is
+`not_applicable` here.
+
+Measured against run 676, the naive `≤` reading made these **1,320 of the indicator's 7,770 triggered lots (17.0%)**
+— 815 of them lots with a single bidder who was rejected — and contradicted the indicator's own published
+description ("Pirkimo dalyje po pasiūlymų vertinimo liko tik vienas tinkamas (neatmestas) pasiūlymas"). With the
+gate in place that description is exactly what the indicator does: re-running the full batch (run 719) leaves
+**6,450 triggers, every one of them a lot with exactly one valid bid**, and moves all 1,320 zero-valid-bid lots to
+`not_applicable`. The trigger rate falls from 59.95% to 55.41% of evaluable lots.
+
+Note this is *not* the same case as `emptyReport` (`totalBids === 0`): there the report lists participants whose
+`tiekejoKodas` is all null, so nothing is known about the lot's competition at all — `insufficient_data`. Here the
+lot's bids are known, and known to have all been rejected.

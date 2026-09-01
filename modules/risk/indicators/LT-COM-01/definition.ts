@@ -26,10 +26,12 @@ export const ltCom01Definition: RiskIndicatorDefinition<LtCom01Parameters> = {
     public: {
         titleLt: "Vienintelis tinkamas pasiūlymas",
         descriptionLt: "Pirkimo dalyje po pasiūlymų vertinimo liko tik vienas tinkamas (neatmestas) pasiūlymas.",
-        formulaLt: "tinkamų pasiūlymų skaičius (po atmetimų) ≤ taikoma riba",
+        formulaLt: "tinkamų pasiūlymų skaičius (po atmetimų) ≥ 1 IR ≤ taikoma riba",
         limitationLt:
             "Vienas tinkamas pasiūlymas gali būti paaiškinamas siaura rinka, specifiniu pirkimo objektu " +
             "arba teisėtu vieno tiekėjo pirkimo būdu. Rodiklis nevertina, ar konkurencijos stoka buvo dirbtinai " +
-            "sukelta.",
+            "sukelta. Pirkimo dalys, kuriose neliko nė vieno tinkamo pasiūlymo (visi atmesti), šiam rodikliui " +
+            "netaikomos — tai neįvykusi procedūra, o ne nekonkurencingas laimėtojo parinkimas; tokius atvejus " +
+            "vertina LT-OTH-05 ir LT-AWD-04.",
     },
 };

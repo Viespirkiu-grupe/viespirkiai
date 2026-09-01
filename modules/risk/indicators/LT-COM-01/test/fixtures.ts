@@ -16,6 +16,13 @@ export const singleBidder: LotParticipation = { totalBids: 1, validBids: 1, repo
 // survived evaluation.
 export const oneOfTwoRejected: LotParticipation = { totalBids: 2, validBids: 1, reportedAt: REPORTED_AT };
 
+// Every bid the lot received was rejected — a failed procedure, not a
+// non-competitive award, so the concept does not apply (see decision.ts).
+export const allBidsRejected: LotParticipation = { totalBids: 3, validBids: 0, reportedAt: REPORTED_AT };
+
+// The same, with only one bidder to reject: still zero valid bids.
+export const soleBidRejected: LotParticipation = { totalBids: 1, validBids: 0, reportedAt: REPORTED_AT };
+
 // Two bidders, neither rejected — not_triggered.
 export const twoValidBidders: LotParticipation = { totalBids: 2, validBids: 2, reportedAt: REPORTED_AT };
 

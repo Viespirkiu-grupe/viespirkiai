@@ -509,6 +509,61 @@ describe("ProcurementReader procedure-outcome (LT-OTH-05)", () => {
         expect(lots[1].sprendimoPriezastys).toBeNull();
     });
 
+    it("keeps one entry per lot when the procurement has several report revisions, taking the most recent", async () => {
+        // A procurement can carry more than one ATN-1 report (445 do
+        // warehouse-wide; one carries 14), and v_pirkimo_pabaiga_v2 emits a
+        // row per (report, lot) despite its header calling its grain
+        // "(pirkimoNumeris, daliesNumeris)". LT-OTH-03/LT-OTH-04/LT-TRA-06
+        // all read "lots" as one entry per lot, so the reader takes each
+        // lot's latest revision — a superseded revision that left
+        // sprendimoPriezastys blank must not read as an undocumented lot.
+        await insertViesiejiPirkimai(970011);
+        const firstReport = await insertAtaskaita({
+            pirkimoNumeris: "970011",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-05-04T09:30:00Z",
+            pretenzijaPateikta: true,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId: firstReport,
+            daliesNumeris: "1",
+            proceduruPabaiga: "Nutraukus pirkimo ar projekto konkurso procedūras",
+            sprendimoPriemimoData: "2026-05-10",
+            sprendimoPriezastys: null,
+        });
+        const laterReport = await insertAtaskaita({
+            pirkimoNumeris: "970011",
+            pirkimoBudas: "Atviras konkursas",
+            daliuSkaicius: 1,
+            sukurtaAt: "2026-06-01T09:30:00Z",
+            pretenzijaPateikta: null,
+        });
+        await insertProceduruPabaiga({
+            ataskaitaId: laterReport,
+            daliesNumeris: "1",
+            proceduruPabaiga: "Sudarius pirkimo sutartį",
+            sprendimoPriemimoData: "2026-05-28",
+            sprendimoPriezastys: "Ekonomiškai naudingiausias pasiūlymas",
+        });
+
+        const [procurement] = await loadAll(reader(["970011"]));
+        expect(procurement.procedureOutcome!.lots).toEqual([
+            {
+                daliesNumeris: "1",
+                proceduruPabaiga: "Sudarius pirkimo sutartį",
+                sprendimoPriemimoData: "2026-05-28",
+                sprendimoPriezastys: "Ekonomiškai naudingiausias pasiūlymas",
+            },
+        ]);
+        // proceduruPabaigos and the bool_or'd report-level flags still span
+        // every revision on purpose — only "lots" is narrowed.
+        expect([...procurement.procedureOutcome!.proceduruPabaigos].sort()).toEqual(
+            ["Nutraukus pirkimo ar projekto konkurso procedūras", "Sudarius pirkimo sutartį"].sort(),
+        );
+        expect(procurement.procedureOutcome!.pretenzijaPateikta).toBe(true);
+    });
+
     it("is null when no procedure-ending decision was observed at all", async () => {
         await insertViesiejiPirkimai(970003);
 

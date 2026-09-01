@@ -4,16 +4,23 @@ import type { Bid, BidSubject, Lot, Procurement } from "../../../types.ts";
 import { EvaluationContext } from "../../../evaluationContext.ts";
 import { RiskDecisionEngine } from "../../../riskDecisionEngine.ts";
 import {
+    citationInProseBid,
+    disqualifiedFreeTextGroundBid,
     disqualifiedWithoutLegalBasisBid,
     NON_CONFORMING_BASIS,
     nonConformingBid,
     noOutcomeBid,
     priceRejectedBid,
+    priceRejectedNoTrailingStopBid,
     rankedBid,
+    spelledOutLawBid,
     UNCLARIFIED_BASIS,
     unclarifiedBid,
     UNQUALIFIED_BASIS,
     unqualifiedBid,
+    UTILITIES_NON_CONFORMING_BASIS,
+    utilitiesNonConformingBid,
+    utilitiesPriceRejectedBid,
 } from "./fixtures.ts";
 
 // Unit tests for the judgement half of LT-COM-21: plain objects in, plain
@@ -96,9 +103,17 @@ describe("LtCom21Decision.assessRisk", () => {
         expect(signal.rawValue).toEqual({
             atmetimoPriezastis: nonConformingBid.atmetimoPriezastis,
             atmetimoTeisinisPagrindas: NON_CONFORMING_BASIS,
+            matchedLegalBasis: { law: "VPĮ", straipsnis: 45, dalis: 1, punktas: 1 },
         });
         expect(signal.threshold).toEqual({
-            nonGenuineIncompleteIncapableLegalBases: [NON_CONFORMING_BASIS, UNQUALIFIED_BASIS, UNCLARIFIED_BASIS],
+            nonGenuineIncompleteIncapableLegalBases: [
+                NON_CONFORMING_BASIS,
+                UNQUALIFIED_BASIS,
+                UNCLARIFIED_BASIS,
+                UTILITIES_NON_CONFORMING_BASIS,
+                "KSPĮ 58 str. 1 d. 3 p.",
+                "KSPĮ 58 str. 1 d. 4 p.",
+            ],
         });
     });
 
@@ -108,6 +123,7 @@ describe("LtCom21Decision.assessRisk", () => {
         expect(signal.rawValue).toEqual({
             atmetimoPriezastis: unqualifiedBid.atmetimoPriezastis,
             atmetimoTeisinisPagrindas: UNQUALIFIED_BASIS,
+            matchedLegalBasis: { law: "VPĮ", straipsnis: 45, dalis: 1, punktas: 3 },
         });
     });
 
@@ -117,13 +133,58 @@ describe("LtCom21Decision.assessRisk", () => {
         expect(signal.rawValue).toEqual({
             atmetimoPriezastis: unclarifiedBid.atmetimoPriezastis,
             atmetimoTeisinisPagrindas: UNCLARIFIED_BASIS,
+            matchedLegalBasis: { law: "VPĮ", straipsnis: 45, dalis: 1, punktas: 4 },
         });
+    });
+
+    it("triggers on the utilities-sector law's twin of the same ground", () => {
+        const signal = assessRiskFor(utilitiesNonConformingBid);
+        expect(signal.state).toBe("triggered");
+        expect(signal.rawValue).toMatchObject({
+            matchedLegalBasis: { law: "KSPĮ", straipsnis: 58, dalis: 1, punktas: 1 },
+        });
+    });
+
+    it("does not trigger on the utilities-sector law's price ground, exactly as for its VPĮ twin", () => {
+        expect(assessRiskFor(utilitiesPriceRejectedBid).state).toBe("not_triggered");
+    });
+
+    it("triggers when the law's name is spelled out and the trailing full stop is missing", () => {
+        const signal = assessRiskFor(spelledOutLawBid);
+        expect(signal.state).toBe("triggered");
+        expect(signal.rawValue).toMatchObject({
+            matchedLegalBasis: { law: "VPĮ", straipsnis: 45, dalis: 1, punktas: 1 },
+        });
+    });
+
+    it("triggers on a citation embedded in the buyer's own prose, ignoring the tender-conditions clause beside it", () => {
+        const signal = assessRiskFor(citationInProseBid);
+        expect(signal.state).toBe("triggered");
+        expect(signal.rawValue).toMatchObject({
+            matchedLegalBasis: { law: "VPĮ", straipsnis: 45, dalis: 1, punktas: 1 },
+        });
+    });
+
+    it("still excludes the price ground when it is written without its trailing full stop", () => {
+        const signal = assessRiskFor(priceRejectedNoTrailingStopBid);
+        expect(signal.state).toBe("not_triggered");
+        expect(signal.rawValue).toMatchObject({ matchedLegalBasis: null });
+    });
+
+    it("does not trigger on a free-text ground that cites no norm at all — LT-AWD-03's concept", () => {
+        const signal = assessRiskFor(disqualifiedFreeTextGroundBid);
+        expect(signal.state).toBe("not_triggered");
+        expect(signal.rawValue).toMatchObject({ matchedLegalBasis: null });
     });
 
     it("does not trigger for a bid that was ranked and never rejected", () => {
         const signal = assessRiskFor(rankedBid);
         expect(signal.state).toBe("not_triggered");
-        expect(signal.rawValue).toEqual({ atmetimoPriezastis: null, atmetimoTeisinisPagrindas: null });
+        expect(signal.rawValue).toEqual({
+            atmetimoPriezastis: null,
+            atmetimoTeisinisPagrindas: null,
+            matchedLegalBasis: null,
+        });
     });
 
     it("does not trigger for a bid disqualified on a price ground — the boundary against a similar but out-of-scope legal basis", () => {
@@ -137,6 +198,7 @@ describe("LtCom21Decision.assessRisk", () => {
         expect(signal.rawValue).toEqual({
             atmetimoPriezastis: disqualifiedWithoutLegalBasisBid.atmetimoPriezastis,
             atmetimoTeisinisPagrindas: null,
+            matchedLegalBasis: null,
         });
     });
 

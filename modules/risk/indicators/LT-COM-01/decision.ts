@@ -35,6 +35,28 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
             });
         }
 
+        // validBids === 0: every bid the lot received was rejected, so no
+        // supplier was left to award to. That is a failed procedure, not a
+        // non-competitive award — the catalogue concept (OCP-R018, "a
+        // single supplier faced no competition for this contract") has no
+        // subject here, so it is not_applicable rather than a trigger.
+        // LT-OTH-05 ("procedure unsuccessful or award not contracted") and
+        // LT-AWD-04 ("excessive share of disqualified bids") are the
+        // concepts that do cover it. Without this gate the naive
+        // `validBids <= 1` reading made these 17.0% of the indicator's
+        // whole triggered population (1,320 of 7,770 lots, run 676) and
+        // contradicted the indicator's own published description ("liko tik
+        // vienas tinkamas pasiūlymas"). Gated here rather than in
+        // isEligible for the same reason the totalBids === 0 branch above
+        // is: both are read off participation, which only assessRisk has
+        // proved non-null.
+        if (participation.validBids === 0) {
+            return this.signalFor(subject, {
+                state: "not_applicable",
+                rawValue: { totalBids: participation.totalBids, validBids: 0 },
+            });
+        }
+
         const maximumValidBids = this.definition.parameters.maximumValidBids;
         return this.signalFor(subject, {
             state: participation.validBids <= maximumValidBids ? "triggered" : "not_triggered",

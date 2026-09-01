@@ -21,7 +21,14 @@
 -- silently disappear — exactly the outcome this entity exists to keep.
 -- Reading xlsxPPAataskaitos/xlsxPPAproceduruPabaiga directly avoids that.
 --
--- Grain: one row per (pirkimoNumeris, daliesNumeris). "proceduruPabaiga" is
+-- Grain: one row per (ataskaita, dalis) — NOT per (pirkimoNumeris,
+-- daliesNumeris). A procurement can carry more than one ATN-1 report (445 do
+-- warehouse-wide; one carries 14) and every revision's rows are kept, so
+-- 12,275 rows cover 10,841 distinct lots. A caller that means "this lot's
+-- outcome" must pick a revision — procurementReader.ts's
+-- PROCEDURE_OUTCOME_SQL takes the latest per lot for its "lots" aggregate,
+-- while deliberately aggregating "proceduruPabaigos" and the report-level
+-- flags across every revision. "proceduruPabaiga" is
 -- the report's own closed-vocabulary outcome label (one of a handful of
 -- statutory phrasings, e.g. "Sudarius pirkimo sutartį..." for a concluded
 -- contract, or one of several unsuccessful/terminated phrasings) — an

@@ -50,20 +50,22 @@ export const ltPri09Definition: RiskIndicatorDefinition<LtPri09Parameters> = {
             "Pirkimo dalyje laimėjusio (mažiausią kainą pasiūliusio ir neatmesto) tiekėjo kaina yra gerokai " +
             "mažesnė už kitą mažiausią tinkamą (neatmestą) konkuruojančio tiekėjo pasiūlymo kainą.",
         formulaLt:
-            "pasiūlymas yra laimėjęs (eilės numeris = 1 IR pasiūlymas neatmestas) IR tinkamų (neatmestų, su " +
-            "nurodyta kaina) pasiūlymų skaičius pirkimo dalyje ≥ taikoma riba IR (kita mažiausia tinkama kaina − " +
-            "laimėjusio pasiūlymo kaina) / laimėjusio pasiūlymo kaina ≥ taikoma santykinės nuolaidos riba",
+            "pasiūlymas yra laimėjęs (eilės numeris = 1 IR pasiūlymas neatmestas) IR laimėjusio pasiūlymo kaina " +
+            "yra mažiausia tarp visų tinkamų (neatmestų, su nurodyta kaina) pirkimo dalies pasiūlymų IR tinkamų " +
+            "pasiūlymų skaičius pirkimo dalyje ≥ taikoma riba IR (kita mažiausia tinkama kaina − laimėjusio " +
+            "pasiūlymo kaina) / laimėjusio pasiūlymo kaina ≥ taikoma santykinės nuolaidos riba",
         limitationLt:
             "Rodiklis remiasi ATN-1 (PPA) ataskaitos pasiūlymų eile, kurioje laimėtojas nustatomas kaip pirmas " +
-            "kainos reitinge ir neatmestas tiekėjas — jei laimėtojas iš tikrųjų buvo parinktas ne vien pagal kainą " +
-            "(pvz., ekonomiškai naudingiausio pasiūlymo vertinimas), šis apytikslis apibrėžimas gali klaidingai " +
-            "nustatyti arba nenustatyti laimėtojo. Rankiniu būdu patikrinus suveikusius atvejus (2026-08 " +
-            "matavimas), dauguma jų yra santykinis skirtumas lygiai (arba beveik lygiai) dvigubas — tai labiau " +
-            "primena vieneto ir bendros (ar kiekio padaugintos) kainos sumaišymo duomenų įvedimo klaidą, nei " +
-            "realų kainos sumažinimą (žr. README dėl matavimo). Didelis kainos skirtumas nuo kito tinkamo " +
-            "pasiūlymo taip pat gali turėti teisėtų priežasčių (efektyvesnė tiekėjo veikla, siauras konkurentų " +
-            "ratas, apskaitos ar PVM traktavimo skirtumai) ir savaime nėra sukčiavimo įrodymas — prieš vertinant " +
-            "signalą verta pirmiausia patikrinti pačios kainos tikėtinumą, o tik tada — ar tiekėjas realiai " +
-            "pajėgus įvykdyti sutartį už pasiūlytą kainą.",
+            "eilėje ir neatmestas tiekėjas. Pasiūlymų eilė sudaroma pagal pirkimo vertinimo kriterijų, todėl " +
+            "vertinant ekonomiškai naudingiausią pasiūlymą (ne vien kainą) laimėtojas gali būti ir ne pigiausias " +
+            "— tokiu atveju nuolaidos nėra ką matuoti ir rodiklis netaikomas (pirkimo dalis pažymima " +
+            "„netaikoma“). Visos duomenų aibės matavimu (2026-09) tokių pirkimo dalių yra apie 12 proc. tų, " +
+            "kuriose apskritai yra su kuo palyginti. Didelis kainos skirtumas nuo kito tinkamo pasiūlymo gali " +
+            "turėti teisėtų priežasčių (efektyvesnė tiekėjo veikla, siauras konkurentų ratas, apskaitos ar PVM " +
+            "traktavimo skirtumai) ir savaime nėra sukčiavimo įrodymas. Dalis suveikusių atvejų taip pat gali " +
+            "būti ne reali nuolaida, o vieneto ir bendros (ar kiekio padaugintos) kainos sumaišymo duomenų " +
+            "įvedimo klaida — tą pačią išlygą turi ir LT-COM-13. Todėl prieš vertinant signalą verta pirmiausia " +
+            "patikrinti pačios kainos tikėtinumą, o tik tada — ar tiekėjas realiai pajėgus įvykdyti sutartį už " +
+            "pasiūlytą kainą.",
     },
 };

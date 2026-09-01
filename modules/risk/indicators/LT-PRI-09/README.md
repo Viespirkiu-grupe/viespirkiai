@@ -28,11 +28,16 @@ population-derived statistical outlier fence (Q3 + 1.5·IQR) and "the winner is 
 
 1. Identifies the lot's winner the way `domain-model.md` §3 documents it is inferred everywhere else in this
    codebase: the bid ranked `eileNumeris = 1` that was not rejected (`atmetimoPriezastis IS NULL`).
-2. Takes the lowest price among the lot's other **valid** (not rejected) priced bids — the "second-lowest valid bid."
+2. Requires that winner to be the lot's **lowest** valid priced bid. The offer ranking (`pasiūlymų eilė`) is the
+   *award* ranking, not a price ranking — under an economically-most-advantageous-tender award the buyer scores
+   quality alongside price, so the #1-ranked bid legitimately need not be the cheapest. OCP-R058's statistic
+   presupposes the winner *is* the price leader, so a lot where a valid competitor undercuts the winner is
+   `not_applicable`: there is no discount to measure. See "Winner is not always the price leader" below.
+3. Takes the lowest price among the lot's other **valid** (not rejected) priced bids — the "second-lowest valid bid."
    A rejected bid's price never counts as the comparator, even if it is cheaper than the runner-up that actually
    survived — the point of comparison is what the buyer could genuinely have paid instead, not the cheapest number
-   anyone typed in.
-3. Triggers when `(secondLowestValidPrice − winningPrice) / winningPrice ≥ minRelativeDiscount`, with at least
+   anyone typed in. Because step 2 proved the winner is the lowest valid price, this really is the *second*-lowest.
+4. Triggers when `(secondLowestValidPrice − winningPrice) / winningPrice ≥ minRelativeDiscount`, with at least
    `minimumValidBids` valid priced bids in the lot (winner included) for the comparison to mean anything.
 
 This is deliberately the same underlying statistic `LT-COM-13` ("wide disparity in bid prices") computes, narrowed
@@ -46,7 +51,8 @@ compares the winner against a bid that was actually a genuine competing option).
 Overrides `ABidIndicatorDecision.isEligible` (`decision.ts`), following `LT-PRO-08`'s precedent for a business-rule
 gate beyond the shared eligibility decision: after the standard Lot Eligibility Decision, a bid that is not the
 lot's inferred winner is `not_applicable` — the catalogue concept has nothing to say about a bid that was never
-awarded anything. `hasRequiredData()` then only asks whether the winner's own price is usable
+awarded anything — and so is a winner that some valid competitor undercuts (see below). `hasRequiredData()` then
+only asks whether the winner's own price is usable
 (`pasiulymoKaina IS NOT NULL AND pasiulymoKaina > 0`); too few *other* valid bids to compute a second-lowest price is
 `not_triggered`, not `insufficient_data` — the same convention `LT-COM-13`'s `minimumPricedBids` gate uses, since the
 report is complete, there just isn't enough competition to judge a discount by.
@@ -58,6 +64,24 @@ report is complete, there just isn't enough competition to judge a discount by.
   (runner-up costs at least double the cheaper price). OCP's own guide computes a population-derived outlier fence
   (Q3 + 1.5·IQR) instead of a fixed ratio; that is not yet something the parameter model supports, so a fixed
   threshold is used, matching the sibling indicator's own choice for the same reason.
+
+## Winner is not always the price leader (measured 2026-09-01 against run 676)
+
+The first full-data run exposed the gap between "first in the offer ranking" and "cheapest bid". Of the 4,267 lots
+where a relative discount was actually computed, **495 (11.6%) produced a negative one** — a valid competitor was
+priced below the bid ranked `eileNumeris = 1` — and 87 more were exact ties.
+
+Checked against the source, that is a MEAT award showing through rather than a broken inference: among lots where
+the ranked-first bid is not the cheapest, **73% carry a scoring column** (`ppa."pasiulymuEile"."kainosSantykis"` —
+values like `100`, `95`, `100 balų`, `Kaina`), against **24%** of the lots where the winner *is* cheapest. The
+ranking is the buyer's own award ranking under whatever criterion the procurement used; `eileNumeris = 1` is right,
+and it is the *comparator* that assumed price ranking.
+
+Before this was gated, those 495 lots resolved to `not_triggered` — the indicator asserting "evaluated, no red
+flag" about a lot whose premise it never satisfied, with a meaningless negative number in `rawValue`. They are now
+`not_applicable`. Confirmed by re-running the full batch (run 719): **zero** negative relative discounts remain
+anywhere in the output, the 247 triggers are unchanged, and the trigger rate is now honest — 247 of 9,545
+comparable winning bids (2.59%) rather than 247 of 10,040 (2.46%).
 
 ## Data coverage and hand-check (measured 2026-08-31 against the real warehouse)
 
@@ -89,9 +113,15 @@ signal as a prompt to check the underlying prices, not as a discount confirmed c
 ## Follow-up
 
 - **The winning-bid inference is approximate**, same caveat `domain-model.md` §3 states generally: `eileNumeris = 1`
-  and not rejected is not a recorded "this bid was awarded" fact, just the best available proxy. A procedure that
-  scores on criteria beyond price (economically most advantageous tender) could rank #1 on price without winning
-  the award, or vice versa — not distinguishable from the currently ingested data.
+  and not rejected is not a recorded "this bid was awarded" fact, just the best available proxy. The
+  price-leader gate above keeps that approximation from producing a meaningless discount, but it does not make the
+  inference exact — a MEAT-awarded lot whose winner *happens* to also be cheapest is still evaluated on the
+  assumption that the ranking means what this indicator needs it to mean.
+- **The hand-check above is superseded on one point.** Its "62% of triggers land at exactly 2x" finding was measured
+  against `public.v_dalyviai` while the `_v2` views were unavailable. Against run 676's real `v_dalyviai_v2` output,
+  only 11 of 247 triggers (4.5%) fall in the 0.98–1.02 band, so the unit-vs-total data-entry artefact is a real
+  caveat but not the dominant explanation it looked like. `definition.ts`'s `limitationLt` has been corrected to say
+  so; the rest of the hand-check still stands.
 - **No statistical outlier fence.** OCP-R058's own methodology recomputes a population-wide Q3 + 1.5·IQR fence per
   run rather than using one fixed ratio; the parameter model here only supports an effective-dated literal, so
   `minRelativeDiscount` is fixed at the same value `LT-COM-13` already uses for the identical statistic. A future

@@ -178,11 +178,32 @@ const LOT_BIDS_SQL = `
 //
 // "lots" carries the same rows at their natural per-lot grain instead —
 // (daliesNumeris, proceduruPabaiga, sprendimoPriemimoData, sprendimoPriezastys)
-// tuples, one per procedure-ending row observed — for LT-OTH-03, which needs
-// a lot's own decision date paired with its own outcome label rather than the
-// collapsed cross-lot set proceduruPabaigos/reportedAt provide, and for LT-TRA-06,
-// which needs a lot's own stated reason text. json_agg is never null here:
-// the JOIN in v_pirkimo_pabaiga_v2 guarantees at least one row per group.
+// tuples, exactly one per lot — for LT-OTH-03 and LT-OTH-04, which need a
+// lot's own decision date paired with its own outcome label rather than the
+// collapsed cross-lot set proceduruPabaigos/reportedAt provide, and for
+// LT-TRA-06, which needs a lot's own stated reason text. json_agg is never
+// null here: the JOIN in v_pirkimo_pabaiga_v2 guarantees at least one row
+// per group.
+//
+// One per lot, not one per row: v_pirkimo_pabaiga_v2's own header calls its
+// grain "(pirkimoNumeris, daliesNumeris)", but a procurement can carry more
+// than one ATN-1 report (445 do; one carries 14), and the view emits every
+// revision's row, so its real grain is (report, lot) — 12,275 rows for
+// 10,841 lots warehouse-wide. Aggregating those raw made a two-lot
+// procurement arrive with 34 entries in "lots" (cvpis:7213562), which
+// LT-TRA-06 read as 34 lots to check for a documented reason — so a
+// superseded revision that left the reason blank flagged a procurement whose
+// current revision documents it — and which LT-OTH-03/LT-OTH-04 wrote into
+// their rawValue.periods as a lot's evaluation period repeated once per
+// revision. The window below keeps only each lot's most recent revision,
+// which is what the three indicators mean by "this lot's outcome" and what
+// the view's header already claims; ties inside one report are broken
+// deterministically so a re-run reproduces the same row.
+//
+// Deliberately not applied to proceduruPabaigos or to the bool_or'd
+// procurement-level flags below: those aggregate across every revision on
+// purpose (see their own note), and narrowing them to the latest revision
+// would change what they mean.
 //
 // preliminariSutartis (LT-PRI-06), pretenzijaPateikta (LT-TRA-07),
 // ieskinysTeismui (LT-TRA-08), and elektroninisPirkimas (LT-TRA-09) are all
@@ -192,7 +213,20 @@ const LOT_BIDS_SQL = `
 // said no, null if no revision ever populated the field (bool_or ignores
 // NULL inputs, matching that semantics exactly).
 const PROCEDURE_OUTCOME_SQL = `
-    ${publicViewsCte(["v_pirkimo_pabaiga_v2"])}
+    ${publicViewsCte(["v_pirkimo_pabaiga_v2"])},
+    pabaiga AS (
+        SELECT po.*,
+               row_number() OVER (
+                   PARTITION BY po."pirkimoNumeris", po."daliesNumeris"
+                   ORDER BY po."ataskaitosData" DESC,
+                            po."sprendimoPriemimoData" DESC NULLS LAST,
+                            po."proceduruPabaiga",
+                            po."sprendimoPriezastys" NULLS LAST
+               ) AS "revisionRank"
+        FROM v_pirkimo_pabaiga_v2 po
+        WHERE po."ataskaitosData" <= $1::timestamptz
+          AND ($2::text[] IS NULL OR po."pirkimoNumeris" = ANY ($2::text[]))
+    )
     SELECT po."pirkimoNumeris"                                                            AS "pirkimoNumeris",
            array_agg(DISTINCT po."proceduruPabaiga")                                       AS "proceduruPabaigos",
            json_agg(json_build_object(
@@ -200,15 +234,13 @@ const PROCEDURE_OUTCOME_SQL = `
                'proceduruPabaiga', po."proceduruPabaiga",
                'sprendimoPriemimoData', to_char(po."sprendimoPriemimoData", 'YYYY-MM-DD'),
                'sprendimoPriezastys', po."sprendimoPriezastys"
-           ))                                                                              AS "lots",
+           ) ORDER BY po."daliesNumeris") FILTER (WHERE po."revisionRank" = 1)              AS "lots",
            to_char(max(po."sprendimoPriemimoData"), 'YYYY-MM-DD')                          AS "reportedAt",
            bool_or(po."preliminariSutartis")                                               AS "preliminariSutartis",
            bool_or(po."pretenzijaPateikta")                                                AS "pretenzijaPateikta",
            bool_or(po."ieskinysTeismui")                                                   AS "ieskinysTeismui",
            bool_or(po."elektroninisPirkimas")                                              AS "elektroninisPirkimas"
-    FROM v_pirkimo_pabaiga_v2 po
-    WHERE po."ataskaitosData" <= $1::timestamptz
-      AND ($2::text[] IS NULL OR po."pirkimoNumeris" = ANY ($2::text[]))
+    FROM pabaiga po
     GROUP BY po."pirkimoNumeris"
 `;
 

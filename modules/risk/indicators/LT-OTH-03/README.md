@@ -34,6 +34,27 @@ pairing is meaningful for this indicator. `ProcurementProcedureOutcome.lots` (ad
 indicator) carries the per-lot rows `PROCEDURE_OUTCOME_SQL` already reads, uncollapsed, so the two facts stay
 correlated.
 
+## One entry per lot, not per report revision
+
+`v_pirkimo_pabaiga_v2`'s header calls its grain "(pirkimoNumeris, daliesNumeris)", but a procurement can carry more
+than one ATN-1 report and the view emits a row per revision — its real grain is (report, lot): 12,275 rows for
+10,841 lots warehouse-wide, with 445 procurements carrying more than one report and one carrying 14. Until run 676
+`PROCEDURE_OUTCOME_SQL` aggregated those raw, so `procedureOutcome.lots` could arrive with a lot's entry repeated
+once per revision — 34 entries for a two-lot procurement (`cvpis:7213562`), and up to 74 in one `rawValue`.
+`PROCEDURE_OUTCOME_SQL` now keeps each lot's most recent revision only (`row_number()` over
+`(pirkimoNumeris, daliesNumeris)` ordered by `ataskaitosData DESC`, with deterministic tie-breaks so a re-run
+reproduces the same row). `proceduruPabaigos` and the `bool_or`'d report-level flags still deliberately span every
+revision — only `lots` is narrowed.
+
+Duplicates hurt this indicator two ways. The visible one: `rawValue.periods` was a wrong record of the
+procurement's lot evaluation periods — 363 of 4,883 evaluable rows carried a repeated `daliesNumeris` — which any
+consumer that counts or averages those entries reads as real lots. The subtler one: a superseded revision carries
+its *own* `proceduruPabaiga` and `sprendimoPriemimoData`, so a lot could contribute a period computed from a stale
+decision date, or qualify through an older revision's "concluded" outcome after the current one terminated it.
+Repeating an identical period cannot flip `periods.some(...)`, but a differing one can — and did: run 719 dropped
+**11 triggers** (532 → 521) and 10 procurements left the evaluable population (4,883 → 4,873) once each lot was
+read at its latest revision.
+
 ## Why the formula only measures `concludedOutcomes` lots
 
 A procedure's `sprendimoPriemimoData` is only reliably "the day the buyer finished evaluating submitted tenders"

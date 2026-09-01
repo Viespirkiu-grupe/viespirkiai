@@ -13,9 +13,10 @@ Unit of analysis is the **bid** — one row per `(pirkimoNumeris, daliesNumeris,
 
 | File            | Question it answers                                                          |
 |-----------------|--------------------------------------------------------------------------------|
-| `definition.ts` | Identity, public wording, and the `nonGenuineIncompleteIncapableLegalBases` parameter list |
-| `decision.ts`   | The `ABidIndicatorDecision` subclass whose `assessRisk()` judges the subject |
-| `test/`         | How we know it works                                                        |
+| `definition.ts`  | Identity, public wording, and the `nonGenuineIncompleteIncapableLegalBases` parameter list |
+| `decision.ts`    | The `ABidIndicatorDecision` subclass whose `assessRisk()` judges the subject |
+| `legalBasis.ts`  | Reading a `(law, straipsnis, dalis, punktas)` citation out of the free-text legal-basis field |
+| `test/`          | How we know it works                                                        |
 
 `Bid` (`tiekejoKodas`/`atmetimoPriezastis`/`atmetimoStatusas`/`atmetimoTeisinisPagrindas`) comes from
 `modules/risk/procurementReader.ts`'s bid-grain query, merged onto `Lot.bids` before `decision.ts` runs.
@@ -24,13 +25,13 @@ no database.
 
 ## Data source
 
-Reuses `atmetimoTeisinisPagrindas` — the ATN-1/PPA procedure report's structured (dropdown) legal-basis citation for
-a rejection (`xlsxPPAatmestiPasiulymai.atmetimoTeisinisPagrindasId` → `xlsxPPAatmetimoTeisiniaiPagrindai.pavadinimas`,
-e.g. `"VPĮ 45 str. 1 d. 1 p."`), first exposed for `LT-AWD-03`. No new view/reader work was needed: the column is
+Reuses `atmetimoTeisinisPagrindas` — the ATN-1/PPA procedure report's legal-basis citation for a rejection
+(`xlsxPPAatmestiPasiulymai.atmetimoTeisinisPagrindasId` → `xlsxPPAatmetimoTeisiniaiPagrindai.pavadinimas`, e.g.
+`"VPĮ 45 str. 1 d. 1 p."`), first exposed for `LT-AWD-03`. No new view/reader work was needed: the column is
 already on `public.v_dalyviai_v2`, `Bid` (`types.ts`), and `LOT_BIDS_SQL`/its row mapping in `procurementReader.ts`.
 
-Lietuvos Respublikos viešųjų pirkimų įstatymo (VPĮ) 45 straipsnio 1 dalis lists the grounds a proposal is rejected
-on. The three points this indicator matches:
+Lietuvos Respublikos viešųjų pirkimų įstatymo (VPĮ) 45 straipsnio 1 dalis lists the conditions a tender must meet to
+be awarded; a rejection cites the point it failed. The three points this indicator matches:
 
 - **1 p.** — the bid does not conform to the tender documents' own requirements (non-genuine/incomplete bid).
 - **3 p.** — the bidder does not meet the qualification requirements (incapable bidder).
@@ -38,7 +39,54 @@ on. The three points this indicator matches:
   as incomplete — the bidder's own follow-through, not just its original submission).
 
 Deliberately excluded: **2 p.** (a supplier-exclusion ground — criminal/tax/conflict-of-interest, a different risk
-concept entirely) and **5 p.** (price too high/unacceptable — `LT-PRI-*` territory, not non-genuineness).
+concept entirely), **5 p.** (price too high/unacceptable — `LT-PRI-*` territory, not non-genuineness) and **6 p.**
+(the VPĮ 57 str. 3 d. circumstances, a separate backstop).
+
+### Both procurement regimes, not just VPĮ
+
+Buyers in the water/energy/transport/postal sectors procure under a different law — *Pirkimų, atliekamų
+vandentvarkos, energetikos, transporto ar pašto paslaugų srities perkančiųjų subjektų, įstatymas* (KSPĮ, also
+abbreviated `PĮ`) — and cite **KSPĮ 58 str. 1 d.** where a VPĮ buyer cites 45 str. 1 d. The two articles carry the
+same title ("Tiekėjo ir jo pateiktos paraiškos ir pasiūlymo vertinimo bendrieji principai") and their first
+paragraphs are drafted point-for-point in parallel — both open with "laimėjusį nustato ekonomiškai naudingiausią
+pasiūlymą, jeigu tenkinamos visos šios sąlygos" and then list the same six conditions in the same order:
+
+| Point | VPĮ 45 str. 1 d.                                              | KSPĮ 58 str. 1 d.                                             |
+|-------|---------------------------------------------------------------|---------------------------------------------------------------|
+| 1 p.  | conforms to the notice and procurement documents (43 str.)    | conforms to the notice and procurement documents (56 str.)    |
+| 2 p.  | bidder not excluded (46 str.)                                 | bidder not excluded (59 str. 1 d.)                            |
+| 3 p.  | meets the qualification requirements (47/48/54 str.)          | meets the qualification requirements (59/60 str.)             |
+| 4 p.  | clarified/supplemented in time (šio str. **3** d.)            | clarified/supplemented in time (šio str. **5** d.)            |
+| 5 p.  | price not too high and unacceptable                           | price not too high and unacceptable                           |
+| 6 p.  | none of the 57 str. 3 d. circumstances                        | none of the 66 str. 3 d. circumstances                        |
+
+So a point number means the same ground under either law, and the parameter list carries both regimes' citations for
+1/3/4 p. Only the enclosing *dalis* numbering differs (4 p. refers back to 3 d. under VPĮ and to 5 d. under KSPĮ —
+the same offset the Viešųjų pirkimų tarnyba's own guidance writes as "VPĮ 45 straipsnio 3 dalies (PĮ 58 straipsnio 5
+dalies)"), which is why the two are matched as an explicit pair rather than by assuming article numbers are
+interchangeable. Before this was listed, disqualified bids citing `KSPĮ 58 str. 1 d. 1/3/4 p.` read
+`not_triggered`, systematically under-flagging utilities-sector buyers. Re-running the full batch (run 719) they
+contribute **213 triggers** (158 on 1 p., 22 on 3 p., 33 on 4 p.).
+
+### The field is free text, so citations are parsed, not string-matched
+
+`atmetimoTeisiniaiPagrindai` is nominally a dropdown, but its 23 warehouse rows include `"ę"`, `"Lietuva"`, the
+spreadsheet's own column header, a whole prose paragraph citing the article mid-sentence, the law's name spelled out
+in full, and citations missing their trailing full stop. Comparing raw display strings therefore missed genuine
+citations on punctuation alone. `legalBasis.ts` extracts `(law, straipsnis, dalis, punktas)` tuples from the value
+instead, and both sides of the comparison go through it. Verified against every one of the 23 dictionary rows:
+
+- `"Viešųjų pirkimų įstatymo 45 str. 1 d. 1 p"` and the prose row citing the same article now match (they did not before).
+- `"PĮ 58 str. 1 d. 4 p."` resolves to KSPĮ and matches.
+- `"VPĮ 45 str. 1 d. 5 p"` — one character from a match under raw comparison — still correctly does not.
+- The prose row's second citation (`"Bendrųjų Pirkimo sąlygų 18.1.7. p."`, the buyer's own tender conditions) is
+  ignored: it carries no `str.`/`d.`, so it is not a statutory citation at all.
+- `"Kita"`, the empty string and bare free-text grounds still yield nothing — `LT-AWD-03`'s concept, not this one.
+
+Measured on run 719, the two changes together take the indicator from 2,740 to 2,955 triggers (9.37% → 10.10% of
+29,252 evaluable bids): 213 from the KSPĮ citations and 2 from the free-text VPĮ variants. `insufficient_data`
+(1,480) and `not_applicable` (78) are unchanged — nothing moved between states other than `not_triggered` →
+`triggered`.
 
 ## Data coverage (measured 2026-08-31 against the real warehouse)
 
@@ -83,9 +131,10 @@ structured legal-basis field can actually evidence.
 
 ## Known limitation
 
-Same as `LT-AWD-03`: `atmetimoTeisinisPagrindas` is the buyer's own structured (dropdown) selection, filled in
-alongside the free-text `atmetimoPriezastis`. A buyer who disqualifies a bid for non-conformity but leaves the
-dropdown at "Kita" or empty will not be caught here — that is `LT-AWD-03`'s concept, not this one. Conversely, a
+Same as `LT-AWD-03`: `atmetimoTeisinisPagrindas` is the buyer's own selection, filled in alongside the free-text
+`atmetimoPriezastis`. A buyer who disqualifies a bid for non-conformity but leaves the field at "Kita", empty, or
+describes the ground in prose without citing a norm will not be caught here — that is `LT-AWD-03`'s concept, not
+this one. Conversely, a
 handful of 4 p. rows in the source data describe an unjustified abnormally-low price rather than an unclarified
 qualification document — a data-entry inconsistency in how buyers use the dropdown, not this indicator misreading a
 genuine ground. Disqualification for non-conformity, weak qualification, or a lapsed clarification deadline can also

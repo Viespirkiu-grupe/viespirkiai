@@ -3,7 +3,15 @@ import { LtCom01Decision } from "../decision.ts";
 import type { Lot, LotParticipation, LotSubject, Procurement } from "../../../types.ts";
 import { EvaluationContext } from "../../../evaluationContext.ts";
 import { RiskDecisionEngine } from "../../../riskDecisionEngine.ts";
-import { emptyReport, oneOfTwoRejected, REPORTED_AT, singleBidder, twoValidBidders } from "./fixtures.ts";
+import {
+    allBidsRejected,
+    emptyReport,
+    oneOfTwoRejected,
+    REPORTED_AT,
+    singleBidder,
+    soleBidRejected,
+    twoValidBidders,
+} from "./fixtures.ts";
 
 // Unit tests for the judgement half of LT-COM-01: plain objects in, plain
 // objects out, no database and no clock
@@ -94,6 +102,16 @@ describe("LtCom01Decision.assessRisk", () => {
         const signal = assessRiskFor(twoValidBidders);
         expect(signal.state).toBe("not_triggered");
         expect(signal.rawValue).toEqual({ totalBids: 2, validBids: 2 });
+    });
+
+    it("does not apply when every bid in the lot was rejected — a failed procedure, not a single-bid award", () => {
+        const signal = assessRiskFor(allBidsRejected);
+        expect(signal.state).toBe("not_applicable");
+        expect(signal.rawValue).toEqual({ totalBids: 3, validBids: 0 });
+    });
+
+    it("does not apply when the lot's only bid was rejected either", () => {
+        expect(assessRiskFor(soleBidRejected).state).toBe("not_applicable");
     });
 
     it("reports insufficient_data for a report that lists no usable participants", () => {
