@@ -202,9 +202,9 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
         });
         await writer.updateEvaluationRun({ statistics });
         log(
-            `procurement-risk: page ${pagesProcessed} done — ${procurementsEvaluated} procurement(s) evaluated, ` +
-                `${decisionsWritten} decision(s) written, ${pagesFailed} page write failure(s), ` +
-                `${statistics.totals.durationSec}s elapsed so far`,
+            `procurement-risk: page ${pagesProcessed} done: evaluated ${procurementsEvaluated} procurements, ` +
+                `written ${decisionsWritten} decisions, failed ${pagesFailed} pages, ` +
+                `${statistics.totals.durationSec}s`,
         );
         cursor = page.nextCursor;
     } while (cursor !== null);
