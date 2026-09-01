@@ -19,6 +19,8 @@
         "db:schema:komentarai": "node scripts/trukstamiLenteliuKomentarai.js",
         "db:schema:rasytojai": "node scripts/aptiktiLenteliuRasytojus.js",
         "adresuRegistras:importuoti": "node modules/geografija/importAdresuRegistra.js",
+        "kotis:atrasti": "node modules/kotis/discover.js",
+        "kotis:apdoroti": "node modules/kotis/processDetails.js",
         "regitra:atnaujinti": "node modules/regitra/atnaujintiRegitra.js",
         "sodra:atnaujinti": "node modules/sodra/atnaujintiSodra.js",
         "scrape:planuojami-pirkimai": "node modules/viesiejiPirkimai/updatePlanuojamiPirkimai.js",

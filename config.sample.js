@@ -103,6 +103,7 @@ export default {
     // (pvz. lokalų cache). Be trailing slash. Paliekam numatytuosius —
     // tikrieji viešieji šaltiniai.
     dataGovUrl: "https://get.data.gov.lt",
+    kotisUrl: "https://kotis.kt.gov.lt",
     viesiejiPirkimaiUrl: "https://viesiejipirkimai.lt",
     esInvesticijos2021Url: "https://2021.esinvesticijos.lt",
 

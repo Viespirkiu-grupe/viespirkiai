@@ -44,12 +44,14 @@ const query = Object.fromEntries(Astro.url.searchParams);
 // Vieno PINREG puslapio dydis; net su `?pinregLimit=max` neatiduodame visko.
 const PINREG_LIMIT = 100;
 const PINREG_MAX_LIMIT = 500;
+const KOTIS_LIMIT = 50;
+const KOTIS_MAX_LIMIT = 500;
 
 function parseLimitai(q: Record<string, string>) {
   if (q.limitai === 'false') return {};
   const defaults: Record<string, number> = {
     regitra: 5, teismoNuosprendziai: 10, sutartys: 10, darboSkelbimai: 5,
-    rcPranesimai: 3, domenai: 3, pinreg: 100, kotis: 3, esInvesticijos: 5,
+    rcPranesimai: 3, domenai: 3, pinreg: 100, kotis: 50, esInvesticijos: 5,
     mvpAprasai: 1, vdiPazeidimai: 3,
   };
   const map: Record<string, string> = {
@@ -82,6 +84,16 @@ function parseLimitai(q: Record<string, string>) {
     tipas: q.pinregTipas,
     pareigos: q.pinregPareigos,
     galiojimas: q.pinregGaliojimas,
+  };
+  const kotisLimit = q.kotisLimit === 'max'
+    ? KOTIS_MAX_LIMIT
+    : Math.min(KOTIS_MAX_LIMIT, Math.max(1, Number(q.kotisLimit) || KOTIS_LIMIT));
+  const kotisPuslapis = Math.max(1, Math.floor(Number(q.kotisPuslapis) || 1));
+  options.kotis = {
+    limit: kotisLimit,
+    offset: (kotisPuslapis - 1) * kotisLimit,
+    sort: q.kotisSort,
+    kryptis: q.kotisKryptis,
   };
 
   const dokumentaiLimit = q.jarDokumentaiLimit;

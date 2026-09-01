@@ -25,6 +25,18 @@ describe('optional server features', () => {
 });
 
 describe('external source URLs', () => {
+  it('reads the KOTIS mirror from the environment', () => {
+    const config = normalizeConfig(configFromEnv({
+      KOTIS_URL: 'http://kotis-proxy.test:8080',
+    }));
+
+    expect(config.kotisUrl).toBe('http://kotis-proxy.test:8080');
+  });
+
+  it('uses the public KOTIS host by default', () => {
+    expect(normalizeConfig({}).kotisUrl).toBe('https://kotis.kt.gov.lt');
+  });
+
   it('reads the CPVA ES investments mirror from the environment', () => {
     const config = normalizeConfig(configFromEnv({
       '2021_ESINVESTICIJOS': 'http://10.1.10.1:9204/',

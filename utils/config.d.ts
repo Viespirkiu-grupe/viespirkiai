@@ -61,6 +61,9 @@ export interface Config {
     torAddress: string;
     torPassword: string;
 
+    /** KOTIS portalo arba jo mirror/proxy bazinis URL. */
+    kotisUrl: string;
+
     internalFileBase: string;
     ocrBandymai: number;
 

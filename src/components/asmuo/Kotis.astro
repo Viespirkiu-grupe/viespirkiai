@@ -1,32 +1,147 @@
 ---
-import ResultCardShell from '@design-system/components/ResultCardShell.astro';
-import ResultSection from '@design-system/components/ResultSection.astro';
+import PageSection from '@design-system/components/PageSection.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+import Table from '@design-system/components/Table.astro';
+import TableEmptyRow from '@design-system/components/TableEmptyRow.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import { linksniuotiOnly } from '@/utils/linksniai.js';
 
 const { asmuo } = Astro.props;
-if (!(asmuo.kotis?.count > 0)) return;
-const { count, rows } = asmuo.kotis;
+const kotis = asmuo.kotis;
+if (!kotis) return;
+
+const rows = kotis.rows || [];
+const limit = kotis.limit || rows.length || 1;
+const offset = kotis.offset || 0;
+const count = kotis.count || 0;
+const puslapiu = Math.max(1, Math.ceil(count / limit));
+const puslapis = Math.floor(offset / limit) + 1;
+const rodomaNuo = count === 0 ? 0 : offset + 1;
+const rodomaIki = offset + rows.length;
+
+const data = (value: any) => {
+  if (!value) return '—';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+};
+const suma = new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' });
+
+const nuoroda = (pakeitimai: Record<string, string | null>) => {
+  const params = new URLSearchParams(Astro.url.search);
+  for (const [raktas, reiksme] of Object.entries(pakeitimai)) {
+    if (reiksme === null) params.delete(raktas);
+    else params.set(raktas, reiksme);
+  }
+  const query = params.toString();
+  return `${Astro.url.pathname}${query ? `?${query}` : ''}#kotis`;
+};
+
+const STULPELIAI = [
+  { raktas: 'data', label: 'Data', kryptis: 'desc', klase: 'cell-center' },
+  { raktas: 'teikejas', label: 'Teikėjas', kryptis: 'asc' },
+  { raktas: 'tipas', label: 'Tipas', kryptis: 'asc' },
+  { raktas: 'rusis', label: 'Rūšis', kryptis: 'asc' },
+  { raktas: 'forma', label: 'Forma', kryptis: 'asc' },
+  { raktas: 'suma', label: 'Suma', kryptis: 'desc', klase: 'cell-right' },
+  { raktas: 'busena', label: 'Būsena', kryptis: 'asc' },
+];
+
+const rikiavimoNuoroda = (raktas: string, numatytoji: string) => {
+  const kryptis = kotis.sort === raktas && kotis.kryptis === numatytoji
+    ? (numatytoji === 'asc' ? 'desc' : 'asc')
+    : numatytoji;
+  return nuoroda({ kotisSort: raktas, kotisKryptis: kryptis, kotisPuslapis: null });
+};
+
+const kitiParametrai = [...new URLSearchParams(Astro.url.search)]
+  .filter(([raktas]) => raktas !== 'kotisPuslapis')
+  .map(([raktas, reiksme]) => `&${encodeURIComponent(raktas)}=${encodeURIComponent(reiksme)}`)
+  .join('');
 ---
 
-<ResultSection
-  id="kotis"
-  title="Valstybės pagalba (KOTIS)"
-  count={count}
-  shown={rows.length}
-  paramName="kotisLimit"
-  forms={['įrašas', 'įrašai', 'įrašų', 'įrašo']}
->
-  {rows.map((item: any) => (
-    <ResultCardShell clickable={true}>
-      <dl slot="meta" class="result-card-meta">
-        <div><dt class="sr-only">Teikėjas</dt><dd>{item.teikejas}</dd></div>
-        <div><dt class="sr-only">Data</dt><dd>{String(item.suteikimoData).split(' ')[0]}</dd></div>
-      </dl>
-      <h3 slot="title" class="result-card-title">
-        <a href={`https://kotis.kt.gov.lt/paraiskos/view_item/id.${item.id}`}>
-          <span class="cell-mono">{new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.suma)}</span>
-        </a>
-      </h3>
-      <div slot="footer" class="result-card-footer"><span>{item.pagalbosForma}</span></div>
-    </ResultCardShell>
-  ))}
-</ResultSection>
+<PageSection id="kotis" title="Valstybės pagalba (KOTIS)">
+  {count > 0 ? (
+    <>
+      <p class="text-muted text-sm mb-4">
+        Rodoma {rodomaNuo}–{rodomaIki} iš {count} {linksniuotiOnly(count, ['įrašo', 'įrašų', 'įrašų', 'įrašo'])}
+      </p>
+      <TableWrapper>
+        <Table>
+          <thead>
+            <tr>
+              {STULPELIAI.map((stulpelis) => {
+                const aktyvus = kotis.sort === stulpelis.raktas;
+                return (
+                  <th
+                    class:list={[
+                      stulpelis.klase,
+                      'sortable',
+                      aktyvus && (kotis.kryptis === 'asc' ? 'asc' : 'desc'),
+                    ]}
+                    aria-sort={aktyvus ? (kotis.kryptis === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  >
+                    <a
+                      class="kotis-rikiavimas"
+                      href={rikiavimoNuoroda(stulpelis.raktas, stulpelis.kryptis)}
+                      title="Rikiuoti pagal šį stulpelį"
+                    >{stulpelis.label}</a>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? rows.map((item: any) => (
+              <tr>
+                <td class="cell-center cell-mono cell-nowrap">
+                  <a href={`https://kotis.kt.gov.lt/paraiskos/view_item/id.${item.id}`}>{data(item.suteikimoData)}</a>
+                </td>
+                <td class="kotis-tekstas" title={item.teikejas || undefined}>{item.teikejas || '—'}</td>
+                <td class="kotis-tekstas" title={item.pagalbosTipas || undefined}>{item.pagalbosTipas || '—'}</td>
+                <td class="kotis-tekstas" title={item.pagalbosRusis || undefined}>{item.pagalbosRusis || '—'}</td>
+                <td class="kotis-tekstas" title={item.pagalbosForma || undefined}>{item.pagalbosForma || '—'}</td>
+                <td class="cell-right cell-mono cell-nowrap">{suma.format(Number(item.suma))}</td>
+                <td class="kotis-tekstas" title={item.busena || undefined}>{item.busena || '—'}</td>
+              </tr>
+            )) : <TableEmptyRow colspan={STULPELIAI.length} message="KOTIS įrašų nerasta" />}
+          </tbody>
+        </Table>
+      </TableWrapper>
+      {puslapiu > 1 && (
+        <div class="kotis-puslapiai">
+          <Pagination
+            currentPage={puslapis}
+            pageCount={puslapiu}
+            queryParams={kitiParametrai}
+            pageParam="kotisPuslapis"
+            hash="kotis"
+          />
+        </div>
+      )}
+    </>
+  ) : <p class="text-muted text-sm">Nėra duomenų</p>}
+</PageSection>
+
+<style>
+  .kotis-tekstas {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .kotis-rikiavimas {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .kotis-rikiavimas:hover {
+    text-decoration: underline;
+  }
+
+  .kotis-puslapiai {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
+  }
+</style>

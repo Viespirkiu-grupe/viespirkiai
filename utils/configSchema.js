@@ -65,6 +65,7 @@ const configSchema = z.object({
     // Baziniai išorinių šaltinių URL — leidžia perrašyti į mirror/proxy.
     // Be trailing slash.
     dataGovUrl: z.string().default("https://get.data.gov.lt"),
+    kotisUrl: z.string().default("https://kotis.kt.gov.lt"),
     viesiejiPirkimaiUrl: z.string().default("https://viesiejipirkimai.lt"),
     esInvesticijos2021Url: z
         .string()

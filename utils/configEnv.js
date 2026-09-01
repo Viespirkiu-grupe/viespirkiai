@@ -57,6 +57,7 @@ const ENV_MAP = [
     ["TOR_PASSWORD", "torPassword", "string"],
 
     ["DATA_GOV_URL", "dataGovUrl", "string"],
+    ["KOTIS_URL", "kotisUrl", "string"],
     ["VIESIEJI_PIRKIMAI_URL", "viesiejiPirkimaiUrl", "string"],
     ["2021_ESINVESTICIJOS", "esInvesticijos2021Url", "string"],
 
