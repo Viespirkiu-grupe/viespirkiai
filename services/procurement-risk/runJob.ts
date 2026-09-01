@@ -10,7 +10,6 @@ import type { IndicatorStats, ProcurementRiskDecisions, RunStatistics, RunTotals
 import { DecisionWriter } from "./decisionWriter.ts";
 
 export type RunJobOptions = Readonly<{
-    codeCommit: string;
     subjects?: readonly string[] | null;
     // Rows per Procurement Reader page. See ensureLotUniverseLoaded's
     // comment in procurementReader.ts for why this bounds evaluation+write
@@ -154,7 +153,6 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
     const openedRun = await writer.updateEvaluationRun({
         status: "running",
         dataAsOf,
-        codeCommit: options.codeCommit,
     });
     const evaluationContext = new EvaluationContext({ runId: openedRun.runId, dataAsOf });
     const engine = new RiskDecisionEngine(riskIndicatorRegistry.createAllIndicators(evaluationContext), evaluationContext);

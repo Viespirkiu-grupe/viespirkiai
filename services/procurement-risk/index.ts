@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { postgres } from "../../postgres/postgres.js";
 import { riskDb } from "../../postgres/riskDb.js";
 import { log } from "../../utils/log.js";
@@ -16,14 +15,6 @@ import { runEvaluation } from "./runJob.ts";
 //     repeatable) and evaluates every deployed indicator against only those.
 
 const LOCK_KEY = "procurement-risk-service";
-
-function resolveCodeCommit(): string {
-    try {
-        return execSync("git rev-parse HEAD", { cwd: import.meta.dirname, encoding: "utf8" }).trim();
-    } catch {
-        return "unknown";
-    }
-}
 
 /**
  * `--limit N`'s sample: the first N distinct ATN-1 procurement ids, ordered
@@ -79,7 +70,6 @@ async function main(): Promise<void> {
         }
 
         const result = await runEvaluation({
-            codeCommit: resolveCodeCommit(),
             subjects,
         });
 

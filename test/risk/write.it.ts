@@ -79,8 +79,8 @@ async function signalsFor(procurementSource: string, procurementId: string) {
 // status = 'running'.
 async function openRun(): Promise<number> {
     const { rows } = await riskDb.query<{ id: number }>(
-        `INSERT INTO risk.risk_evaluation_runs (data_as_of, code_commit, status)
-         VALUES (now(), 'test', 'succeeded')
+        `INSERT INTO risk.risk_evaluation_runs (data_as_of, status)
+         VALUES (now(), 'succeeded')
          RETURNING id`,
     );
     return rows[0].id;
@@ -202,9 +202,7 @@ describe("risk.v_latest_run", () => {
     it("is the newest completed run, ignoring one still running", async () => {
         const older = await openRun();
         const newer = await openRun();
-        await riskDb.query(
-            `INSERT INTO risk.risk_evaluation_runs (data_as_of, code_commit, status) VALUES (now(), 'test', 'running')`,
-        );
+        await riskDb.query(`INSERT INTO risk.risk_evaluation_runs (data_as_of, status) VALUES (now(), 'running')`);
 
         const { rows } = await riskDb.query<{ id: string }>(`SELECT id FROM risk.v_latest_run`);
         expect(rows[0].id).toBe(String(newer));

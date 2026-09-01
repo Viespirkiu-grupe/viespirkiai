@@ -48,7 +48,6 @@ classDiagram
 
 class RunJobOptions {
 <<type>>
-+codeCommit: string
 +subjects: string[] | null
 +pageSize: number
 }
@@ -253,7 +252,6 @@ classDiagram
         +runId: number
         +status: RunStatus
         +dataAsOf: string
-        +codeCommit: string
         +statistics: Record~string, IndicatorStats~
     }
     note for EvaluationRun "Opened and updated by the Decision Writer; the provenance every
@@ -344,7 +342,6 @@ natural key directly — only `decision_id`, resolved once via a join to
 |--------------|---------------|---------------|-----------------------------------------------------------|
 | `runId`      | `id`          | `bigint`      | The FK every decisions row carries                        |
 | `dataAsOf`   | `data_as_of`  | `timestamptz` |                                                           |
-| `codeCommit` | `code_commit` | `text`        |                                                           |
 | `status`     | `status`      | `text`        | CHECK: the four `RunStatus` values                        |
 | `statistics` | `statistics`  | `jsonb`       | Per-indicator `rows` / `triggered` / `written`            |
 | —            | `started_at`  | `timestamptz` | `DEFAULT now()`                                           |
@@ -544,6 +541,8 @@ row's `updated_at` says how fresh it is.
 ## 5. Deprecated
 
 What exists in the code today and is superseded by §1–§2. To be removed by the refactoring; this section goes with it.
+
+Migration filenames below (`002_roles.sql` through `006_drop_code_commit.sql`) predate a 2026-09 flattening: with no risk data anywhere worth an upgrade path, they were folded into a single `001_risk.sql` reflecting the schema they converged to. The filenames are kept here only as history of what changed and in what order — they no longer exist as separate files.
 
 | #  | Deprecated                                                                                                   | Where                                                                | Replacement                                                                                                                                                                                                                                                                  |
 |----|--------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

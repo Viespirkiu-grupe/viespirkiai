@@ -18,10 +18,14 @@
 // Procurement Reader is guaranteed to find all of them, not just report
 // them).
 //
-// Safety: riskDb (the only pool this file writes to or deletes from) MUST be
-// the local, disposable risk-dev Postgres — never a real database. The
-// assertion below refuses to run otherwise, since this test deletes every
-// row in three risk.* tables before evaluating.
+// Safety: riskDb (the only pool this file writes to) MUST be the local,
+// disposable risk-dev Postgres — never a real database. The assertion below
+// refuses to run otherwise. This test never truncates or deletes rows: the
+// local risk-dev database is shared with manual `npm run risk:run`
+// investigation, and wiping risk.* out from under that would destroy
+// whatever the person running it is looking at. Instead its assertions are
+// scoped to just the sampled subjects' own rows, so it coexists with
+// whatever else already lives in the table.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import config from "../../utils/config.js";
 import { postgres } from "../../postgres/postgres.js";
@@ -36,8 +40,8 @@ const SUBJECT_COUNT = 3;
  * riskDb (postgres/riskDb.js) must be the local risk-dev Docker container
  * (docker/risk/compose.yml) — never the shared production database
  * `postgres` (postgres/postgres.js) reads canonical facts from. Called both
- * in beforeAll and again right before the destructive run, so a config
- * change mid-suite can't slip the guard.
+ * in beforeAll and again right before the run, so a config change mid-suite
+ * can't slip the guard.
  */
 function assertTargetsLocalRiskDb(): void {
     if (config.riskPgHost !== "localhost" || config.riskPgUser !== "risk_rw") {
@@ -45,7 +49,7 @@ function assertTargetsLocalRiskDb(): void {
             "refusing to run: riskDb must be the local risk-dev Postgres " +
                 `(riskPgHost === "localhost", riskPgUser === "risk_rw"), got ` +
                 `riskPgHost=${JSON.stringify(config.riskPgHost)}, riskPgUser=${JSON.stringify(config.riskPgUser)}. ` +
-                "This test truncates risk.risk_procurement_decisions/risk_signals/risk_evaluation_runs.",
+                "This test writes real risk.risk_procurement_decisions/risk_signals/risk_evaluation_runs rows.",
         );
     }
 }
@@ -88,17 +92,25 @@ async function resolvePirkimoNumeriai(): Promise<readonly string[]> {
     return rows.map((row) => row.pirkimoNumeris);
 }
 
-async function truncateRiskTables(): Promise<void> {
-    // risk_signals also cascades from risk_procurement_decisions
-    // (ON DELETE CASCADE, migrations/risk/005_signals_table.sql), but is
-    // cleared explicitly too so this doesn't depend on delete order.
-    await riskDb.query(`DELETE FROM risk.risk_signals`);
-    await riskDb.query(`DELETE FROM risk.risk_procurement_decisions`);
-    await riskDb.query(`DELETE FROM risk.risk_evaluation_runs`);
+// Scoped to just the sampled subjects, never the whole table — the local
+// risk-dev database is shared with manual `npm run risk:run` investigation,
+// so this must tell its own rows apart from whatever else is already there
+// rather than owning (and clearing) the table.
+async function countDecisions(subjects: readonly string[]): Promise<number> {
+    const { rows } = await riskDb.query<{ count: string }>(
+        `SELECT count(*) FROM risk.risk_procurement_decisions WHERE procurement_id = ANY($1)`,
+        [subjects],
+    );
+    return Number(rows[0].count);
 }
 
-async function countRows(table: "risk_procurement_decisions" | "risk_signals"): Promise<number> {
-    const { rows } = await riskDb.query<{ count: string }>(`SELECT count(*) FROM risk.${table}`);
+async function countSignals(subjects: readonly string[]): Promise<number> {
+    const { rows } = await riskDb.query<{ count: string }>(
+        `SELECT count(*) FROM risk.risk_signals s
+           JOIN risk.risk_procurement_decisions d ON d.id = s.decision_id
+          WHERE d.procurement_id = ANY($1)`,
+        [subjects],
+    );
     return Number(rows[0].count);
 }
 
@@ -108,7 +120,6 @@ describe("Procurement Risk Service — real execution on named procurements", ()
     beforeAll(async () => {
         assertTargetsLocalRiskDb();
         subjects = await resolvePirkimoNumeriai();
-        await truncateRiskTables();
     });
 
     afterAll(async () => {
@@ -119,23 +130,23 @@ describe("Procurement Risk Service — real execution on named procurements", ()
         assertTargetsLocalRiskDb();
         expect(subjects.length).toBe(SUBJECT_COUNT);
 
-        const first = await runEvaluation({ codeCommit: "it-test", subjects });
+        const first = await runEvaluation({ subjects });
         expect(first.status).toBe("succeeded");
 
-        const decisionsAfterFirst = await countRows("risk_procurement_decisions");
-        const signalsAfterFirst = await countRows("risk_signals");
+        const decisionsAfterFirst = await countDecisions(subjects);
+        const signalsAfterFirst = await countSignals(subjects);
         expect(decisionsAfterFirst).toBe(subjects.length);
         expect(signalsAfterFirst).toBeGreaterThan(0);
 
         // A refresh over the same subjects: same decisions rows (upserted in
         // place), same signals rows (wiped and reinserted, but with the same
-        // content) — never a growing table.
-        const second = await runEvaluation({ codeCommit: "it-test", subjects });
+        // content) — never a growing count for these subjects.
+        const second = await runEvaluation({ subjects });
         expect(second.status).toBe("succeeded");
         expect(second.runId).not.toBe(first.runId);
 
-        const decisionsAfterSecond = await countRows("risk_procurement_decisions");
-        const signalsAfterSecond = await countRows("risk_signals");
+        const decisionsAfterSecond = await countDecisions(subjects);
+        const signalsAfterSecond = await countSignals(subjects);
         expect(decisionsAfterSecond).toBe(decisionsAfterFirst);
         expect(signalsAfterSecond).toBe(signalsAfterFirst);
     });

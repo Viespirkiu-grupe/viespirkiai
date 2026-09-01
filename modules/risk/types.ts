@@ -111,7 +111,6 @@ export type EvaluationRun = Readonly<{
     runId: number;
     status: RunStatus;
     dataAsOf: string;
-    codeCommit: string;
     statistics: RunStatistics;
 }>;
 

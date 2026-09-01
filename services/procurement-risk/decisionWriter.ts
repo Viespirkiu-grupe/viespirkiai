@@ -48,15 +48,14 @@ export class DecisionWriter {
     async updateEvaluationRun(update: Partial<Omit<EvaluationRun, "runId">>): Promise<EvaluationRun> {
         if (this.evaluationRun === null) {
             const { rows } = await this.pool.query<{ id: number }>(
-                `INSERT INTO risk.risk_evaluation_runs (data_as_of, code_commit, status, statistics)
-                 VALUES ($1, $2, $3, $4) RETURNING id`,
-                [update.dataAsOf, update.codeCommit, update.status ?? "running", JSON.stringify(update.statistics ?? EMPTY_RUN_STATISTICS)],
+                `INSERT INTO risk.risk_evaluation_runs (data_as_of, status, statistics)
+                 VALUES ($1, $2, $3) RETURNING id`,
+                [update.dataAsOf, update.status ?? "running", JSON.stringify(update.statistics ?? EMPTY_RUN_STATISTICS)],
             );
             this.evaluationRun = {
                 runId: rows[0].id,
                 status: update.status ?? "running",
                 dataAsOf: update.dataAsOf!,
-                codeCommit: update.codeCommit!,
                 statistics: update.statistics ?? EMPTY_RUN_STATISTICS,
             };
             return this.evaluationRun;
