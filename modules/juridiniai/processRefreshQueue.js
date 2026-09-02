@@ -44,7 +44,7 @@ export async function processJuridiniaiRefreshQueue(
         }
         const claimed = await client.query(
             `SELECT "jarKodas"
-             FROM public."juridiniaiRefreshQueue"
+             FROM juridiniai."refreshQueue"
              ORDER BY "sukurta", "jarKodas"
              LIMIT $1
              FOR UPDATE SKIP LOCKED`,
@@ -60,7 +60,7 @@ export async function processJuridiniaiRefreshQueue(
 
         const projected = await client.query(REFRESH_BATCH_SQL, [codes]);
         const removed = await client.query(
-            `DELETE FROM public."juridiniai" j
+            `DELETE FROM juridiniai."juridiniai" j
              WHERE j."jarKodas" = ANY($1::text[])
                AND NOT EXISTS (
                    SELECT 1 FROM "rcJar"."asmenys" source
@@ -69,7 +69,7 @@ export async function processJuridiniaiRefreshQueue(
             [codes.map(String)],
         );
         await client.query(
-            `DELETE FROM public."juridiniaiRefreshQueue"
+            `DELETE FROM juridiniai."refreshQueue"
              WHERE "jarKodas" = ANY($1::integer[])`,
             [codes],
         );
@@ -104,7 +104,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
         const pending = await postgres.query(
             `SELECT count(*)::integer AS count
-             FROM public."juridiniaiRefreshQueue"`,
+             FROM juridiniai."refreshQueue"`,
         );
         console.log(
             `Juridinių atnaujinimo eilėje laukia ` +

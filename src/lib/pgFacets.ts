@@ -161,7 +161,7 @@ export async function attachJarNames(options: FacetOption[]): Promise<FacetOptio
   const missing = options.filter((option) => !option.label).map((option) => option.value);
   if (!missing.length) return options;
   const { rows } = await postgres.query(
-    'SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" = ANY($1)',
+    'SELECT "jarKodas", pavadinimas FROM "rcJar"."spintaAsmenys" WHERE "jarKodas" = ANY($1)',
     [missing],
   );
   const names = new Map(rows.map((row: any) => [String(row.jarKodas), row.pavadinimas as string]));

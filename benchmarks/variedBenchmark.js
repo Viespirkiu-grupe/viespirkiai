@@ -288,7 +288,7 @@ const QUERIES = [
                 avg(array_length(regexp_split_to_array(trim(pavadinimas), '\\s+'), 1))::numeric(6,2) AS zodziu_vid,
                 avg(length(pavadinimas))::numeric(6,2)     AS ilgio_vid,
                 count(*) FILTER (WHERE "isregistravimoData" IS NOT NULL) AS isregistruota
-            FROM jar
+            FROM "rcJar"."spintaAsmenys"
             GROUP BY 1
             ORDER BY kiekis DESC
             LIMIT 100`,

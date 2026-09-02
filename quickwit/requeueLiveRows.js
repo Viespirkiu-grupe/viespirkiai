@@ -36,10 +36,12 @@ const TABLES = {
   },
   // jarKodas yra text, o quickwit.eilutes."eilutesId" – bigint, tad reikia ::text.
   juridiniai: {
-    queue: "juridiniaiIndexQueue",
+    queue: "indexQueue",
+    queueSchema: "juridiniai",
     queueId: "jarKodas",
     queueValue: `e."eilutesId"::text`,
     source: "juridiniai",
+    sourceSchema: "juridiniai",
     sourceId: "jarKodas",
     sourceValue: `e."eilutesId"::text`,
     signal: WORK_SIGNALS.JURIDINIAI_INDEX_READY,

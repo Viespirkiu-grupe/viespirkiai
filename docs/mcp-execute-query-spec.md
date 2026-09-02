@@ -382,7 +382,7 @@ All tables accessible to `execute_query` (Layer 2) and queryable by the analyst 
 
 ```
 sutartys | vpmSutartys: atviriDuomenys, atviriDuomenysImp, atviriDuomenysPilni, atviriDuomenysImpPilni, atviriTiekejai, atviriPirkejai, atviriCpvKodai, atviriObjektai, atviriValstybes, atviriPirkimoBudai
-rcJar: asmenys | public: jar
+rcJar: asmenys, spintaAsmenys (data.gov.lt/Spinta), spintaKapitalas (įstatinis kapitalas per Spintą)
 eppsViesiejiPirkimai: pirkimai, vykdytojai
 pinreg: deklaracijos, juridiniaiRysiai, juridiniaiRysiaiPilni, rysiuPobudziai, teisinesFormos
 failai
@@ -395,7 +395,6 @@ vptJuodiejiSarasai: tiekejai, pagrindimai, sarasai (VPT juodieji sąrašai)
 jadis: suvestine, dalyviuSkaiciai, dalyviuSarasai, valstybesDalyviai | rcInformaciniaiPranesimai: pranesimai, pranesimaiPilni, juridiniuPavadinimai, leidiniai
 domenai, kotis
 adpFinansinesAtaskaitos: balansoEilutes, pelnoNuostoliuEilutes
-istatinisKapitalas
 uzt: darboVietos, darboVietosPilnos, darbdaviai, profesijos, profesijuGrupes, issilavinimai, mokymoProgramos
 ppa: ataskaitos, dalyviai, pasiulymuEile, atmestiPasiulymai
 neskelbiamosDerybos
@@ -550,7 +549,8 @@ GRANT SELECT ON
     "vpmSutartys"."atviriTiekejai", "vpmSutartys"."atviriPirkejai",
     "vpmSutartys"."atviriCpvKodai", "vpmSutartys"."atviriObjektai",
     "vpmSutartys"."atviriValstybes", "vpmSutartys"."atviriPirkimoBudai",
-    "jar", "eppsViesiejiPirkimai"."pirkimai", "eppsViesiejiPirkimai"."vykdytojai",
+    "rcJar"."spintaAsmenys", "rcJar"."spintaKapitalas",
+    "eppsViesiejiPirkimai"."pirkimai", "eppsViesiejiPirkimai"."vykdytojai",
     pinreg."deklaracijos", pinreg."juridiniaiRysiai", pinreg."juridiniaiRysiaiPilni",
     pinreg."rysiuPobudziai", pinreg."teisinesFormos", sabis."sutartys", sabis."sutarciuSalys", sabis."saskaitos",
     sabis."saskaituSalys", sabis."saskaituSalysTipai", sabis."saskaituSalysVeiklosVieta",
@@ -566,7 +566,6 @@ GRANT SELECT ON
     "rcInformaciniaiPranesimai"."juridiniuPavadinimai", "rcInformaciniaiPranesimai"."leidiniai",
     "domenai", "kotis",
     "adpFinansinesAtaskaitos"."balansoEilutes", "adpFinansinesAtaskaitos"."pelnoNuostoliuEilutes",
-    "istatinisKapitalas",
     uzt."darboVietos", uzt."darboVietosPilnos", uzt."darbdaviai",
     uzt."profesijos", uzt."profesijuGrupes", uzt."savivaldybes",
     uzt."issilavinimai", uzt."mokymoProgramos", uzt."statusai", uzt."valiutos",

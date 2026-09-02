@@ -8,7 +8,7 @@ export async function attachIstaigaNames(options: FacetOption[]): Promise<FacetO
   const codes = [...new Set(options.map((option) => option.value).filter(Boolean))];
   if (!codes.length) return options;
   const { rows } = await postgres.query(
-    `SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" = ANY($1)`,
+    `SELECT "jarKodas", pavadinimas FROM "rcJar"."spintaAsmenys" WHERE "jarKodas" = ANY($1)`,
     [codes],
   );
   const names = new Map<string, string>(

@@ -25,7 +25,7 @@ function toUnixTimestamp(date) {
 const JAR_COLLECTION = "viespirkiaiJAR";
 const JAR_SCHEMA_VERSION = 12;
 
-// Šaltinis — kanoninė public."juridiniai" lentelė (žr.
+// Šaltinis — kanoninė juridiniai."juridiniai" lentelė (žr.
 // modules/juridiniai/typesenseProcessIndexQueue.js). Laikomi tik tie laukai,
 // kuriuos realiai skaito paieška ar jos vartotojai: formos/statuso kodai,
 // `statusasNuo` ir `duomenuData` buvo nurašyti v12, nes jų niekas neužklausė.
@@ -112,7 +112,7 @@ export async function ensureJarCollection(options = {}) {
 
 /**
  * Įterpia (upsert) JAR dokumentus į Typesense paieškos kolekciją.
- * @param {Object[]} rows - public."juridiniai" eilutės su pavadinimasBase
+ * @param {Object[]} rows - juridiniai."juridiniai" eilutės su pavadinimasBase
  * @returns {Promise<void>}
  * @throws {Error} Jei nepavyksta pridėti dokumentų
  */

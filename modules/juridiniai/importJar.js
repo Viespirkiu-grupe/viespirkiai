@@ -94,7 +94,7 @@ async function insertBatch(rows) {
         .join(", ");
 
     const sql = `
-        INSERT INTO "jar" (
+        INSERT INTO "rcJar"."spintaAsmenys" (
             "id", "jarKodas", "pavadinimas", "adresas", "adresasId",
             "registravimoData", "isregistravimoData",
             "formaId", "statusasId", "statusasData"

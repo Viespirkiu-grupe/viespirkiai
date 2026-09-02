@@ -203,13 +203,13 @@ export async function updateVdiPazeidimai() {
                 FULL JOIN current_counts current USING ("jarKodas")
                 WHERE old.count IS DISTINCT FROM current.count
              )
-             INSERT INTO public."juridiniaiRefreshQueue" ("jarKodas", "saltiniai")
+             INSERT INTO juridiniai."refreshQueue" ("jarKodas", "saltiniai")
              SELECT "jarKodas", ARRAY['vdi']
              FROM changed WHERE "jarKodas" BETWEEN 100000000 AND 999999999
              ON CONFLICT ("jarKodas") DO UPDATE SET
                 "saltiniai" = ARRAY(
                     SELECT DISTINCT value FROM unnest(
-                        public."juridiniaiRefreshQueue"."saltiniai" ||
+                        juridiniai."refreshQueue"."saltiniai" ||
                         EXCLUDED."saltiniai"
                     ) value ORDER BY value
                 ),

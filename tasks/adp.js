@@ -395,7 +395,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpIstatinisKapitalas",
-        table: "istatinisKapitalas",
+        table: "spintaKapitalas",
+        schema: "rcJar",
         dataset: "datasets/gov/rc/jar/ja_kapitalas/JuridinisAsmuoKapitalas",
         limit: 1000,
         mapping: {
@@ -406,7 +407,8 @@ const ADP_DATASETS = [
     },
     {
         name: "syncAdpJar",
-        table: "jar",
+        table: "spintaAsmenys",
+        schema: "rcJar",
         dataset: "datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo",
         limit: 1000,
         mapping: {

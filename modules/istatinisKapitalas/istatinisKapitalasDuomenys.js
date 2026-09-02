@@ -7,7 +7,7 @@ export async function gautiIstatiniKapitala(jarId) {
     if (jarId) {
         const istatinisKapitalasRes = await postgres.query(
             `SELECT data, reiksme, valiuta
-               FROM "istatinisKapitalas"
+               FROM "rcJar"."spintaKapitalas"
                WHERE "jarId" = $1
                ORDER BY "data" DESC`,
             [jarId],

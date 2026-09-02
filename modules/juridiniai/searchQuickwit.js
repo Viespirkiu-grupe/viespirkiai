@@ -105,7 +105,7 @@ let evrkNamesPromise;
 async function evrkNames() {
     if (!evrkNamesPromise) {
         evrkNamesPromise = postgres.query(
-            `SELECT "kodas", "pavadinimas" FROM public."juridiniaiEvrk"`,
+            `SELECT "kodas", "pavadinimas" FROM juridiniai."evrk"`,
         ).then(({ rows }) => new Map(
             rows
                 .map((row) => [String(row.kodas), String(row.pavadinimas ?? "").trim()])

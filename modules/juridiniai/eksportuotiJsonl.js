@@ -58,16 +58,16 @@ function buildSql({ tikRegistruoti, limit }) {
                 THEN NULL ELSE ST_Y(j."location") END AS "lat",
             CASE WHEN j."location" IS NULL
                 THEN NULL ELSE ST_X(j."location") END AS "lon"
-        FROM public."juridiniai" j
-        LEFT JOIN public."juridiniaiFormos" f
+        FROM juridiniai."juridiniai" j
+        LEFT JOIN juridiniai."formos" f
             ON f."kodas" = j."formosKodas"
-        LEFT JOIN public."juridiniaiStatusai" s
+        LEFT JOIN juridiniai."statusai" s
             ON s."kodas" = j."statusoKodas"
-        LEFT JOIN public."juridiniaiSavivaldybesPavadinimai" sav
+        LEFT JOIN juridiniai."savivaldybes" sav
             ON sav."id" = j."savivaldybeId"
-        LEFT JOIN public."juridiniaiApskritysPavadinimai" aps
+        LEFT JOIN juridiniai."apskritys" aps
             ON aps."id" = j."apskritisId"
-        LEFT JOIN public."juridiniaiEvrk" e
+        LEFT JOIN juridiniai."evrk" e
             ON e."kodas" = j."evrkKodas"
         ${tikRegistruoti ? `WHERE j."isregistruotas" = false` : ""}
         ORDER BY j."jarKodas"

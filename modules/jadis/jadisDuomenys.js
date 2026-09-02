@@ -26,7 +26,7 @@ async function gautiAdministracijas(db) {
             laikas: dabar,
             uzklausa: db.query(
                 `SELECT j."pavadinimas", min(j."jarKodas") AS "jarKodas"
-                 FROM public."juridiniai" j
+                 FROM juridiniai."juridiniai" j
                  WHERE j."pavadinimas" ILIKE '%savivaldybės administracija'
                  GROUP BY 1`,
             ).then(({ rows }) =>

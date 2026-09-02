@@ -14,7 +14,7 @@ import {
 describe("juridiniai refresh queue", () => {
     it("reuses the full projection for only claimed JAR codes", () => {
         expect(REFRESH_BATCH_SQL).toContain('= ANY($1::integer[])');
-        expect(REFRESH_BATCH_SQL).toContain('INSERT INTO public."juridiniai"');
+        expect(REFRESH_BATCH_SQL).toContain('INSERT INTO juridiniai."juridiniai"');
         expect(REFRESH_BATCH_SQL).toContain("IS DISTINCT FROM");
     });
 
@@ -30,7 +30,7 @@ describe("juridiniai refresh queue", () => {
                     return { rows: [{ jarKodas: 123456789 }] };
                 }
                 if (sql === REFRESH_BATCH_SQL) return { rows: [{ changed: 1 }] };
-                if (sql.includes('DELETE FROM public."juridiniai" j')) {
+                if (sql.includes('DELETE FROM juridiniai."juridiniai" j')) {
                     return { rows: [], rowCount: 0 };
                 }
                 return { rows: [], rowCount: 1 };

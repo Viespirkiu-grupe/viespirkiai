@@ -251,7 +251,7 @@ export default [
         job: processJuridiniaiIndexQueue,
     },
     {
-        // juridiniai -> typesense (iš juridiniaiTypesenseQueue). Typesense lieka
+        // juridiniai -> typesense (iš juridiniai."typesenseQueue"). Typesense lieka
         // dėl typo tolerancijos: nuo jo priklauso findSingleJuridinis, kuriuo
         // scraperiai pavadinimą verčia jarKodas-u.
         name: "juridiniaiTypesenseProcessIndexQueue",

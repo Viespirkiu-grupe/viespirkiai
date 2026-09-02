@@ -34,7 +34,7 @@ export async function hydrateHits(
        d."sourceId0" AS "saltinioId0", d."sourceId1" AS "saltinioId1",
        d."sourceId2" AS "saltinioId2", d."sourceId3" AS "saltinioId3"
      FROM documents."documentsFull" d
-     LEFT JOIN public.jar j ON j."jarKodas" = d."institutionJarCode"::text
+     LEFT JOIN "rcJar"."spintaAsmenys" j ON j."jarKodas" = d."institutionJarCode"::text
      WHERE d.id = ANY($1)
        AND NOT EXISTS (
          SELECT 1 FROM public."filesHidden" n WHERE n.id = d."fileId"

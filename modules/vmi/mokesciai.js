@@ -13,7 +13,7 @@ export function paruostiEilute(obj) {
     return [
         obj._id ?? null,
         obj.id ?? null,
-        obj.mm_kodas?._id ?? null, // jarId (= public."jar"._id)
+        obj.mm_kodas?._id ?? null, // jarId (= "rcJar"."spintaAsmenys"._id)
         obj.pavadinimas ?? null,
         obj.tipas ?? null, // formos pavadinimas
         obj.apskritis?._id ?? null,

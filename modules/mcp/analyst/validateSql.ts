@@ -15,9 +15,11 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "atviriDuomenysPilni", "atviriDuomenysImpPilni",
     "atviriTiekejai", "atviriPirkejai", "atviriCpvKodai",
     "atviriObjektai", "atviriValstybes", "atviriPirkimoBudai",
-    // RC JAR CSV lentelės iškeltos į `rcJar` schemą (asmenys = buvęs jarAsmenys);
-    // `jar` yra atskira public lentelė iš data.gov.lt (Spinta).
-    "asmenys", "jar",
+    // RC JAR CSV lentelės iškeltos į `rcJar` schemą (asmenys = buvęs jarAsmenys).
+    // Tie patys asmenys per data.gov.lt (Spinta) API — `spintaAsmenys` (buvusi
+    // public."jar"), o jų įstatinis kapitalas — `spintaKapitalas` (buvusi
+    // public."istatinisKapitalas"); abi irgi `rcJar` schemoje.
+    "asmenys", "spintaAsmenys", "spintaKapitalas",
     // EPPS viešieji pirkimai iškelti į `eppsViesiejiPirkimai` schemą; analyst
     // search_path juos mato nekvalifikuotai (pirkimai = buvęs viesiejiPirkimai).
     "pirkimai", "vykdytojai",
@@ -63,7 +65,6 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // Balanso ir pelno (nuostolių) ataskaitos iš ADP — "adpFinansinesAtaskaitos"
     // schemoje; viena eilutė = vienas rodiklis vienam laikotarpiui.
     "balansoEilutes", "pelnoNuostoliuEilutes",
-    "istatinisKapitalas",
     // UŽT darbo vietos iškeltos į `uzt` schemą ir normalizuotos:
     // `darboVietos` + žodynai + `darbdaviai` (ten ir buvęs "darboVietaCount"),
     // o `darboVietosPilnos` – suderinamumo view su senąja plokščia forma.

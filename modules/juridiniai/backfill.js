@@ -25,29 +25,29 @@ function parseBatchSize(argv) {
 
 export async function upsertDictionaries(client) {
     await client.query(`
-        INSERT INTO public."juridiniaiSavivaldybesPavadinimai" ("pavadinimas")
+        INSERT INTO juridiniai."savivaldybes" ("pavadinimas")
         SELECT DISTINCT "pavadinimas"
         FROM "adresuRegistras"."savivaldybes"
         ON CONFLICT ("pavadinimas") DO NOTHING
     `);
 
     await client.query(`
-        INSERT INTO public."juridiniaiApskritysPavadinimai" ("pavadinimas")
+        INSERT INTO juridiniai."apskritys" ("pavadinimas")
         SELECT DISTINCT "pavadinimas"
         FROM "adresuRegistras"."apskritys"
         ON CONFLICT ("pavadinimas") DO NOTHING
     `);
 
     await client.query(`
-        INSERT INTO public."juridiniaiFormos" ("kodas", "pavadinimas", "viesasis")
+        INSERT INTO juridiniai."formos" ("kodas", "pavadinimas", "viesasis")
         SELECT "kodas", "pavadinimas", "tipas" = 'Viešasis'
         FROM "rcJar"."formos"
         ON CONFLICT ("kodas") DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas",
             "viesasis" = EXCLUDED."viesasis"
         WHERE ROW(
-            "juridiniaiFormos"."pavadinimas",
-            "juridiniaiFormos"."viesasis"
+            "formos"."pavadinimas",
+            "formos"."viesasis"
         ) IS DISTINCT FROM ROW(
             EXCLUDED."pavadinimas",
             EXCLUDED."viesasis"
@@ -55,17 +55,17 @@ export async function upsertDictionaries(client) {
     `);
 
     await client.query(`
-        INSERT INTO public."juridiniaiStatusai" ("kodas", "pavadinimas")
+        INSERT INTO juridiniai."statusai" ("kodas", "pavadinimas")
         SELECT "kodas", "pavadinimas"
         FROM "rcJar"."statusai"
         ON CONFLICT ("kodas") DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas"
-        WHERE "juridiniaiStatusai"."pavadinimas"
+        WHERE "statusai"."pavadinimas"
             IS DISTINCT FROM EXCLUDED."pavadinimas"
     `);
 
     await client.query(`
-        INSERT INTO public."juridiniaiEvrk" ("kodas", "skyrius", "pavadinimas")
+        INSERT INTO juridiniai."evrk" ("kodas", "skyrius", "pavadinimas")
         SELECT DISTINCT ON ("kodas")
             "kodas", left("kodas", 2), COALESCE("pavadinimas", "kodas")
         FROM sodra."evrk"
@@ -75,8 +75,8 @@ export async function upsertDictionaries(client) {
             "skyrius" = EXCLUDED."skyrius",
             "pavadinimas" = EXCLUDED."pavadinimas"
         WHERE ROW(
-            "juridiniaiEvrk"."skyrius",
-            "juridiniaiEvrk"."pavadinimas"
+            "evrk"."skyrius",
+            "evrk"."pavadinimas"
         ) IS DISTINCT FROM ROW(
             EXCLUDED."skyrius",
             EXCLUDED."pavadinimas"
@@ -149,14 +149,14 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
         ) naujausiSodra ON true
         LEFT JOIN sodra."evrk" evrk
             ON evrk."id" = naujausiSodra."evrkId"
-        LEFT JOIN public."juridiniaiEvrk" evrk_dict
+        LEFT JOIN juridiniai."evrk" evrk_dict
             ON evrk_dict."kodas" = evrk."kodas"
-        -- VMI su juridiniu asmeniu siejasi per public."jar"._id, o ne per kodą:
+        -- VMI su juridiniu asmeniu siejasi per "rcJar"."spintaAsmenys"._id, o ne per kodą:
         -- buvęs mokesciai."jarKodas" buvo "id" dublikatas ir nesutapdavo su nė
         -- vienu JAR kodu, tad šis stulpelis būdavo visada tuščias.
         LEFT JOIN LATERAL (
             SELECT m."suma"
-            FROM public."jar" jr
+            FROM "rcJar"."spintaAsmenys" jr
             JOIN "vmi"."mokesciai" m ON m."jarId" = jr."_id"
             WHERE jr."jarKodas" = j."jarKodas"::text
             ORDER BY m."metai" DESC, m."menuo" DESC, m."duomenuData" DESC
@@ -181,13 +181,13 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
         ) vdi ON true
         LEFT JOIN domenai.counts domenai
             ON domenai."savininkoKodas" = j."jarKodas"::text
-        LEFT JOIN public."juridiniaiSavivaldybesPavadinimai" sav_dict
+        LEFT JOIN juridiniai."savivaldybes" sav_dict
             ON sav_dict."pavadinimas" = jar_municipality."pavadinimas"
-        LEFT JOIN public."juridiniaiApskritysPavadinimai" aps_dict
+        LEFT JOIN juridiniai."apskritys" aps_dict
             ON aps_dict."pavadinimas" = jar_county."pavadinimas"
     ),
     upserted AS (
-        INSERT INTO public."juridiniai" AS old (
+        INSERT INTO juridiniai."juridiniai" AS old (
             "jarKodas", "pavadinimas", "adresas", "formosKodas",
             "statusoKodas", "isregistruotas", "registravimoData",
             "isregistravimoData", "savivaldybeId", "apskritisId",
@@ -323,7 +323,7 @@ export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}
 
         await client.query("BEGIN");
         const removed = await client.query(
-            `DELETE FROM public."juridiniai" target
+            `DELETE FROM juridiniai."juridiniai" target
              WHERE target."jarKodas" ~ '^[0-9]{9}$'
                AND NOT EXISTS (
                    SELECT 1 FROM "rcJar"."asmenys" source

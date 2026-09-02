@@ -63,7 +63,7 @@ export async function findSingleJuridinisPanel(q: string): Promise<JuridinisPane
       )),
       optional(postgres.query(
         `SELECT _id AS "jarId"
-         FROM public.jar
+         FROM "rcJar"."spintaAsmenys"
          WHERE "jarKodas"::text = $1::text
          LIMIT 1`,
         [item.jarKodas],
@@ -80,7 +80,7 @@ export async function findSingleJuridinisPanel(q: string): Promise<JuridinisPane
       jarId
         ? optional(postgres.query(
             `SELECT reiksme, valiuta
-             FROM public."istatinisKapitalas"
+             FROM "rcJar"."spintaKapitalas"
              WHERE "jarId" = $1
              ORDER BY data DESC
              LIMIT 1`,

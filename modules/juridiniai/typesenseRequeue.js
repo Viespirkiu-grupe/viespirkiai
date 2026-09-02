@@ -1,7 +1,7 @@
 /*
 Pilnas juridinių asmenų Typesense indekso perkėlimas.
 
-Į "juridiniaiTypesenseQueue" sudeda visus public."juridiniai" kodus — eilę
+Į juridiniai."typesenseQueue" sudeda visus juridiniai."juridiniai" kodus — eilę
 nudreniruoja įprastas procesas (`npm run juridiniai:typesense`) arba TaskRunner.
 
 Reikalingas po Typesense schemos versijos pakėlimo: ensureJarCollection() tokiu
@@ -19,8 +19,8 @@ import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
  */
 export async function requeueJuridiniaiTypesense(db = postgres) {
     const result = await db.query(
-        `INSERT INTO public."juridiniaiTypesenseQueue" ("jarKodas", "keitimas")
-         SELECT "jarKodas", 'insert' FROM public."juridiniai"`,
+        `INSERT INTO juridiniai."typesenseQueue" ("jarKodas", "keitimas")
+         SELECT "jarKodas", 'insert' FROM juridiniai."juridiniai"`,
     );
 
     if (result.rowCount > 0) {

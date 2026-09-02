@@ -148,7 +148,7 @@ describe("requeueLiveRows transaction", () => {
         const normalized = sql.replace(/\s+/g, " ").trim();
         queries.push(normalized);
         if (normalized.startsWith("SELECT COUNT(*)")) return { rows: [{ total: 5 }], rowCount: 1 };
-        if (normalized.startsWith("INSERT INTO \"juridiniaiIndexQueue\"")) return { rows: [], rowCount: 4 };
+        if (normalized.startsWith("INSERT INTO \"juridiniai\".\"indexQueue\"")) return { rows: [], rowCount: 4 };
         return { rows: [], rowCount: 0 };
       },
       release() {},
@@ -161,7 +161,7 @@ describe("requeueLiveRows transaction", () => {
       db,
     );
 
-    const dataQueries = queries.filter((sql) => sql.includes('"juridiniaiIndexQueue"'));
+    const dataQueries = queries.filter((sql) => sql.includes('"juridiniai"."indexQueue"'));
     expect(dataQueries).not.toHaveLength(0);
     expect(dataQueries.every((sql) => sql.includes('e."eilutesId"::text'))).toBe(true);
     expect(dataQueries.every((sql) => !sql.includes('e."eilutesId"::bigint'))).toBe(true);

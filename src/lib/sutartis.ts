@@ -66,7 +66,7 @@ async function attachJarPavadinimai(salys: any[]) {
   ));
   if (codes.length === 0) return;
   const rows = await postgres.query(
-    `SELECT "jarKodas", "pavadinimas" FROM jar WHERE "jarKodas" = ANY($1::text[])`,
+    `SELECT "jarKodas", "pavadinimas" FROM "rcJar"."spintaAsmenys" WHERE "jarKodas" = ANY($1::text[])`,
     [codes],
   ).then((r: any) => r.rows);
   const byCode = new Map<string, string>(rows.map((r: any) => [String(r.jarKodas), r.pavadinimas]));

@@ -82,7 +82,7 @@ export const GET: APIRoute = async ({ url }) => {
       const counts = new Map(options.map((option) => [option.value, option.count]));
       const registryResults = /^\d+$/.test(optionSearch)
         ? (await postgres.query(
-            `SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" LIKE $1 ORDER BY "jarKodas" LIMIT 50`,
+            `SELECT "jarKodas", pavadinimas FROM "rcJar"."spintaAsmenys" WHERE "jarKodas" LIKE $1 ORDER BY "jarKodas" LIMIT 50`,
             [`${optionSearch}%`],
           )).rows
         : (await searchJar({ search: optionSearch }, { page: 1, limit: 50 })).results;

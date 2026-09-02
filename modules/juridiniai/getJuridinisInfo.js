@@ -85,7 +85,7 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
                  LIMIT 1`,
             [jarKodas],
         ),
-        postgres.query(`SELECT * FROM "jar" WHERE "jarKodas" = $1`, [jarKodas]),
+        postgres.query(`SELECT * FROM "rcJar"."spintaAsmenys" WHERE "jarKodas" = $1`, [jarKodas]),
     ]);
     timings.end("jarAsmenys");
     timings.end("jar");

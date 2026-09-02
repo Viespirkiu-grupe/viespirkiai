@@ -1,7 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 
 /**
- * Ryšys su juridiniu asmeniu eina TIK per `jarId` (= public."jar"._id). Buvęs
+ * Ryšys su juridiniu asmeniu eina TIK per `jarId` (= "rcJar"."spintaAsmenys"._id). Buvęs
  * `mokesciai."jarKodas"` buvo `id` dublikatas ir su JAR kodais nesutapdavo, tad
  * paieška pagal jį visada grąžindavo tuščią rezultatą (žr. vmiSchema.sql).
  *

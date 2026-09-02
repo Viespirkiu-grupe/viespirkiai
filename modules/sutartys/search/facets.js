@@ -78,7 +78,7 @@ async function attachJarNames(options) {
     const codes = [...new Set(options.map((o) => o.value).filter(Boolean))];
     if (!codes.length) return options;
     const { rows } = await postgres.query(
-        `SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" = ANY($1)`,
+        `SELECT "jarKodas", pavadinimas FROM "rcJar"."spintaAsmenys" WHERE "jarKodas" = ANY($1)`,
         [codes],
     );
     const names = new Map(
@@ -289,7 +289,7 @@ export async function sutartysFacetOptions(field, query, size = 1000, optionSear
     const registryRows = /^\d+$/.test(optionSearch)
         ? (
               await postgres.query(
-                  `SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" LIKE $1 ORDER BY "jarKodas" LIMIT 50`,
+                  `SELECT "jarKodas", pavadinimas FROM "rcJar"."spintaAsmenys" WHERE "jarKodas" LIKE $1 ORDER BY "jarKodas" LIMIT 50`,
                   [`${optionSearch}%`],
               )
           ).rows

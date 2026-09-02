@@ -1,12 +1,12 @@
 /*
 Juridinių asmenų indeksavimo eilės nudreniravimas į Typesense.
 
-Apdoroja "juridiniaiTypesenseQueue" partijomis. Eilę pildo tie patys trigeriai
-ant public."juridiniai", kurie maitina ir Quickwit eilę (žr.
-juridiniaiTypesenseQueue.sql), todėl abu indeksai mato tuos pačius pakeitimus.
+Apdoroja juridiniai."typesenseQueue" partijomis. Eilę pildo tie patys trigeriai
+ant juridiniai."juridiniai", kurie maitina ir Quickwit eilę (žr.
+juridiniai.typesenseQueue.sql), todėl abu indeksai mato tuos pačius pakeitimus.
 
 Būsenos šaltinis yra pati lentelė, o ne eilės "keitimas" reikšmė: jei įrašo
-public."juridiniai" nebėra, LEFT JOIN grąžina NULL ir dokumentas trinamas.
+juridiniai."juridiniai" nebėra, LEFT JOIN grąžina NULL ir dokumentas trinamas.
 
 Kaip ir quickwit/indexQueueDrainer.js: eilutės pasiimamos su FOR UPDATE SKIP
 LOCKED, indeksuojama dar neužbaigus transakcijos, ir tik tada trinamos bei
@@ -30,7 +30,7 @@ let collectionReady = false;
 async function claimQueueRows(client, batchSize) {
     const { rows } = await client.query(
         `SELECT "id", "jarKodas"
-         FROM public."juridiniaiTypesenseQueue"
+         FROM juridiniai."typesenseQueue"
          ORDER BY "id" ASC
          LIMIT $1
          FOR UPDATE SKIP LOCKED`,
@@ -48,9 +48,9 @@ async function fetchJuridiniai(client, jarKodai) {
                 j."isregistruotas",
                 f."pavadinimas" AS "formosPavadinimas",
                 s."pavadinimas" AS "statusoPavadinimas"
-         FROM public."juridiniai" j
-         LEFT JOIN public."juridiniaiFormos" f ON f."kodas" = j."formosKodas"
-         LEFT JOIN public."juridiniaiStatusai" s ON s."kodas" = j."statusoKodas"
+         FROM juridiniai."juridiniai" j
+         LEFT JOIN juridiniai."formos" f ON f."kodas" = j."formosKodas"
+         LEFT JOIN juridiniai."statusai" s ON s."kodas" = j."statusoKodas"
          WHERE j."jarKodas" = ANY($1::text[])`,
         [jarKodai],
     );
@@ -58,7 +58,7 @@ async function fetchJuridiniai(client, jarKodai) {
 }
 
 /**
- * Suformuoja Typesense dokumentą iš public."juridiniai" eilutės.
+ * Suformuoja Typesense dokumentą iš juridiniai."juridiniai" eilutės.
  * @param {Object} row - Užklausos eilutė su formos/statuso pavadinimais
  */
 export function buildDoc(row) {
@@ -79,7 +79,7 @@ export function buildDoc(row) {
  * Tas pats jarKodas eilėje gali pasitaikyti kelis kartus, todėl dirbama su
  * unikaliais kodais — į Typesense keliauja vienas dokumentas vietoj kelių vienodų.
  * @param {Object[]} claimed - Užrakintos eilės eilutės
- * @param {Object[]} rows - Rastos public."juridiniai" eilutės
+ * @param {Object[]} rows - Rastos juridiniai."juridiniai" eilutės
  */
 export function splitBatch(claimed, rows) {
     const esami = new Map(rows.map((row) => [String(row.jarKodas), row]));
@@ -128,7 +128,7 @@ export async function processJuridiniaiTypesenseQueue(
         if (toDelete.length > 0) await deleteJarFromSearch(toDelete);
 
         await client.query(
-            `DELETE FROM public."juridiniaiTypesenseQueue"
+            `DELETE FROM juridiniai."typesenseQueue"
              WHERE "id" = ANY($1::bigint[])`,
             [claimed.map((row) => row.id)],
         );

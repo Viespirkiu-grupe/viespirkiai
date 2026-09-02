@@ -84,7 +84,7 @@ async function gautiDalyvius(saltinis, sprendimoId) {
     const trukstamiKodai = [...new Set(dalyviai.filter((d) => !d.pavadinimas && d.isJar).map((d) => d.kodas))];
     if (trukstamiKodai.length) {
         const { rows: jarRows } = await postgres.query(
-            `SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" = ANY($1)`,
+            `SELECT "jarKodas", pavadinimas FROM "rcJar"."spintaAsmenys" WHERE "jarKodas" = ANY($1)`,
             [trukstamiKodai],
         );
         const jarVardai = Object.fromEntries(jarRows.map((r) => [r.jarKodas, r.pavadinimas]));

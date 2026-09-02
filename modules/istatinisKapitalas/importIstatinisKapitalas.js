@@ -89,7 +89,7 @@ async function insertBatch(rows) {
         .join(", ");
 
     const sql = `
-        INSERT INTO "istatinisKapitalas" (
+        INSERT INTO "rcJar"."spintaKapitalas" (
             "jarId", "formaId", "data", "reiksme", "valiuta"
         )
         VALUES ${placeholders}

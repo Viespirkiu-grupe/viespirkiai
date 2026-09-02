@@ -29,8 +29,8 @@ const [sutartys, pirkimai, failai, asmenys] = await Promise.all([
     `SELECT id FROM public.files WHERE "filenameId" IS NOT NULL LIMIT 2`,
   ),
   randomIds(
-    `SELECT "jarKodas" FROM "jar" TABLESAMPLE SYSTEM (0.1) LIMIT 2`,
-    `SELECT "jarKodas" FROM "jar" LIMIT 2`,
+    `SELECT "jarKodas" FROM "rcJar"."spintaAsmenys" TABLESAMPLE SYSTEM (0.1) LIMIT 2`,
+    `SELECT "jarKodas" FROM "rcJar"."spintaAsmenys" LIMIT 2`,
   ),
 ]);
 
