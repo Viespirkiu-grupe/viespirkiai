@@ -2,6 +2,9 @@ import { syncAdpChanges } from "../modules/adp/syncChanges.js";
 // UŽT darbo vietos iškeltos į `uzt` schemą – vieną šaltinio eilutę reikia
 // išskaidyti į žodynus, darbdavį ir skelbimą, todėl aprašas gyvena moduly.
 import { DARBO_VIETU_SYNC } from "../modules/uzimtumoTarnyba/adpSync.js";
+// VMI mokesčiai iškelti į `vmi` schemą ir normalizuoti (pavadinimai, formos,
+// apskritys, savivaldybės – žodynuose), tad rašymas irgi gyvena moduly.
+import { MOKESCIU_SYNC } from "../modules/vmi/adpSync.js";
 
 const FINANSINES_ATASKAITOS_COLUMNS = [
     "_id",
@@ -415,20 +418,6 @@ const ADP_DATASETS = [
         },
     },
     {
-        name: "syncAdpMokesciai",
-        table: "mokesciai",
-        dataset: "datasets/gov/vmi/ja_mokesciai/Moketojas",
-        limit: 1000,
-        mapping: {
-            _id: "_id", id: "id", "mm_kodas._id": "mm_kodas_id",
-            jarKodas: "jarKodas", pavadinimas: "pavadinimas",
-            tipas: "formosPavadinimas", "apskritis._id": "apskritis",
-            "savivaldybe._id": "savivaldybe",
-            metai: "metai", menuo: "menuo", suma: "suma",
-            atnaujinta: "duomenuData",
-        },
-    },
-    {
         name: "syncAdpPelnoNuostoliuAtaskaitos",
         table: "pelnoNuostoliuEilutes",
         schema: FINANSINES_ATASKAITOS_SCHEMA,
@@ -454,6 +443,7 @@ const ADP_DATASETS = [
         },
     },
     DARBO_VIETU_SYNC,
+    MOKESCIU_SYNC,
 ];
 
 export default ADP_DATASETS.map((cfg) => ({
