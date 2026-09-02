@@ -50,7 +50,7 @@ SELECT j."jarKodas"::text,
         FROM domenai."domenaiPilni" d
         WHERE d."savininkoKodas" = j."jarKodas"::text)                              AS "domenaiSkaicius",
        (SELECT COUNT(*)
-        FROM "neskelbiamosDerybos" nd
+        FROM "neskelbiamosDerybos"."sutikimai" nd
         WHERE nd."jarKodas" = j."jarKodas"::text)                                   AS "neskelbiamosDerybosSkaicius"
 FROM "rcJar"."asmenys" j
          LEFT JOIN "rcJar"."formos" forma ON forma."kodas" = j."formosKodas"

@@ -90,9 +90,9 @@ export const FAILAI_SELECT_COLUMNS = `
         vp."jarKodas",
         s."perkanciosiosOrganizacijosKodas",
         (SELECT nd."jarKodas"
-         FROM public."neskelbiamosDerybos" nd
+         FROM "neskelbiamosDerybos"."sutikimai" nd
          WHERE st.title = 'neskelbiamosDerybos'
-           AND nd.link = 'https://eviesiejipirkimai.lt/' || f."sourceId0"
+           AND nd."failoKelias" = f."sourceId0"
          LIMIT 1)
     ) AS "istaigaJar"
 `;
@@ -101,8 +101,11 @@ export const FAILAI_SELECT_COLUMNS = `
 // apskaičiavimui. Raktai remiasi tik į atrenkamus stulpelius, todėl tinka ir
 // backfill'ui, ir eilės vartotojui.
 // viesiejiPirkimai.pirkimoId UNIQUE, vpmSutartys.unikalusId PK — eilučių nedaugina.
-// neskelbiamosDerybos link NEunikalus (PK = hash), todėl jis imamas skaliariniu
-// subquery (LIMIT 1) FAILAI_SELECT_COLUMNS viduje, ne JOIN'u.
+// neskelbiamosDerybos "failoKelias" NEunikalus (PK = hash; vienas dokumentas
+// dengia kelis sutikimus), todėl jis imamas skaliariniu subquery (LIMIT 1)
+// FAILAI_SELECT_COLUMNS viduje, ne JOIN'u. Anksčiau čia buvo lyginama su
+// 'https://eviesiejipirkimai.lt/' || sourceId0, o šaltinis duoda santykinį
+// kelią — sąlyga nesutapdavo niekada ir "istaigaJar" likdavo tuščias.
 //
 // filesLocations čia nebejungiamas: koordinates dokumentas paveldi iš failo.
 export const FAILAI_ISTAIGA_JOINS = `

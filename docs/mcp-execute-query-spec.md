@@ -371,7 +371,7 @@ Raw tables used directly (no covering view):
 |--------------------------|-------------------------------------------------------|
 | `cpvaProjektuSutartys`   | CPVA subcontractor data — join shape varies per query |
 | `domenai`                | Domain pair queries need flexible self-join           |
-| `neskelbiamosDerybos`    | Single-table lookup, no join needed                   |
+| `sutikimai` (arba `sutikimaiPilni`) | VPT sutikimai neskelbiamoms deryboms; išvada – `isvados` žodyne |
 | `pinreg."juridiniaiRysiai"` | Revolving-door queries need self-join on date ranges |
 
 ---
@@ -397,7 +397,7 @@ domenai, kotis
 adpFinansinesAtaskaitos: balansoEilutes, pelnoNuostoliuEilutes
 uzt: darboVietos, darboVietosPilnos, darbdaviai, profesijos, profesijuGrupes, issilavinimai, mokymoProgramos
 ppa: ataskaitos, dalyviai, pasiulymuEile, atmestiPasiulymai
-neskelbiamosDerybos
+neskelbiamosDerybos: sutikimai, isvados, sutikimaiPilni
 vdiPazeidimai
 bylos, bylosDalyviai
 vmi: mokesciai, mokesciaiPilni
@@ -540,6 +540,7 @@ GRANT USAGE ON SCHEMA "vptJuodiejiSarasai" TO analyst;
 GRANT USAGE ON SCHEMA "vpmSutartys" TO analyst;
 GRANT USAGE ON SCHEMA bvpz TO analyst;
 GRANT USAGE ON SCHEMA pinreg TO analyst;
+GRANT USAGE ON SCHEMA "neskelbiamosDerybos" TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -572,7 +573,8 @@ GRANT SELECT ON
     uzt."registravimoPagrindai", uzt."registravimoBudai", uzt."pageidavimoBudai",
     uzt."susisiekimoBudai", uzt."rizikos", uzt."gebejimai",
     uzt."teisiniaiStatusai", uzt."teisinesFormos", uzt."kontraktuTipai",
-    "neskelbiamosDerybos", "vdiPazeidimai",
+    "neskelbiamosDerybos"."sutikimai", "neskelbiamosDerybos"."isvados",
+    "neskelbiamosDerybos"."sutikimaiPilni", "vdiPazeidimai",
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
     vmi."mokesciai", vmi."mokesciaiPilni",
     ppa."ataskaitos", ppa."dalyviai", ppa."ataskaituSutartys",
@@ -591,5 +593,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, bvpz, pinreg, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, bvpz, pinreg, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai", "neskelbiamosDerybos";
 ```

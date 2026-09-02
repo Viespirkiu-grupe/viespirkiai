@@ -1,7 +1,8 @@
 ---
 // Neskelbiamų derybų paieška. Maketas — tas pats šoninės juostos idiomas kaip
 // /sutartys ir /cvpp/ataskaitos: facetai kairėje juostoje viename #searchForm,
-// rezultatai plokščiu sąrašu dešinėje. Variklis — vien Postgres: lentelėje ~1 tūkst.
+// rezultatai plokščiu sąrašu dešinėje. Šaltinis — neskelbiamosDerybos."sutikimai"
+// (išvada žodyne). Variklis — vien Postgres: lentelėje ~1 tūkst.
 // eilučių, tad ir rezultatai, ir facetų `GROUP BY` skaičiuojami tiesiogiai.
 import Layout from '../layouts/Layout.astro';
 import Button from '@design-system/components/Button.astro';
@@ -65,13 +66,13 @@ const cleanSearch = quoteMatch ? quoteMatch[1] : rawSearch;
 function buildWhere(params: SqlParams, skipFacet?: string) {
   const conditions: string[] = [];
   if (cleanSearch) {
-    conditions.push(`nd."search_index" @@ ${tsQueryFunc}('simple', ${params.add(cleanSearch)})`);
+    conditions.push(`nd."paieska" @@ ${tsQueryFunc}('simple', ${params.add(cleanSearch)})`);
   }
   if (skipFacet !== 'jarKodas' && selected.jarKodas.length) {
     conditions.push(`nd."jarKodas" = ANY(${params.add(selected.jarKodas)}::text[])`);
   }
   if (skipFacet !== 'isvada' && selected.isvada.length) {
-    conditions.push(`nd.isvada = ANY(${params.add(selected.isvada)}::text[])`);
+    conditions.push(`i."pavadinimas" = ANY(${params.add(selected.isvada)}::text[])`);
   }
   if (skipFacet !== 'data') {
     if (dataNuo) conditions.push(`nd.data >= ${params.add(dataNuo)}::date`);
@@ -87,10 +88,15 @@ const SORTS: Record<string, string> = {
 };
 const sort = SORTS[query.sort ?? ''] ? (query.sort ?? '') : '';
 
-// neskelbiamosDerybos saltinioId nedalinamas — visas kelias lieka sourceId0.
+// Išvada visada imama iš žodyno — ir filtrui, ir facetui, ir kortelei.
+const ISVADA_JOIN = `
+  JOIN "neskelbiamosDerybos"."isvados" i ON i."id" = nd."isvadaId"`;
+
+// `failoKelias` saugomas tokiu pat pavidalu kaip files."sourceId0" (santykinis
+// kelias su `sutikimai_laikini/`), tad jungiama lygybe.
 const FILE_JOIN = `
   LEFT JOIN public.files f
-    ON replace(nd.link, 'https://eviesiejipirkimai.lt/', '') = f."sourceId0"
+    ON f."sourceId0" = nd."failoKelias"
     AND f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'neskelbiamosDerybos')
     AND f."downloadStatus" = 1`;
 
@@ -114,7 +120,7 @@ function facetQuery(param: string, valueExpr: string, labelExpr: string | null, 
     : '';
   return postgres.query(
     `SELECT ${valueExpr} AS value, COUNT(*)::int AS count${label}
-     FROM public."neskelbiamosDerybos" nd
+     FROM "neskelbiamosDerybos"."sutikimai" nd ${ISVADA_JOIN}
      ${where}
      GROUP BY 1
      HAVING ${valueExpr} IS NOT NULL AND ${valueExpr}::text <> ''
@@ -139,22 +145,25 @@ const histWhere = buildWhere(histParams, 'data');
 
 const [resultsRes, totalRes, pirkejasRes, isvadaRes, histRes] = await cachePageData(Astro.url, () => Promise.all([
   timed(postgres.query(
-    `SELECT nd.*, f.id AS "failoId"
-     FROM public."neskelbiamosDerybos" nd ${FILE_JOIN}
+    `SELECT nd."hash", nd."data", nd."jarKodas", nd."jarPavadinimas",
+            nd."aprasymas", nd."failoKelias",
+            i."pavadinimas" AS "isvada", f.id AS "failoId"
+     FROM "neskelbiamosDerybos"."sutikimai" nd ${ISVADA_JOIN} ${FILE_JOIN}
      ${resultWhere}
      ORDER BY ${SORTS[sort]}
      LIMIT ${limitPh} OFFSET ${offsetPh}`,
     resultParams.values,
   )),
   timed(postgres.query(
-    `SELECT COUNT(*)::int AS count FROM public."neskelbiamosDerybos" nd ${countWhere}`,
+    `SELECT COUNT(*)::int AS count
+     FROM "neskelbiamosDerybos"."sutikimai" nd ${ISVADA_JOIN} ${countWhere}`,
     countParams.values,
   )),
   timed(facetQuery('jarKodas', 'nd."jarKodas"', 'nd."jarPavadinimas"')),
-  timed(facetQuery('isvada', 'nd.isvada', null, 100)),
+  timed(facetQuery('isvada', 'i."pavadinimas"', null, 100)),
   timed(postgres.query(
     `SELECT date_trunc('month', nd.data)::date AS bucket, COUNT(*)::int AS count
-     FROM public."neskelbiamosDerybos" nd
+     FROM "neskelbiamosDerybos"."sutikimai" nd ${ISVADA_JOIN}
      ${histWhere}${histWhere ? ' AND' : 'WHERE'} nd.data IS NOT NULL
      GROUP BY 1 ORDER BY 1`,
     histParams.values,
@@ -321,7 +330,11 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
           </Fragment>
 
           {rows.map((item: any) => {
-            const href = item.failoId ? `/failas/${item.failoId}` : `https://eviesiejipirkimai.lt/${item.link}`;
+            // Dokumento gali ir nebūti (šaltinyje vietoj nuorodos „#") — tada
+            // aprašymas lieka paprastu tekstu, be nuorodos į niekur.
+            const href = item.failoId
+              ? `/failas/${item.failoId}`
+              : item.failoKelias ? `https://eviesiejipirkimai.lt/${item.failoKelias}` : null;
             return (
               <ResultCardShell clickable={true}>
                 <dl slot="meta" class="result-card-meta">
@@ -338,7 +351,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 
                 <h3 slot="title" class="result-card-title">
                   {item.aprasymas && item.aprasymas.length > 0 ? (
-                    <a href={href}>{item.aprasymas}</a>
+                    href ? <a href={href}>{item.aprasymas}</a> : <span>{item.aprasymas}</span>
                   ) : (
                     <em>Nenurodyta</em>
                   )}

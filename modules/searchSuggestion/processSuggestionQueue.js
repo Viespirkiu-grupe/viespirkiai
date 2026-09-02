@@ -1,9 +1,10 @@
 /*
 Procesina paieškos pasiūlymų (autocomplete) indeksavimo eilę į Typesense.
 
-Apdoroja "searchSuggestionChanges" lentelę partijomis (batches): kiekvienas
+Apdoroja searchSuggestion."pakeitimai" lentelę partijomis (batches): kiekvienas
 įrašas žymi pakeitimą (insert/patch/delete), kurį reikia atspindėti Typesense
-kolekcijoje "searchSuggestion". Maitinama "searchSuggestion.sql" trigerių.
+kolekcijoje "searchSuggestion" (kolekcijos vardas nesikeitė). Eilę pildo
+searchSuggestion.track_changes() trigeris ant searchSuggestion."pasiulymai".
 */
 
 import { postgres } from "../../postgres/postgres.js";
@@ -22,8 +23,8 @@ async function fetchBatch(client) {
     const res = await client.query(
         `SELECT q."id" AS "queueId", q."suggestionId", q."keitimas",
                 s."pavadinimas", s."saltinis", s."count"
-         FROM "searchSuggestionChanges" q
-         LEFT JOIN "searchSuggestion" s ON s."id" = q."suggestionId"
+         FROM "searchSuggestion"."pakeitimai" q
+         LEFT JOIN "searchSuggestion"."pasiulymai" s ON s."id" = q."suggestionId"
          ORDER BY q."id" ASC
          LIMIT $1`,
         [BATCH_SIZE],
@@ -34,7 +35,7 @@ async function fetchBatch(client) {
 async function deleteQueueRows(client, queueIds) {
     if (queueIds.length === 0) return;
     await client.query(
-        `DELETE FROM "searchSuggestionChanges" WHERE "id" = ANY($1)`,
+        `DELETE FROM "searchSuggestion"."pakeitimai" WHERE "id" = ANY($1)`,
         [queueIds],
     );
 }

@@ -74,7 +74,10 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "darboVietos", "darboVietosPilnos", "darbdaviai", "profesijos",
     "profesijuGrupes", "issilavinimai", "mokymoProgramos",
 
-    "neskelbiamosDerybos",
+    // VPT sutikimai neskelbiamoms deryboms iškelti į "neskelbiamosDerybos"
+    // schemą ir normalizuoti: `sutikimai` + išvadų žodynas `isvados`, o
+    // `sutikimaiPilni` yra suderinamumo view su senąja plokščia forma.
+    "sutikimai", "isvados", "sutikimaiPilni",
     // `vdi` schema; `pazeidimaiPilni` yra suderinamumo view su senąja forma.
     // Abu pasiekiami nekvalifikuotai per analyst search_path.
     "pazeidimai", "pazeidimaiPilni", "subjektai",

@@ -90,6 +90,21 @@ async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
 }
 
 /**
+ * Sutikimo dokumento kelias iš sąrašo nuorodos.
+ *
+ * Šaltinis duoda SANTYKINĮ kelią (`sutikimai_laikini/2024-12/BodyPart_….docx`),
+ * o kai dokumento nėra – literalų `#`. Toks pat kelias saugomas ir
+ * public.files."sourceId0", tad jungiama lygybe, be jokio `replace()`.
+ *
+ * @param {string} link Nuoroda iš sąrašo
+ * @returns {string|null} Santykinis kelias arba `null`, jei dokumento nėra
+ */
+function failoKelias(link) {
+    const kelias = (link || "").replace(/^https?:\/\/[^/]+\//, "").trim();
+    return kelias && kelias !== "#" ? kelias : null;
+}
+
+/**
  * Nuskaityti visas neskelbiamas derybas ir įdėti į duomenų bazę
  */
 export async function nuskaitytiVisasNeskelbiamasDerybas() {
@@ -112,64 +127,88 @@ export async function nuskaitytiVisasNeskelbiamasDerybas() {
         return true;
     });
 
-    if (allDerybos.length > 0) {
+    // Data ir išvada yra privalomi laukai (DB – NOT NULL). Per 13 metų tokių
+    // eilučių nepasitaikė, bet jei šaltinis kada nors jas praleistų, geriau
+    // praleisti eilutę su įrašu žurnale nei nutraukti visą nuskaitymą.
+    const nepilnos = allDerybos.filter((d) => !d.data || !d.isvada);
+    if (nepilnos.length > 0) {
+        log(`Praleista eilučių be datos ar išvados: ${nepilnos.length}`);
+    }
+    const derybos = allDerybos.filter((d) => d.data && d.isvada);
+
+    if (derybos.length > 0) {
+        // Išvada yra viena iš kelių kanceliarinių frazių, todėl lentelėje
+        // laikomas tik žodyno id.
+        const isvados = [...new Set(derybos.map((d) => d.isvada))];
+        await postgres.query(
+            `INSERT INTO "neskelbiamosDerybos"."isvados" ("pavadinimas")
+             SELECT unnest($1::text[])
+             ON CONFLICT ("pavadinimas") DO NOTHING`,
+            [isvados],
+        );
+        const { rows: isvaduEilutes } = await postgres.query(
+            `SELECT "id", "pavadinimas" FROM "neskelbiamosDerybos"."isvados"
+             WHERE "pavadinimas" = ANY($1::text[])`,
+            [isvados],
+        );
+        const isvadaId = new Map(
+            isvaduEilutes.map((eilute) => [eilute.pavadinimas, eilute.id]),
+        );
+
         const columns = [
+            "hash",
+            "data",
             "jarKodas",
             "jarPavadinimas",
+            "isvadaId",
             "aprasymas",
-            "data",
-            "link",
-            "isvada",
-            "hash",
+            "failoKelias",
         ];
 
         // Flatten all values into a single array for parameterized query
         const values = [];
-        const placeholders = allDerybos
+        const placeholders = derybos
             .map((d, i) => {
                 const start = i * columns.length + 1;
+                values.push(d.hash);
+                values.push(d.data);
                 values.push(d.jarKodas || null);
                 values.push(d.jarPavadinimas || null);
+                values.push(isvadaId.get(d.isvada));
                 values.push(d.aprasymas || null);
-                values.push(d.data || null);
-                values.push(d.link || null);
-                values.push(d.isvada || null);
-                values.push(d.hash);
+                values.push(failoKelias(d.link));
                 return `(${columns.map((_, j) => `$${start + j}`).join(", ")})`;
             })
             .join(", ");
 
         const query = `
-            INSERT INTO public."neskelbiamosDerybos"
+            INSERT INTO "neskelbiamosDerybos"."sutikimai"
             (${columns.map((c) => `"${c}"`).join(", ")})
             VALUES ${placeholders}
             ON CONFLICT ("hash") DO UPDATE SET
+                "data" = EXCLUDED."data",
                 "jarKodas" = EXCLUDED."jarKodas",
                 "jarPavadinimas" = EXCLUDED."jarPavadinimas",
+                "isvadaId" = EXCLUDED."isvadaId",
                 "aprasymas" = EXCLUDED."aprasymas",
-                "data" = EXCLUDED."data",
-                "link" = EXCLUDED."link",
-                "isvada" = EXCLUDED."isvada"
+                "failoKelias" = EXCLUDED."failoKelias"
         `;
 
         await postgres.query(query, values);
 
-        const failai = [];
-        allDerybos.forEach((deryba) => {
-            failai.push({
+        // Vienas dokumentas dengia kelias eilutes, o dalis eilučių dokumento
+        // išvis neturi – tad failų sąrašą sudedam iš unikalių kelių.
+        const keliai = [
+            ...new Set(derybos.map((d) => failoKelias(d.link)).filter(Boolean)),
+        ];
+        const failai = keliai.map((kelias) => {
+            const failoVardas = kelias.split("/").pop().split("?")[0];
+            return {
                 saltinis: "neskelbiamosDerybos",
-                saltinioId: deryba.link.replace(
-                    "https://eviesiejipirkimai.lt/sutikimai_laikini/",
-                    "",
-                ),
-                pavadinimas: deryba.link.split("/").pop().split("?")[0],
-                extension: deryba.link
-                    .split("/")
-                    .pop()
-                    .split("?")[0]
-                    .split(".")
-                    .pop(),
-            });
+                saltinioId: kelias,
+                pavadinimas: failoVardas,
+                extension: failoVardas.split(".").pop(),
+            };
         });
 
         // Dublikatus atmeta files unikalūs indeksai (žr. failuIrasymas.js).
