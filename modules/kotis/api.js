@@ -148,7 +148,7 @@ export function kotisListUrl(from, page = 1, to = from, filters = {}) {
     url.searchParams.set("include_archive", "1");
     // Datos filtras visas eilutes sulygina, todėl vien datos rikiavimas nėra
     // stabilus offset puslapiavimui. KOTIS vidinis ID yra unikalus cursoris.
-    url.searchParams.set("ordering", "id.asc");
+    url.searchParams.set("ordering", filters.ordering ?? "id.asc");
     url.searchParams.set("ff", "1");
     url.searchParams.set("page", String(page));
     if (filters.amountFrom != null) url.searchParams.set("aid_amount[from]", filters.amountFrom);

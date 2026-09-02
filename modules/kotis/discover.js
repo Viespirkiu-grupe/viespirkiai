@@ -76,14 +76,16 @@ function listUrl(range, page) {
     return kotisListUrl(range.from, page, range.to, {
         amountFrom: range.amountFrom == null ? null : amountText(range.amountFrom),
         amountTo: range.amountTo == null ? null : amountText(range.amountTo),
+        ordering: range.ordering,
     });
 }
 
 function rangeLabel(range) {
     const dates = `${range.from}..${range.to}`;
-    return range.amountFrom == null
+    const label = range.amountFrom == null
         ? dates
         : `${dates}, suma ${amountText(range.amountFrom)}..${amountText(range.amountTo)}`;
+    return range.ordering ? `${label}, ${range.ordering}` : label;
 }
 
 export function parseDiscoverArgs(argv) {
@@ -138,7 +140,6 @@ export async function discoverKotis(options, { db = postgres, fetchHtml = fetchK
         await cancelStaleDiscoveries(db);
         importId = await createDiscovery(options, db);
         let storedPage = 0;
-        let expectedTotal = 0;
         let authoritativeTotal = null;
         const seen = new Set();
         const ranges = [{ from: options.from, to: options.to }];
@@ -151,21 +152,34 @@ export async function discoverKotis(options, { db = postgres, fetchHtml = fetchK
             if (first.pageSize != null && first.pageSize !== 1_000) {
                 throw new Error(`KOTIS sesijoje yra ${first.pageSize}, o ne 1000 įrašų puslapyje`);
             }
-            if (first.total > 10_000) {
-                if (authoritativeTotal == null && range.from === options.from && range.to === options.to) {
-                    authoritativeTotal = first.total;
-                }
+            if (authoritativeTotal == null && range.from === options.from && range.to === options.to
+                && range.amountFrom == null) {
+                authoritativeTotal = first.total;
+            }
+            if (first.total > 10_000 && !range.window) {
                 const dateParts = splitRange(range.from, range.to);
                 let parts;
                 if (dateParts) {
                     parts = dateParts.map((part) => ({ ...part }));
                 } else if (range.amountFrom == null) {
-                    parts = initialAmountRanges().map((amount) => ({ ...range, ...amount }));
+                    parts = [
+                        ...initialAmountRanges().map((amount) => ({ ...range, ...amount })),
+                        // Sumos intervalai neapima NULL ar nestandartinių sumų.
+                        // Abu kraštiniai langai jas surenka, o ID deduplikuojami.
+                        { ...range, window: true, ordering: "aid_amount.asc" },
+                        { ...range, window: true, ordering: "aid_amount.desc" },
+                    ];
                 } else {
                     parts = splitAmountRange(range);
                 }
                 if (!parts) {
-                    throw new Error(`${rangeLabel(range)} turi ${first.total} vienodos sumos įrašų`);
+                    if (first.total > 20_000) {
+                        throw new Error(`${rangeLabel(range)} turi ${first.total} vienodos sumos įrašų`);
+                    }
+                    parts = [
+                        { ...range, window: true, ordering: "id.asc" },
+                        { ...range, window: true, ordering: "id.desc" },
+                    ];
                 }
                 log(`KOTIS sąrašas: ${rangeLabel(range)} turi ${first.total}, intervalas dalijamas`);
                 ranges.unshift(...parts);
@@ -181,7 +195,8 @@ export async function discoverKotis(options, { db = postgres, fetchHtml = fetchK
                         `${range.from}..${range.to} įrašų skaičius pasikeitė (${first.total} -> ${list.total})`,
                     );
                 }
-                const duplicate = list.rows.find((row) => rangeSeen.has(row.id) || seen.has(row.id));
+                const duplicate = list.rows.find((row) => rangeSeen.has(row.id)
+                    || (!range.window && seen.has(row.id)));
                 if (duplicate) throw new Error(`KOTIS ID ${duplicate.id} pasikartojo keliuose intervaluose`);
                 list.rows.forEach((row) => {
                     rangeSeen.add(row.id);
@@ -194,18 +209,17 @@ export async function discoverKotis(options, { db = postgres, fetchHtml = fetchK
                     `KOTIS sąrašas ${range.from}..${range.to}: puslapis ${page}, `
                     + `intervale ${rangeSeen.size}/${first.total}, iš viso ${count}`,
                 );
-                if (!list.nextUrl) break;
+                if (!list.nextUrl || (range.window && page === 10)) break;
                 page++;
                 if (page > 10) throw new Error(`${range.from}..${range.to} viršyta KOTIS 10000 rezultatų riba`);
                 const url = listUrl(range, page);
                 list = parseListPage(await fetchHtml(url), url);
             }
-            if (rangeSeen.size !== first.total) {
-                throw new Error(`${range.from}..${range.to}: rasta ${rangeSeen.size}, skelbiama ${first.total}`);
+            const expectedInRange = range.window ? Math.min(first.total, 10_000) : first.total;
+            if (rangeSeen.size !== expectedInRange) {
+                throw new Error(`${rangeLabel(range)}: rasta ${rangeSeen.size}, tikėtasi ${expectedInRange}`);
             }
-            expectedTotal += first.total;
         }
-        if (count !== expectedTotal) throw new Error(`Rasta ${count}, KOTIS skelbia ${expectedTotal} įrašų`);
         if (authoritativeTotal != null && count !== authoritativeTotal) {
             throw new Error(`Po intervalų skaidymo rasta ${count}, visas KOTIS intervalas skelbia ${authoritativeTotal}`);
         }

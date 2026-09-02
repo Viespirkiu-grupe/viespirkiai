@@ -95,12 +95,14 @@ describe("KOTIS parseriai", () => {
         const url = new URL(kotisListUrl("2026-08-01", 3, "2026-08-31", {
             amountFrom: "100.01",
             amountTo: "1000.00",
+            ordering: "id.desc",
         }));
         expect(url.searchParams.get("aid_date[from]")).toBe("2026-08-01");
         expect(url.searchParams.get("aid_date[to]")).toBe("2026-08-31");
         expect(url.searchParams.get("page")).toBe("3");
         expect(url.searchParams.get("aid_amount[from]")).toBe("100.01");
         expect(url.searchParams.get("aid_amount[to]")).toBe("1000.00");
+        expect(url.searchParams.get("ordering")).toBe("id.desc");
     });
 
     it("kortelę sieja pagal data-code ir išskiria susijusį subjektą", () => {
