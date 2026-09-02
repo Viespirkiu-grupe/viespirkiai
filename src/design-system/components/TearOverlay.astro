@@ -1,0 +1,101 @@
+---
+/**
+ * Nuplėšto popieriaus kraštas su „Padidinti" mygtuku.
+ *
+ * Siaurame ekrane įdėtinė peržiūra (dokumentas, nuotrauka, ilgas tekstas) atima
+ * visą ekraną ir dar pasiglemžia slinktį — pirštas įstringa vidiniame
+ * konteineryje. Todėl peržiūra ten paliekama kaip nukirpta ištrauka: apačia
+ * užbaigiama plėštu kraštu, o visą jos plotą uždengia nuoroda į pilną langą.
+ *
+ * Komponentas rūpinasi tik kraštu ir mygtuku; nukirpti turinį (fiksuotas
+ * aukštis, `overflow`) ir išjungti jo spaudymą turi tėvinis, pozicionuotas
+ * konteineris. Plačiame ekrane nerodo nieko.
+ */
+interface Props {
+  /** Kur veda mygtukas — pilna peržiūra. */
+  href: string;
+  label?: string;
+  ariaLabel?: string;
+  target?: string;
+  rel?: string;
+}
+
+const { href, label = 'Padidinti', ariaLabel, target, rel } = Astro.props;
+
+// Zigzagas piešiamas dukart: linija kontūrui ir ta pati linija, uždaryta iki
+// apačios — užpildas, kuris uždengia nukirptą turinį po plėšimo vieta.
+const DANTYS = 16;
+const ZINGSNIS = 20;
+const PLOTIS = DANTYS * ZINGSNIS;
+const AUKSTIS = 10;
+let zigzagas = 'M0 1';
+for (let i = 0; i < DANTYS; i++) {
+  zigzagas += ` L${i * ZINGSNIS + ZINGSNIS / 2} 8 L${(i + 1) * ZINGSNIS} 1`;
+}
+const uzpildas = `${zigzagas} L${PLOTIS} ${AUKSTIS} L0 ${AUKSTIS} Z`;
+---
+
+<svg class="tear" aria-hidden="true" viewBox={`0 0 ${PLOTIS} ${AUKSTIS}`} preserveAspectRatio="none">
+  <path class="tear-fill" d={uzpildas} />
+  <path class="tear-line" d={zigzagas} vector-effect="non-scaling-stroke" />
+</svg>
+
+<a
+  class="tear-open"
+  href={href}
+  target={target}
+  rel={rel}
+  aria-label={ariaLabel ?? `${label} — atverti per visą ekraną`}
+>
+  <span>{label}</span>
+</a>
+
+<style>
+  .tear,
+  .tear-open { display: none; }
+
+  @media (max-width: 640px) {
+    .tear,
+    .tear-open { display: block; }
+  }
+
+  .tear {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    width: 100%;
+    height: 10px;
+  }
+  .tear-fill { fill: var(--white); }
+  .tear-line {
+    fill: none;
+    stroke: var(--light-gray);
+    stroke-width: 1;
+    stroke-linejoin: round;
+  }
+
+  .tear-open {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    text-decoration: none;
+  }
+  .tear-open span {
+    position: absolute;
+    left: 50%;
+    bottom: -13px;
+    transform: translateX(-50%);
+    padding: 7px 16px;
+    border: var(--border);
+    border-radius: var(--radius-pill);
+    color: var(--black);
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .tear-open span::after { content: ' ↗'; font-size: var(--text-xs); }
+</style>

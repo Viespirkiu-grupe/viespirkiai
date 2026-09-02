@@ -1,0 +1,52 @@
+---
+// Failo peržiūra per visą langą — tas pats sprendimas kaip teisės akto teksto
+// skaitytuvas (/teisesAktas/:id/tekstas): puslapyje nieko, tik rėmas su juostele
+// ir grįžimo nuoroda. Į čia veda „Padidinti" tiek antraštėje, tiek telefone
+// nuplėštos ištraukos mygtukas.
+import Layout from '../../../layouts/Layout.astro';
+import FailoPerziurosSkydelis from '../../../components/failai/FailoPerziurosSkydelis.astro';
+import { getColorScheme, getFont } from '../../../lib/failai.js';
+import { loadFailasById, enrichFailas, turiPerziurosSkydeli, failoKelias } from '../../../lib/failas.js';
+import { getFailasNerodymas } from '@/modules/failai/queries.js';
+
+const { id } = Astro.params;
+if (!id || isNaN(Number(id))) return Astro.redirect('/404');
+
+let failas = await loadFailasById(id);
+if (!failas) return Astro.redirect('/404');
+
+// Paslėpto failo peržiūros nėra — priežastį rodo pats failo puslapis.
+if (await getFailasNerodymas(failas.id)) return Astro.redirect(failoKelias(failas.id));
+
+failas = await enrichFailas(failas);
+if (!turiPerziurosSkydeli(failas)) return Astro.redirect(failoKelias(failas.id));
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const search = Astro.url.searchParams.get('search') || '';
+const pageParam = Astro.url.searchParams.get('puslapis') || Astro.url.searchParams.get('page') || '';
+const page = /^\d+$/.test(pageParam) ? pageParam : '';
+const title = failas.metaduomenys?.Title || failas.pavadinimas || 'Failas';
+---
+
+<Layout pageTitle={title} colorScheme={colorScheme} font={font} hideFooter={true}>
+  <main class="failas-reader-main px-0">
+    <FailoPerziurosSkydelis
+      failas={failas}
+      search={search}
+      page={page}
+      pilnas={true}
+      failoHref={failoKelias(failas.id)}
+    />
+  </main>
+</Layout>
+
+<style>
+  .failas-reader-main {
+    height: calc(100dvh - var(--site-header-offset, 49px));
+    min-height: 0;
+    overflow: hidden;
+  }
+</style>

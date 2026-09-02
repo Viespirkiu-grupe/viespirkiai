@@ -1,0 +1,68 @@
+---
+import PageHeader from '@design-system/components/PageHeader.astro';
+
+/**
+ * Failo puslapio antraštė: vardas, po juo formatas ar originalus failo vardas ir
+ * veiksmų mygtukai. Mygtukai gyvena paantraštės eilutėje (kaip teisės akto
+ * puslapyje), nes perskeltame makete `PageHeader` veiksmų juosta nesilaužo — ji
+ * tiesiog išsprūsta už siauros skilties krašto.
+ */
+interface Props {
+  failas: any;
+  /** Ar rodoma peržiūra kabančiame rėme — tada yra ir „Padidinti". */
+  skydelis?: boolean;
+  perziurosHref?: string;
+  /** Formatas ir dydis — paantraštė, kai failas neturi atskiro pavadinimo. */
+  meta?: string;
+}
+
+const { failas, skydelis = false, perziurosHref, meta = '' } = Astro.props;
+---
+
+<PageHeader className="failas-header">
+  <Fragment slot="subtext">
+    <span class="failas-header-meta">
+      {failas.metaduomenys?.Title ? failas.pavadinimas : meta}
+    </span>
+    <span class="failas-header-links">
+      <a href={`/failas/${failas.id}.json`} class="btn btn-outline btn-sm" aria-label="Atsisiųsti failo metaduomenis JSON formatu">
+        <span aria-hidden="true">↗</span> JSON
+      </a>
+      <a href={`https://failai.viespirkiai.org/${failas.id}`} class="btn btn-outline btn-sm" aria-label="Atsisiųsti failą">
+        <span aria-hidden="true">↗</span> Failas
+      </a>
+      {skydelis && (
+        <a href={perziurosHref} class="btn btn-outline btn-sm" aria-label="Atverti peržiūrą per visą langą">
+          <span aria-hidden="true">↗</span> Padidinti
+        </a>
+      )}
+      {failas.originalusLinkas && (
+        <a href={failas.originalusLinkas} class="btn btn-outline btn-sm" aria-label={`Atidaryti ${failas.originalusLinkasPavadinimas}`}>
+          <span aria-hidden="true">↗</span> {failas.originalusLinkasPavadinimas}
+        </a>
+      )}
+    </span>
+  </Fragment>
+  {failas.metaduomenys?.Title || failas.pavadinimas}
+</PageHeader>
+
+<style>
+  /* Paantraštės eilutė: kairėje failo vardas ar formatas, dešinėje mygtukai.
+     `.subtext` yra kursyvinis, tad mygtukams kursyvą grąžinam į normalų. */
+  :global(.failas-header .subtext) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  .failas-header-meta { min-width: 0; }
+  .failas-header-links {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-shrink: 0;
+    font-style: normal;
+  }
+</style>

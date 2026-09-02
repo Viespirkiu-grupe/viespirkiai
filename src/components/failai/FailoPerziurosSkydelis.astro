@@ -1,0 +1,158 @@
+---
+import TearOverlay from '@design-system/components/TearOverlay.astro';
+import FailasPreview from './FailasPreview.astro';
+
+/**
+ * Failo peržiūra rėme — tas pats sprendimas kaip teisės akto tekstui
+ * (TeisesAktoTekstoPanel): plačiame ekrane rėmas kabo dešinėje per visą lango
+ * aukštį, siaurame virsta nukirpta ištrauka su plėštu kraštu, o skaitymas
+ * atiduodamas atskiram pilno lango puslapiui (/failas/:id/perziura).
+ */
+interface Props {
+  failas: any;
+  search?: string;
+  page?: number | string;
+  /** Pilno lango skaitytuvas — su juostele ir grįžimo nuoroda. */
+  pilnas?: boolean;
+  /** Kur grįžti iš skaitytuvo. */
+  failoHref?: string;
+  /** Kur veda „Padidinti". */
+  perziurosHref?: string;
+}
+
+const { failas, search = '', page, pilnas = false, failoHref, perziurosHref } = Astro.props;
+const pavadinimas = failas.metaduomenys?.Title || failas.pavadinimas || 'Failas';
+---
+
+<div class:list={['failas-panel', pilnas && 'is-reader']}>
+  {pilnas && (
+    <div class="failas-panel-bar">
+      <a class="failas-panel-back" href={failoHref} aria-label="Grįžti į failo informaciją">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5" />
+          <path d="m12 19-7-7 7-7" />
+        </svg>
+        <span>Apie failą</span>
+      </a>
+      <span class="failas-panel-title" title={pavadinimas}>{pavadinimas}</span>
+      <a class="btn btn-outline btn-sm failas-panel-download" href={`https://failai.viespirkiai.org/${failas.id}`} aria-label="Atsisiųsti failą">
+        <span aria-hidden="true">↗</span> Failas
+      </a>
+    </div>
+  )}
+
+  <div class="failas-frame-wrap">
+    <FailasPreview failas={failas} search={search} page={page} uzpildyti={true} />
+    {!pilnas && perziurosHref && (
+      <TearOverlay href={perziurosHref} ariaLabel="Skaityti dokumentą per visą ekraną" />
+    )}
+  </div>
+</div>
+
+<style>
+  .failas-panel {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: var(--border);
+    background: var(--white);
+    overflow: hidden;
+  }
+  .failas-panel.is-reader {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .failas-panel-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 39px;
+    padding: 5px 6px;
+    border-bottom: var(--border);
+  }
+  .failas-panel-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    text-decoration: none;
+  }
+  .failas-panel-back svg { display: block; flex: 0 0 auto; }
+  .failas-panel-back:hover { color: var(--black); }
+  .failas-panel-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+  }
+  .failas-panel-download { flex: 0 0 auto; }
+
+  .failas-frame-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  @media (max-width: 640px) {
+    /* Ištrauka: plėštas kraštas ir „Padidinti" mygtukas kabo už rėmo apačios,
+       tad apkarpymą čia perima pats turinio langelis. */
+    .failas-panel:not(.is-reader) {
+      border-bottom: 0;
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      overflow: visible;
+    }
+    /* Mygtukas kabo per rėmo apačią, tad langelis jo kirpti negali. Peržiūros
+       turinys ir taip yra lygiai 100% aukščio — jam apkarpymo nereikia. */
+    .failas-panel:not(.is-reader) .failas-frame-wrap {
+      overflow: visible;
+      contain: layout;
+    }
+    /* Rėmelio viduje pirštas įstringa — slinktį paliekam puslapiui. Išjungiam
+       tik pačią peržiūrą: plėštas kraštas ir „Padidinti" yra to paties langelio
+       vaikai, tad be išimties mygtukas irgi taptų nepaspaudžiamas. */
+    .failas-panel:not(.is-reader) .failas-frame-wrap > :global(*:not(.tear):not(.tear-open)) {
+      pointer-events: none;
+    }
+    .failas-panel-title { display: none; }
+  }
+</style>
+
+<script>
+  // Siaurame ekrane peržiūra yra tik nukirpta ištrauka: nespaudžiama, tad
+  // pdf.js įrankių juosta joje – negyva ir tik atima vietą. Rėmelis yra tos
+  // pačios kilmės, tad jo dokumentui įrašom stilių, kuris juostą paslepia
+  // (`--toolbar-height` valdo ir puslapių srities poslinkį) bei užrakina vidinę
+  // slinktį – iš po plėšto krašto lieka kyšoti pats dokumentas.
+  const frame = document.querySelector<HTMLIFrameElement>('.failas-panel:not(.is-reader) .failas-pdf-frame');
+  if (frame) {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const STILIAUS_ID = 'failas-istraukos-stilius';
+
+    const pritaikyti = () => {
+      const doc = frame.contentDocument;
+      if (!doc) return;   // kitos kilmės ar dar nepakrautas
+      const esamas = doc.getElementById(STILIAUS_ID);
+      if (!mq.matches) { esamas?.remove(); return; }
+      if (esamas || !doc.head) return;
+
+      const style = doc.createElement('style');
+      style.id = STILIAUS_ID;
+      style.textContent = 'html,body{overflow:hidden}:root{--toolbar-height:0px}#toolbarContainer{display:none}#viewerContainer{overflow:hidden}';
+      doc.head.appendChild(style);
+    };
+
+    frame.addEventListener('load', pritaikyti);
+    mq.addEventListener('change', pritaikyti);
+    if (frame.contentDocument?.readyState === 'complete') pritaikyti();
+  }
+</script>

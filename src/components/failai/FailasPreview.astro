@@ -4,15 +4,33 @@ import PdfPreview from '@design-system/components/PdfPreview.astro';
 import ArchiveTree from './ArchiveTree.astro';
 import EmailMessage from './EmailMessage.astro';
 import FaxSpecial from './FaxSpecial.astro';
-interface Props { failas: any; search?: string; page?: number | string; }
-const { failas, search = '', page } = Astro.props;
+
+interface Props {
+  failas: any;
+  search?: string;
+  page?: number | string;
+  /** Peržiūra kabo skydelyje (žr. FailoPerziurosSkydelis) ir turi jį užpildyti. */
+  uzpildyti?: boolean;
+}
+const { failas, search = '', page, uzpildyti = false } = Astro.props;
+
+const failoUrl = `https://failai.viespirkiai.org/${failas.id}`;
+const paveiksloUrl = `${failoUrl}${failas.extension === 'heic' ? '?convertTo=jpeg' : ''}`;
 ---
 {failas.previewType === 'pdf' && (
   <>
-    {failas.isLibreFormat && (
+    {failas.isLibreFormat && !uzpildyti && (
       <p class="text-muted text-xs mb-3"><em>Dokumentas konvertuotas į PDF naudojant LibreOffice, gali būti atvaizduojamas iškraipytas.</em></p>
     )}
-    <PdfPreview failasId={failas.id} search={search} page={page} height="70vh" rounded={true} border="none" />
+    <PdfPreview
+      class="failas-pdf-frame"
+      failasId={failas.id}
+      search={search}
+      page={page}
+      height={uzpildyti ? '100%' : '70vh'}
+      rounded={!uzpildyti}
+      border="none"
+    />
   </>
 )}
 
@@ -25,18 +43,20 @@ const { failas, search = '', page } = Astro.props;
 
 {failas.previewType === 'mp4' && (
   <video controls class="w-full max-h-[70vh] rounded-md block">
-    <source src={`https://failai.viespirkiai.org/${failas.id}`} type="video/mp4" />
+    <source src={failoUrl} type="video/mp4" />
   </video>
 )}
 
 {failas.previewType === 'mp3' && (
   <audio controls class="w-full">
-    <source src={`https://failai.viespirkiai.org/${failas.id}`} type="audio/mpeg" />
+    <source src={failoUrl} type="audio/mpeg" />
   </audio>
 )}
 
 {failas.previewType === 'image' && (
-  <img src={`https://failai.viespirkiai.org/${failas.id}${failas.extension === 'heic' ? '?convertTo=jpeg' : ''}`} alt="" class="max-w-full rounded-md" />
+  uzpildyti
+    ? <img src={paveiksloUrl} alt="" class="failas-nuotrauka" />
+    : <img src={paveiksloUrl} alt="" class="max-w-full rounded-md" />
 )}
 
 {failas.previewType === 'url' && (
@@ -52,7 +72,7 @@ const { failas, search = '', page } = Astro.props;
 )}
 
 {failas.previewType === 'txt' && (
-  <div class="bg-lighter-gray border rounded-md p-4 overflow-x-auto">
+  <div class:list={['failas-tekstas', uzpildyti ? 'is-fill' : 'bg-lighter-gray border rounded-md p-4 overflow-x-auto']}>
     <pre class="whitespace-pre-wrap break-words font-mono text-sm m-0">{failas.tekstasPerziurai}</pre>
   </div>
 )}
@@ -60,7 +80,10 @@ const { failas, search = '', page } = Astro.props;
 {failas.previewType === 'fax-special' && <FaxSpecial />}
 
 {failas.previewType === 'html' && (
-  <iframe src={`https://failai.viespirkiai.org/${failas.id}`} class="w-full h-[600px] border border-border rounded-md"></iframe>
+  <iframe
+    src={failoUrl}
+    class:list={['failas-html', uzpildyti ? 'is-fill' : 'w-full h-[600px] border border-border rounded-md']}
+  ></iframe>
 )}
 
 {failas.previewType === 'email' && (
@@ -70,3 +93,43 @@ const { failas, search = '', page } = Astro.props;
 {failas.previewType === 'none' && (
   <p class="text-muted text-sm"><em>Peržiūra nepalaikoma šio formato failams. Spustelėkite „Failas", jei norite jį atsisiųsti.</em></p>
 )}
+
+<style>
+  /* Skydelio režimas: peržiūra yra visas rėmo turinys, tad ji ir tempiasi per
+     visą jo aukštį. Nuotrauka rodoma nuo viršaus — dokumento skenas skaitomas
+     nuo pirmos eilutės, o ne nuo vidurio. */
+  .failas-nuotrauka {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: top center;
+    background: var(--white);
+  }
+  @media (max-width: 640px) {
+    /* Ištraukoje nuotrauka pjaunama kaip dokumentas: pilnas plotis, viršus. */
+    .failas-nuotrauka { object-fit: cover; object-position: top center; }
+  }
+
+  .failas-tekstas.is-fill {
+    height: 100%;
+    overflow: auto;
+    padding: 16px 20px;
+    background: var(--white);
+  }
+  /* Rėme kortelė jau yra pats rėmas — bendras `pre` fonas jame atrodytų kaip
+     dėžutė dėžutėje. */
+  .failas-tekstas.is-fill pre {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+  }
+  .failas-html.is-fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--white);
+  }
+</style>

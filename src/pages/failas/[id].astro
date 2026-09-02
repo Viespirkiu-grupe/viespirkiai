@@ -1,13 +1,13 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import Map from '@design-system/components/maps/Map.astro';
-import PageHeader from '@design-system/components/PageHeader.astro';
 import KeyValueList from '@design-system/components/KeyValueList.astro';
 import Alert from '@design-system/components/Alert.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
-import { loadFailasById, enrichFailas, parseSuffix } from '../../lib/failas.js';
+import { loadFailasById, enrichFailas, parseSuffix, turiPerziurosSkydeli, failoPerziurosKelias } from '../../lib/failas.js';
 import { getFailasNerodymas } from '@/modules/failai/queries.js';
 import FailasPreview from '../../components/failai/FailasPreview.astro';
+import FailoPerziurosSkydelis from '../../components/failai/FailoPerziurosSkydelis.astro';
 import FailasOcr from '../../components/failai/FailasOcr.astro';
 import Domenai from '../../components/failai/Domenai.astro';
 import Nuorodos from '../../components/failai/Nuorodos.astro';
@@ -16,6 +16,7 @@ import Telefonai from '../../components/failai/Telefonai.astro';
 import IbanNumeriai from '../../components/failai/IbanNumeriai.astro';
 import Parasai from '@design-system/components/content/SignatureList.astro';
 import FailasPasalintas from '../../components/failai/FailasPasalintas.astro';
+import FailoAntraste from '../../components/failai/FailoAntraste.astro';
 import PpaAtaskaita from '../../components/failai/PpaAtaskaita.astro';
 import { loadPpaByFailasId } from '../../lib/ppa.js';
 import { convertUnit } from '@/utils/units.js';
@@ -65,6 +66,12 @@ const ogParts = [failas.extension?.toUpperCase(), failas.dydis ? convertUnit(fai
 const search = Astro.url.searchParams.get('search') || '';
 const pageParam = Astro.url.searchParams.get('puslapis') || Astro.url.searchParams.get('page') || '';
 const page = /^\d+$/.test(pageParam) ? pageParam : '';
+
+// Peržiūra rodoma kabančiame rėme (kaip teisės akto tekstas) tik tada, kai jį
+// yra kuo užpildyti. PPA ataskaita turi savo korteles su skirtukais — ten
+// maketas lieka paprastas.
+const skydelis = !isPasalintas && !ppa && turiPerziurosSkydeli(failas);
+const perziurosHref = failoPerziurosKelias(failas.id, { search, puslapis: page });
 ---
 <Layout
   pageTitle={ogTitle}
@@ -88,43 +95,83 @@ const page = /^\d+$/.test(pageParam) ? pageParam : '';
       .failas-grid > div:last-child { order: -1; }
       .failas-grid iframe { height: 50vh; }
     }
+
+    /* ── Perskeltas maketas: kairėje viskas apie failą, dešinėje — pats failas.
+       Dešinė skiltis „prilipusi", tad skaitant ilgą dokumentą kairė kolona
+       nenuslenka iš akių, o pasibaigus turiniui abi kartu pasitraukia prieš
+       poraštę (tas pats sprendimas kaip teisės akto puslapyje). */
+    /* `align-items` čia numatytas (`stretch`), o ne `start` kaip įprastame
+       makete: peržiūros stulpelis turi driektis per visas groteles, kitaip
+       prilipusiam rėmui nebūtų kur keliauti. */
+    .failas-grid.is-split {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 20px;
+      margin-bottom: 0;
+      align-items: stretch;
+    }
+    .failas-grid.is-split .failas-info { padding-bottom: 40px; }
+    /* Poraštė prasideda iškart po rėmu — bendras tarpas paliktų tuščią juostą
+       po per visą ekraną nusidriekusia peržiūra. Taisyklė galioja tik tada, kai
+       puslapyje tikrai yra kabantis rėmas. */
+    :global(body:has(.failas-grid.is-split) .site-footer-shell) { margin-block-start: 0; }
+    /* Rėmas prilimpa po antrašte ir ribojasi savo langeliu — pasibaigus kairės
+       kolonos turiniui jis savaime atsisėda ir neužlipa ant poraštės. Dešinėje
+       eina iki lango krašto: `main` šoninė paraštė ten tik paliktų tuščią
+       juostelę, todėl ją atitraukiam neigiama parašte. */
+    .failas-preview-col {
+      --failas-top: var(--site-header-offset, 58px);
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      margin-right: -56px;
+    }
+    /* Kabėjimas ir jo apvadai galioja tik perskeltame makete — siaurame ekrane
+       rėmas eina paprastu srautu ir lieka toks, kokį jį aprašo pats komponentas. */
+    @media (min-width: 1101px) {
+      .failas-preview-col :global(.failas-panel) {
+        position: sticky;
+        top: var(--failas-top);
+        /* Be `flex: none` stulpelio flex patemptų rėmą per visą grotelių aukštį
+           ir užgožtų čia nurodytą lango aukštį. */
+        flex: none;
+        height: calc(100dvh - var(--failas-top));
+        /* Lieka tik kairė linija: viršuje jau yra antraštės apvadas, apačioje ir
+           dešinėje — lango kraštas, tad kiti kraštai dvigubintų liniją. */
+        border-block: 0;
+        border-right: 0;
+        border-radius: 0;
+      }
+    }
+    @media (min-width: 1101px) and (max-width: 1200px) {
+      .failas-preview-col { margin-right: -28px; }
+    }
+    @media (max-width: 1100px) {
+      .failas-grid.is-split { grid-template-columns: minmax(0, 1fr); }
+      /* Telefone svarbesnis pats dokumentas — keliam jį virš metaduomenų.
+         Vietą rezervuoja pats grotelių langelis dar iki peržiūros užsikrovimo:
+         18rem turiniui + 17px nuplėšimo mygtukui. */
+      .failas-preview-col {
+        order: -1;
+        height: calc(18rem + 17px);
+        flex: none;
+        margin-top: 12px;
+        margin-right: 0;
+        margin-bottom: 28px;
+      }
+    }
   </style>
 
   {isPasalintas ? (
     <FailasPasalintas priezastis={nerodymas!.priezastis} status={nerodymas!.status ?? 451} />
   ) : (
   <main>
-    <PageHeader>
-      {failas.metaduomenys?.Title ? (
-        <>
-          <Fragment slot="subtext">{failas.pavadinimas}</Fragment>
-          {failas.metaduomenys.Title}
-        </>
-      ) : (
-        failas.pavadinimas
-      )}
-      <Fragment slot="actions">
-        <a href={`/failas/${failas.id}.json`} class="btn btn-outline btn-sm" aria-label="Atsisiųsti failo metaduomenis JSON formatu">
-          <span aria-hidden="true">↗</span> JSON
-        </a>
-        <a href={`https://failai.viespirkiai.org/${failas.id}`} class="btn btn-outline btn-sm" aria-label="Atsisiųsti failą">
-          <span aria-hidden="true">↗</span> Failas
-        </a>
-        {failas.previewType === 'pdf' && (
-          <a href={`/dist/pdfjs/web/viewer.html?file=${encodeURIComponent(`/failas/${failas.id}/preview`)}#${page ? `page=${encodeURIComponent(page)}&` : ''}search=${encodeURIComponent(search)}`} class="btn btn-outline btn-sm" aria-label="Atidaryti PDF peržiūrą">
-            <span aria-hidden="true">↗</span> Padidinti
-          </a>
-        )}
-        {failas.originalusLinkas && (
-          <a href={failas.originalusLinkas} class="btn btn-outline btn-sm" aria-label={`Atidaryti ${failas.originalusLinkasPavadinimas}`}>
-            <span aria-hidden="true">↗</span> {failas.originalusLinkasPavadinimas}
-          </a>
-        )}
-      </Fragment>
-    </PageHeader>
+    {!skydelis && <FailoAntraste failas={failas} meta={ogParts.join(' · ')} />}
 
-    <div class="failas-grid mb-10">
-      <div class="flex flex-col gap-4">
+    <div class:list={['failas-grid', skydelis ? 'is-split' : 'mb-10']}>
+      <div class="failas-info flex flex-col gap-4">
+        {skydelis && (
+          <FailoAntraste failas={failas} meta={ogParts.join(' · ')} skydelis={true} perziurosHref={perziurosHref} />
+        )}
 
         {failas.password && (
           <Alert variant="warning" icon="!" title="Failas apsaugotas slaptažodžiu" className="w-fit max-w-full mb-0">
@@ -149,6 +196,9 @@ const page = /^\d+$/.test(pageParam) ? pageParam : '';
             <dt>Šaltinis</dt>
             <dd><a href={failas.saltinioLinkas}>{failas.saltinioLinkoPavadinimas}</a></dd>
           </KeyValueList>
+          {skydelis && failas.isLibreFormat && (
+            <p class="text-muted text-xs mt-3 mb-0"><em>Dokumentas konvertuotas į PDF naudojant LibreOffice, gali būti atvaizduojamas iškraipytas.</em></p>
+          )}
         </div>
 
         {failas.location && (
@@ -202,8 +252,10 @@ const page = /^\d+$/.test(pageParam) ? pageParam : '';
         {failas.hasOcrSection && <FailasOcr failas={failas} />}
       </div>
 
-      <div>
-        {ppa ? (
+      <div class:list={[skydelis && 'failas-preview-col']}>
+        {skydelis ? (
+          <FailoPerziurosSkydelis failas={failas} search={search} page={page} perziurosHref={perziurosHref} />
+        ) : ppa ? (
           <>
             <div class="failas-tabs" role="tablist" aria-label="Failo turinys">
               <button type="button" class="failas-tab is-active" role="tab" aria-selected="true" aria-controls="panel-ataskaita" data-tab="ataskaita">Ataskaita (PPA)</button>

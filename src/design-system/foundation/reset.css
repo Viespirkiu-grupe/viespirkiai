@@ -3,8 +3,12 @@
         -webkit-tap-highlight-color: transparent;
     }
 
+    /* `clip`, o ne `hidden`: kerpa lygiai taip pat, bet NESUKURIA slinkties
+       konteinerio, tad `position: sticky` puslapiuose tebesiremia į langą.
+       Su `hidden` slinktį perimdavo `body` ir sticky nustodavo lipti — dėl to
+       kabantys skydeliai anksčiau būdavo daromi per `fixed` ir JavaScript. */
     html, body {
-        @apply overflow-x-hidden;
+        overflow-x: clip;
     }
 
     body {

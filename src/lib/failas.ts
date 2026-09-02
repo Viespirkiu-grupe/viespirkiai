@@ -24,6 +24,31 @@ function formatOcrTimestampForVilnius(value: unknown): string | null {
   return null;
 }
 
+/**
+ * Peržiūros tipai, kurie užpildo peržiūros rėmą ir turi pilno lango skaitytuvą
+ * (/failas/:id/perziura). Garsas, vaizdo įrašai, archyvai ir el. laiškai į rėmą
+ * netelpa prasmingai — jie lieka paprastame sraute.
+ */
+export const SKYDELIO_PERZIUROS = new Set(['pdf', 'image', 'txt', 'html']);
+
+/** Ar failo peržiūra rodoma kabančiame rėme (kaip teisės akto tekstas). */
+export function turiPerziurosSkydeli(failas: Failas): boolean {
+  return SKYDELIO_PERZIUROS.has(String(failas?.previewType));
+}
+
+/** Failo puslapis. */
+export function failoKelias(id: string | number): string {
+  return `/failas/${encodeURIComponent(String(id))}`;
+}
+
+/** To paties failo peržiūra per visą langą. */
+export function failoPerziurosKelias(id: string | number, params?: Record<string, string>): string {
+  const query = new URLSearchParams(
+    Object.entries(params ?? {}).filter(([, v]) => v),
+  ).toString();
+  return `${failoKelias(id)}/perziura${query ? `?${query}` : ''}`;
+}
+
 export function parseSuffix(raw: string) {
   if (raw.endsWith('.json')) return { value: raw.slice(0, -5), format: 'json' as const };
   if (raw.endsWith('.png')) return { value: raw.slice(0, -4), format: 'png' as const };

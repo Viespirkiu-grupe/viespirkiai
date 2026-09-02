@@ -304,7 +304,6 @@ const pageDescription = [
 
 <script>
   import { initTeisesAktoJuosta } from '../../scripts/teisesAktoJuosta.ts';
-  import { initTeisesAktoTekstoStulpelis } from '../../scripts/teisesAktoTekstoStulpelis.ts';
   import {
     initTeisesAktoMobiliaPerziura,
     initTeisesAktoSkaitytuvoNuorodas,
@@ -313,7 +312,6 @@ const pageDescription = [
   } from '../../scripts/teisesAktoTekstoTema.ts';
 
   initTeisesAktoJuosta();
-  initTeisesAktoTekstoStulpelis();
   initTeisesAktoTekstoTema();
   initTeisesAktoTurinioSekimas();
   initTeisesAktoMobiliaPerziura();
@@ -322,12 +320,13 @@ const pageDescription = [
 
 <style>
   /* Pusiau perskeltas puslapis. Abi kolonos vienodo pločio: kairė nesutraukta į
-     siaurą juostelę, dešinė — pakankamai plati akto pastraipoms. */
+     siaurą juostelę, dešinė — pakankamai plati akto pastraipoms.
+     `align-items` paliekam numatytą (`stretch`): teksto stulpelis turi būti per
+     visą grotelių aukštį, kitaip prilipusiam rėmui nebūtų kur keliauti. */
   .ta-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 20px;
-    align-items: start;
   }
   .ta-info {
     min-width: 0;
@@ -356,22 +355,47 @@ const pageDescription = [
     font-style: normal;
   }
 
-  /* Teksto stulpelis — tuščias grotelių langelis, rezervuojantis vietą: pats
-     rėmas kabo `position: fixed` (žr. teisesAktoTekstoStulpelis.ts, ten ir
-     paaiškinta, kodėl ne `sticky`). Aukštį JS perrašo tiksliai, CSS reikšmė
-     galioja be JS. */
+  /* Teksto stulpelis: pats langelis driekiasi per visas groteles, o rėmas jame
+     prilimpa po antrašte. Sticky ribojasi savo langeliu, tad pasibaigus kairės
+     kolonos turiniui rėmas savaime atsisėda ir neužlipa ant poraštės.
+     Dešinėje rėmas eina iki lango krašto — `main` šoninė paraštė ten tik
+     paliktų tuščią juostelę, todėl ją atitraukiam neigiama parašte. */
   .ta-text-col {
-    --ta-top: calc(var(--site-header-offset, 58px) + 8px);
+    --ta-top: var(--site-header-offset, 58px);
     min-width: 0;
     display: flex;
     flex-direction: column;
-    height: calc(100dvh - var(--ta-top) - 12px);
+    margin-right: -56px;
+  }
+  /* Kabėjimas ir jo apvadai galioja tik perskeltame makete — siaurame ekrane
+     rėmas eina paprastu srautu ir lieka toks, kokį jį aprašo pats komponentas.
+     `:global`, nes `.ta-panel` priklauso vaikiniam komponentui. */
+  @media (min-width: 1101px) {
+    .ta-text-col :global(.ta-panel) {
+      position: sticky;
+      top: var(--ta-top);
+      /* Be `flex: none` stulpelio flex patemptų rėmą per visą grotelių aukštį
+         ir užgožtų čia nurodytą lango aukštį. */
+      flex: none;
+      height: calc(100dvh - var(--ta-top));
+      /* Lieka tik kairė linija: viršuje jau yra antraštės apvadas, apačioje ir
+         dešinėje — lango kraštas, tad kiti kraštai dvigubintų liniją. */
+      border-block: 0;
+      border-right: 0;
+      border-radius: 0;
+    }
+  }
+
+  @media (min-width: 1101px) and (max-width: 1200px) {
+    .ta-text-col { margin-right: -28px; }
   }
 
   @media (max-width: 1100px) {
     .ta-grid { grid-template-columns: minmax(0, 1fr); }
-    /* Telefone aktas svarbesnis už metaduomenis — keliam jį į viršų. */
+    /* Telefone aktas svarbesnis už metaduomenis — keliam jį į viršų, o kabėti
+       nebėra kur: rėmas eina paprastu srautu per visą kolonos plotį. */
     .ta-text-col {
+      margin-right: 0;
       order: -1;
       /* Vietą rezervuoja pats grotelių langelis dar iki iframe užsikrovimo:
          18rem tekstui + 40px valdiklių juostai + 17px nuplėšimo mygtukui. */

@@ -109,18 +109,9 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
     display: flex;
     flex-direction: column;
     border: var(--border);
-    border-radius: var(--radius-md);
     background: var(--white);
     view-transition-name: teises-akto-tekstas;
   }
-  .ta-panel.is-fixed {
-    position: fixed;
-    z-index: 1;
-    border: none;
-    border-left: var(--border);
-    border-radius: 0;
-  }
-  .ta-panel.is-fixed .ta-frame { border-radius: 0; }
   .ta-panel.is-reader {
     border: 0;
     border-radius: 0;
@@ -146,7 +137,7 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    border-radius: 0;
   }
   .ta-frame {
     display: block;
