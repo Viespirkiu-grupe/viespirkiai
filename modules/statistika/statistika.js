@@ -288,9 +288,10 @@ export async function gautiStatistika() {
         COALESCE(SUM(characters), 0)       AS "simboliuSuma"
       FROM public."filesStats";`),
     // Užklausa gyvena modules/statistika/lenteliuDydziai.js – ja dalinasi ir
-    // /duomenys/lenteles. Filtruojam į `public`, kad dokumentacijos schema `dba`
-    // nepatektų į bendrą statistiką.
-    gautiLenteliuDydzius({ schemos: ["public"] }).then((rows) => ({ rows })),
+    // /duomenys/lenteles. Imam visas schemas: lentelių sąrašą žemiau filtruojam į
+    // `public` (kad dokumentacijos schema `dba` nepatektų į bendrą statistiką), o
+    // eilės renkamos iš visų schemų – pvz. documents."indexQueue".
+    gautiLenteliuDydzius().then((rows) => ({ rows })),
     postgres.query(`SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`),
     postgres.query(`SELECT current_database() AS db, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, deadlocks, temp_files, temp_bytes, extract(epoch from now() - stats_reset) AS stats_age_seconds, extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds FROM pg_stat_database WHERE datname = current_database();`),
     postgres.query(`SELECT * FROM "quickwit"."indeksai" ORDER BY "lentele", "seq";`),
@@ -342,8 +343,18 @@ export async function gautiStatistika() {
 
   statistika.failai = { kiekiai, dydziai, apytiksliai };
 
-  statistika.eiles = lentelesRes.rows.filter((lentele) => lentele.tableName.endsWith('Queue'));
-  statistika.lenteles = lentelesRes.rows;
+  // Ne-public schemų eilėms rodom schemos prefiksą, kad vienodai pavadintos
+  // lentelės skirtingose schemose nesusilietų į vieną kortelę.
+  statistika.eiles = lentelesRes.rows
+    .filter((lentele) => lentele.tableName.endsWith('Queue'))
+    .map((lentele) => ({
+      ...lentele,
+      tableName: lentele.schemaName === 'public'
+        ? lentele.tableName
+        : `${lentele.schemaName}.${lentele.tableName}`,
+    }))
+    .sort((a, b) => a.tableName.localeCompare(b.tableName));
+  statistika.lenteles = lentelesRes.rows.filter((lentele) => lentele.schemaName === 'public');
   statistika.lenteles.push({
     tableName: 'Iš viso',
     dataSize: statistika.lenteles.reduce((a, b) => a + (parseFloat(b.dataSize) || 0), 0),
