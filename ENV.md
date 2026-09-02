@@ -17,7 +17,7 @@ kintamieji krenta į numatytąsias schemos reikšmes (žr. `utils/configSchema.j
 | **Quickwit** | Pilnatekstė sutarčių / viešųjų pirkimų / dokumentų paieška ir facetavimas. | Ne (krenta į lėtesnę Postgres paiešką) |
 | **Tor (SOCKS5)** | Duomenų scrapinimas per Tor (tik taskrunneris). | Tik backend'ui |
 | **Chromium** | OG paveikslėlių atvaizdavimas (jau įdiegtas Docker image'e). | Frontend'ui |
-| **Sidecar saugykla** | OCR rezultatai, failų tekstas/metaduomenys, dokumentai, LITEKO2, e-TAR. Vienas `SIDECAR_DIR` katalogas su zstd SQLite bazėmis; kitas host'as skaito per `/api/v1/sidecar/<vardas>`. | Taip (failų funkcijoms) |
+| **Sidecar saugykla** | OCR rezultatai, failų tekstas/metaduomenys, dokumentai, LITEKO2, TED skelbimai, e-TAR. Vienas `SIDECAR_DIR` katalogas su zstd SQLite bazėmis; kitas host'as skaito per `/api/v1/sidecar/<vardas>`. | Taip (failų funkcijoms) |
 
 > **PostGIS:** DB turi būti su įjungtu plėtiniu: `CREATE EXTENSION IF NOT EXISTS postgis;`
 
@@ -281,6 +281,7 @@ Registras — `utils/sidecarPaths.js`:
 | `dokumentai` | `dokumentai.sqlite` | Dokumentų JSON (tekstas, metaduomenys, subjektai). |
 | `ocrRezultatai` | `ocrRezultatai.sqlite` | OCR rezultatai. |
 | `liteko2` | `liteko2.sqlite` | LITEKO2 sprendimai (`modules/liteko2`). |
+| `ted` | `ted.sqlite` | TED skelbimų XML (`modules/ted`); raktas md5(`ted:<numeris>`). |
 | `eTar` | `eTar.sqlite` | e-TAR API atsakymai (`modules/eTar`). |
 
 Kiekviena bazė lieka atskiru failu: SQLite turi vieną rašytoją visai bazei, o
@@ -364,7 +365,7 @@ npm run sidecars:sqlite-missing -- --store dokumentai
 ```
 
 Kiekvienas nerastas raktas išvedamas kaip `TRŪKSTA <hash>`. Galimi
-`--store failaiInfo|dokumentai|ocrRezultatai|liteko2|eTar`, `--db`, `--page`,
+`--store failaiInfo|dokumentai|ocrRezultatai|liteko2|ted|eTar`, `--db`, `--page`,
 `--limit` ir `--after <hash>`.
 
 ### Kita

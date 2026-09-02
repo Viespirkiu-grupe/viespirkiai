@@ -28,6 +28,12 @@ const SIDECAR_SALTINIAI = {
         fromSql: `FROM liteko2."sprendimai" WHERE md5 IS NOT NULL`,
         keySql: `md5`,
     },
+    ted: {
+        // TED sidecar raktas išvedamas iš skelbimo numerio (žr. modules/ted/sidecar.js),
+        // atskiro hash stulpelio DB nėra – turinį turi turėti visi nuskaityti skelbimai.
+        fromSql: `FROM ted."tedNotices" WHERE "scrapeStatus" >= 1`,
+        keySql: `md5('ted:' || "tedNoticeNumber")`,
+    },
     eTar: {
         // Aktų dokumentai ir redakcijų sąrašai rašo į tą pačią sidecar lentelę,
         // tad referencinė aibė yra jų md5 sąjunga.

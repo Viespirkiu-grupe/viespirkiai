@@ -3,6 +3,8 @@ const scrapeFetch = createScraperFetch("ted", { operation: "ted" });
 import { postgres } from "../postgres/postgres.js";
 import { log } from "../utils/log.js";
 import { WORK_SIGNALS } from "../utils/taskSignals.js";
+// XML gyvena sidecar'e, DB lieka tik metaduomenys (žr. modules/ted/sidecar.js).
+import { saveTedXml, tedMd5 } from "../modules/ted/sidecar.js";
 
 const TED_RPS = 1;
 const TED_SCRAPE_VERSION = 2;
@@ -40,7 +42,7 @@ async function nuskaitytiTedNotice(tedNoticeNumber) {
     if (!response.ok) {
         const scrapeStatus = response.status === 404 ? -404 : -1;
         await postgres.query(
-            `INSERT INTO public."tedNotices" ("tedNoticeNumber", "scrapeStatus", "scrapeTimestamp")
+            `INSERT INTO ted."tedNotices" ("tedNoticeNumber", "scrapeStatus", "scrapeTimestamp")
              VALUES ($1, $2, NOW())
              ON CONFLICT ("tedNoticeNumber") DO UPDATE SET
                  "scrapeStatus" = EXCLUDED."scrapeStatus",
@@ -51,14 +53,16 @@ async function nuskaitytiTedNotice(tedNoticeNumber) {
     }
 
     const turinys = await response.text();
+    // Pirma sidecar'as, tik paskui būsena: `scrapeStatus >= 0` turi reikšti, kad
+    // XML jau pasiekiamas. Nepavykus rašyti – task'as nukris ir bus pakartotas.
+    await saveTedXml(tedMd5(tedNoticeNumber), turinys);
     await postgres.query(
-        `INSERT INTO public."tedNotices" ("tedNoticeNumber", "scrapeStatus", "scrapeTimestamp", "turinys")
-         VALUES ($1, $2, NOW(), $3)
+        `INSERT INTO ted."tedNotices" ("tedNoticeNumber", "scrapeStatus", "scrapeTimestamp")
+         VALUES ($1, $2, NOW())
          ON CONFLICT ("tedNoticeNumber") DO UPDATE SET
-             "scrapeStatus" = $2,
-             "scrapeTimestamp" = NOW(),
-             "turinys" = EXCLUDED."turinys"`,
-        [tedNoticeNumber, TED_SCRAPE_VERSION, turinys],
+             "scrapeStatus" = EXCLUDED."scrapeStatus",
+             "scrapeTimestamp" = EXCLUDED."scrapeTimestamp"`,
+        [tedNoticeNumber, TED_SCRAPE_VERSION],
     );
 
     return { tedNoticeNumber, status: response.status };
@@ -67,9 +71,9 @@ async function nuskaitytiTedNotice(tedNoticeNumber) {
 async function nuskaitytiSeniausiaTedNotice() {
     const { rows } = await postgres.query(
         `SELECT "tedNoticeNumber"
-         FROM public."tedNotices"
-         WHERE ("scrapeStatus" IS NULL OR "scrapeStatus" >= 0)
-           AND ("scrapeStatus" IS NULL OR "scrapeStatus" < $1)
+         FROM ted."tedNotices"
+         WHERE "scrapeStatus" IS NULL
+            OR ("scrapeStatus" >= 0 AND "scrapeStatus" < $1)
          ORDER BY "scrapeStatus" ASC NULLS FIRST
          LIMIT 1`,
         [TED_SCRAPE_VERSION],

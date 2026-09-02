@@ -1,5 +1,6 @@
 import { postgres } from '@/postgres/postgres.js';
 import { buildTedNoticeViewModel } from '@/modules/ted/viewer.js';
+import { readTedXml, tedMd5 } from '@/modules/ted/sidecar.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -34,18 +35,23 @@ export async function loadTedDbNotice(id: string) {
   if (!isTedDbId(id)) return null;
 
   const result = await postgres.query(
-    `SELECT * FROM "tedNotices" WHERE "tedNoticeNumber" = $1;`,
+    `SELECT "tedNoticeNumber", "scrapeStatus", "scrapeTimestamp"
+       FROM ted."tedNotices" WHERE "tedNoticeNumber" = $1;`,
     [id],
   );
 
   if (result.rowCount === 0) return null;
 
   const notice = result.rows[0];
-  if (!notice?.scrapeStatus || !notice?.turinys || notice.scrapeStatus < 1) {
+  if (!notice?.scrapeStatus || notice.scrapeStatus < 1) {
     return null;
   }
 
-  return notice;
+  // XML nebe DB, o sidecar'e; be jo rodyti nėra ko.
+  const turinys = await readTedXml(tedMd5(id));
+  if (!turinys) return null;
+
+  return { ...notice, turinys };
 }
 
 export async function loadTedNoticePageData(id: string) {

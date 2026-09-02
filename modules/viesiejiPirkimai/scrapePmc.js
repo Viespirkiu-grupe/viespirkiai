@@ -227,7 +227,7 @@ async function processPmcRecord(cft, options = {}) {
 
             const tedQueued = await postgres.query(
                 `
-                INSERT INTO "tedNotices" ("tedNoticeNumber")
+                INSERT INTO ted."tedNotices" ("tedNoticeNumber")
                 VALUES ${placeholders}
                 ON CONFLICT ("tedNoticeNumber") DO NOTHING;
                 `,

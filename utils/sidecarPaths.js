@@ -29,6 +29,8 @@ export const SIDECAR_DBS = {
     dokumentai: { table: "dokumentai", keyColumn: "hash" },
     ocrRezultatai: { table: "ocrRezultatai", keyColumn: "hash" },
     liteko2: { table: "liteko2", keyColumn: "hash" },
+    // TED skelbimų XML: `ted."tedNotices"` lieka tik metaduomenys.
+    ted: { table: "ted", keyColumn: "hash" },
     // eTar rašomas ne per createSidecarStore, o tiesiai (modules/eTar/eTarSidecar.js).
     eTar: { table: "eTarAtsakymai", keyColumn: "md5" },
     // Atskiras failas, kad e-TAR ir e-Seimo rašytojai nekonkuruotų dėl vieno WAL.

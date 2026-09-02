@@ -1,5 +1,6 @@
 import { postgres } from '@/postgres/postgres.js';
 import { buildTedNoticeViewModel } from '@/modules/ted/viewer.js';
+import { readTedXmlMany, tedMd5 } from '@/modules/ted/sidecar.js';
 import { searchSutartys } from '@/modules/sutartys/searchSutartys.js';
 import { assembleTurinys } from '@/modules/viesiejiPirkimai/assembleTurinys.js';
 import { prisegtiLokaliusFailus } from '@/modules/viesiejiPirkimai/prisegtiLokaliusFailus.js';
@@ -38,11 +39,18 @@ async function annotateTedSkelbimai(turinys: any) {
     return;
   }
 
+  // DB pasako, kurie skelbimai nuskaityti, XML paimam iš sidecar'o viena partija.
   const { rows: tedRows } = await postgres.query(
-    `SELECT "tedNoticeNumber", turinys FROM public."tedNotices" WHERE "tedNoticeNumber" = ANY($1) AND turinys IS NOT NULL`,
+    `SELECT "tedNoticeNumber" FROM ted."tedNotices"
+      WHERE "tedNoticeNumber" = ANY($1) AND "scrapeStatus" >= 1`,
     [tedNoticeNumbers],
   );
-  const availableNotices = new Map(tedRows.map((r: any) => [r.tedNoticeNumber, r.turinys]));
+  const xmlByMd5 = await readTedXmlMany(tedRows.map((r: any) => tedMd5(r.tedNoticeNumber)));
+  const availableNotices = new Map<string, string>();
+  for (const row of tedRows as any[]) {
+    const xml = xmlByMd5.get(tedMd5(row.tedNoticeNumber));
+    if (xml) availableNotices.set(row.tedNoticeNumber, xml);
+  }
 
   for (const url of tedUrls) {
     const tedNoticeNumber = parseTedNoticeNumber(url);
