@@ -25,7 +25,7 @@ export async function syncAdpChanges(CONFIG) {
 
     async function getLastState() {
         const res = await postgres.query(
-            `SELECT "lastCid", "lastId", "lastRevision" FROM "adpChanges" WHERE "dataset" = $1`,
+            `SELECT "lastCid", "lastId", "lastRevision" FROM adp."adpChanges" WHERE "dataset" = $1`,
             [CONFIG.dataset],
         );
         if (res.rowCount === 0)
@@ -35,7 +35,7 @@ export async function syncAdpChanges(CONFIG) {
 
     async function markAttempt() {
         await postgres.query(
-            `UPDATE "adpChanges" SET "lastCheckedAt" = now() WHERE "dataset" = $1`,
+            `UPDATE adp."adpChanges" SET "lastCheckedAt" = now() WHERE "dataset" = $1`,
             [CONFIG.dataset],
         );
     }
@@ -43,7 +43,7 @@ export async function syncAdpChanges(CONFIG) {
     async function saveState(cid, id, revision) {
         await postgres.query(
             `
-            INSERT INTO "adpChanges"
+            INSERT INTO adp."adpChanges"
                 ("dataset","lastCid","lastId","lastRevision","lastCheckedAt","lastSuccessfulAt")
             VALUES ($1,$2,$3,$4,now(),now())
             ON CONFLICT ("dataset")

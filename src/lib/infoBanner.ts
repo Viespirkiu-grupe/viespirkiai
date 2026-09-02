@@ -1,5 +1,5 @@
 /**
- * Informacinio banerio (viršuje) šaltinis — DB lentelė `public."infoBaneris"`.
+ * Informacinio banerio (viršuje) šaltinis — DB lentelė `viespirkiai."infoBaneris"`.
  *
  * Anksčiau baneris buvo imamas iš `config.infoBanner`. Dabar jį valdo DB lentelė
  * su laukais `enabled` ir `aplinka` (kur rodyti). Reikšmė cache'inama procese;
@@ -29,7 +29,7 @@ async function ensureTable(): Promise<void> {
   const client = await postgres.connect();
   try {
     await client.query(`
-      CREATE TABLE IF NOT EXISTS public."infoBaneris" (
+      CREATE TABLE IF NOT EXISTS viespirkiai."infoBaneris" (
         id          serial PRIMARY KEY,
         content     text        NOT NULL,
         type        text        NOT NULL DEFAULT 'text'  CHECK (type IN ('text', 'html')),
@@ -41,7 +41,7 @@ async function ensureTable(): Promise<void> {
     `);
 
     await client.query(`
-      COMMENT ON COLUMN public."infoBaneris".aplinka IS
+      COMMENT ON COLUMN viespirkiai."infoBaneris".aplinka IS
         'Kur rodyti: NULL = visur; ''dev'' = tik dev aplinkoje; ''prod'' = tik gyvoje. Aplinka nustatoma pagal config.dev.'
     `);
 
@@ -53,7 +53,7 @@ async function ensureTable(): Promise<void> {
 async function reload(): Promise<void> {
   const { rows } = await postgres.query(
       `SELECT type, content, important
-         FROM public."infoBaneris"
+         FROM viespirkiai."infoBaneris"
         WHERE enabled = true
           AND (aplinka IS NULL OR aplinka = $1)
         ORDER BY important DESC, atnaujinta DESC

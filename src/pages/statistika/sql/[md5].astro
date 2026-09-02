@@ -125,7 +125,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=15');
             ? <pre class="code-block"><code class="hljs language-sql" set:html={paryskintasSql}></code></pre>
             : (
               <Alert variant="warning">
-                Teksto nėra: jis saugomas Postgres lentelėje <code>public."sqlLogTekstai"</code>,
+                Teksto nėra: jis saugomas Postgres lentelėje <code>dba."sqlLogTekstai"</code>,
                 o ši forma joje dar neužfiksuota.
               </Alert>
             )}

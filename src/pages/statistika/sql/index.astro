@@ -94,7 +94,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=15');
     {!klaida && !yraTekstuLentele && (
       <Alert variant="warning" title="Nėra sqlLogTekstai lentelės">
         Quickwit'e saugomas tik <code>md5</code>, o tekstai — Postgres lentelėje
-        <code>public."sqlLogTekstai"</code>. Kol jos nėra, sąraše matysite tik hash'us
+        <code>dba."sqlLogTekstai"</code>. Kol jos nėra, sąraše matysite tik hash'us
         (lentelės kūrimas — <code>sqlLogTekstai.sql</code>).
       </Alert>
     )}

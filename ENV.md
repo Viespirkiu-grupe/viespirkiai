@@ -123,7 +123,7 @@ Tekstą laiko Postgres lentelė `sqlLogTekstai` (žr. [`sqlLogTekstai.sql`](sqlL
 pati įrašymo užklausa į logą nepatenka):
 
 ```sql
-SELECT "sql" FROM public."sqlLogTekstai" WHERE "md5" = '…';
+SELECT "sql" FROM dba."sqlLogTekstai" WHERE "md5" = '…';
 ```
 
 Jei lentelės nėra (`42P01`) arba jungtis read-only (`25006`), rašymas išsijungia
@@ -184,7 +184,7 @@ curl -s 'localhost:7280/api/v1/sqlLogV2_*/search?query=ok:false'
 Gavus `md5`, tekstas imamas iš Postgres:
 
 ```sql
-SELECT "md5", "sql" FROM public."sqlLogTekstai" WHERE "md5" = ANY($1);
+SELECT "md5", "sql" FROM dba."sqlLogTekstai" WHERE "md5" = ANY($1);
 ```
 
 #### `SCRAPE_LOG_*` – outbound duomenų šaltinių užklausos
@@ -466,4 +466,4 @@ naudojamas jis (Stalčius, Bearer), kitaip OAuth client-credentials (Spinta).
 | Laukas | Kaip nustatomas |
 | --- | --- |
 | `dev` | Pagal `NODE_ENV` — `true`, kai `NODE_ENV !== "production"`. Naudojamas dev log'ams, info banerio aplinkai, logotipui. |
-| `infoBanner` | Iš DB lentelės `public."infoBaneris"` (ne per config), keitimai plinta per `pg_notify`. |
+| `infoBanner` | Iš DB lentelės `viespirkiai."infoBaneris"` (ne per config), keitimai plinta per `pg_notify`. |

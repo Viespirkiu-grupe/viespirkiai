@@ -9,7 +9,7 @@ import PageHeader from '@design-system/components/PageHeader.astro';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-const vieslaiskiaiRes = await postgres.query('SELECT * FROM vieslaiskiai ORDER BY id DESC;');
+const vieslaiskiaiRes = await postgres.query('SELECT * FROM viespirkiai."vieslaiskiai" ORDER BY id DESC;');
 const vieslaiskiai = vieslaiskiaiRes.rows;
 
 const vieslaiskiuTiles = vieslaiskiai.map((vieslaiskis: any) => ({
@@ -18,7 +18,7 @@ const vieslaiskiuTiles = vieslaiskiai.map((vieslaiskis: any) => ({
   alt: `${vieslaiskis.pavadinimas} (PDF)`,
 }));
 
-const ziniasklaidojeRes = await postgres.query('SELECT * FROM "vieslaiskiaiZiniasklaidoje" ORDER BY date DESC, id DESC;');
+const ziniasklaidojeRes = await postgres.query('SELECT * FROM viespirkiai."vieslaiskiaiZiniasklaidoje" ORDER BY date DESC, id DESC;');
 const vieslaiskiaiZiniasklaidoje = ziniasklaidojeRes.rows;
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');

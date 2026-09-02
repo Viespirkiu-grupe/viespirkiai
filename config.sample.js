@@ -19,7 +19,7 @@ export default {
     // jei nenaudojame Tor.
     onionAddress: undefined,
 
-    // Informacinis baneris viršuje valdomas per DB lentelę public."infoBaneris"
+    // Informacinis baneris viršuje valdomas per DB lentelę viespirkiai."infoBaneris"
     // (laukai: content, type, important, enabled, aplinka [NULL=visur | 'dev' | 'prod']).
     // Lentelė sukuriama automatiškai; keitimai pasiimami periodiniu poll'u.
 

@@ -35,7 +35,7 @@ export async function validateReverseProxyApiKey(authHeader) {
     const result = await postgres.query(
         `
         SELECT r.*
-        FROM public."reverseProxies" r
+        FROM viespirkiai."reverseProxies" r
         JOIN auth."raktai" a ON a.id = r."apiRaktasId"
         WHERE a."apiKey" = $1
         LIMIT 1

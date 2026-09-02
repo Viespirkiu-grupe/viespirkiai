@@ -82,7 +82,7 @@ function registruotiSqlTeksta(md5, sql) {
 
     postgres
         .query({
-            text: `INSERT INTO public."sqlLogTekstai" ("md5", "sql")
+            text: `INSERT INTO dba."sqlLogTekstai" ("md5", "sql")
                    VALUES ($1, $2)
                    ON CONFLICT ("md5") DO NOTHING`,
             values: [md5, sql],

@@ -125,7 +125,7 @@ async function gautiTekstus(md5ai: string[]): Promise<Map<string, string>> {
   if (!md5ai.length) return new Map();
   try {
     const { rows } = await postgres.query(
-      'SELECT "md5", "sql" FROM public."sqlLogTekstai" WHERE "md5" = ANY($1)',
+      'SELECT "md5", "sql" FROM dba."sqlLogTekstai" WHERE "md5" = ANY($1)',
       [md5ai],
     );
     return new Map(rows.map((r: any) => [String(r.md5), String(r.sql)]));
@@ -138,7 +138,7 @@ async function gautiTekstus(md5ai: string[]): Promise<Map<string, string>> {
 /** Ar `sqlLogTekstai` lentelė apskritai egzistuoja (žinutei puslapyje). */
 export async function arYraTekstuLentele(): Promise<boolean> {
   const { rows } = await postgres.query(
-    `SELECT to_regclass('public."sqlLogTekstai"') IS NOT NULL AS yra`,
+    `SELECT to_regclass('dba."sqlLogTekstai"') IS NOT NULL AS yra`,
   );
   return rows[0]?.yra === true;
 }

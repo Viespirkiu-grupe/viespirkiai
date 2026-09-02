@@ -8,7 +8,7 @@ export async function pickReklama(vieta) {
     try {
         const { rows } = await postgres.query(
             `SELECT "id", "tipas", "antraste", "tekstas", "mygtukoTekstas", "nuoroda"
-               FROM public."reklamos"
+               FROM viespirkiai."reklamos"
               WHERE "aktyvi" = true
                 AND $1 = ANY("vietos")
                 AND ("rodytiNuo" IS NULL OR "rodytiNuo" <= now())
