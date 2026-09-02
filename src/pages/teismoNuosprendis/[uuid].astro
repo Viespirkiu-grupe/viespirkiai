@@ -4,9 +4,7 @@ import PageHeader from '@design-system/components/PageHeader.astro';
 import DetailsSection from '@design-system/components/DetailsSection.astro';
 import DataTable from '@design-system/components/DataTable.astro';
 import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
-import { postgres } from '@/postgres/postgres.js';
-import { readDocumentFs } from '@/modules/documents/documentsFs.js';
-import { readLiteko2Sidecar } from '@/modules/liteko2/sidecar.js';
+import { gautiNuosprendiPagalUuid } from '@/modules/liteko/nuosprendisPagalUuid.js';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
 import config from '../../lib/config.ts';
 
@@ -16,115 +14,13 @@ const font = getFont(Astro.cookies);
 const { uuid } = Astro.params;
 if (!uuid) return Astro.redirect('/404');
 
-// Pirmiausia ieškom senajame LITEKO. Naujojo LITEKO2 identifikatoriai gyvena
-// atskiroje lentelėje, todėl ją tikrinam tik neradę seno įrašo.
-const { rows: litekoRows } = await postgres.query(
-  `SELECT id, md5, "litekoId", "bylosNumeris", "teisminisProcesoNr", "bylosRusis",
-          teismas, "teismoRumai", skyrius, instancija, data, "fileHref"
-     FROM liteko."nuosprendziaiPilni" WHERE "litekoId" = $1`,
-  [uuid],
-);
-let n: any = litekoRows[0];
-let saltinis: 'liteko' | 'liteko2' = 'liteko';
+const sprendimas = await gautiNuosprendiPagalUuid(uuid);
+if (!sprendimas) return Astro.redirect('/404');
 
-if (!n) {
-  const { rows: liteko2Rows } = await postgres.query(
-    `SELECT s.id, s.md5, s."liteko2Id" AS "litekoId", s."bylosNumeris",
-            s."teisminisProcesoNr", br.pavadinimas AS "bylosRusis",
-            t.pavadinimas AS teismas, r.pavadinimas AS "teismoRumai",
-            NULL::text AS skyrius, NULL::text AS instancija,
-            s."sprendimoData" AS data, s."bylosAprasymas", s."bylaGauta",
-            dt.pavadinimas AS "sprendimoTipas", s.busena
-       FROM liteko2."sprendimai" s
-       LEFT JOIN liteko2."teismai" t ON t."liteko2Id" = s."teismoId"
-       LEFT JOIN liteko2."teismai" r ON r."liteko2Id" = s."rumuId"
-       LEFT JOIN liteko2."byluRusys" br ON br."liteko2Id" = s."bylosRusiesId"
-       LEFT JOIN liteko2."dokumentuTipai" dt ON dt."liteko2Id" = s."sprendimoTipoId"
-      WHERE s."liteko2Id" = $1`,
-    [uuid],
-  );
-  n = liteko2Rows[0];
-  saltinis = 'liteko2';
-}
-
-if (!n) return Astro.redirect('/404');
-
-const [dalyviaiRes, kategorijosRes] = await Promise.all([
-  saltinis === 'liteko'
-    ? postgres.query(
-        `SELECT pavadinimas, kodas, "bylojeKaip"
-           FROM liteko."dalyviaiPilni"
-          WHERE "nuosprendzioId" = $1
-          ORDER BY "bylojeKaip" NULLS LAST, pavadinimas`,
-        [n.id],
-      )
-    : postgres.query(
-        `SELECT d.pavadinimas, d.kodas, v.pavadinimas AS "bylojeKaip"
-           FROM liteko2."sprendimuDalyviai" d
-           LEFT JOIN liteko2."vaidmenys" v ON v.id = d."vaidmuoId"
-          WHERE d."sprendimoId" = $1
-          ORDER BY v.pavadinimas NULLS LAST, d.pavadinimas`,
-        [n.id],
-      ),
-  saltinis === 'liteko'
-    ? postgres.query(
-        `SELECT k.kodas, p.pavadinimas
-           FROM liteko."nuosprendziuKategorijos" nk
-           JOIN liteko.kategorijos k ON k.id = nk."kategorijaId"
-           LEFT JOIN liteko."kategorijuPavadinimai" p ON p.id = k."pavadinimoId"
-          WHERE nk."nuosprendzioId" = $1
-          ORDER BY p.pavadinimas NULLS LAST`,
-        [n.id],
-      )
-    : postgres.query(
-        `SELECT k."kategorijosId" AS kodas, p.pavadinimas
-           FROM liteko2."sprendimuKategorijos" k
-           LEFT JOIN liteko2."kategorijos" p ON p."liteko2Id" = k."kategorijosId"
-          WHERE k."sprendimoId" = $1
-          ORDER BY p.pavadinimas NULLS LAST`,
-        [n.id],
-      ),
-]);
-// isJar — 9 skaitmenų kodas yra JAR kodas (juridinis asmuo) → nuoroda į /asmuo.
-const dalyviai = (dalyviaiRes.rows as any[]).map((d) => ({ ...d, isJar: /^\d{9}$/.test(d.kodas || '') }));
-
-// Trūkstamus dalyvių pavadinimus papildom iš JAR (pagal kodą).
-const trukstamiKodai = [...new Set(dalyviai.filter((d) => !d.pavadinimas && d.isJar).map((d) => d.kodas))];
-if (trukstamiKodai.length) {
-  const { rows: jarRows } = await postgres.query(
-    `SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" = ANY($1)`,
-    [trukstamiKodai],
-  );
-  const jarVardai: Record<string, string> = Object.fromEntries(jarRows.map((r: any) => [r.jarKodas, r.pavadinimas]));
-  for (const d of dalyviai) if (!d.pavadinimas && jarVardai[d.kodas]) d.pavadinimas = jarVardai[d.kodas];
-}
-
-// Rodom tik įvardintas kategorijas — be pavadinimo lieka tik kodas (pvz. „2.4.2.2"), jo neberodom.
-const kategorijos = (kategorijosRes.rows as any[]).filter((k) => k.pavadinimas);
-
-// Pilnas tekstas ir papildomi metaduomenys — iš dokumento sidecar JSON (pagal md5).
-let sidecar: any = null;
-try {
-  sidecar = n.md5
-    ? await (saltinis === 'liteko2' ? readLiteko2Sidecar(n.md5) : readDocumentFs(n.md5))
-    : null;
-} catch { sidecar = null; }
-// Nuvalom tekstą: pašalinam eilučių pradžios tarpus, sutraukiam >1 tuščią eilutę iki vienos.
-const tekstas: string | null = sidecar?.text
-  ? String(sidecar.text)
-      .replace(/^[ \t]+/gm, '')
-      .replace(/[ \t]+\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
-  : null;
-const teisejai: string[] = sidecar?.metadata?.teisejai ?? [];
-const vieta: string | null = sidecar?.metadata?.vieta ?? null;
+const { n, dalyviai, kategorijos, tekstas, teisejai, vieta, litekoUrl, saltinis } = sprendimas;
 
 const dataStr = n.data ? new Date(n.data).toLocaleDateString('lt-LT') : null;
 const busena = n.busena === 'decs_published' ? 'Paskelbtas' : n.busena;
-const litekoUrl = saltinis === 'liteko2'
-  ? `https://liteko-api-pub.teismas.lt/v1/decisions/${encodeURIComponent(n.litekoId)}`
-  : `https://liteko.teismai.lt/viesasprendimupaieska/${n.fileHref}`;
 const dokumentaiUrl = `/dokumentai?mode=phrase&type=teismoNuosprendis&q=${encodeURIComponent(n.bylosNumeris)}`;
 
 const bylaItems = [

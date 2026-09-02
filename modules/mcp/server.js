@@ -6,6 +6,7 @@ import * as getFailas from "./tools/getFailas.js";
 import * as getFailasTekstas from "./tools/getFailasTekstas.js";
 import * as getDokumentasTekstas from "./tools/getDokumentasTekstas.js";
 import * as getTeisesAktoTekstas from "./tools/getTeisesAktoTekstas.js";
+import * as getTeismoNuosprendis from "./tools/getTeismoNuosprendis.js";
 import * as getTeisesAktoIstrauka from "./tools/getTeisesAktoIstrauka.js";
 import * as getJuridinis from "./tools/getJuridinis.js";
 import * as getPinregAsmuo from "./tools/getPinregAsmuo.js";
@@ -49,6 +50,7 @@ const tools = config.enableExecuteQueryMcpOnly
           getDokumentasTekstas,
           getTeisesAktoTekstas,
           getTeisesAktoIstrauka,
+          getTeismoNuosprendis,
           getJuridinis,
           getPinregAsmuo,
           getPinregJar,

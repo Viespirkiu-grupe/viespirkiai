@@ -6,6 +6,7 @@ export const description =
     "Ieško viešųjų pirkimų ir kitų dokumentų (sutartys, CVP IS, neskelbiamos derybos, MVP tvarkos, teisės aktai, teismo nuosprendžiai) pagal pavadinimą, autorių ir turinį. " +
     "Teisės aktų ir jų projektų tekstą skaityk su get_teises_akto_tekstas: jis trumpą tekstą grąžina visą, o ilgam parenka turinį arba dalis. " +
     "Kitų rezultatų tekstą skaityk su get_dokumentas_tekstas, perduodamas dokumentoId. " +
+    "Teismo sprendimą pagal LITEKO identifikatorių (uuid iš viespirkiai.org/teismoNuosprendis/<uuid> ar LITEKO adreso) imk su get_teismo_nuosprendis — jis grąžina ir bylos duomenis, dalyvius bei kategorijas. " +
     "get_failas naudok tik tada, kai turi failoId arba MD5 ir reikia failo metaduomenų.";
 
 const TYPE_VALUES = [
@@ -114,6 +115,15 @@ function stripSnippet(html) {
         .replace(/&gt;/g, ">");
 }
 
+// Nuoroda į viespirkiai.org — failams pagal failoId, teismo sprendimams pagal LITEKO id.
+function viespirkiaiUrl(h) {
+    if (h.failasId) return `https://viespirkiai.org/failas/${h.failasId}`;
+    if (h.type === "teismoNuosprendis" && h.saltinioId2) {
+        return `https://viespirkiai.org/teismoNuosprendis/${encodeURIComponent(h.saltinioId2)}`;
+    }
+    return null;
+}
+
 export async function handler(params) {
     const { search, page, mode, sort, type, extension, saltinis, jarKodas, istaiga, facetai } = params;
 
@@ -139,6 +149,8 @@ export async function handler(params) {
         versijosId: h.type === "teisesAktas" || h.type === "teisesAktoProjektas"
             ? h.saltinioId3 || h.saltinioId1 || "original"
             : null,
+        // Teismo sprendimų LITEKO id — juo get_teismo_nuosprendis grąžina bylos duomenis.
+        litekoId: h.type === "teismoNuosprendis" ? h.saltinioId2 ?? null : null,
         md5: h.md5,
         pavadinimas: h.title || h.pavadinimas,
         tipas: h.type,
@@ -151,7 +163,7 @@ export async function handler(params) {
         istaiga: h.istaigaPavadinimas || h.istaigaJar,
         fragmentas: stripSnippet(h.snippet),
         url: h.url || null,
-        viespirkiaiUrl: h.failasId ? `https://viespirkiai.org/failas/${h.failasId}` : null,
+        viespirkiaiUrl: viespirkiaiUrl(h),
     }));
 
     const payload = {
