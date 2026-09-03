@@ -375,6 +375,8 @@ Kiekvienas nerastas raktas išvedamas kaip `TRŪKSTA <hash>`. Galimi
 | `OCR_BANDYMAI` | `5` | Kiek kartų bandyti OCR vienam failui prieš pažymint kaip nepavykusį. |
 | `ENABLE_GRAPH` | `false` | Ryšių grafiko funkcija UI. |
 | `ONION_ADDRESS` | — | Tor onion adresas, skelbiamas per HTTP antraštę. |
+| `INFO_BANNER` | — | Info banerio tekstas. Netuščias **nustelbia** DB lentelę `viespirkiai."infoBaneris"` (kai DB redaguoti neįmanoma). Tik tekstas, ne HTML. |
+| `INFO_BANNER_IMPORTANT` | `false` | Ar `.env` baneris rodomas kaip svarbus (paryškintas). |
 | `ANALITIKA_URL` | `""` | Išorinis analitikos URL (`/analitika` peradresuoja į jį). |
 | `CUSTOM_HEAD` | `""` | HTML, įterpiamas į kiekvieno puslapio `<head>`. |
 
@@ -467,4 +469,4 @@ naudojamas jis (Stalčius, Bearer), kitaip OAuth client-credentials (Spinta).
 | Laukas | Kaip nustatomas |
 | --- | --- |
 | `dev` | Pagal `NODE_ENV` — `true`, kai `NODE_ENV !== "production"`. Naudojamas dev log'ams, info banerio aplinkai, logotipui. |
-| `infoBanner` | Iš DB lentelės `viespirkiai."infoBaneris"` (ne per config), keitimai plinta per `pg_notify`. |
+| `infoBanner` | Iš DB lentelės `viespirkiai."infoBaneris"`, keitimai plinta per `pg_notify`. Išimtis — nustatytas `INFO_BANNER` turi pirmenybę ir DB visai neskaitoma. |

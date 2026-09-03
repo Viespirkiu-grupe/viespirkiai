@@ -1,14 +1,5 @@
 import { z } from "zod";
 
-const infoBannerSchema = z.union([
-    z.string(),
-    z.object({
-        type: z.enum(["text", "html"]).optional(),
-        content: z.string(),
-        important: z.boolean().optional(),
-    }).passthrough(),
-]);
-
 const typesenseNodeSchema = z.object({
     host: z.string(),
     port: z.number(),
@@ -19,7 +10,10 @@ const configSchema = z.object({
     customHead: z.string().default(""),
     analitikaUrl: z.string().default(""),
     onionAddress: z.string().optional(),
-    infoBanner: infoBannerSchema.optional(),
+    // Info baneris paprastai imamas iš DB (`viespirkiai."infoBaneris"`), bet
+    // kai DB redaguoti neįmanoma, `.env` reikšmė turi pirmenybę.
+    infoBanner: z.string().default(""),
+    infoBannerImportant: z.boolean().default(false),
 
     port: z.number().int().positive().default(9019),
     appEnv: z.enum(["dev", "prod"]).optional(),

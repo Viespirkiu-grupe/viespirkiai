@@ -19,6 +19,8 @@ const ENV_MAP = [
     ["CUSTOM_HEAD", "customHead", "string"],
     ["ANALITIKA_URL", "analitikaUrl", "string"],
     ["ONION_ADDRESS", "onionAddress", "string"],
+    ["INFO_BANNER", "infoBanner", "string"],
+    ["INFO_BANNER_IMPORTANT", "infoBannerImportant", "boolean"],
 
     ["PORT", "port", "number"],
     ["TASKRUNNER_DISABLED_TASKS", "taskRunnerDisabledTasks", "csv"],

@@ -6,6 +6,9 @@
  * atnaujinama poll'u, o `npm run baneris:reload` NATS signalu perkrauna iškart
  * (lentelė redaguojama ranka per SQL, tad DB pusėje siuntėjo nėra).
  * Header.astro tik nuskaito jau paruoštą cache'ą.
+ *
+ * Išimtis: kai DB redaguoti neįmanoma, netuščias `INFO_BANNER` (`.env`)
+ * nustelbia lentelę – rodomas tas tekstas, svarbumas iš `INFO_BANNER_IMPORTANT`.
  */
 import { postgres } from '@/postgres/postgres.js';
 import { subscribe } from '@/utils/natsHub.js';
@@ -21,6 +24,15 @@ const POLL_INTERVAL_MS = 20_000;
  * Lentelės stulpelyje `aplinka`: NULL = visur; 'dev' = tik dev; 'prod' = tik gyvoje.
  */
 const currentEnv: 'dev' | 'prod' = config.dev ? 'dev' : 'prod';
+
+/** `.env` baneris – turi pirmenybę prieš DB; null, kai nenustatytas. */
+const envBanner: InfoBanner | null = config.infoBanner?.trim()
+  ? {
+      type: 'text',
+      content: config.infoBanner.trim(),
+      important: config.infoBannerImportant === true,
+    }
+  : null;
 
 let cached: InfoBanner | null = null;
 let initPromise: Promise<void> | null = null;
@@ -105,6 +117,7 @@ async function init(): Promise<void> {
  * lentelę, užkrauna cache'ą ir prisijungia prie NATS; toliau – akimirksniu iš cache.
  */
 export async function getInfoBanner(): Promise<InfoBanner | null> {
+  if (envBanner) return envBanner;
   if (!initPromise) {
     initPromise = init().catch((err) => {
       initPromise = null;

@@ -11,6 +11,10 @@ export interface Config {
     customHead: string;
     analitikaUrl: string;
     onionAddress?: string;
+    /** Info banerio tekstas iš `.env`; netuščias nustelbia DB lentelę. */
+    infoBanner: string;
+    /** Ar `.env` baneris rodomas kaip svarbus (paryškintas). */
+    infoBannerImportant: boolean;
 
     port: number;
     /** Į stderr rašyti struktūrizuotą kiekvienos HTTP užklausos žurnalą. */
