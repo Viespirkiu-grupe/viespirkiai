@@ -17,16 +17,19 @@ const { count, rows } = asmuo.esInvesticijos;
   gender="f"
 >
   {rows.map((item: any) => {
-    const suma = typeof item.galutineSuma === 'number' && Number.isFinite(item.galutineSuma)
-      ? new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.galutineSuma)
+    const suma = typeof item.ismoketasFinansavimas === 'number' && Number.isFinite(item.ismoketasFinansavimas)
+      ? new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.ismoketasFinansavimas)
       : null;
-    const pabaiga = item.pabaigosData ? new Date(item.pabaigosData).toISOString().slice(0, 10) : 'nenurodyta';
     return (
       <ResultCardShell clickable={true}>
         <dl slot="meta" class="result-card-meta">
           <div><dt class="sr-only">Pareiškėjas</dt><dd>{item.pareiskejas}</dd></div>
           <div><dt class="sr-only">Kodas</dt><dd><span class="cell-mono">{item.kodas}</span></dd></div>
-          <div><dt class="sr-only">Pabaiga</dt><dd>Iki {pabaiga}</dd></div>
+          <div>
+            <dt class="sr-only">Sutarties pasirašymo data</dt>
+            <dd>{item.sutartiesData ? `Sutartis ${item.sutartiesData}` : 'Sutartis nepasirašyta'}</dd>
+          </div>
+          {item.priemone && <div><dt class="sr-only">Priemonė</dt><dd>{item.priemone}</dd></div>}
         </dl>
         <h3 slot="title" class="result-card-title">
           <a href={`https://2014.esinvesticijos.lt/lt/finansavimas/paraiskos_ir_projektai/${item.slug}`}>

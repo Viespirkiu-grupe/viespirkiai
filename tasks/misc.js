@@ -1,5 +1,7 @@
 import { rastiEsInvesticijosPareiskejoJarKoda } from "../modules/2014esinvesticijos/rastiPareiskejuKodus.js";
-import { update2014EsInvesticijosData } from "../modules/2014esinvesticijos/scrape.js";
+import { atnaujintiEsInvesticijosSarasa } from "../modules/2014esinvesticijos/scrape.js";
+import { nuskaitytiProjektuDetales } from "../modules/2014esinvesticijos/scrapeDetales.js";
+import { nuskaitytiPriemones } from "../modules/2014esinvesticijos/scrapePriemones.js";
 import { nuskaitytiCpvaProjektaiTiekejai } from "../modules/cpva/scrapeProjektai.js";
 import { nuskaitytiPinregDeklaracija } from "../modules/pinreg/nuskaityti.js";
 import { getNewestPinreg } from "../modules/pinreg/scrapeNewest.js";
@@ -42,9 +44,29 @@ export default [
         job: rastiEsInvesticijosPareiskejoJarKoda,
     },
     {
-        name: "update2014EsInvesticijosData",
+        // Sąrašas – 41 užklausa (po 1000 eilučių puslapyje). Pasikeitusiems
+        // projektams nunulinamas "detalesNuskaitytos", tad po sąrašo darbo
+        // gauna ir detalių eilė.
+        name: "atnaujintiEsInvesticijosSarasa",
         schedule: "47 */3 * * *",
-        job: async () => update2014EsInvesticijosData(),
+        job: async () => atnaujintiEsInvesticijosSarasa(),
+    },
+    {
+        // Projektų puslapiai: 40 tūkst. įrašų, tad imama po porciją ir
+        // sukama tol, kol eilė (detalesNuskaitytos IS NULL) tuščia.
+        name: "nuskaitytiEsInvesticijosDetales",
+        mode: "asap",
+        priority: 7,
+        cooldown: 300,
+        errorCooldown: 60,
+        // Worker'is job'ui paduoda AbortSignal, o funkcija laukia porcijos dydžio.
+        job: async () => nuskaitytiProjektuDetales(),
+    },
+    {
+        // Priemonių tėra ~263, slug'ą joms priskiria detalių nuskaitymas.
+        name: "nuskaitytiEsInvesticijosPriemones",
+        schedule: "20 4 * * *",
+        job: async () => nuskaitytiPriemones({ tikNaujas: true }),
     },
     {
         name: "nuskaitytiCpvaProjektaiTiekejai",
