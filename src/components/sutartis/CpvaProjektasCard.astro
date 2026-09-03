@@ -9,7 +9,9 @@ interface Props {
 
 const { item } = Astro.props;
 const proj = item.projektas;
-const pradzia = proj?.projektoVeikluPradziosData || '';
+// Šaltinis projekto veiklų pradžios datos neteikia, todėl laikotarpis
+// skaičiuojamas nuo sutarties įsigaliojimo iki veiklų pabaigos.
+const pradzia = proj?.sutartiesData || '';
 const pabaiga = proj?.projektoVeikluPabaigosData || '';
 const laikotarpis = pradzia && pabaiga
   ? `${pradzia} — ${pabaiga}`

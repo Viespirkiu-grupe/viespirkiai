@@ -541,6 +541,7 @@ GRANT USAGE ON SCHEMA "vpmSutartys" TO analyst;
 GRANT USAGE ON SCHEMA bvpz TO analyst;
 GRANT USAGE ON SCHEMA pinreg TO analyst;
 GRANT USAGE ON SCHEMA "neskelbiamosDerybos" TO analyst;
+GRANT USAGE ON SCHEMA cpva TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
@@ -555,7 +556,11 @@ GRANT SELECT ON
     pinreg."deklaracijos", pinreg."juridiniaiRysiai", pinreg."juridiniaiRysiaiPilni",
     pinreg."rysiuPobudziai", pinreg."teisinesFormos", sabis."sutartys", sabis."sutarciuSalys", sabis."saskaitos",
     sabis."saskaituSalys", sabis."saskaituSalysTipai", sabis."saskaituSalysVeiklosVieta",
-    "cpvaProjektuSutartys", "cpvaProjektuSarasas", cvpp."archyvoSkelbimai",
+    cpva."projektai", cpva."projektaiPilni", cpva."projektuLesos",
+    cpva."pirkimuSutartys", cpva."pirkimuSutartysPilnos", cpva."organizacijos",
+    cpva."institucijos", cpva."busenos", cpva."apskritys",
+    cpva."igyvendinimoVietos", cpva."lesuStraipsniai", cpva."pirkimuBudai",
+    cpva."objektuRusys", cpva."subjektuStatusai", cvpp."archyvoSkelbimai",
     "eiluciuSkaiciai", bvpz."kodai",
     sodra."menesiniai", sodra."evrk", sodra."importai",
     sodra."pavadinimai", sodra."savivaldybes",
@@ -593,5 +598,5 @@ ALTER ROLE analyst SET default_transaction_read_only = on;
 ALTER ROLE analyst SET statement_timeout = '180s';
 
 -- Iškeltos schemos matomos nekvalifikuotai (menesiniai, pazeidimai, domenai ir t. t.)
-ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, bvpz, pinreg, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai", "neskelbiamosDerybos";
+ALTER ROLE analyst SET search_path = public, viespirkiai, domenai, ppa, sabis, regitra, jadis, vmi, uzt, bvpz, pinreg, "vptJuodiejiSarasai", "vpmSutartys", "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", liteko, vdi, sodra, cvpp, "rcJar", "rcInformaciniaiPranesimai", "neskelbiamosDerybos", cpva;
 ```

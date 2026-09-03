@@ -1,31 +1,36 @@
 /*
-Parsiunčia ir importuoja CPVA adminstruojamų projektų ir tiekėjų sąrašą
+Parsiunčia ir importuoja CPVA administruojamų projektų ir tiekėjų sąrašą
+į `cpva` schemą.
 */
 
 import * as XLSX from "xlsx";
 import path from "node:path";
-import { postgres } from "../../postgres/postgres.js";
-import { Logger } from "../../utils/log.js";
-const logger = new Logger();
-import { parseHTML } from "linkedom";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { postgres } from "../../postgres/postgres.js";
+import { Logger } from "../../utils/log.js";
+import { parseHTML } from "linkedom";
 import config from "../../utils/config.js";
 import { cpvaDocumentUrl, cpvaXlsxUrl } from "./sourceUrls.js";
 import { parseCpvaWorkbook } from "./parseWorkbook.js";
+import {
+    insertPirkimuSutartys,
+    insertProjektai,
+    insertProjektuLesos,
+    upsertZodynai,
+} from "./normalizedStore.js";
 
+const logger = new Logger();
 const execFileAsync = promisify(execFile);
 
-export async function nuskaitytiCpvaProjektaiTiekejai() {
+async function parsisiustiWorkbook() {
     const url = cpvaDocumentUrl(config.esInvesticijos2021Url);
     logger.log(`Nuskaitymas iš ${url}`);
 
-    // 1. Load HTML via curl
     const { stdout: html } = await execFileAsync("curl", ["-k", "-fsSL", url]);
-
     const { document } = parseHTML(html);
 
-    // 2. Find first .xlsx link and keep using the configured mirror/proxy.
+    // Nuoroda puslapyje būna į viešą domeną — kelią perkeliame į tą patį mirror/proxy.
     const resolvedFileUrl = cpvaXlsxUrl(
         document,
         url,
@@ -39,25 +44,31 @@ export async function nuskaitytiCpvaProjektaiTiekejai() {
     const { stdout: fileBuffer } = await execFileAsync(
         "curl",
         ["-k", "-fsSL", resolvedFileUrl],
-        {
-            encoding: "buffer",
-            maxBuffer: 1024 * 1024 * 250, // 250 MB
-        },
+        { encoding: "buffer", maxBuffer: 1024 * 1024 * 250 },
     );
-
     logger.log(`Fetched ${filename}, size: ${fileBuffer.length} bytes`);
 
-    // Nuskaitome duomenis iš XLSX failo
-    const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+    return { workbook: XLSX.read(fileBuffer, { type: "buffer" }), filename };
+}
 
-    const {
-        projects: projektuSarasas,
-        contracts: projektuPirkimuSutartys,
-    } = parseCpvaWorkbook(workbook);
+async function assertMigratedSchema(client) {
+    const { rows } = await client.query(
+        `SELECT to_regclass('cpva."pirkimuSutartys"') IS NOT NULL AS migrated`,
+    );
+    if (!rows[0]?.migrated) {
+        throw new Error(
+            "CPVA DB schema neatnaujinta: paleiskite cpvaMigracija.sql",
+        );
+    }
+}
+
+export async function nuskaitytiCpvaProjektaiTiekejai() {
+    const { workbook, filename } = await parsisiustiWorkbook();
+    const { projects, contracts } = parseCpvaWorkbook(workbook);
 
     logger.log(
-        `Paruošta importuoti: ${projektuSarasas.length} projektų, ` +
-        `${projektuPirkimuSutartys.length} sutarčių eilučių`,
+        `Paruošta importuoti: ${projects.length} projektų, ` +
+        `${contracts.length} sutarčių eilučių`,
     );
 
     const client = await postgres.connect();
@@ -67,169 +78,35 @@ export async function nuskaitytiCpvaProjektaiTiekejai() {
 
         // CPVA failas yra visas aktualus snapshot, ne pakeitimų srautas.
         // Tranzakcija užtikrina, kad skaitytojai matys arba visą seną, arba
-        // visą naują snapshot — niekada pusiau importuotą būseną.
-        await client.query(`DELETE FROM public."cpvaProjektuSutartys"`);
-        await client.query(`DELETE FROM public."cpvaProjektuSarasas"`);
+        // visą naują snapshot — niekada pusiau importuotą būseną. Žodynai
+        // neišvalomi, kad organizacijų id nesikeistų tarp perskaitymų.
+        await client.query(`DELETE FROM cpva."pirkimuSutartys"`);
+        await client.query(`DELETE FROM cpva."projektuLesos"`);
+        await client.query(`DELETE FROM cpva."projektai"`);
 
-        const projectCount = await insertProjektuSarasas(
-            projektuSarasas,
+        const zodynai = await upsertZodynai(client, projects, contracts);
+        const projectCount = await insertProjektai(client, projects, zodynai);
+        const lesuCount = await insertProjektuLesos(client, projects, zodynai);
+        const projektuNr = new Set(projects.map((row) => row.projektoNr));
+        const contractCount = await insertPirkimuSutartys(
             client,
+            contracts,
+            zodynai,
+            projektuNr,
         );
-        const contractCount = await insertCpvaProjektuSutartys(
-            projektuPirkimuSutartys,
-            client,
-        );
+
         await client.query("COMMIT");
-        return { projectCount, contractCount, filename };
+        logger.log(
+            `Importuota: ${projectCount} projektų, ${lesuCount} lėšų eilučių, ` +
+            `${contractCount} sutarčių`,
+        );
+        return { projectCount, lesuCount, contractCount, filename };
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;
     } finally {
         client.release();
     }
-}
-
-async function assertMigratedSchema(client) {
-    const result = await client.query(
-        `SELECT EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'cpvaProjektuSutartys'
-              AND column_name = 'id'
-        ) AS migrated`,
-    );
-    if (!result.rows[0]?.migrated) {
-        throw new Error(
-            "CPVA DB schema neatnaujinta: paleiskite " +
-            "modules/cpva/migrateCpvaProjektuSutartys.sql",
-        );
-    }
-}
-
-async function insertProjektuSarasas(rows, db = postgres) {
-    const sql = `
-      INSERT INTO public."cpvaProjektuSarasas" (
-          "projektoNr",
-          "finansavimoSaltinis",
-          "projektoVykdytojas",
-          "projektoVykdytojoKodas",
-          "projektoPavadinimas",
-          "atsakingaMinisterija",
-          "projektasSuPartneriais",
-          "sutartiesData",
-          "projektoVeikluPradziosData",
-          "projektoVeikluPabaigosData",
-          "egadpSubsidijos",
-          "egadpPaskolos",
-          "iperpfLesos",
-          "ipesfLesos",
-          "ipsaFLesos",
-          "iptpfLesos",
-          "bendrojoFinansavimo",
-          "lrBiudzetoLesos",
-          "lrvbEsFonduLesos",
-          "nuosavoInasoLesos",
-          "nuosavasInasasNetinkamam",
-          "isViso"
-      ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
-      )
-  `;
-
-    let count = 0;
-    for (const row of rows) {
-        // If projektoVeikluPabaigosData is not a date string, set to null
-        if (
-            row.projektoVeikluPabaigosData &&
-            !/^\d{4}-\d{2}-\d{2}$/.test(row.projektoVeikluPabaigosData)
-        ) {
-            row.projektoVeikluPabaigosData = null;
-        }
-
-        const values = [
-            row.projektoNr,
-            row.finansavimoSaltinis,
-            row.projektoVykdytojas,
-            row.projektoVykdytojoKodas,
-            row.projektoPavadinimas,
-            row.atsakingaMinisterija,
-            row.projektasSuPartneriais,
-            row.sutartiesData,
-            row.projektoVeikluPradziosData,
-            row.projektoVeikluPabaigosData,
-            row.egadpSubsidijos,
-            row.egadpPaskolos,
-            row.iperpfLesos,
-            row.ipesfLesos,
-            row.ipsaFLesos,
-            row.iptpfLesos,
-            row.bendrojoFinansavimo,
-            row.lrBiudzetoLesos,
-            row.lrvbEsFonduLesos,
-            row.nuosavoInasoLesos,
-            row.nuosavasInasasNetinkamam,
-            row.isViso,
-        ];
-
-        await db.query(sql, values);
-        count++;
-    }
-    return count;
-}
-
-async function insertCpvaProjektuSutartys(rows, db = postgres) {
-    const sql = `
-        INSERT INTO public."cpvaProjektuSutartys" (
-            "projektoNr",
-            "projektoPavadinimas",
-            "arProjektasFinansuojamasEGADPLesoms",
-            "pirkimoNrCvpis",
-            "pirkimaVykdantisSubjektas",
-            "pirkimoObjektas",
-            "pirkimoSutartiesNr",
-            "pirkimoSutartiesData",
-            "pirkimoSutartiesSumaSusijusiSuProjektu",
-            "tiekejoPavadinimasVardasIrPavardeGimimoData",
-            "tiekejoKodas",
-            "subtiekejoPavadinimasVardasIrPavardeGimimoData",
-            "subtiekejoKodas"
-        ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
-        )
-    `;
-
-    let count = 0;
-    for (const row of rows) {
-        const values = [
-            row.projektoNr,
-            row.projektoPavadinimas,
-            row.arProjektasFinansuojamasEGADPLesoms,
-            row.pirkimoNrCvpis,
-            row.pirkimaVykdantisSubjektas,
-            row.pirkimoObjektas,
-            row.pirkimoSutartiesNr,
-            row.pirkimoSutartiesData,
-            row.pirkimoSutartiesSumaSusijusiSuProjektu,
-            row.tiekejoPavadinimasVardasIrPavardeGimimoData,
-            row.tiekejoKodas,
-            row.subtiekejoPavadinimasVardasIrPavardeGimimoData,
-            row.subtiekejoKodas,
-        ];
-
-        try {
-            await db.query(sql, values);
-            count++;
-        } catch (err) {
-            throw new Error(
-                `Klaida įterpiant CPVA sutartį: projektoNr=${row.projektoNr}, ` +
-                `sutartiesNr=${row.pirkimoSutartiesNr}: ${err.message}`,
-                { cause: err },
-            );
-        }
-    }
-    return count;
 }
 
 if (

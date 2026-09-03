@@ -1,56 +1,42 @@
 import * as XLSX from "xlsx";
 import { toCamelCase } from "../../utils/text.js";
+import {
+    boolOrNull,
+    cleanValue,
+    excelDate,
+    first,
+    numberOrNull,
+    textOrNull,
+} from "./laukai.js";
 
-const DATE_KEY_RE = /data/i;
-const IGNORED_DATE_KEYS = new Set([
-    "subtiekejoPavadinimasVardasIrPavardeGimimoData",
+// Šaltinio lėšų stulpeliai antraštėje numeruoti ("1.2. EGADP subsidijos lėšos"),
+// o tas numeris ir yra cpva."lesuStraipsniai"."kodas". Remiamės numeriu, o ne
+// formuluote — CPVA pavadinimus koreguoja, numeraciją keičia rečiau.
+const LESU_ANTRASTE_RE = /^(\d+(?:\.\d+)*)\.\s/;
+
+// Senesnis failo formatas numeracijos neturėjo; jo stulpelius susiejame rankomis.
+const SENOS_LESOS = new Map([
+    ["didziausiaGalimaTinkamuFinansuotiIslaiduSumaEGADPSubsidijosLesos", "1.2"],
+    ["didziausiaGalimaTinkamuFinansuotiIslaiduSumaEGADPPaskolosLesos", "1.3"],
+    ["didziausiaGalimaTinkamuFinansuotiIslaiduSumaBendrojoFinansavimoLesos", "1.4"],
+    ["didziausiaGalimaTinkamuFinansuotiIslaiduSumaLRValstybesBiudzetoLesos", "1.5"],
+    [
+        "didziausiaGalimaTinkamuFinansuotiIslaiduSumaLRVBLesosSkirtosESFonduLesomisNetinkamamFinasnsuotiPVMApmoketi",
+        "1.6",
+    ],
+    ["didziausiaGalimaTinkamuFinansuotiIslaiduSumaNuosavoInasoLesos", "2"],
+    [
+        "didziausiaGalimaTinkamuFinansuotiIslaiduSumaNuosavasInasasTenkantisLRVBNetinkamamPVMApmoketi",
+        "2.1.4",
+    ],
 ]);
 
-function cleanValue(value) {
-    if (typeof value !== "string") return value;
-    const cleaned = value.replace(/\s+/g, " ").trim();
-    return cleaned.toUpperCase() === "NULL" ? null : cleaned;
-}
-
-function excelDate(value) {
-    if (value == null || value === "") return null;
-    if (value instanceof Date && !Number.isNaN(value.valueOf())) {
-        return value.toISOString().slice(0, 10);
-    }
-    if (typeof value === "number" && value >= 0 && value < 100_000) {
-        return new Date(Math.round((value - 25569) * 86_400_000))
-            .toISOString()
-            .slice(0, 10);
-    }
-    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        return value;
-    }
-    return null;
-}
-
-function numberOrNull(value) {
-    if (value == null || value === "") return null;
-    if (typeof value === "number") return Number.isFinite(value) ? value : null;
-    const normalized = String(value)
-        .replace(/[\s\u00a0]/g, "")
-        .replace(",", ".");
-    const number = Number(normalized);
-    return Number.isFinite(number) ? number : null;
-}
-
-function sumOrNull(...values) {
-    const numbers = values.map(numberOrNull).filter((value) => value !== null);
-    return numbers.length === 0 ? null : numbers.reduce((sum, value) => sum + value, 0);
-}
-
-function first(row, ...keys) {
-    for (const key of keys) {
-        if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
-            return row[key];
-        }
-    }
-    return null;
-}
+const DATE_KEY_RE = /data/i;
+// Vienintelė "data" antraštė, kuri yra ne data, o tiekėjo pavadinimo dalis.
+const IGNORED_DATE_KEYS = new Set([
+    "subtiekejoPavadinimasVardasIrPavardeGimimoData",
+    "tiekejoPavadinimasVardasIrPavardeGimimoData",
+]);
 
 function findHeaderRow(sheet, expectedKeys) {
     const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:A1");
@@ -76,18 +62,24 @@ function findHeaderRow(sheet, expectedKeys) {
     return range.s.r + offset;
 }
 
+/**
+ * Nuskaito lapą į camelCase raktais aprašytas eilutes ir kartu grąžina
+ * camelCase -> originali antraštė žemėlapį (jo reikia lėšų numeracijai).
+ */
 function readRows(sheet, expectedKeys) {
     const headerRow = findHeaderRow(sheet, expectedKeys);
-    const rows = XLSX.utils.sheet_to_json(sheet, {
+    const sourceRows = XLSX.utils.sheet_to_json(sheet, {
         defval: null,
         range: headerRow,
     });
 
-    return rows.map((sourceRow) => {
+    const antrastes = new Map();
+    const rows = sourceRows.map((sourceRow) => {
         const row = {};
         for (const [header, sourceValue] of Object.entries(sourceRow)) {
             if (/^__EMPTY/.test(header)) continue;
             const key = toCamelCase(header);
+            antrastes.set(key, header);
             let value = cleanValue(sourceValue);
             if (DATE_KEY_RE.test(key) && !IGNORED_DATE_KEYS.has(key)) {
                 value = excelDate(value);
@@ -96,139 +88,143 @@ function readRows(sheet, expectedKeys) {
         }
         return row;
     });
+
+    return { rows, antrastes };
 }
 
-function projectRow(row) {
+/** Iš antraščių išrenka lėšų stulpelius kaip [camelKey, straipsnioKodas] poras. */
+function lesuStulpeliai(antrastes) {
+    const stulpeliai = [];
+    for (const [key, header] of antrastes) {
+        const match = LESU_ANTRASTE_RE.exec(String(header).trim());
+        if (match) {
+            stulpeliai.push([key, match[1]]);
+        } else if (SENOS_LESOS.has(key)) {
+            stulpeliai.push([key, SENOS_LESOS.get(key)]);
+        }
+    }
+    return stulpeliai;
+}
+
+function lesos(row, stulpeliai) {
+    const result = [];
+    for (const [key, kodas] of stulpeliai) {
+        const suma = numberOrNull(row[key]);
+        // Nulių nesaugome — šaltinyje jų ~77 %, o nebuvimas reiškia nulį.
+        if (suma !== null && suma !== 0) result.push({ kodas, suma });
+    }
+    return result;
+}
+
+function projectRow(row, lesuStulp) {
     return {
-        projektoNr: first(row, "projektoNr", "projektoKodas"),
-        finansavimoSaltinis: first(row, "finansavimoSaltinis"),
-        projektoVykdytojas: first(
+        projektoNr: textOrNull(first(row, "projektoKodas", "projektoNr")),
+        kvietimoNr: textOrNull(first(row, "kvietimoNumeris")),
+        pavadinimas: textOrNull(first(row, "projektoPavadinimas")),
+        atsakingaInstitucija: textOrNull(first(
             row,
-            "projektoVykdytojas",
-            "projektoVykdytojoPavadinimas",
-        ),
-        projektoVykdytojoKodas: first(
-            row,
-            "projektoVykdytojoJuridinioAsmensKodas",
-            "projektoVykdytojoKodas",
-        ),
-        projektoPavadinimas: first(row, "projektoPavadinimas"),
-        atsakingaMinisterija: first(
-            row,
-            "atsakingaMinisterija",
             "atsakingaInstitucija",
-        ),
-        projektasSuPartneriais: first(row, "projektasSuPartneriais"),
-        sutartiesData: first(row, "sutartiesData", "sutartiesIsigaliojimoData"),
-        projektoVeikluPradziosData: first(row, "projektoVeikluPradziosData"),
-        projektoVeikluPabaigosData: first(
+            "atsakingaMinisterija",
+        )),
+        vykdytojoPavadinimas: textOrNull(first(
             row,
-            "projektoVeikluPabaigosData",
+            "projektoVykdytojoPavadinimas",
+            "projektoVykdytojas",
+        )),
+        vykdytojoKodas: textOrNull(first(
+            row,
+            "projektoVykdytojoKodas",
+            "projektoVykdytojoJuridinioAsmensKodas",
+        )),
+        busena: textOrNull(first(row, "projektoBusena")),
+        busenosData: first(row, "busenosData"),
+        sutartiesData: first(row, "sutartiesIsigaliojimoData", "sutartiesData"),
+        veikluPabaigosData: first(
+            row,
             "projektoVeikluVykdymoPabaigosData",
+            "projektoVeikluPabaigosData",
         ),
-        egadpSubsidijos: numberOrNull(first(
+        igyvendinimoVieta: textOrNull(first(
             row,
-            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaEGADPSubsidijosLesos",
-            "12EGADPSubsidijosLesos",
+            "projektoIgyvendinimoVietaSavivaldybe",
         )),
-        egadpPaskolos: numberOrNull(first(
+        pagrindineApskritis: textOrNull(first(
             row,
-            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaEGADPPaskolosLesos",
-            "13EGADPPaskolosLesos",
+            "apskritisKuriaiTenkaDidziojiDalisProjektoLesu",
         )),
-        iperpfLesos: numberOrNull(first(row, "didziausiaGalimaTinkamuFinansuotiIslaiduSumaIPERPFLesos")),
-        ipesfLesos: numberOrNull(first(row, "didziausiaGalimaTinkamuFinansuotiIslaiduSumaIPESFLesos")),
-        ipsaFLesos: numberOrNull(first(row, "didziausiaGalimaTinkamuFinansuotiIslaiduSumaIPSaFLesos")),
-        iptpfLesos: numberOrNull(first(row, "didziausiaGalimaTinkamuFinansuotiIslaiduSumaIPTPFLesos")),
-        bendrojoFinansavimo: numberOrNull(first(
+        kitosApskritys: textOrNull(first(
             row,
-            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaBendrojoFinansavimoLesos",
-            "14BendrojoFinansavimoLesos",
+            "kitaOsApskritisYsKuriaiIomsTenkaDalisProjektoLesu",
+            "kitaOsApskritisYsKuriaiIomsTenkaDalisProje",
         )),
-        lrBiudzetoLesos: numberOrNull(first(
+        saiTaikoma: boolOrNull(first(row, "sAITaikymas")),
+        islaiduSuma: numberOrNull(first(
             row,
-            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaLRValstybesBiudzetoLesos",
-            "15ValstybesBiudzetoLesos",
-        )),
-        lrvbEsFonduLesos: numberOrNull(first(
-            row,
-            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaLRVBLesosSkirtosESFonduLesomisNetinkamamFinasnsuotiPVMApmoketi",
-            "16ValstybesBiudzetoLesosSkirtosESFonduLesomisNetinkamamFinansuotiPVMApmoketi",
-        )),
-        nuosavoInasoLesos: numberOrNull(first(
-            row,
-            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaNuosavoInasoLesos",
-            "2NuosavasInasas",
-        )),
-        nuosavasInasasNetinkamam: first(
-            row,
-            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaNuosavasInasasTenkantisLRVBNetinkamamPVMApmoketi",
-        ) !== null
-            ? numberOrNull(first(
-                row,
-                "didziausiaGalimaTinkamuFinansuotiIslaiduSumaNuosavasInasasTenkantisLRVBNetinkamamPVMApmoketi",
-            ))
-            : sumOrNull(
-                row["214NacionalinesViesosiosLesosSkirtosESFonduNetinkamamFinansuotiPVMApmoketi"],
-                row["223PrivaciosLesosSkirtosESFonduLesomisNetinkamamFinansuotiPVMApmoketi"],
-            ),
-        isViso: numberOrNull(first(
-            row,
-            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaIsViso",
             "projektoIslaiduSumaEurais",
+            "didziausiaGalimaTinkamuFinansuotiIslaiduSumaIsViso",
         )),
+        lesos: lesos(row, lesuStulp),
     };
 }
 
 function contractRow(row) {
     return {
-        projektoNr: first(row, "projektoNr", "projektoKodas"),
-        projektoPavadinimas: first(row, "projektoPavadinimas"),
-        arProjektasFinansuojamasEGADPLesoms: first(
+        projektoNr: textOrNull(first(row, "projektoKodas", "projektoNr")),
+        vykdytojoPavadinimas: textOrNull(first(
             row,
-            "arProjektasFinansuojamasEGADPLesoms",
-        ),
-        pirkimoNrCvpis: first(row, "pirkimoNrCVPIS", "pirkimoNumeris"),
-        pirkimaVykdantisSubjektas: first(
-            row,
-            "pirkimaVykdantisSubjektas",
             "projektoVykdytojoPavadinimas",
-        ),
-        pirkimoObjektas: first(row, "pirkimoObjektas", "pirkimoPavadinimas"),
-        pirkimoSutartiesNr: first(
-            row,
-            "pirkimoSutartiesNr",
-            "vykdytojoPirkimoSutartiesNumeris",
-        ),
-        pirkimoSutartiesData: first(row, "pirkimoSutartiesData"),
-        pirkimoSutartiesSumaSusijusiSuProjektu: numberOrNull(first(
-            row,
-            "pirkimoSutartiesSumaSusijusiSuProjektu",
-            "bendraPirkimoSutartiesSumaTenkantiProjektuiEurais",
+            "pirkimaVykdantisSubjektas",
         )),
-        tiekejoPavadinimasVardasIrPavardeGimimoData: first(
+        vykdytojoKodas: textOrNull(first(row, "projektoVykdytojoKodas")),
+        vykdytojoStatusas: textOrNull(first(row, "pirkimaVykdancioSubjektoStatusas")),
+        vykdytojasUzsienyje: boolOrNull(first(
             row,
-            "tiekejoPavadinimasVardasIrPavardeGimimoData",
+            "pirkimaVykdantisSubjektasYraUzsienyjeRegistruotasJuridinisAsmuo",
+        )),
+        pirkimoNr: textOrNull(first(row, "pirkimoNumeris", "pirkimoNrCVPIS")),
+        pirkimoPavadinimas: textOrNull(first(
+            row,
+            "pirkimoPavadinimas",
+            "pirkimoObjektas",
+        )),
+        pirkimoBudas: textOrNull(first(row, "pirkimoBudas")),
+        objektoRusis: textOrNull(first(row, "pirkimoObjektoRusis")),
+        sutartiesData: first(row, "pirkimoSutartiesData"),
+        sutartiesNr: textOrNull(first(
+            row,
+            "vykdytojoPirkimoSutartiesNumeris",
+            "pirkimoSutartiesNr",
+        )),
+        sumaProjektui: numberOrNull(first(
+            row,
+            "bendraPirkimoSutartiesSumaTenkantiProjektuiEurais",
+            "pirkimoSutartiesSumaSusijusiSuProjektu",
+        )),
+        tinkamaFinansuotiSuma: numberOrNull(first(
+            row,
+            "tinkamaFinansuotiSutartiesSumaEurais",
+        )),
+        tiekejoPavadinimas: textOrNull(first(
+            row,
             "tiekejoPavadinimas",
-        ),
-        tiekejoKodas: first(row, "tiekejoKodas"),
-        subtiekejoPavadinimasVardasIrPavardeGimimoData: first(
+            "tiekejoPavadinimasVardasIrPavardeGimimoData",
+        )),
+        tiekejoKodas: textOrNull(first(row, "tiekejoKodas")),
+        tiekejasFizinisAsmuo: boolOrNull(first(row, "tiekejasFizinisAsmuo")),
+        tiekejasUzsienyje: boolOrNull(first(
             row,
-            "subtiekejoPavadinimasVardasIrPavardeGimimoData",
-        ),
-        subtiekejoKodas: first(row, "subtiekejoKodas"),
+            "tiekejasYraUzsienyjeRegistruotasJuridinisAsmuo",
+        )),
+        vykdoma: boolOrNull(first(row, "pirkimoSutartisVykdoma")),
     };
 }
 
 function validateRows(rows, type) {
     for (const [index, row] of rows.entries()) {
-        if (row.projektoNr == null || row.projektoNr === "") {
+        if (row.projektoNr == null) {
             throw new Error(`CPVA ${type} eilutėje ${index + 2} nėra projekto numerio`);
         }
-        if (
-            type === "sutarčių" &&
-            (row.pirkimoSutartiesNr == null || row.pirkimoSutartiesNr === "")
-        ) {
+        if (type === "sutarčių" && row.sutartiesNr == null) {
             throw new Error(`CPVA sutarčių eilutėje ${index + 2} nėra sutarties numerio`);
         }
     }
@@ -240,14 +236,13 @@ export function parseCpvaWorkbook(workbook) {
         throw new Error("CPVA Excel faile turi būti bent du lapai");
     }
 
-    const projects = readRows(
-        workbook.Sheets[workbook.SheetNames[0]],
-        ["projektoNr", "projektoKodas"],
-    ).map(projectRow);
-    const contracts = readRows(
-        workbook.Sheets[workbook.SheetNames[1]],
-        ["projektoNr", "projektoKodas"],
-    ).map(contractRow);
+    const raktai = ["projektoKodas", "projektoNr"];
+    const projektuLapas = readRows(workbook.Sheets[workbook.SheetNames[0]], raktai);
+    const sutarciuLapas = readRows(workbook.Sheets[workbook.SheetNames[1]], raktai);
+
+    const lesuStulp = lesuStulpeliai(projektuLapas.antrastes);
+    const projects = projektuLapas.rows.map((row) => projectRow(row, lesuStulp));
+    const contracts = sutarciuLapas.rows.map(contractRow);
 
     validateRows(projects, "projektų");
     validateRows(contracts, "sutarčių");

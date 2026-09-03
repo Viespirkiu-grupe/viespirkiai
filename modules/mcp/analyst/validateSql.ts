@@ -32,7 +32,15 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     // SABIS sutarčių registrą (PPA ataskaitų sutartys — `ataskaituSutartys`).
     "sutartys", "sutarciuSalys", "saskaitos", "saskaituSalys",
     "saskaituSalysTipai", "saskaituSalysVeiklosVieta",
-    "cpvaProjektuSutartys", "cpvaProjektuSarasas",
+    // CPVA projektai iškelti į `cpva` schemą ir normalizuoti: `projektai` +
+    // `pirkimuSutartys` (vardas ne `sutartys`, nes nekvalifikuotai tai SABIS
+    // registras) + `projektuLesos` ilguoju formatu su `lesuStraipsniai` žodynu.
+    // `projektaiPilni` / `pirkimuSutartysPilnos` – suderinamumo view'ai su senąja
+    // plokščia forma. `organizacijos` – bendras vykdytojų ir tiekėjų žodynas.
+    "projektai", "pirkimuSutartys", "projektaiPilni", "pirkimuSutartysPilnos",
+    "projektuLesos", "lesuStraipsniai", "organizacijos", "institucijos",
+    "igyvendinimoVietos", "apskritys", "objektuRusys", "subjektuStatusai",
+    "busenos", "pirkimuBudai",
     // CVPP archyvo skelbimai (buvęs public."cvppViesiejiPirkimai") — `cvpp`
     // schemoje; nukirptas vardas `viesiejiPirkimai` būtų sutapęs su public
     // lentele, tad lentelė pervadinta į `archyvoSkelbimai`.

@@ -25,7 +25,7 @@ describe('CPVA project reader', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].projektas.projektoPavadinimas).toBe('Projektas');
     expect(db.query).toHaveBeenCalledTimes(2);
-    expect(String(db.query.mock.calls[0][0])).toContain('"pirkimoNrCvpis" = $1');
+    expect(String(db.query.mock.calls[0][0])).toContain('c."pirkimoNr" = $1');
   });
 
   it('falls back to contract, supplier and date/amount matching', async () => {
@@ -49,6 +49,8 @@ describe('CPVA project reader', () => {
       'S-2', ['111', '222'], '2026-02-03', 250,
     ]);
     expect(String(db.query.mock.calls[1][0])).toContain('date_match = 1 OR amount_match = 1');
+    // Data lyginama tiesiogiai – "sutartiesData" po migracijos yra `date`.
+    expect(String(db.query.mock.calls[1][0])).toContain('c."sutartiesData" = $3::date');
   });
 
   it('does not guess without a contract number, supplier and secondary signal', async () => {

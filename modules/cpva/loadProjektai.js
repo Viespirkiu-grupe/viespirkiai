@@ -1,5 +1,16 @@
 import { postgres } from "../../postgres/postgres.js";
 
+// Sutarties eilutės grąžinamos senaisiais laukų vardais, kad `cpva` schemos
+// normalizavimas nepersiduotų į UI (src/components/sutartis) ir MCP atsakymus.
+const SUTARTIES_LAUKAI = `
+    c."id",
+    c."projektoNr",
+    c."pirkimoNr" AS "pirkimoNrCvpis",
+    c."pirkimoPavadinimas" AS "pirkimoObjektas",
+    c."sutartiesNr" AS "pirkimoSutartiesNr",
+    c."sutartiesData" AS "pirkimoSutartiesData",
+    c."sumaProjektui" AS "pirkimoSutartiesSumaSusijusiSuProjektu"`;
+
 function legacyPirkimoNumeris(value) {
     return typeof value === "string" && /^\d+$/.test(value);
 }
@@ -38,9 +49,16 @@ async function attachProjektai(rows, db) {
 
     const projektai = await db
         .query(
-            `SELECT *
-             FROM public."cpvaProjektuSarasas"
-             WHERE "projektoNr" = ANY($1::text[])`,
+            `SELECT p."projektoNr",
+                    p."pavadinimas" AS "projektoPavadinimas",
+                    o."pavadinimas" AS "projektoVykdytojas",
+                    o."kodas"       AS "projektoVykdytojoKodas",
+                    p."sutartiesData",
+                    p."veikluPabaigosData" AS "projektoVeikluPabaigosData",
+                    p."islaiduSuma" AS "isViso"
+             FROM cpva."projektai" p
+             LEFT JOIN cpva."organizacijos" o ON o."id" = p."vykdytojoId"
+             WHERE p."projektoNr" = ANY($1::text[])`,
             [projektuNr],
         )
         .then((result) => result.rows);
@@ -58,10 +76,10 @@ async function loadLegacyMatch(sutartis, db) {
     if (!legacyPirkimoNumeris(sutartis?.pirkimoNumeris)) return [];
     return db
         .query(
-            `SELECT DISTINCT ON ("projektoNr") *
-             FROM public."cpvaProjektuSutartys"
-             WHERE "pirkimoNrCvpis" = $1
-             ORDER BY "projektoNr", id`,
+            `SELECT DISTINCT ON (c."projektoNr") ${SUTARTIES_LAUKAI}
+             FROM cpva."pirkimuSutartys" c
+             WHERE c."pirkimoNr" = $1
+             ORDER BY c."projektoNr", c."id"`,
             [sutartis.pirkimoNumeris],
         )
         .then((result) => result.rows);
@@ -76,22 +94,23 @@ async function loadContractMatch(sutartis, db) {
         return [];
     }
 
+    // "sutartiesData" dabar yra `date`, todėl palyginimas eina tiesiai per
+    // ("sutartiesNr", "tiekejoId") indeksą be regex/cast'o kiekvienai eilutei.
     return db
         .query(
-            `WITH candidates AS (
-                 SELECT c.*,
+            `WITH tiekejai AS (
+                 SELECT "id" FROM cpva."organizacijos" WHERE "kodas" = ANY($2::text[])
+             ), candidates AS (
+                 SELECT ${SUTARTIES_LAUKAI},
                         CASE WHEN $3::date IS NOT NULL
-                                   AND CASE
-                                           WHEN c."pirkimoSutartiesData" ~ '^\\d{4}-\\d{2}-\\d{2}$'
-                                           THEN c."pirkimoSutartiesData"::date
-                                       END = $3::date
+                                   AND c."sutartiesData" = $3::date
                              THEN 1 ELSE 0 END AS date_match,
                         CASE WHEN $4::numeric IS NOT NULL
-                                   AND c."pirkimoSutartiesSumaSusijusiSuProjektu" = $4::numeric
+                                   AND c."sumaProjektui" = $4::numeric
                              THEN 1 ELSE 0 END AS amount_match
-                 FROM public."cpvaProjektuSutartys" c
-                 WHERE c."pirkimoSutartiesNr" = $1
-                   AND c."tiekejoKodas" = ANY($2::text[])
+                 FROM cpva."pirkimuSutartys" c
+                 WHERE c."sutartiesNr" = $1
+                   AND c."tiekejoId" IN (SELECT "id" FROM tiekejai)
              ), ranked AS (
                  SELECT *, date_match + amount_match AS match_score
                  FROM candidates
@@ -99,7 +118,7 @@ async function loadContractMatch(sutartis, db) {
              )
              SELECT DISTINCT ON ("projektoNr") *
              FROM ranked
-             ORDER BY "projektoNr", match_score DESC, id`,
+             ORDER BY "projektoNr", match_score DESC, "id"`,
             [sutartiesNumeris, kodai, sudarymoData, verte],
         )
         .then((result) => result.rows.map(stripMatchColumns));

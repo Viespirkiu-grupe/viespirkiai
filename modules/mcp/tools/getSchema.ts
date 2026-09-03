@@ -13,7 +13,7 @@ const VIEW_LIST = [...VIEW_NAMES];
 // schemose randamos tik pagal savo schemą.
 const ANALYST_SCHEMAS = ["public", "viespirkiai", "domenai", "ppa", "sabis", "regitra", "jadis", "vmi", "uzt", "bvpz", "pinreg", "vptJuodiejiSarasai", "vpmSutartys",
     "adpFinansinesAtaskaitos", "eppsViesiejiPirkimai", "liteko", "vdi", "sodra", "cvpp", "rcJar",
-    "rcInformaciniaiPranesimai", "neskelbiamosDerybos"];
+    "rcInformaciniaiPranesimai", "neskelbiamosDerybos", "cpva"];
 const SCHEMA_ARRAY = `ARRAY[${ANALYST_SCHEMAS.map((s) => `'${s}'`).join(", ")}]`;
 const IDENTIFIER_CANDIDATES = [
     "id",
