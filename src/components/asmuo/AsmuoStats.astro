@@ -27,15 +27,15 @@ const mokesciai = asmuo.mokesciai;
     {sodra.vidutinisAtlyginimas ? (
       <KeyValueList>
         <dt>Darbo sutartys</dt>
-        <dd><MoneyValue value={sodra.vidutinisAtlyginimas} suffix=" €/mėn." /></dd>
+        <dd><MoneyValue value={sodra.vidutinisAtlyginimas} suffix={"\u00a0€/mėn."} /></dd>
         <dt>Autorinės ir kitos</dt>
         <dd>
           {sodra.vidutinisAtlyginimas2
-            ? <MoneyValue value={sodra.vidutinisAtlyginimas2} suffix=" €/mėn." />
+            ? <MoneyValue value={sodra.vidutinisAtlyginimas2} suffix={"\u00a0€/mėn."} />
             : <em class="text-muted">Nėra duomenų</em>}
         </dd>
         <dt>Bendrai</dt>
-        <dd><MoneyValue value={sodra.bendrasVidutinisAtlyginimas} suffix=" €/mėn." bold /></dd>
+        <dd><MoneyValue value={sodra.bendrasVidutinisAtlyginimas} suffix={"\u00a0€/mėn."} bold /></dd>
       </KeyValueList>
     ) : <em class="text-muted">Nėra duomenų</em>}
   </StatCard>
@@ -51,7 +51,7 @@ const mokesciai = asmuo.mokesciai;
       <dt>Atlyginimai</dt>
       <dd>
         {sodra.atlyginimuIslaidos
-          ? <MoneyValue value={sodra.atlyginimuIslaidos} suffix=" €/mėn." />
+          ? <MoneyValue value={sodra.atlyginimuIslaidos} suffix={"\u00a0€/mėn."} />
           : <em class="text-muted">Nėra duomenų</em>}
       </dd>
       <dt>SODRA įmokos</dt>

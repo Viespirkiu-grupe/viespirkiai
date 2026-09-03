@@ -46,12 +46,14 @@ const PINREG_LIMIT = 100;
 const PINREG_MAX_LIMIT = 500;
 const KOTIS_LIMIT = 50;
 const KOTIS_MAX_LIMIT = 500;
+const ES_INVESTICIJOS_LIMIT = 50;
+const ES_INVESTICIJOS_MAX_LIMIT = 500;
 
 function parseLimitai(q: Record<string, string>) {
   if (q.limitai === 'false') return {};
   const defaults: Record<string, number> = {
     regitra: 5, teismoNuosprendziai: 10, sutartys: 10, darboSkelbimai: 5,
-    rcPranesimai: 3, domenai: 3, pinreg: 100, kotis: 50, esInvesticijos: 5,
+    rcPranesimai: 3, domenai: 3, pinreg: 100, kotis: 50, esInvesticijos: 50,
     mvpAprasai: 1, vdiPazeidimai: 3,
   };
   const map: Record<string, string> = {
@@ -94,6 +96,18 @@ function parseLimitai(q: Record<string, string>) {
     offset: (kotisPuslapis - 1) * kotisLimit,
     sort: q.kotisSort,
     kryptis: q.kotisKryptis,
+  };
+  // ES investicijos – kaip ir KOTIS: rikiavimas bei puslapiavimas duomenų
+  // bazėje (didžiausias pareiškėjas turi ~3000 projektų).
+  const esInvesticijosLimit = q.esInvesticijosLimit === 'max'
+    ? ES_INVESTICIJOS_MAX_LIMIT
+    : Math.min(ES_INVESTICIJOS_MAX_LIMIT, Math.max(1, Number(q.esInvesticijosLimit) || ES_INVESTICIJOS_LIMIT));
+  const esInvesticijosPuslapis = Math.max(1, Math.floor(Number(q.esInvesticijosPuslapis) || 1));
+  options.esInvesticijos = {
+    limit: esInvesticijosLimit,
+    offset: (esInvesticijosPuslapis - 1) * esInvesticijosLimit,
+    sort: q.esInvesticijosSort,
+    kryptis: q.esInvesticijosKryptis,
   };
 
   const dokumentaiLimit = q.jarDokumentaiLimit;
@@ -202,10 +216,13 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
         <DarboSkelbimai asmuo={asmuo} />
         <RcPranesimai asmuo={asmuo} />
         <Domenai asmuo={asmuo} />
-        <Kotis asmuo={asmuo} />
-        <EsInvesticijos asmuo={asmuo} />
         <VdiPazeidimai asmuo={asmuo} />
       </div>
+
+      {/* Plačios lentelės – kiekviena savo eilutėje per visą plotį, o ne
+          `grid-2` stulpelyje, kur turinys susigrūsdavo. */}
+      <Kotis asmuo={asmuo} />
+      <EsInvesticijos asmuo={asmuo} />
 
       <Regitra asmuo={asmuo} />
       <TeismoNuosprendziai asmuo={asmuo} />

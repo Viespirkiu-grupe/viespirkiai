@@ -24,7 +24,8 @@ const hasValue = value != null && value !== '' && !Number.isNaN(amount);
 const formatted = hasValue
   ? amount.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   : fallback;
-const unit = suffix ?? (currency === 'EUR' ? ' €' : ` ${currency}`);
+// Nedalomas tarpas – suma ir valiuta niekada neišsiskiria per eilutės lūžį.
+const unit = suffix ?? (currency === 'EUR' ? '\u00a0€' : `\u00a0${currency}`);
 const classes = [mono ? 'cell-mono' : '', bold ? 'font-bold' : '', className].filter(Boolean).join(' ');
 ---
 

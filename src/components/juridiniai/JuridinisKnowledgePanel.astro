@@ -11,7 +11,7 @@ interface Props {
 
 const { juridinis } = Astro.props;
 const isActive = arAktyvusStatusas(juridinis.statusoPavadinimas);
-const money = (value: number | null) => value != null ? `${fmtEur(value)} €` : null;
+const money = (value: number | null) => value != null ? `${fmtEur(value)}\u00a0€` : null;
 const hasStats = juridinis.darbuotojai != null || juridinis.vidutinisAtlyginimas != null
   || juridinis.pirkimuSuma != null || juridinis.pardavimuSuma != null;
 const panelClass = ['juridinis-panel', juridinis.location ? 'juridinis-panel--has-map' : ''].filter(Boolean).join(' ');

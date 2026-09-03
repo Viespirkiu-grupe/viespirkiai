@@ -76,7 +76,7 @@ function formatValue(field: string, value: unknown): string | null {
   if (typeof value === 'boolean') return value ? 'Taip' : 'Ne';
 
   if (MONEY_FIELDS.has(field) && (typeof value === 'number' || typeof value === 'string')) {
-    return `${fmtEur(value)} €`;
+    return `${fmtEur(value)}\u00a0€`;
   }
 
   if (DATE_FIELDS.has(field) && typeof value === 'string') {

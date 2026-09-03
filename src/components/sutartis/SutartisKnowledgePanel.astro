@@ -17,7 +17,7 @@ const verte = sutartis.faktineVerte ?? sutartis.verte;
   eyebrowLabel={sutartis.tipoPavadinimas || sutartis.tipas || 'Sutartis'}
   eyebrowValue={sutartis.id}
   title={sutartis.pavadinimas || 'Pavadinimas nenurodytas'}
-  amount={verte != null ? `${fmtEur(verte)} €` : null}
+  amount={verte != null ? `${fmtEur(verte)}\u00a0€` : null}
   className="sutartis-panel"
   detailsColumns={2}
   actionsColumns={2}

@@ -236,7 +236,7 @@ function naujosSistemosAtitikmuo(sutartis: SutartiesKontekstas, pirkimas: any): 
         ? { label: 'Pasiūlymų terminas', value: String(pirkimas.pasiulymuPateikimoTerminas).slice(0, 10) }
         : null,
       Number(pirkimas.numatomaVerteEUR) > 0
-        ? { label: 'Numatoma vertė', value: `${Number(pirkimas.numatomaVerteEUR).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` }
+        ? { label: 'Numatoma vertė', value: `${Number(pirkimas.numatomaVerteEUR).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€` }
         : null,
     ].filter(Boolean) as { label: string; value: string }[],
     informacija: pirkimas.informacija || null,

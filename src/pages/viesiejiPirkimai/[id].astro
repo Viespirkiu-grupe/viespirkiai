@@ -47,7 +47,7 @@ const tedKorteles = buildTedKorteles(t);
 const cvpisUrl = getCvpisUrl(pirkimas);
 
 const verteStr = pirkimas.numatomaBendraPirkimoVerte
-  ? Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' € '
+  ? Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0€ '
   : '';
 const pageTitle = verteStr + pirkimas.pavadinimas;
 const pageDescription = `${pirkimas.pirkimoBudas || ''}\nPaskelbta: ${String(pirkimas.paskelbimoData).slice(0, 10)}\nVykdytojas: ${pirkimas.pirkimoVykdytojas}`;

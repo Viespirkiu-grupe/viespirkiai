@@ -1,43 +1,152 @@
 ---
-import ResultCardShell from '@design-system/components/ResultCardShell.astro';
-import ResultSection from '@design-system/components/ResultSection.astro';
+import PageSection from '@design-system/components/PageSection.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+import Table from '@design-system/components/Table.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import { linksniuotiOnly } from '@/utils/linksniai.js';
 
 const { asmuo } = Astro.props;
-if (!(asmuo.esInvesticijos?.count > 0)) return;
-const { count, rows } = asmuo.esInvesticijos;
+const esInvesticijos = asmuo.esInvesticijos;
+if (!(esInvesticijos?.count > 0)) return;
+
+const rows = esInvesticijos.rows || [];
+const limit = esInvesticijos.limit || rows.length || 1;
+const offset = esInvesticijos.offset || 0;
+const count = esInvesticijos.count || 0;
+const puslapiu = Math.max(1, Math.ceil(count / limit));
+const puslapis = Math.floor(offset / limit) + 1;
+const rodomaNuo = count === 0 ? 0 : offset + 1;
+const rodomaIki = offset + rows.length;
+
+// Rikiuojama duomenų bazėje, tad antraštės yra nuorodos (ne kliento pusės
+// rikiavimas – jis apimtų tik šį puslapį).
+const STULPELIAI = [
+  { raktas: 'data', label: 'Data', kryptis: 'desc', klase: 'cell-nowrap' },
+  { raktas: 'pavadinimas', label: 'Projektas', kryptis: 'asc' },
+  { raktas: 'priemone', label: 'Priemonė', kryptis: 'asc', klase: 'cell-nowrap' },
+  { raktas: 'finansavimas', label: 'Finansavimas', kryptis: 'desc', klase: 'cell-right' },
+  { raktas: 'ismoketas', label: 'Išmokėta', kryptis: 'desc', klase: 'cell-right' },
+  { raktas: 'busena', label: 'Būsena', kryptis: 'asc', klase: 'cell-nowrap' },
+];
+
+const nuoroda = (pakeitimai: Record<string, string | null>) => {
+  const params = new URLSearchParams(Astro.url.search);
+  for (const [raktas, reiksme] of Object.entries(pakeitimai)) {
+    if (reiksme === null) params.delete(raktas);
+    else params.set(raktas, reiksme);
+  }
+  const query = params.toString();
+  return `${Astro.url.pathname}${query ? `?${query}` : ''}#esInvesticijos`;
+};
+
+const rikiavimoNuoroda = (raktas: string, numatytoji: string) => {
+  const kryptis = esInvesticijos.sort === raktas && esInvesticijos.kryptis === numatytoji
+    ? (numatytoji === 'asc' ? 'desc' : 'asc')
+    : numatytoji;
+  return nuoroda({
+    esInvesticijosSort: raktas,
+    esInvesticijosKryptis: kryptis,
+    esInvesticijosPuslapis: null,
+  });
+};
+
+const kitiParametrai = [...new URLSearchParams(Astro.url.search)]
+  .filter(([raktas]) => raktas !== 'esInvesticijosPuslapis')
+  .map(([raktas, reiksme]) => `&${encodeURIComponent(raktas)}=${encodeURIComponent(reiksme)}`)
+  .join('');
 ---
 
-<ResultSection
-  id="esInvesticijos"
-  title="ES investicijos (2014 programa)"
-  count={count}
-  shown={rows.length}
-  paramName="esInvesticijosLimit"
-  forms={['paraiška', 'paraiškos', 'paraiškų', 'paraiškos']}
-  gender="f"
->
-  {rows.map((item: any) => {
-    const suma = typeof item.ismoketasFinansavimas === 'number' && Number.isFinite(item.ismoketasFinansavimas)
-      ? new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.ismoketasFinansavimas)
-      : null;
-    return (
-      <ResultCardShell clickable={true}>
-        <dl slot="meta" class="result-card-meta">
-          <div><dt class="sr-only">Pareiškėjas</dt><dd>{item.pareiskejas}</dd></div>
-          <div><dt class="sr-only">Kodas</dt><dd><span class="cell-mono">{item.kodas}</span></dd></div>
-          <div>
-            <dt class="sr-only">Sutarties pasirašymo data</dt>
-            <dd>{item.sutartiesData ? `Sutartis ${item.sutartiesData}` : 'Sutartis nepasirašyta'}</dd>
-          </div>
-          {item.priemone && <div><dt class="sr-only">Priemonė</dt><dd>{item.priemone}</dd></div>}
-        </dl>
-        <h3 slot="title" class="result-card-title">
-          <a href={`https://2014.esinvesticijos.lt/lt/finansavimas/paraiskos_ir_projektai/${item.slug}`}>
-            {suma && <span class="cell-mono">{suma}</span>}{suma && ' – '}{item.pavadinimas}
-          </a>
-        </h3>
-        <div slot="footer" class="result-card-footer"><span>{item.busena}</span></div>
-      </ResultCardShell>
-    );
-  })}
-</ResultSection>
+<PageSection id="esInvesticijos" title="ES investicijos (2014 programa)">
+  <p class="text-muted text-sm mb-4">
+    Rodoma {rodomaNuo}–{rodomaIki} iš {count} {linksniuotiOnly(count, ['paraiškos', 'paraiškų', 'paraiškų', 'paraiškos'])}
+  </p>
+  <TableWrapper>
+    <Table>
+      <thead>
+        <tr>
+          {STULPELIAI.map((stulpelis) => {
+            const aktyvus = esInvesticijos.sort === stulpelis.raktas;
+            return (
+              <th
+                class:list={[
+                  stulpelis.klase,
+                  'sortable',
+                  aktyvus && (esInvesticijos.kryptis === 'asc' ? 'asc' : 'desc'),
+                ]}
+                aria-sort={aktyvus ? (esInvesticijos.kryptis === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <a
+                  class="es-rikiavimas"
+                  href={rikiavimoNuoroda(stulpelis.raktas, stulpelis.kryptis)}
+                  title="Rikiuoti pagal šį stulpelį"
+                >{stulpelis.label}</a>
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((item: any) => (
+          <tr>
+            <td class="cell-nowrap">
+              {item.sutartiesData
+                ? <DateValue value={item.sutartiesData} mono={true} />
+                : <span class="text-muted">nepasirašyta</span>}
+            </td>
+            <td class="es-projektas">
+              <ExternalSourceLink
+                href={`https://2014.esinvesticijos.lt/lt/finansavimas/paraiskos_ir_projektai/${item.slug}`}
+                label={item.pavadinimas}
+                icon={false}
+              />
+              <div class="text-muted text-sm cell-mono">{item.kodas}</div>
+            </td>
+            <td class="cell-nowrap"><span class="cell-mono" title={item.priemone || undefined}>{item.priemonesKodas || '—'}</span></td>
+            <td class="cell-right cell-nowrap"><MoneyValue value={item.finansavimas} /></td>
+            <td class="cell-right cell-nowrap"><MoneyValue value={item.ismoketasFinansavimas} /></td>
+            <td class="cell-nowrap">{item.busena || '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  </TableWrapper>
+  {puslapiu > 1 && (
+    <div class="es-puslapiai">
+      <Pagination
+        currentPage={puslapis}
+        pageCount={puslapiu}
+        queryParams={kitiParametrai}
+        pageParam="esInvesticijosPuslapis"
+        hash="esInvesticijos"
+      />
+    </div>
+  )}
+</PageSection>
+
+<style>
+  /* Projekto stulpelis pasiima visą likusį plotį – tik jis laužomas į eilutes,
+     o siauri (data, priemonės kodas, sumos, būsena) lieka vienoje eilutėje. */
+  td.es-projektas {
+    width: 100%;
+    min-width: 22rem;
+    white-space: normal;
+  }
+
+  .es-rikiavimas {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .es-rikiavimas:hover {
+    text-decoration: underline;
+  }
+
+  .es-puslapiai {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
+  }
+</style>

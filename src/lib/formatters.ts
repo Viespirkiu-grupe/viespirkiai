@@ -25,7 +25,7 @@ export const fmtEur = (v: number | string): string =>
 export const fmtEurOrNull = (v: unknown): string | null => {
   const n = Number(v);
   return v != null && v !== '' && !Number.isNaN(n) && n > 0
-    ? n.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+    ? n.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0€'
     : null;
 };
 
