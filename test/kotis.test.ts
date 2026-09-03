@@ -167,6 +167,29 @@ describe("KOTIS HTTP", () => {
         expect(wait).toHaveBeenCalledOnce();
     });
 
+    it("nukreipimą seka sukonfigūruotu hostu, o ne viešuoju KOTIS adresu", async () => {
+        const base = new URL(kotisDetailUrl(1)).origin;
+        const fetchImpl = vi.fn()
+            .mockResolvedValueOnce(new Response("", {
+                status: 302,
+                headers: { Location: "http://kotis.kt.gov.lt/paraiskos" },
+            }))
+            .mockResolvedValueOnce(new Response("sąrašas", { status: 200 }));
+        await expect(fetchKotisHtml(`${base}/paraiskos`, { fetchImpl })).resolves.toBe("sąrašas");
+        expect(fetchImpl.mock.calls[1][0]).toBe(`${base}/paraiskos`);
+    });
+
+    it("nukreipimą į kitą puslapį laiko neegzistuojančiu įrašu", async () => {
+        const fetchImpl = vi.fn()
+            .mockResolvedValueOnce(new Response("", {
+                status: 302,
+                headers: { Location: "http://kotis.kt.gov.lt/paraiskos" },
+            }))
+            .mockResolvedValueOnce(new Response("sąrašas", { status: 200 }));
+        await expect(fetchKotisHtml(kotisDetailUrl(867_380), { fetchImpl }))
+            .rejects.toThrow("įrašo nėra");
+    });
+
     it("nekartoja netinkamos 4xx užklausos", async () => {
         const fetchImpl = vi.fn().mockResolvedValue(new Response("bad", { status: 400 }));
         await expect(fetchKotisHtml("https://example.test", { fetchImpl }))

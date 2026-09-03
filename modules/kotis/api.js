@@ -41,6 +41,42 @@ function cookieHeader() {
     return [...sessionCookies].map(([name, value]) => `${name}=${value}`).join("; ");
 }
 
+function sameHostUrl(location, requestUrl) {
+    const base = new URL(`${baseUrl()}/`);
+    const target = new URL(location, requestUrl);
+    target.protocol = base.protocol;
+    target.host = base.host;
+    // Mirror gali gyventi po kelio prefiksu (pvz. http://proxy/kotis) — KOTIS
+    // nukreipimai visada absoliutūs nuo šaknies, todėl prefiksą grąžiname.
+    const prefix = base.pathname.replace(/\/+$/, "");
+    if (prefix && !target.pathname.startsWith(`${prefix}/`) && target.pathname !== prefix) {
+        target.pathname = `${prefix}${target.pathname}`;
+    }
+    return target;
+}
+
+/**
+ * KOTIS nukreipimus išduoda absoliučiu viešuoju adresu (kotis.kt.gov.lt), kuris
+ * iš mirror'o nepasiekiamas, todėl sekame patys, hostą pakeisdami į sukonfigūruotą.
+ */
+async function fetchFollowing(fetchImpl, url, init = {}, maxRedirects = 5) {
+    let current = new URL(url);
+    for (let hop = 0; ; hop++) {
+        const response = await fetchImpl(current.href, { ...init, redirect: "manual" });
+        captureCookies(response.headers);
+        const location = response.status >= 300 && response.status < 400
+            ? response.headers.get("location")
+            : null;
+        if (!location) return { response, url: current };
+        if (hop >= maxRedirects) throw new Error(`KOTIS per daug nukreipimų iš ${url}`);
+        await response.text().catch(() => "");
+        current = sameHostUrl(location, current);
+        const headers = init.headers ? { ...init.headers } : {};
+        if (sessionCookies.size) headers.Cookie = cookieHeader();
+        init = { ...init, method: "GET", body: undefined, headers };
+    }
+}
+
 function inputValue(html, name) {
     const input = [...html.matchAll(/<input\b[^>]*>/gi)]
         .map((match) => match[0])
@@ -64,8 +100,7 @@ export async function prepareKotisSession({ fetchImpl = defaultFetch, pageSize =
     sessionUrl.searchParams.set("ordering", "id.asc");
     sessionUrl.searchParams.set("ff", "1");
     sessionUrl.searchParams.set("page", "1");
-    const page = await fetchImpl(sessionUrl);
-    captureCookies(page.headers);
+    const { response: page } = await fetchFollowing(fetchImpl, sessionUrl);
     if (!page.ok) throw new Error(`KOTIS sesijos pradžia: HTTP ${page.status}`);
     const html = await page.text();
     const form = html.match(/<form\b[^>]*\bpager_value\b[^>]*>[\s\S]*?<\/form>/i)?.[0];
@@ -107,7 +142,7 @@ export async function fetchKotisHtml(url, {
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            const response = await fetchImpl(url, {
+            const { response, url: finalUrl } = await fetchFollowing(fetchImpl, url, {
                 signal: AbortSignal.timeout(timeoutMs),
                 headers: {
                     Accept: "text/html,application/xhtml+xml",
@@ -115,8 +150,14 @@ export async function fetchKotisHtml(url, {
                     ...(sessionCookies.size ? { Cookie: cookieHeader() } : {}),
                 },
             });
-            captureCookies(response.headers);
-            if (response.ok) return await response.text();
+            if (response.ok) {
+                // Nežinomo įrašo KOTIS neduoda 404 — nukreipia į sąrašą, todėl
+                // pasikeitęs kelias reiškia, kad prašyto puslapio nėra.
+                if (finalUrl.pathname !== new URL(url).pathname) {
+                    throw new Error(`KOTIS ${url} nukreipė į ${finalUrl.href} — įrašo nėra`);
+                }
+                return await response.text();
+            }
             const body = await response.text().catch(() => "");
             if (!isRetryableStatus(response.status) || attempt === maxAttempts) {
                 throw new Error(`KOTIS HTTP ${response.status}: ${body.slice(0, 200)}`);
