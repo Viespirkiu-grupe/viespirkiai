@@ -11,7 +11,8 @@ const pastraipos = String(tekstas)
   .map((p) => p.trim())
   .filter(Boolean);
 // Dekoratyvinis kairysis „bortelis" – vietoj blockquote linijos „AI AI AI".
-// Netelpantys „AI" paslepiami JS, kad nei vienas nebūtų nukirstas per vidurį.
+// Netelpantys „AI" paslepiami JS, o pritrūkus (siauras ekranas – aukštas
+// tekstas) JS jų prideda, kad juosta visada siektų teksto apačią.
 const railCount = 80;
 ---
 
@@ -132,12 +133,22 @@ const railCount = 80;
     });
   });
 
-  // Paslepiam „AI", kurie netilptų visi – kad bortelis nesibaigtų puse raidės.
+  // Bortelį prisitaikom prie teksto aukščio: pritrūkus „AI" – priklonuojam,
+  // netelpančius – paslepiam, kad juosta nesibaigtų puse raidės.
   const rails = document.querySelectorAll<HTMLElement>('.ai__rail');
+  const MAX_AI = 400;
   const fitRail = (rail: HTMLElement) => {
-    const items = Array.from(rail.children) as HTMLElement[];
+    let items = Array.from(rail.children) as HTMLElement[];
+    if (!items.length) return;
     items.forEach((item) => { item.style.display = ''; });
     const limit = rail.clientHeight;
+    // Žingsnis tarp dviejų „AI" (su tarpais) – iš jo skaičiuojam, kiek reikia.
+    const step = items.length > 1 ? items[1].offsetTop - items[0].offsetTop : items[0].offsetHeight;
+    if (step > 0.5) {
+      const reikia = Math.min(Math.ceil(limit / step) + 1, MAX_AI);
+      while (rail.children.length < reikia) rail.appendChild(items[0].cloneNode(true));
+      items = Array.from(rail.children) as HTMLElement[];
+    }
     let telpa = items.length;
     for (let i = 0; i < items.length; i++) {
       if (items[i].offsetTop + items[i].offsetHeight > limit + 0.5) { telpa = i; break; }
