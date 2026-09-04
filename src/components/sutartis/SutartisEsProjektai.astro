@@ -1,30 +1,82 @@
 ---
 import DetailsSection from '@design-system/components/DetailsSection.astro';
-import CpvaProjektasCard from './CpvaProjektasCard.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import EntityLink from '@design-system/components/EntityLink.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 
 interface Props {
   sutartys: any[] | null | undefined;
-  showAll?: boolean;
+  className?: string;
 }
 
-const { sutartys, showAll = false } = Astro.props;
+const { sutartys, className = '' } = Astro.props;
 const list = sutartys ?? [];
-const truncated = list.length > 3 && !showAll;
+// Šaltinis projekto veiklų pradžios datos neteikia, todėl „Nuo“ rodoma
+// projekto sutarties įsigaliojimo data.
+const projektoNuoroda = (nr: any) =>
+  `https://2021.esinvesticijos.lt/projektu-sritis/projektu-sarasas?query=${nr}`;
 ---
 
 {list.length > 0 && (
-  <DetailsSection title="Europos sąjungos projektai">
-    {truncated ? (
-      <>
-        <p class="text-muted mt-4">
-          Yra daug (<strong>{list.length}</strong>) CPVA projektų su šiuo pirkimo numeriu — tikėtina, kad ryšys netiesioginis (DPS / CPO katalogas).
-        </p>
-        <div class="mt-2"><a href="?cpvaAll=true" class="btn btn-sm btn-secondary">Rodyti</a></div>
-      </>
-    ) : (
-      <div class="result-list mt-4">
-        {list.map((ps: any) => <CpvaProjektasCard item={ps} />)}
-      </div>
-    )}
+  <DetailsSection title="Europos sąjungos projektai" className={className}>
+    <p class="text-sm text-muted mt-1 mb-0">Centrinė projektų valdymo agentūra</p>
+    <div class="mt-4">
+      <DataTable
+        size="sm"
+        className="cpva-table"
+        sortable={list.length > 1}
+        columns={[
+          { label: 'Projekto Nr.', headerClassName: 'cpva-col-nr' },
+          { label: 'Projektas', headerClassName: 'cpva-col-pav' },
+          { label: 'Vykdytojas', headerClassName: 'cpva-col-vykd' },
+          { label: 'Nuo', sortType: 'date' },
+          { label: 'Iki', sortType: 'date' },
+          { label: 'Suma projektui', headerClassName: 'cell-right', sortType: 'number' },
+          { label: 'Projekto vertė', headerClassName: 'cell-right', sortType: 'number' },
+        ]}
+      >
+        {list.map((item: any) => {
+          const proj = item.projektas;
+          return (
+            <tr>
+              <td class="cell-mono cpva-cell-nowrap">
+                {item.projektoNr
+                  ? <a href={projektoNuoroda(item.projektoNr)}>{item.projektoNr}</a>
+                  : '—'}
+              </td>
+              <td>{proj?.projektoPavadinimas || item.pirkimoObjektas || '—'}</td>
+              <td>
+                {proj?.projektoVykdytojas
+                  ? <EntityLink kodas={proj.projektoVykdytojoKodas} label={proj.projektoVykdytojas} />
+                  : '—'}
+              </td>
+              <td class="cpva-cell-nowrap"><DateValue value={proj?.sutartiesData} mono={true} /></td>
+              <td class="cpva-cell-nowrap"><DateValue value={proj?.projektoVeikluPabaigosData} mono={true} /></td>
+              <td class="cell-right cpva-cell-nowrap"><MoneyValue value={item.pirkimoSutartiesSumaSusijusiSuProjektu} /></td>
+              <td class="cell-right cpva-cell-nowrap"><MoneyValue value={proj?.isViso} /></td>
+            </tr>
+          );
+        })}
+      </DataTable>
+    </div>
   </DetailsSection>
 )}
+
+<style>
+  /* Telefone stulpeliai nesuspaudžiami iki kelių eilučių teksto – lentelė
+     lieka natūralaus pločio ir `.table-wrapper` ją skrolina horizontaliai. */
+  :global(.cpva-table) {
+    min-width: 1040px;
+  }
+
+  /* Datoms ir sumoms pakanka antraštės bei `nowrap` turinio pločio, todėl
+     likusią vietą pasiima abu tekstiniai stulpeliai. */
+  :global(.cpva-table .cpva-col-nr) { min-width: 9rem; }
+  :global(.cpva-table .cpva-col-pav) { min-width: 22rem; }
+  :global(.cpva-table .cpva-col-vykd) { min-width: 15rem; }
+
+  :global(.cpva-table td.cpva-cell-nowrap) {
+    white-space: nowrap;
+  }
+</style>

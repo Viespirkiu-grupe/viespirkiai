@@ -48,8 +48,6 @@ const cvpisUrl = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&ta
 
 const pageTitle = `${fmtEur(verte)} € ${sutartis.pavadinimas}`;
 const pageDescription = `Sutartis nr. ${sutartis.sutartiesNumeris}\nSudaryta: ${String(sutartis.sudarymoData).slice(0, 10)}\nGalioja iki: ${String(sutartis.galiojimoData).slice(0, 10)}`;
-
-const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
 ---
 
 <Layout
@@ -106,8 +104,9 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
       </DetailsSection>
     )}
 
+    <SutartisEsProjektai sutartys={sutartis.cpvaProjektuSutartys} className="mb-7" />
+
     <div class="grid-2">
-      <SutartisEsProjektai sutartys={sutartis.cpvaProjektuSutartys} showAll={showCpvaAll} />
       <SutartisSabis sutartys={sutartis.sabisSutartys} />
       <SutartisPanasios sutartys={sutartis.panasiosSutartys} />
     </div>
