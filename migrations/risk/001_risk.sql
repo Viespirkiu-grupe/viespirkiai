@@ -1,5 +1,6 @@
--- Schema `risk`: risk signals and decisions for public procurement, plus the
--- roles/grants that read and write it. Flattened (2026-09) from what was
+-- Schema `risk`: risk signals and decisions for public procurement. Owned and
+-- used by the application's own role — there is no separate risk_rw/risk_ro
+-- privilege split, and no role is created here. Flattened (2026-09) from what was
 -- originally six incremental migrations (001-006) once no risk data existed
 -- anywhere worth preserving through an upgrade path — this is the schema
 -- those migrations converged to, created directly. See
@@ -17,32 +18,11 @@
 
 CREATE SCHEMA IF NOT EXISTS risk;
 
--- 1. Roles -------------------------------------------------------------------
---
--- `risk_calc` is intentionally NOT created here: the risk schema lives in the
--- main database alongside the `public` canonical facts, and both reads and
--- writes currently go through the application's own pool
--- (postgres/postgres.js). Splitting the read side onto a dedicated read-only
--- role is a follow-up.
-
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'risk_rw') THEN
-        CREATE ROLE risk_rw LOGIN PASSWORD 'risk_rw';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'risk_ro') THEN
-        CREATE ROLE risk_ro LOGIN PASSWORD 'risk_ro';
-    END IF;
-END
-$$;
-
-GRANT USAGE ON SCHEMA risk TO risk_rw, risk_ro;
-
--- 2. Procurement risk decisions -------------------------------------------
+-- 1. Procurement risk decisions -------------------------------------------
 --
 -- Current-state, not a snapshot: one row per procurement, refreshed in place
 -- by INSERT ... ON CONFLICT DO UPDATE on the natural key below — metadata
--- only, no signals (those live in "signals", §3).
+-- only, no signals (those live in "signals", §2).
 
 CREATE TABLE risk."procurementDecisions" (
     "id"                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -60,7 +40,7 @@ CREATE TABLE risk."procurementDecisions" (
 CREATE INDEX "procurementDecisionsUpdatedAtIdx"
     ON risk."procurementDecisions" ("updatedAt" DESC);
 
--- 3. Risk signals -----------------------------------------------------------
+-- 2. Risk signals -----------------------------------------------------------
 --
 -- Current-state, one row per signal, linked to its procurement only via
 -- "decisionId" (surrogate FK) — no "dataAsOf" column (that cutoff lives once
@@ -101,7 +81,7 @@ CREATE TABLE risk."signals" (
 CREATE INDEX "signalsIndicatorStateIdx"
     ON risk."signals" ("indicatorId", "state") INCLUDE ("decisionId");
 
--- 4. Read-path views -----------------------------------------------------------
+-- 3. Read-path views -----------------------------------------------------------
 
 -- List-page read model: per-procurement summary computed from that row's own
 -- "signals". Grouped by the decisions row's primary key — the other d.*
@@ -121,18 +101,3 @@ SELECT d."procurementSource",
 FROM risk."procurementDecisions" d
          JOIN risk."signals" s ON s."decisionId" = d."id"
 GROUP BY d."id";
-
--- 5. Grants -------------------------------------------------------------------
---
--- risk_rw: Process 2, recording results — INSERT/UPDATE on the upsert
--- tables; SELECT, INSERT, DELETE on "signals" (wiped and reinserted per
--- procurement, never edited — no UPDATE grant, and nothing to retain/expire).
--- risk_ro: Process 3, read-only visualisation.
-
-GRANT SELECT, INSERT, UPDATE ON risk."procurementDecisions" TO risk_rw;
-GRANT SELECT, INSERT, DELETE ON risk."signals" TO risk_rw;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA risk TO risk_rw;
-GRANT SELECT ON risk."vProcurementSummaries" TO risk_rw;
-
-GRANT SELECT ON risk."procurementDecisions", risk."signals" TO risk_ro;
-GRANT SELECT ON risk."vProcurementSummaries" TO risk_ro;
