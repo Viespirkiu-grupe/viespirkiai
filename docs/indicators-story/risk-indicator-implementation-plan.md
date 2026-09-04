@@ -140,13 +140,11 @@ Directory: `modules/risk/indicators/<ID>/`.
   boundary at the threshold, and the `insufficient_data` case(s) from `hasRequiredData`.
 - [ ] `test/decision.test.ts` — unit-test `assessRisk()` directly against fixtures (no database), plus an
   "end to end" block through `RiskDecisionEngine` covering the eligibility gate.
-- [ ] If Phase 3 added or changed a reader query, add/extend an integration test (`*.it.ts`, requires a live DB —
-  `npm run test:integration`) proving the query itself produces the shapes the fixtures assume — reading real rows,
-  since there is no fixture schema to write into. **If a local database isn't reachable in the current
-  environment**, write the test
-  anyway — it documents and will verify the query's contract once run — but say so explicitly in the Phase 8
-  handoff rather than silently skipping it; don't report `npm run test:integration` as green without having run it.
-- [ ] `npm test` and, if touched, `npm run test:integration` both green.
+- [ ] Reader queries and the `risk` schema have no automated coverage: the risk suites that touched a database were
+  removed, and nothing under `test/risk/` writes to Postgres any more. If Phase 3 added or changed a reader query,
+  verify it by hand against a real database (`npm run risk:run -- <pirkimoNumeris>` and inspect the resulting
+  `risk."procurementDecisions"` / `risk."signals"` rows) and record what you checked in the Phase 8 handoff.
+- [ ] `npm test` green.
 - [ ] If Phase 0a added a subject type, or any earlier phase added a required field to a shared type (`Lot`,
   `Procurement`, …), grep the repo for every other literal of that type and confirm each still compiles — see Phase
   0a's ripple-effect bullet. `npm run check`'s error count going up by more than one *new kind* of error (as opposed
