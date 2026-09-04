@@ -28,7 +28,7 @@ function definition(overrides: Partial<TestDefinition> = {}): TestDefinition {
     };
 }
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
+const CONTEXT = new EvaluationContext({ dataAsOf: "2026-08-01" });
 
 // Always eligible; assessRisk() records every subject it was called with (so
 // tests can assert which subjects the Engine routed to it), and either

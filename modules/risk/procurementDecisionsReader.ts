@@ -1,9 +1,9 @@
-import { riskDb } from "../../postgres/riskDb.js";
+import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import type { RiskSignal, SubjectType } from "./types.ts";
 import { riskCatalogue } from "./deployedIndicators.ts";
 
-// Reads risk.risk_procurement_decisions joined to risk.risk_signals for
+// Reads risk."procurementDecisions" joined to risk."signals" for
 // display on the procurement detail page
 // (src/pages/viesiejiPirkimai/[id].astro). No existing module read these
 // tables back before — services/procurement-risk/write.ts and the
@@ -22,30 +22,12 @@ export type EnrichedRiskSignal = RiskSignal &
         limitationLt: string;
     }>;
 
-type RiskSignalRow = Readonly<{
-    indicator_id: string;
-    indicator_version: number;
-    subject_type: SubjectType;
-    subject_key: string;
-    state: RiskSignal["state"];
-    raw_value: Readonly<Record<string, unknown>> | null;
-    threshold: Readonly<Record<string, unknown>> | null;
-    applied_parameters: Readonly<Record<string, unknown>> | null;
-    missing_data: readonly string[] | null;
-}>;
+// risk."signals" columns are camelCase, so a row is already a RiskSignal —
+// except for "missingData", which the column allows NULL for.
+type RiskSignalRow = Readonly<Omit<RiskSignal, "missingData"> & { missingData: readonly string[] | null }>;
 
 function rowToSignal(row: RiskSignalRow): RiskSignal {
-    return {
-        indicatorId: row.indicator_id,
-        indicatorVersion: row.indicator_version,
-        subjectType: row.subject_type,
-        subjectKey: row.subject_key,
-        state: row.state,
-        rawValue: row.raw_value,
-        threshold: row.threshold,
-        appliedParameters: row.applied_parameters,
-        missingData: row.missing_data ?? [],
-    };
+    return { ...row, missingData: row.missingData ?? [] };
 }
 
 export type ProcurementRiskView = Readonly<{
@@ -102,35 +84,35 @@ export async function loadProcurementRiskView(
     procurementSource: string,
     procurementId: string,
 ): Promise<ProcurementRiskView | null> {
-    let decisionRow: { id: string; data_as_of: unknown } | undefined;
+    let decisionRow: { id: string; dataAsOf: unknown } | undefined;
     let signalRows: readonly RiskSignalRow[] = [];
     try {
-        const { rows } = await riskDb.query<{ id: string; data_as_of: unknown }>(
-            `SELECT id, data_as_of FROM risk.risk_procurement_decisions
-              WHERE procurement_source = $1 AND procurement_id = $2`,
+        const { rows } = await postgres.query<{ id: string; dataAsOf: unknown }>(
+            `SELECT "id", "dataAsOf" FROM risk."procurementDecisions"
+              WHERE "procurementSource" = $1 AND "procurementId" = $2`,
             [procurementSource, procurementId],
         );
         decisionRow = rows[0];
         if (decisionRow) {
-            const signals = await riskDb.query<RiskSignalRow>(
-                `SELECT indicator_id, indicator_version, subject_type, subject_key, state,
-                        raw_value, threshold, applied_parameters, missing_data
-                   FROM risk.risk_signals
-                  WHERE decision_id = $1 AND state = 'triggered'`,
+            const signals = await postgres.query<RiskSignalRow>(
+                `SELECT "indicatorId", "indicatorVersion", "subjectType", "subjectKey", "state",
+                        "rawValue", "threshold", "appliedParameters", "missingData"
+                   FROM risk."signals"
+                  WHERE "decisionId" = $1 AND "state" = 'triggered'`,
                 [decisionRow.id],
             );
             signalRows = signals.rows;
         }
     } catch (err) {
-        // The risk DB is a separate Postgres instance (postgres/riskDb.js) that
-        // isn't guaranteed to be up in every dev environment — never let a
-        // down/misconfigured risk DB break the procurement page.
+        // The `risk` schema isn't guaranteed to exist in every dev environment
+        // (migrations/risk/001_risk.sql may not have been applied) — never let
+        // a missing or misconfigured risk schema break the procurement page.
         log(`rizikos signalų nepavyko nuskaityti (${procurementSource}:${procurementId}): ${(err as Error)?.message ?? err}`);
         return null;
     }
     if (!decisionRow) return null;
 
-    const dataAsOf = decisionRow.data_as_of instanceof Date ? decisionRow.data_as_of.toISOString() : String(decisionRow.data_as_of);
+    const dataAsOf = decisionRow.dataAsOf instanceof Date ? decisionRow.dataAsOf.toISOString() : String(decisionRow.dataAsOf);
 
     const triggered = signalRows.map((row) => enrich(rowToSignal(row), dataAsOf));
     const bySubjectType = (subjectType: SubjectType) => triggered.filter((s) => s.subjectType === subjectType);

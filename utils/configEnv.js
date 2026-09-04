@@ -88,12 +88,6 @@ const ENV_MAP = [
     ["PG_ANALYST_MAX_CONNECTIONS", "pgAnalystMaxConnections", "number"],
     ["MCP_QUERY_TIMEOUT", "mcpQueryTimeout", "number"],
 
-    ["RISK_PG_HOST", "riskPgHost", "string"],
-    ["RISK_PG_PORT", "riskPgPort", "number"],
-    ["RISK_PG_USER", "riskPgUser", "string"],
-    ["RISK_PG_PASSWORD", "riskPgPassword", "string"],
-    ["RISK_PG_DATABASE", "riskPgDatabase", "string"],
-    ["RISK_PG_MAX_CONNECTIONS", "riskPgMaxConnections", "number"],
     ["RISK_ENABLE_INDICATORS_CHIPS", "riskEnableIndicatorsChips", "boolean"],
 
     ["SPINTA_SERVER", "spintaServer", "string"],

@@ -22,9 +22,8 @@ flowchart LR
 
     COLLECT["Decision Collector<br/>(one ProcurementRiskDecisions per procurement"]
     WRITER["Decision Writer<br/>(upserts by procurement, updates the run)"]
-    STORE[("risk.risk_procurement_decisions")]
-    SIGNALS[("risk.risk_signals")]
-    RUNS[("risk.risk_evaluation_runs")]
+    STORE[("risk.\"procurementDecisions\"")]
+    SIGNALS[("risk.\"signals\"")]
     CRON -->|" run trigger "| READER
     READER -->|" Procurement + Lots + Bids "| ELIG
     SIGE --> COLLECT
@@ -32,9 +31,7 @@ flowchart LR
     COLLECT -->|" ProcurementRiskDecisions "| WRITER
     WRITER -->|" INSERT … ON CONFLICT DO UPDATE "| STORE
     WRITER -->|" DELETE then INSERT, per procurement "| SIGNALS
-    WRITER -->|" run row + statistics "| RUNS
-    STORE -.->|" run_id "| RUNS
-    SIGNALS -.->|" decision_id → id "| STORE
+    SIGNALS -.->|" decisionId → id "| STORE
 ```
 
 ### 1.2 Procurement Reader and Decision Writer Components Class Diagram
@@ -54,11 +51,11 @@ class RunJobOptions {
 
 class RunResult {
 <<type>>
-+runId: number
 +status: RunStatus
 +statistics: Record~string, IndicatorStats~
 }
-note for RunResult "RunStatus, IndicatorStats and the EvaluationRun row behind them: §2.3."
+note for RunResult "RunStatus and IndicatorStats: §2.3. Returned to the caller only — a batch
+    persists nothing about itself; each decisions row carries its own freshness."
 
 class ProcurementReader {
 -subjects: string[] | null
@@ -89,17 +86,14 @@ note for RiskDecisionEngine "The signals of a procurement, of its lots and of it
     (subjectType, subjectKey), not on the row."
 
 class DecisionWriter {
--evaluationRun: EvaluationRun | null
 +writeDecisions(decisions: ProcurementRiskDecisions[]) Promise~number~
-+updateEvaluationRun(update: Partial~EvaluationRun~) Promise~EvaluationRun~
 }
 note for DecisionWriter "writeDecisions upserts the procurement's metadata row on
-    (procurement_source, procurement_id) — INSERT … ON CONFLICT DO UPDATE … RETURNING id — then
-    wipes and replaces that procurement's rows in risk_signals using the returned id: DELETE
-    WHERE decision_id = …, followed by a bulk INSERT of the freshly evaluated signals stamped
-    with that same decision_id. Never an UPDATE on risk_signals. updateEvaluationRun upserts the
-    run row — the first call inserts it, later calls accumulate per-indicator stats across pages.
-    No crash recovery, no retry."
+    (procurementSource, procurementId) — INSERT … ON CONFLICT DO UPDATE … RETURNING id — then
+    wipes and replaces that procurement's rows in risk.signals using the returned id: DELETE
+    WHERE decisionId = …, followed by a bulk INSERT of the freshly evaluated signals stamped
+    with that same decisionId. Never an UPDATE on risk.signals. There is no run row to open or
+    close: a crash mid-batch leaves committed pages current and the rest untouched."
 
 RunJob ..> RunJobOptions: options
 RunJob --> RunResult: returns
@@ -206,7 +200,7 @@ two names — to be reconciled.
 
 ### 2.3 Output Data Object Model
 
-A run produces one `EvaluationRun`, and one `ProcurementRiskDecisions` per procurement it evaluated. Every
+A run produces one `ProcurementRiskDecisions` per procurement it evaluated. Every
 `RiskSignal` the run produced — for the procurement, its lots and its bids — lives inside that procurement's decisions
 object. Nothing else.
 
@@ -215,7 +209,6 @@ classDiagram
     class ProcurementRiskDecisions {
         +procurementSource: string
         +procurementId: string
-        +runId: number
         +signals: RiskSignal[]
         +dataAsOf: string
         +createdAt: Date
@@ -223,7 +216,7 @@ classDiagram
     }
     note for ProcurementRiskDecisions "Created by the Decision Collector, persisted by the Decision Writer.
     Natural key: (procurementSource, procurementId) — one row per procurement, refreshed in place.
-    runId, dataAsOf and updatedAt always describe the run that last refreshed it."
+    dataAsOf and updatedAt always describe the evaluation that last refreshed it."
 
     class RiskSignal {
         +indicatorId: string
@@ -237,7 +230,7 @@ classDiagram
         +missingData: string[]
     }
     note for RiskSignal "Created by RiskIndicatorDecision. Persisted as its own row in
-    risk.risk_signals, one row per signal — not nested jsonb. Carries no dataAsOf: that cutoff
+    risk."signals", one row per signal — not nested jsonb. Carries no dataAsOf: that cutoff
     lives once on the parent ProcurementRiskDecisions row and is not repeated per signal (§2.4)."
 
     class IndicatorState {
@@ -248,15 +241,6 @@ classDiagram
         not_applicable
     }
 
-    class EvaluationRun {
-        +runId: number
-        +status: RunStatus
-        +dataAsOf: string
-        +statistics: Record~string, IndicatorStats~
-    }
-    note for EvaluationRun "Opened and updated by the Decision Writer; the provenance every
-    decisions row points at."
-
     class IndicatorStats {
         +rows: number
         +triggered: number
@@ -265,105 +249,90 @@ classDiagram
 
     class RunStatus {
         <<enumeration>>
-        running
         succeeded
         partial
         failed
     }
+    note for RunStatus "On RunResult only (§1.2) — a batch's outcome is returned to its caller,
+    never stored."
 
-    EvaluationRun "1" --> "1" RunStatus: status
-    EvaluationRun "1" *-- "0..*" IndicatorStats: statistics, keyed by indicatorId
-    EvaluationRun "1" <-- "0..*" ProcurementRiskDecisions: runId, the last run that refreshed the row
-    ProcurementRiskDecisions "1" *-- "0..*" RiskSignal: signals, stored as rows in risk.risk_signals
+    RunResult "1" --> "1" RunStatus: status
+    RunResult "1" *-- "0..*" IndicatorStats: statistics, keyed by indicatorId
+    ProcurementRiskDecisions "1" *-- "0..*" RiskSignal: signals, stored as rows in risk."signals"
     RiskSignal "1" --> "1" IndicatorState: state
 ```
 
 `RiskSignal` (the domain type) carries neither `procurementSource` / `procurementId` nor `dataAsOf`: the
 `ProcurementRiskDecisions` it is collected into already answers both. Persistence resolves the link even more directly
-than a stamped natural key — `risk_signals` points at its parent by the parent's own surrogate
+than a stamped natural key — `risk."signals"` points at its parent by the parent's own surrogate
 `id` (`decision_id`), never by `procurement_source` / `procurement_id` at all (§2.4). That also sidesteps any question
 of whether `(procurement_source, procurement_id)` is safe to rely on as a natural key elsewhere:
 the signal table's referential integrity doesn't depend on it.
 
 ### 2.4 Output Data Object Model Persistence
 
-`ProcurementRiskDecisions` → `risk.risk_procurement_decisions`, **one row per procurement** (not per run) — metadata
+`ProcurementRiskDecisions` → `risk."procurementDecisions"`, **one row per procurement** (not per run) — metadata
 only, no signals:
 
 | Field               | Column               | Type          | Note                                                                    |
 |---------------------|----------------------|---------------|-------------------------------------------------------------------------|
 | —                   | `id`                 | `bigint`      | Identity PK                                                             |
-| `procurementSource` | `procurement_source` | `text`        | Natural key, part 1                                                     |
-| `procurementId`     | `procurement_id`     | `text`        | Natural key, part 2                                                     |
-| `runId`             | `run_id`             | `bigint`      | FK → `risk.risk_evaluation_runs(id)`; **overwritten** on every refresh  |
-| `dataAsOf`          | `data_as_of`         | `timestamptz` | Cutoff of the run that last wrote the row                               |
-| `createdAt`         | `created_at`         | `timestamptz` | `DEFAULT now()`, never updated — first time this procurement was scored |
-| `updatedAt`         | `updated_at`         | `timestamptz` | `now()` on every upsert — the "assessed at" the GUI shows               |
+| `procurementSource` | `"procurementSource"` | `text`        | Natural key, part 1                                                     |
+| `procurementId`     | `"procurementId"`     | `text`        | Natural key, part 2                                                     |
+| `dataAsOf`          | `"dataAsOf"`         | `timestamptz` | Cutoff of the evaluation that last wrote the row                        |
+| `createdAt`         | `"createdAt"`         | `timestamptz` | `DEFAULT now()`, never updated — first time this procurement was scored |
+| `updatedAt`         | `"updatedAt"`         | `timestamptz` | `now()` on every upsert — the "assessed at" the GUI shows               |
 
 | Constraint / Index                            | Purpose                                                                           |
 |-----------------------------------------------|-----------------------------------------------------------------------------------|
-| `UNIQUE (procurement_source, procurement_id)` | The upsert conflict target; one row per procurement; FK target for `risk_signals` |
-| `INDEX (run_id)`                              | "What did run N touch"; FK maintenance                                            |
-| `INDEX (updated_at DESC)`                     | Freshness listings                                                                |
+| `UNIQUE ("procurementSource", "procurementId")` | The upsert conflict target; one row per procurement; FK target for `risk."signals"` |
+| `INDEX ("updatedAt" DESC)`                     | Freshness listings                                                                |
 
-`RiskSignal` → `risk.risk_signals`, **one row per signal**. A procurement's signals are wiped and reinserted whole on
+`RiskSignal` → `risk."signals"`, **one row per signal**. A procurement's signals are wiped and reinserted whole on
 every refresh that touches it — never updated in place (Invariant 2 below). No `id` column: the row has no identity
 worth naming outside its parent, nothing references an individual signal row, and the table is always replaced wholesale
 rather than addressed row-by-row, so a natural composite key does the job without a surrogate:
 
 | Field               | Column               | Type          | Note                                                                                                   |
 |---------------------|----------------------|---------------|--------------------------------------------------------------------------------------------------------|
-| —                   | `decision_id`        | `bigint`      | FK → `risk_procurement_decisions(id)` — the only link to the procurement; not on the `RiskSignal` type |
-| `indicatorId`       | `indicator_id`       | `text`        |                                                                                                        |
-| `indicatorVersion`  | `indicator_version`  | `int`         |                                                                                                        |
-| `subjectType`       | `subject_type`       | `text`        | CHECK: the five `SubjectType` values (§3.4)                                                            |
-| `subjectKey`        | `subject_key`        | `text`        |                                                                                                        |
+| —                   | `"decisionId"`        | `bigint`      | FK → `risk."procurementDecisions"("id")` — the only link to the procurement; not on the `RiskSignal` type |
+| `indicatorId`       | `"indicatorId"`       | `text`        |                                                                                                        |
+| `indicatorVersion`  | `"indicatorVersion"`  | `int`         |                                                                                                        |
+| `subjectType`       | `"subjectType"`       | `text`        | CHECK: the five `SubjectType` values (§3.4)                                                            |
+| `subjectKey`        | `"subjectKey"`        | `text`        |                                                                                                        |
 | `state`             | `state`              | `text`        | CHECK: the four `IndicatorState` values                                                                |
-| `rawValue`          | `raw_value`          | `jsonb`       | Nullable                                                                                               |
+| `rawValue`          | `"rawValue"`          | `jsonb`       | Nullable                                                                                               |
 | `threshold`         | `threshold`          | `jsonb`       | Nullable                                                                                               |
-| `appliedParameters` | `applied_parameters` | `jsonb`       | Nullable                                                                                               |
-| `missingData`       | `missing_data`       | `text[]`      |                                                                                                        |
-| —                   | `created_at`         | `timestamptz` | `DEFAULT now()` — when this refresh inserted the row                                                   |
+| `appliedParameters` | `"appliedParameters"` | `jsonb`       | Nullable                                                                                               |
+| `missingData`       | `"missingData"`       | `text[]`      |                                                                                                        |
+| —                   | `"createdAt"`         | `timestamptz` | `DEFAULT now()` — when this refresh inserted the row                                                   |
 
-No `procurement_source` / `procurement_id` columns: unlike the deprecated table (§5 #1), a signal never carries the
-natural key directly — only `decision_id`, resolved once via a join to
-`risk_procurement_decisions` when a query needs it. No `data_as_of` column either: the cutoff lives once on the parent
-`risk_procurement_decisions.data_as_of` and is read from there, not duplicated per signal.
+No `"procurementSource"` / `"procurementId"` columns: unlike the deprecated table (§5 #1), a signal never carries the
+natural key directly — only `"decisionId"`, resolved once via a join to
+`risk."procurementDecisions"` when a query needs it. No `"dataAsOf"` column either: the cutoff lives once on the parent
+`risk."procurementDecisions"."dataAsOf"` and is read from there, not duplicated per signal.
 
 | Constraint / Index                                                                       | Purpose                                                                                                                                                                   |
 |------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `PRIMARY KEY (decision_id, indicator_id, indicator_version, subject_type, subject_key)`  | One signal per indicator version per subject per procurement; also the FK access path — "all signals for this procurement" (the GUI's main read) leads with `decision_id` |
-| `FOREIGN KEY (decision_id) REFERENCES risk_procurement_decisions (id) ON DELETE CASCADE` | Every signal belongs to exactly one procurement's decisions row                                                                                                           |
-| `INDEX (indicator_id, state)`                                                            | List filters: which procurements a given indicator triggered                                                                                                              |
-
-`EvaluationRun` → `risk.risk_evaluation_runs`, one row per run:
-
-| Field        | Column        | Type          | Note                                                      |
-|--------------|---------------|---------------|-----------------------------------------------------------|
-| `runId`      | `id`          | `bigint`      | The FK every decisions row carries                        |
-| `dataAsOf`   | `data_as_of`  | `timestamptz` |                                                           |
-| `status`     | `status`      | `text`        | CHECK: the four `RunStatus` values                        |
-| `statistics` | `statistics`  | `jsonb`       | Per-indicator `rows` / `triggered` / `written`            |
-| —            | `started_at`  | `timestamptz` | `DEFAULT now()`                                           |
-| —            | `finished_at` | `timestamptz` | Stamped when status becomes terminal                      |
-| —            | `error`       | `text`        | Set only by the stale-run sweep at the next process start |
+| `PRIMARY KEY ("decisionId", "indicatorId", "indicatorVersion", "subjectType", "subjectKey")`  | One signal per indicator version per subject per procurement; also the FK access path — "all signals for this procurement" (the GUI's main read) leads with `"decisionId"` |
+| `FOREIGN KEY ("decisionId") REFERENCES risk."procurementDecisions" ("id") ON DELETE CASCADE` | Every signal belongs to exactly one procurement's decisions row                                                                                                           |
+| `INDEX ("indicatorId", "state") INCLUDE ("decisionId")`                                  | List filters: which procurements a given indicator triggered — covering, so the read stays index-only                                                                     |
 
 Invariants:
 
 | # | Invariant                                                                                                                                                                                                                                                                                                                                     |
 |---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | **One row per procurement, refreshed in place.** There is no per-run snapshot; `risk_procurement_decisions` is the current state. `risk_rw` needs `INSERT` **and** `UPDATE` on it, and `INSERT` **and** `DELETE` on `risk_signals` (no `UPDATE` there — see Invariant 2).                                                                     |
-| 2 | **A procurement's signals are wiped, not merged.** Never updated element-wise: the Decision Writer deletes every `risk_signals` row for that `decision_id` and inserts the freshly evaluated set. A refresh re-evaluates every deployed indicator for that procurement, so the replacement set is always internally consistent.               |
-| 3 | **A refresh is scoped.** A run over a subset of procurements touches only those procurements' `risk_procurement_decisions` row and its `decision_id`'s `risk_signals` rows; every other procurement keeps its older `run_id` / `updated_at` and untouched signals. Indicators can grow and be re-run without reprocessing the whole register. |
-| 4 | **At most one open run** — partial unique index on `status = 'running'` in `risk.risk_evaluation_runs`.                                                                                                                                                                                                                                       |
-| 5 | **`updated_at` is the published freshness.** The GUI shows it per procurement; there is no global "as of" for the site any more.                                                                                                                                                                                                              |
+| 1 | **One row per procurement, refreshed in place.** There is no per-run snapshot; `risk."procurementDecisions"` is the current state. `risk_rw` needs `INSERT` **and** `UPDATE` on it, and `INSERT` **and** `DELETE` on `risk."signals"` (no `UPDATE` there — see Invariant 2).                                                                     |
+| 2 | **A procurement's signals are wiped, not merged.** Never updated element-wise: the Decision Writer deletes every `risk."signals"` row for that `"decisionId"` and inserts the freshly evaluated set. A refresh re-evaluates every deployed indicator for that procurement, so the replacement set is always internally consistent.               |
+| 3 | **A refresh is scoped.** A run over a subset of procurements touches only those procurements' `risk."procurementDecisions"` row and its `"decisionId"`'s `risk."signals"` rows; every other procurement keeps its older `"dataAsOf"` / `"updatedAt"` and untouched signals. Indicators can grow and be re-run without reprocessing the whole register. |
+| 4 | **One evaluation at a time** — a Postgres advisory lock taken by `services/procurement-risk/index.ts` for the length of the process. There is no run table to enforce it in the schema, and a crash releases the lock with no row left behind to reconcile.                                                                                    |
+| 5 | **`"updatedAt"` is the published freshness.** The GUI shows it per procurement; there is no global "as of" for the site any more.                                                                                                                                                                                                              |
 
 Read path:
 
 | View                           | Answers                                                                                                                               |
 |--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `risk.v_latest_run`            | Provenance only: the most recently started `succeeded` / `partial` run. No longer a read filter                                       |
-| `risk.v_procurement_summaries` | Per procurement, joining its `risk_signals` rows: counts by state, the `triggered` indicator ids, `updated_at` from the decisions row |
+| `risk."vProcurementSummaries"` | Per procurement, joining its `risk."signals"` rows: counts by state, the `triggered` indicator ids, `"updatedAt"` from the decisions row |
 
 ## 3. Risk Decision Services (DRD)
 
@@ -530,11 +499,12 @@ npm run risk:run -- <pirkimoNumeris...>  # only the named procurements
 npm run risk:run -- --limit 20         # light run: first 20 distinct ATN-1 procurement ids (deterministic)
 ```
 
-`--limit N` and explicit subject ids are mutually exclusive. Requires `riskDb` (see `postgres/riskDb.js`) and the
-primary Postgres DB configured, as in [Local dev setup](../../CLAUDE.md).
+`--limit N` and explicit subject ids are mutually exclusive. Requires the primary Postgres DB configured, as in
+[Local dev setup](../../CLAUDE.md) — the `risk` schema lives in that same database and is reached through the same
+`postgres` pool.
 
 Every invocation is a **refresh**, not a snapshot: it rewrites the decisions row of each procurement it touched and
-wipes and reinserts that procurement's `risk_signals` rows, leaving every other procurement untouched. Adding an
+wipes and reinserts that procurement's `risk."signals"` rows, leaving every other procurement untouched. Adding an
 indicator and re-running a subset is therefore a normal operation — the whole register is not reprocessed, and each
 row's `updated_at` says how fresh it is.
 
@@ -543,6 +513,10 @@ row's `updated_at` says how fresh it is.
 What exists in the code today and is superseded by §1–§2. To be removed by the refactoring; this section goes with it.
 
 Migration filenames below (`002_roles.sql` through `006_drop_code_commit.sql`) predate a 2026-09 flattening: with no risk data anywhere worth an upgrade path, they were folded into a single `001_risk.sql` reflecting the schema they converged to. The filenames are kept here only as history of what changed and in what order — they no longer exist as separate files.
+Table and column names below are also written as they stood at the time: a later 2026-09 change converted the schema to
+the repo's quoted camelCase convention (`risk.risk_procurement_decisions` → `risk."procurementDecisions"`,
+`risk.risk_signals` → `risk."signals"`, `risk.risk_evaluation_runs` → `risk."evaluationRuns"`, and every column with
+it). §2.4 above is the current spec.
 
 | #  | Deprecated                                                                                                   | Where                                                                | Replacement                                                                                                                                                                                                                                                                  |
 |----|--------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

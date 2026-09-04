@@ -17,7 +17,7 @@ import { negotiatedProcedure, negotiatedSurveyProcedure, openProcedure, restrict
 // goes through RiskDecisionEngine itself, since that is genuinely how a
 // ProcurementSubject reaches assessRisk in production.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
+const CONTEXT = new EvaluationContext({ dataAsOf: "2026-08-01" });
 const ltPro01v1 = new LtPro01Decision(CONTEXT);
 
 function testProcurement(pirkimoBudas: string | null, overrides: Partial<Procurement> = {}): Procurement {

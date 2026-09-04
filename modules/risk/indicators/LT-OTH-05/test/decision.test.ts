@@ -25,7 +25,7 @@ import {
 // goes through RiskDecisionEngine itself, since that is genuinely how a
 // ProcurementSubject reaches assessRisk in production.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
+const CONTEXT = new EvaluationContext({ dataAsOf: "2026-08-01" });
 const ltOth05v1 = new LtOth05Decision(CONTEXT);
 
 function testProcurement(procedureOutcome: ProcurementProcedureOutcome | null, overrides: Partial<Procurement> = {}): Procurement {

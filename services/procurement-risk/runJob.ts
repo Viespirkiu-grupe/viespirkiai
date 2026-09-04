@@ -1,12 +1,11 @@
 import { postgres } from "../../postgres/postgres.js";
-import { riskDb } from "../../postgres/riskDb.js";
 import { log } from "../../utils/log.js";
 import { PostgresRiskDataSource } from "../../modules/risk/riskDataSource.ts";
 import { riskIndicatorRegistry } from "../../modules/risk/deployedIndicators.ts";
 import { ProcurementReader } from "../../modules/risk/procurementReader.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
 import { EvaluationContext } from "../../modules/risk/evaluationContext.ts";
-import type { IndicatorStats, ProcurementRiskDecisions, RunStatistics, RunTotals } from "../../modules/risk/types.ts";
+import type { IndicatorStats, ProcurementRiskDecisions, RunStatistics, RunStatus, RunTotals } from "../../modules/risk/types.ts";
 import { DecisionWriter } from "./decisionWriter.ts";
 
 export type RunJobOptions = Readonly<{
@@ -19,8 +18,7 @@ export type RunJobOptions = Readonly<{
 }>;
 
 export type RunResult = Readonly<{
-    runId: number;
-    status: "succeeded" | "partial" | "failed";
+    status: RunStatus;
     statistics: RunStatistics;
 }>;
 
@@ -103,61 +101,39 @@ function buildStatistics(
 }
 
 /**
- * Closes any run left `running` by a previous crash. The partial unique
- * index on `status = 'running'` (risk-schema.md §1) is the database-enforced
- * backstop to the advisory lock this only needs to run once per process
- * start, before opening a new run.
- */
-async function closeStaleRunningRuns(): Promise<void> {
-    const { rowCount } = await riskDb.query(
-        `UPDATE risk.risk_evaluation_runs
-         SET status = 'failed', finished_at = now(), error = 'closed at next service start: run left running'
-         WHERE status = 'running'`,
-    );
-    if (rowCount) {
-        log(`procurement-risk: closed ${rowCount} stale running run(s) from a previous crash`);
-    }
-}
-
-/**
  * Executes every Risk Indicator whose parameter timeline is in force as of
  * `dataAsOf` against every page the Procurement Reader loads
- * (risk-service-architecture.md §1.2): opens one run, loops pages until
- * nextCursor is null, evaluates each page's Procurements through the
- * RiskDecisionEngine (one ProcurementRiskDecisions per procurement, spanning
- * every indicator), upserts that page's decisions in one transaction, and
- * checkpoints run-wide totals plus per-indicator statistics (types.ts's
- * RunStatistics) after every page.
+ * (risk-service-architecture.md §1.2): loops pages until nextCursor is null,
+ * evaluates each page's Procurements through the RiskDecisionEngine (one
+ * ProcurementRiskDecisions per procurement, spanning every indicator), and
+ * upserts that page's decisions in one transaction. Run-wide totals and
+ * per-indicator statistics (types.ts's RunStatistics) are accumulated in
+ * memory and returned to the caller — nothing about a batch is persisted,
+ * since each procurement row carries its own freshness.
  *
  * Per-indicator computation failures are contained by RiskDecisionEngine
  * itself (logged, that subject's signal just doesn't appear) and never reach
  * this job. What this job still isolates is a page's *write* failing as a
- * whole — the run closes `partial`, not `failed`; every other page's rows,
- * from this and other runs, stay untouched (a refresh is scoped to the
- * procurements it actually re-evaluates).
+ * whole — the result is `partial`, not `failed`; every other page's rows stay
+ * untouched (a refresh is scoped to the procurements it actually
+ * re-evaluates).
  */
 export async function runEvaluation(options: RunJobOptions): Promise<RunResult> {
-    await closeStaleRunningRuns();
-
     const startedAt = Date.now();
     const dataAsOf = new Date().toISOString();
     const subjects = options.subjects ?? null;
     const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
 
-    // Calculations read the real database's `public` canonical facts; only
-    // the Decision Writer touches `riskDb`.
+    // Calculations read the `public` canonical facts and the Decision Writer
+    // writes the `risk` schema — both in the same database, over one pool.
     const canonicalFacts = new PostgresRiskDataSource(postgres);
     const reader = new ProcurementReader(canonicalFacts, subjects, dataAsOf);
-    const writer = new DecisionWriter(riskDb);
+    const writer = new DecisionWriter(postgres);
 
-    const openedRun = await writer.updateEvaluationRun({
-        status: "running",
-        dataAsOf,
-    });
-    const evaluationContext = new EvaluationContext({ runId: openedRun.runId, dataAsOf });
+    const evaluationContext = new EvaluationContext({ dataAsOf });
     const engine = new RiskDecisionEngine(riskIndicatorRegistry.createAllIndicators(evaluationContext), evaluationContext);
     log(
-        `procurement-risk: run ${openedRun.runId} starting — dataAsOf=${dataAsOf}, pageSize=${pageSize}, ` +
+        `procurement-risk: run starting — dataAsOf=${dataAsOf}, pageSize=${pageSize}, ` +
             `subjects=${subjects ? subjects.length : "all"}`,
     );
 
@@ -190,19 +166,10 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
         }
 
         mergeIndicatorStats(indicatorStats, decisions, written);
-        const statistics = buildStatistics(indicatorStats, {
-            procurementsEvaluated,
-            decisionsWritten,
-            orphanLotsDropped: reader.droppedOrphanLotCount,
-            pagesProcessed,
-            pagesFailed,
-            durationSec: elapsedSec(startedAt),
-        });
-        await writer.updateEvaluationRun({ statistics });
         log(
             `procurement-risk: page ${pagesProcessed} done: evaluated ${procurementsEvaluated} procurements, ` +
                 `written ${decisionsWritten} decisions, failed ${pagesFailed} pages, ` +
-                `${statistics.totals.durationSec}s`,
+                `${elapsedSec(startedAt)}s`,
         );
         cursor = page.nextCursor;
     } while (cursor !== null);
@@ -216,7 +183,6 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
         pagesFailed,
         durationSec: elapsedSec(startedAt),
     });
-    const closed = await writer.updateEvaluationRun({ status, statistics });
-    log(`procurement-risk: run ${closed.runId} ${status}`);
-    return { runId: closed.runId, status, statistics };
+    log(`procurement-risk: run ${status}`);
+    return { status, statistics };
 }

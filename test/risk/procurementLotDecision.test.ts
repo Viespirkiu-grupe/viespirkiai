@@ -104,8 +104,7 @@ function subject(
     };
 }
 
-const RUN = Object.freeze({ runId: 7, dataAsOf: "2026-08-01", subjects: null }) as Readonly<{
-    runId: number;
+const RUN = Object.freeze({ dataAsOf: "2026-08-01", subjects: null }) as Readonly<{
     dataAsOf: string;
     subjects: readonly string[] | null;
 }>;

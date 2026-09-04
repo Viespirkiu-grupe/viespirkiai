@@ -4,18 +4,13 @@ import { fileURLToPath } from "node:url";
 
 // The Procurement Reader's queries run against the real database through the
 // `postgres` pool's role (postgres/postgres.js — a dev-mode stand-in for the
-// dedicated read-only `risk_calc` role riskDb.js's header comment describes),
+// dedicated read-only `risk_calc` role §1.2 describes),
 // which has SELECT on every base table these views read but no CREATE
 // privilege on the `public` schema there — so the _v2 views under
 // modules/mcp/analyst/views/ can never be persisted as real database objects
 // on that connection. This module inlines the same view SQL as a WITH
 // (CTE) prefix instead: it is applied fresh, per query, over whatever
 // connection runs it, rather than once via CREATE VIEW.
-//
-// A CTE of the same name simply shadows a persisted view inside the query
-// that defines it, so this works unchanged against test/risk/testPublicDb.ts's
-// local Postgres too, where the same four files are also applied for real
-// via CREATE VIEW (riskDb there is an admin-owned local Docker instance).
 //
 // Keep this in sync with modules/mcp/analyst/views/v_pirkimas_v2.sql,
 // v_dalyviai_v2.sql, v_pirkimo_dalis_v2.sql, v_pirkimo_pabaiga_v2.sql and

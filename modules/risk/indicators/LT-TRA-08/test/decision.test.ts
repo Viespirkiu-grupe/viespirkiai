@@ -14,7 +14,7 @@ import { procedureOutcome } from "./fixtures.ts";
 // eligibility-gate and hasRequiredData cases belong to the "end to end"
 // describe block, which goes through RiskDecisionEngine itself.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
+const CONTEXT = new EvaluationContext({ dataAsOf: "2026-08-01" });
 const ltTra08v1 = new LtTra08Decision(CONTEXT);
 
 function testProcurement(overrides: Partial<Procurement> = {}): Procurement {

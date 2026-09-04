@@ -30,7 +30,6 @@ export const riskSignalContract: RuntimeContract<RiskSignal> = zodContract(riskS
 export const procurementRiskDecisionsSchema: z.ZodType<ProcurementRiskDecisions> = z.object({
     procurementSource: z.string().min(1),
     procurementId: z.string().min(1),
-    runId: z.number().int().positive(),
     signals: z.array(riskSignalSchema),
     dataAsOf: z.string(),
     createdAt: z.date(),

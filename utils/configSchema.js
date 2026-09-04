@@ -106,13 +106,9 @@ const configSchema = z.object({
     pgAnalystMaxConnections: z.number().int().positive().default(16),
     mcpQueryTimeout: z.number().positive().default(20),
 
-    // Procurement Risk Service — `risk` output schema
-    riskPgHost: z.string().default("localhost"),
-    riskPgPort: z.number().int().positive().default(15432),
-    riskPgUser: z.string().default("risk_rw"),
-    riskPgPassword: z.string().default("risk_rw"),
-    riskPgDatabase: z.string().default("viespirkiai"),
-    riskPgMaxConnections: z.number().int().positive().default(5),
+    // Procurement Risk Service — the `risk` schema lives in the main database
+    // and is reached through the main `postgres` pool, so it needs no
+    // connection settings of its own.
     // Rodyti rizikos indikatorių "čipsus" (chips) viešųjų pirkimų puslapiuose.
     riskEnableIndicatorsChips: z.boolean().default(false),
 

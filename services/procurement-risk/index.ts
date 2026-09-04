@@ -1,5 +1,4 @@
 import { postgres } from "../../postgres/postgres.js";
-import { riskDb } from "../../postgres/riskDb.js";
 import { log } from "../../utils/log.js";
 import { runEvaluation } from "./runJob.ts";
 
@@ -62,7 +61,7 @@ async function resolveSubjects(argv: readonly string[]): Promise<readonly string
 
 async function main(): Promise<void> {
     const subjects = await resolveSubjects(process.argv.slice(2));
-    const client = await riskDb.connect();
+    const client = await postgres.connect();
     try {
         const lock = await client.query("SELECT pg_try_advisory_lock(hashtext($1)::bigint) AS locked", [LOCK_KEY]);
         if (!lock.rows[0]?.locked) {
@@ -73,7 +72,7 @@ async function main(): Promise<void> {
             subjects,
         });
 
-        log(`procurement-risk: run ${result.runId} ${result.status}`);
+        log(`procurement-risk: run ${result.status}`);
         console.log(JSON.stringify(result, null, 2));
 
         if (result.status !== "succeeded") {
@@ -91,5 +90,5 @@ main()
         process.exitCode = 1;
     })
     .finally(async () => {
-        await Promise.all([postgres.end(), riskDb.end()]);
+        await postgres.end();
     });

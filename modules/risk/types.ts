@@ -25,11 +25,11 @@ export type RiskIndicatorKey = Readonly<{
 
 // RiskSignal (risk-service-architecture.md §2.3), validated at runtime by
 // contracts.ts's riskSignalSchema. Persisted as its own row in
-// risk.risk_signals, linked to its procurement only via that row's
-// decision_id (a surrogate FK, resolved by joining risk_procurement_decisions
-// — never stamped onto the signal itself). Carries neither
+// risk."signals", linked to its procurement only via that row's "decisionId"
+// (a surrogate FK, resolved by joining risk."procurementDecisions" — never
+// stamped onto the signal itself). Carries neither
 // procurementSource/procurementId nor dataAsOf: both are held once on the
-// parent ProcurementRiskDecisions/risk_procurement_decisions row instead.
+// parent ProcurementRiskDecisions/risk."procurementDecisions" row instead.
 export type RiskSignal = Readonly<{
     indicatorId: string;
     indicatorVersion: number;
@@ -45,25 +45,25 @@ export type RiskSignal = Readonly<{
 // One procurement's whole risk picture (risk-service-architecture.md §2.3):
 // every RiskSignal the run produced for it, its lots and its bids, collected
 // by RiskDecisionEngine.evaluateAll (riskDecisionEngine.ts) and persisted by
-// the Decision Writer as one row in risk.risk_procurement_decisions (metadata
-// only), keyed by (procurementSource, procurementId), plus one row per signal
-// in risk.risk_signals linked back via that row's id (decision_id). runId/
-// dataAsOf describe the run that last refreshed the row; createdAt/updatedAt
+// the Decision Writer as one row in risk."procurementDecisions" (metadata
+// only), keyed by ("procurementSource", "procurementId"), plus one row per
+// signal in risk."signals" linked back via that row's id ("decisionId").
+// dataAsOf is the cutoff of the evaluation that last refreshed the row;
+// createdAt/updatedAt
 // are best-effort placeholders here — the upsert SQL
 // (services/procurement-risk/write.ts) is the actual authority on those two
-// columns (DEFAULT now() on insert, now() on every refresh, created_at
+// columns (DEFAULT now() on insert, now() on every refresh, "createdAt"
 // otherwise untouched).
 export type ProcurementRiskDecisions = Readonly<{
     procurementSource: string;
     procurementId: string;
-    runId: number;
     signals: readonly RiskSignal[];
     dataAsOf: string;
     createdAt: Date;
     updatedAt: Date;
 }>;
 
-export type RunStatus = "running" | "succeeded" | "partial" | "failed";
+export type RunStatus = "succeeded" | "partial" | "failed";
 
 export type IndicatorStats = Readonly<{ rows: number; triggered: number; written: number }>;
 
@@ -90,28 +90,6 @@ export type RunTotals = Readonly<{
 export type RunStatistics = Readonly<{
     totals: RunTotals;
     indicators: Readonly<Record<string, IndicatorStats>>;
-}>;
-
-export const EMPTY_RUN_STATISTICS: RunStatistics = Object.freeze({
-    totals: Object.freeze({
-        procurementsEvaluated: 0,
-        decisionsWritten: 0,
-        signalsEvaluated: 0,
-        signalsTriggered: 0,
-        signalsWritten: 0,
-        orphanLotsDropped: 0,
-        pagesProcessed: 0,
-        pagesFailed: 0,
-        durationSec: 0,
-    }),
-    indicators: Object.freeze({}),
-});
-
-export type EvaluationRun = Readonly<{
-    runId: number;
-    status: RunStatus;
-    dataAsOf: string;
-    statistics: RunStatistics;
 }>;
 
 export type BaseParameters = Readonly<{

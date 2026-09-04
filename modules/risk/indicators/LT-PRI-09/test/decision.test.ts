@@ -33,7 +33,7 @@ import {
 // goes through RiskDecisionEngine, since that is genuinely how a BidSubject
 // reaches assessRisk in production.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
+const CONTEXT = new EvaluationContext({ dataAsOf: "2026-08-01" });
 const ltPri09v1 = new LtPri09Decision(CONTEXT);
 
 function testProcurement(overrides: Partial<Procurement> = {}): Procurement {

@@ -37,7 +37,7 @@ it mid-implementation:
   runtime signal actually being built (a decision test or an end-to-end engine test) will,** with a `ZodError` deep
   inside `signalFor`. Update it in the same commit as `types.ts`, don't wait to be told by a failing test.
 - [ ] `migrations/risk/00N_<name>.sql` — a new migration (do not edit `001_risk.sql` in place) that drops and
-  re-adds `risk_signals_subject_type_check` with the new value included.
+  re-adds `signalsSubjectTypeCheck` with the new value included.
 - [ ] `modules/risk/procurementLotDecision.ts` — add the new `A<X>IndicatorDecision` base class, following
   `ALotIndicatorDecision`'s shape: delegate `isEligible` to whichever existing Eligibility Decision the new subject's
   parent already has (extend `procurementEligibility.ts` only if the new subject genuinely needs its own rule, per
@@ -121,10 +121,6 @@ Directory: `modules/risk/indicators/<ID>/`.
   copy of it (`procurementPublicViews.ts`'s header explains why the copies exist), **edit both the shared view and
   its `_v2` copy by hand, in the same change** — they are not generated from one source, and only the `_v2` copy is
   what the Procurement Reader and its integration tests actually run.
-- [ ] If that new column's source table isn't already reproduced in
-  `migrations/risk/test/001_public_test_tables.sql`, add the column (and any lookup table it references) there too,
-  and extend the matching helper in `modules/risk/indicators/test/xlsxPPAFixtures.ts` so integration tests can set
-  it. Check `test/risk/testPublicDb.ts`'s `TEST_TABLES` truncation list also names any new table.
 - [ ] `README.md` — one paragraph on unit of analysis, a "where to look" table for the files, and any known
   limitation the public `limitationLt` text should already be saying in Lithuanian. If Phase 1 measured a data
   coverage number that shaped the formula (see Phase 1's coverage bullet), record the measurement and its date here
@@ -145,8 +141,9 @@ Directory: `modules/risk/indicators/<ID>/`.
 - [ ] `test/decision.test.ts` — unit-test `assessRisk()` directly against fixtures (no database), plus an
   "end to end" block through `RiskDecisionEngine` covering the eligibility gate.
 - [ ] If Phase 3 added or changed a reader query, add/extend an integration test (`*.it.ts`, requires a live DB —
-  `npm run test:integration`) proving the query itself produces the shapes the fixtures assume. **If the local risk
-  Postgres (`docs/indicators-story/compose.yml`) isn't reachable in the current environment** (no Docker), write the test
+  `npm run test:integration`) proving the query itself produces the shapes the fixtures assume — reading real rows,
+  since there is no fixture schema to write into. **If a local database isn't reachable in the current
+  environment**, write the test
   anyway — it documents and will verify the query's contract once run — but say so explicitly in the Phase 8
   handoff rather than silently skipping it; don't report `npm run test:integration` as green without having run it.
 - [ ] `npm test` and, if touched, `npm run test:integration` both green.
@@ -166,7 +163,7 @@ as done:
   runs `ProcurementReader` + `RiskDecisionEngine` with just this indicator against a real, non-trivial sample of
   subjects (tens of procurements, not one), and prints the resulting state distribution
   (`triggered`/`not_triggered`/`insufficient_data`/`not_applicable` counts) plus a few example `triggered` signals.
-  This reads real `public` data but never writes to `risk.risk_signals` (skip `SignalWriter` entirely) — safe to run
+  This reads real `public` data but never writes to `risk."signals"` (skip `SignalWriter` entirely) — safe to run
   without the local risk Postgres.
 - [ ] Look at the `triggered` examples by hand: do they look like genuine instances of the catalogue concept, not an
   artifact of the query (duplicate rows, a wrong join, a threshold that's trivially always true)?

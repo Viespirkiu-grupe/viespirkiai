@@ -1,11 +1,10 @@
 // Integration test for the Procurement Risk Service's real execution path
 // (services/procurement-risk/runJob.ts's runEvaluation — the same function
-// services/procurement-risk/index.ts's CLI calls). Unlike the rest of
-// test/risk, which runs indicator SQL against local fixture rows
-// (test/risk/testPublicDb.ts), this test reads real canonical procurement
-// facts through the production `postgres` pool (postgres/postgres.js) —
-// exactly what a real `npm run risk:run` does — and writes through the local
-// risk-dev `riskDb` (postgres/riskDb.js, docs/indicators-story/compose.yml). See
+// services/procurement-risk/index.ts's CLI calls). This test reads real
+// canonical procurement facts through the `postgres` pool
+// (postgres/postgres.js) — exactly what a
+// real `npm run risk:run` does — and writes the `risk` schema back through
+// that same pool, since the risk schema lives in the main database. See
 // docs/indicators-story/risk-service-architecture.md §1/§4.
 //
 // Named procurements: a comma-separated pirkimoNumeris list — the same
@@ -18,18 +17,16 @@
 // Procurement Reader is guaranteed to find all of them, not just report
 // them).
 //
-// Safety: riskDb (the only pool this file writes to) MUST be the local,
-// disposable risk-dev Postgres — never a real database. The assertion below
-// refuses to run otherwise. This test never truncates or deletes rows: the
-// local risk-dev database is shared with manual `npm run risk:run`
-// investigation, and wiping risk.* out from under that would destroy
-// whatever the person running it is looking at. Instead its assertions are
-// scoped to just the sampled subjects' own rows, so it coexists with
-// whatever else already lives in the table.
+// Safety: this test writes real risk.* rows into whatever database `postgres`
+// points at, so it MUST target a local one — the assertion below refuses to
+// run otherwise. It never truncates or deletes rows: the database is shared
+// with manual `npm run risk:run` investigation, and wiping risk.* out from
+// under that would destroy whatever the person running it is looking at.
+// Instead its assertions are scoped to just the sampled subjects' own rows,
+// so it coexists with whatever else already lives in the table.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import config from "../../utils/config.js";
 import { postgres } from "../../postgres/postgres.js";
-import { riskDb } from "../../postgres/riskDb.js";
 import { runEvaluation } from "../../services/procurement-risk/runJob.ts";
 import { publicViewsCte } from "../../modules/risk/procurementPublicViews.ts";
 
@@ -37,19 +34,19 @@ const PIRKIMO_NUMERIAI_ENV = "RISK_IT_PIRKIMO_NUMERIAI";
 const SUBJECT_COUNT = 3;
 
 /**
- * riskDb (postgres/riskDb.js) must be the local risk-dev Docker container
- * (docs/indicators-story/compose.yml) — never the shared production database
- * `postgres` (postgres/postgres.js) reads canonical facts from. Called both
- * in beforeAll and again right before the run, so a config change mid-suite
+ * The `postgres` pool must point at a local database — never a shared remote
+ * one. Since the risk schema moved into the main database, this test's writes
+ * land in the same database it reads canonical facts from, so "local" is the
+ * only thing separating a safe run from writing to production. Called both in
+ * beforeAll and again right before the run, so a config change mid-suite
  * can't slip the guard.
  */
-function assertTargetsLocalRiskDb(): void {
-    if (config.riskPgHost !== "localhost" || config.riskPgUser !== "risk_rw") {
+function assertTargetsLocalDb(): void {
+    if (config.pgHost !== "localhost" && config.pgHost !== "127.0.0.1") {
         throw new Error(
-            "refusing to run: riskDb must be the local risk-dev Postgres " +
-                `(riskPgHost === "localhost", riskPgUser === "risk_rw"), got ` +
-                `riskPgHost=${JSON.stringify(config.riskPgHost)}, riskPgUser=${JSON.stringify(config.riskPgUser)}. ` +
-                "This test writes real risk.risk_procurement_decisions/risk_signals/risk_evaluation_runs rows.",
+            "refusing to run: pgHost must be a local database, got " +
+                `${JSON.stringify(config.pgHost)}. ` +
+                'This test writes real risk."procurementDecisions" and risk."signals" rows.',
         );
     }
 }
@@ -93,22 +90,22 @@ async function resolvePirkimoNumeriai(): Promise<readonly string[]> {
 }
 
 // Scoped to just the sampled subjects, never the whole table — the local
-// risk-dev database is shared with manual `npm run risk:run` investigation,
+// database is shared with manual `npm run risk:run` investigation,
 // so this must tell its own rows apart from whatever else is already there
 // rather than owning (and clearing) the table.
 async function countDecisions(subjects: readonly string[]): Promise<number> {
-    const { rows } = await riskDb.query<{ count: string }>(
-        `SELECT count(*) FROM risk.risk_procurement_decisions WHERE procurement_id = ANY($1)`,
+    const { rows } = await postgres.query<{ count: string }>(
+        `SELECT count(*) FROM risk."procurementDecisions" WHERE "procurementId" = ANY($1)`,
         [subjects],
     );
     return Number(rows[0].count);
 }
 
 async function countSignals(subjects: readonly string[]): Promise<number> {
-    const { rows } = await riskDb.query<{ count: string }>(
-        `SELECT count(*) FROM risk.risk_signals s
-           JOIN risk.risk_procurement_decisions d ON d.id = s.decision_id
-          WHERE d.procurement_id = ANY($1)`,
+    const { rows } = await postgres.query<{ count: string }>(
+        `SELECT count(*) FROM risk."signals" s
+           JOIN risk."procurementDecisions" d ON d."id" = s."decisionId"
+          WHERE d."procurementId" = ANY($1)`,
         [subjects],
     );
     return Number(rows[0].count);
@@ -118,16 +115,16 @@ describe("Procurement Risk Service — real execution on named procurements", ()
     let subjects: readonly string[];
 
     beforeAll(async () => {
-        assertTargetsLocalRiskDb();
+        assertTargetsLocalDb();
         subjects = await resolvePirkimoNumeriai();
     });
 
     afterAll(async () => {
-        await Promise.all([postgres.end(), riskDb.end()]);
+        await postgres.end();
     });
 
     it("evaluates the named procurements against real data, and run a second time writes no additional decisions or signals", async () => {
-        assertTargetsLocalRiskDb();
+        assertTargetsLocalDb();
         expect(subjects.length).toBe(SUBJECT_COUNT);
 
         const first = await runEvaluation({ subjects });
@@ -143,7 +140,6 @@ describe("Procurement Risk Service — real execution on named procurements", ()
         // content) — never a growing count for these subjects.
         const second = await runEvaluation({ subjects });
         expect(second.status).toBe("succeeded");
-        expect(second.runId).not.toBe(first.runId);
 
         const decisionsAfterSecond = await countDecisions(subjects);
         const signalsAfterSecond = await countSignals(subjects);

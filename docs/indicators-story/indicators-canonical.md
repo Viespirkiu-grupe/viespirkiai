@@ -81,7 +81,7 @@ a warehouse table — is what an indicator is specified against. Live database s
 supplier sanction is one company-level result that may be shown as context on many procurements; duplicating it as a
 separate procurement decision would distort counts and history.
 
-Storage constraint: `SubjectType` in `modules/risk/types.ts` and the `risk_signals_subject_type_check` constraint in
+Storage constraint: `SubjectType` in `modules/risk/types.ts` and the `signalsSubjectTypeCheck` constraint in
 `migrations/risk/001_risk.sql` today admit only `procurement`, `lot`, `contract`, and `supplier`. The remaining five
 subject types must be added there before their indicators can be stored.
 

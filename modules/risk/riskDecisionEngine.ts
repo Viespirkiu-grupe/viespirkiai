@@ -26,7 +26,7 @@ export class RiskDecisionEngine {
      * fixed EvaluationContext (riskIndicatorDecision.ts), built by
      * RiskIndicatorRegistry.createAllIndicators(context)
      * (registry.ts). `context` is that same run-scoped context, passed
-     * explicitly rather than read off an indicator, so runId/dataAsOf are
+     * explicitly rather than read off an indicator, so dataAsOf is
      * available even when a subject-type's indicator list is empty — it's
      * used only to stamp the ProcurementRiskDecisions this class collects,
      * never to build or resolve indicators. Split by subjectType once here,
@@ -71,7 +71,6 @@ export class RiskDecisionEngine {
         return {
             procurementSource: procurement.saltinis ?? "unknown",
             procurementId: procurement.pirkimoNumeris,
-            runId: this.context.runId,
             signals,
             dataAsOf: this.context.dataAsOf,
             createdAt: now,

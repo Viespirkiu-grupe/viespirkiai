@@ -18,7 +18,7 @@ import { noOutcomeBid, rankedBid, rankedThenWithdrawnBid, rejectedForCauseBid, w
 // goes through RiskDecisionEngine itself, since that is genuinely how a
 // BidSubject reaches assessRisk in production.
 
-const CONTEXT = new EvaluationContext({ runId: 1, dataAsOf: "2026-08-01" });
+const CONTEXT = new EvaluationContext({ dataAsOf: "2026-08-01" });
 const ltCom20v1 = new LtCom20Decision(CONTEXT);
 
 function testProcurement(overrides: Partial<Procurement> = {}): Procurement {

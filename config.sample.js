@@ -188,18 +188,10 @@ export default {
 
     // ─────────────────────────────────────────────────────────────────────
     // Procurement Risk Service — schema `risk` (žr. modules/risk/,
-    // services/procurement-risk/). Dev aplinkoje tai lokalus Docker Postgres
-    // (docs/indicators-story/compose.yml), atskiras nuo pagrindinio pg* prisijungimo,
-    // kad evaluation run'ai niekada nerašytų į bendrą (public schema)
-    // duomenų bazę. `public` faktai skaitomi per pagrindinį pg* pool'ą.
+    // services/procurement-risk/). Gyvena toje pačioje pagrindinėje DB kaip ir
+    // `public` faktai ir pasiekiama per tą patį pg* prisijungimą, todėl atskirų
+    // nustatymų neturi. Schemą kuria migrations/risk/001_risk.sql.
     // ─────────────────────────────────────────────────────────────────────
-
-    riskPgHost: "localhost",
-    riskPgPort: 15432,
-    riskPgUser: "risk_rw",
-    riskPgPassword: "risk_rw",
-    riskPgDatabase: "viespirkiai",
-    riskPgMaxConnections: 5,
 
     // Rodyti rizikos indikatorių „čipsus“ (chips) viešųjų pirkimų sąraše.
     riskEnableIndicatorsChips: false,

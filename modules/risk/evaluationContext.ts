@@ -1,9 +1,7 @@
 export class EvaluationContext {
-    readonly runId: number;
     readonly dataAsOf: string;
 
-    constructor(run: Readonly<{ runId: number; dataAsOf: string }>) {
-        this.runId = run.runId;
+    constructor(run: Readonly<{ dataAsOf: string }>) {
         this.dataAsOf = run.dataAsOf;
         Object.freeze(this);
     }
