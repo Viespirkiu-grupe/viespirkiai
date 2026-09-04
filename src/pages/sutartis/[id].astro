@@ -14,7 +14,7 @@ import SutartisSabis from '../../components/sutartis/SutartisSabis.astro';
 import SutartisPanasios from '../../components/sutartis/SutartisPanasios.astro';
 import SutartisPakeitimai from '../../components/sutartis/SutartisPakeitimai.astro';
 import DetailsSection from '@design-system/components/DetailsSection.astro';
-import { loadSutartis } from '../../lib/sutartis.js';
+import { loadSutartis, SABIS_SASKAITU_LIMIT } from '../../lib/sutartis.js';
 import { countSutartisPakeitimai, loadSutartisPakeitimai } from '../../lib/sutartisPakeitimai.ts';
 import { fmtEur } from '../../lib/formatters.ts';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
@@ -26,7 +26,15 @@ const font = getFont(Astro.cookies);
 const { id } = Astro.params;
 if (!id || isNaN(parseInt(id))) return Astro.redirect('/404');
 
-const sutartis = await loadSutartis(parseInt(id));
+const saskaituPuslapis = Math.max(1, Math.floor(Number(Astro.url.searchParams.get('saskaituPuslapis')) || 1));
+const sutartis = await loadSutartis(parseInt(id), {
+  sabisSaskaitos: {
+    limit: SABIS_SASKAITU_LIMIT,
+    offset: (saskaituPuslapis - 1) * SABIS_SASKAITU_LIMIT,
+    sort: Astro.url.searchParams.get('saskaituSort') ?? undefined,
+    kryptis: Astro.url.searchParams.get('saskaituKryptis') ?? undefined,
+  },
+});
 if (!sutartis) return Astro.redirect('/404');
 
 if (Astro.url.pathname.endsWith('.json') || (Astro.request?.headers.get('accept') || '').includes('application/json')) {
@@ -106,10 +114,13 @@ const pageDescription = `Sutartis nr. ${sutartis.sutartiesNumeris}\nSudaryta: ${
 
     <SutartisEsProjektai sutartys={sutartis.cpvaProjektuSutartys} className="mb-7" />
 
-    <div class="grid-2">
-      <SutartisSabis sutartys={sutartis.sabisSutartys} />
-      <SutartisPanasios sutartys={sutartis.panasiosSutartys} />
-    </div>
+    <SutartisSabis
+      sutartys={sutartis.sabisSutartys}
+      saskaitos={sutartis.sabisSaskaitos}
+      className="mb-7"
+    />
+
+    <SutartisPanasios sutartys={sutartis.panasiosSutartys} />
 
   </main>
 </Layout>

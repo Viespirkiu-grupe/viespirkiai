@@ -1,26 +1,224 @@
 ---
-import SabisSutartisCard from './SabisSutartisCard.astro';
-import CollapsibleListSection from '@design-system/components/CollapsibleListSection.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import EntityLink from '@design-system/components/EntityLink.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import Table from '@design-system/components/Table.astro';
+import TableEmptyRow from '@design-system/components/TableEmptyRow.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 
 interface Props {
   sutartys: any[] | null | undefined;
-  maxVisible?: number;
+  saskaitos?: any;
+  className?: string;
 }
 
-const { sutartys, maxVisible = 3 } = Astro.props;
+const { sutartys, saskaitos, className = '' } = Astro.props;
 const list = sutartys ?? [];
-const visible = list.slice(0, maxVisible);
-const hidden = list.slice(maxVisible);
+const sk = saskaitos ?? { rows: [], count: 0, limit: 50, offset: 0, sort: 'data', kryptis: 'desc' };
+const rows = sk.rows ?? [];
+const count = sk.count ?? 0;
+const limit = sk.limit || 50;
+
+// Iki `limit` sąskaitų telpa į vieną puslapį, todėl rikiuoja naršyklė. Daugiau —
+// rikiavimas ir puslapiavimas keliauja į serverį, kitaip būtų rikiuojamas tik
+// matomas puslapis (didžiausia sutartis turi per 6000 sąskaitų).
+const serverine = count > limit;
+const puslapiu = Math.max(1, Math.ceil(count / limit));
+const puslapis = Math.floor((sk.offset || 0) / limit) + 1;
+const rodomaNuo = count === 0 ? 0 : (sk.offset || 0) + 1;
+const rodomaIki = (sk.offset || 0) + rows.length;
+const keliosSutartys = list.length > 1;
+
+const STULPELIAI = [
+  { raktas: 'data', label: 'Data', kryptis: 'desc', klase: '', tipas: 'date' },
+  { raktas: 'numeris', label: 'Nr.', kryptis: 'asc', klase: '', tipas: 'text' },
+  { raktas: 'tipas', label: 'Tipas', kryptis: 'asc', klase: '', tipas: 'text' },
+  ...(keliosSutartys ? [{ raktas: null, label: 'Sutartis', kryptis: 'asc', klase: '', tipas: 'text' }] : []),
+  { raktas: 'bePvm', label: 'Be PVM', kryptis: 'desc', klase: 'cell-right', tipas: 'number' },
+  { raktas: 'pvm', label: 'PVM', kryptis: 'desc', klase: 'cell-right', tipas: 'number' },
+  { raktas: 'viso', label: 'Viso', kryptis: 'desc', klase: 'cell-right', tipas: 'number' },
+  { raktas: 'busena', label: 'Būsena', kryptis: 'asc', klase: '', tipas: 'text' },
+];
+
+const rikiavimoNuoroda = (raktas: string, numatytoji: string) => {
+  const params = new URLSearchParams(Astro.url.search);
+  const kryptis = sk.sort === raktas && sk.kryptis === numatytoji
+    ? (numatytoji === 'asc' ? 'desc' : 'asc')
+    : numatytoji;
+  params.set('saskaituSort', raktas);
+  params.set('saskaituKryptis', kryptis);
+  params.delete('saskaituPuslapis');
+  return `${Astro.url.pathname}?${params.toString()}#sabis`;
+};
+
+const kitiParametrai = [...new URLSearchParams(Astro.url.search)]
+  .filter(([raktas]) => raktas !== 'saskaituPuslapis')
+  .map(([raktas, reiksme]) => `&${encodeURIComponent(raktas)}=${encodeURIComponent(reiksme)}`)
+  .join('');
+
+const salis = (s: any) => s?.jarPavadinimas || s?.pavadinimas || s?.validusJarKodas || '';
+const sutartiesElementai = (item: any) => [
+  { label: 'Numeris', value: item.sutartiesNumeris },
+  { label: 'Tipas', value: item.tipas },
+  { label: 'Pavadinimas', value: item.pavadinimas },
+  { label: 'CPV', value: [item.cpvKodas, item.cpvPav].filter(Boolean).join(' ') },
+];
 ---
 
-<CollapsibleListSection
-  title="SABIS sutartys"
-  emptyText="SABIS sutarčių nerasta."
-  totalCount={list.length}
-  hiddenCount={hidden.length}
->
-  {visible.map((item: any) => <SabisSutartisCard item={item} />)}
-  <Fragment slot="hidden">
-    {hidden.map((item: any) => <SabisSutartisCard item={item} />)}
-  </Fragment>
-</CollapsibleListSection>
+<section id="sabis" class={className}>
+  <h2>SABIS</h2>
+
+  {list.length === 0 ? (
+    <p class="text-muted text-sm mt-2">SABIS sutarčių nerasta.</p>
+  ) : (
+    <>
+      {keliosSutartys ? (
+        <div class="mt-4">
+          <TableWrapper>
+            <Table size="sm" className="sabis-sutartys-table" sortable={true}>
+              <thead>
+                <tr>
+                  <th class="sortable">Nr.</th>
+                  <th class="sortable">Tipas</th>
+                  <th class="sortable">Pavadinimas</th>
+                  <th class="sortable" data-sort-type="date">Pasirašyta</th>
+                  <th class="sortable" data-sort-type="date">Galioja iki</th>
+                  <th class="sortable cell-right" data-sort-type="number">Suma</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((item: any) => (
+                  <tr>
+                    <td class="cell-mono sabis-nowrap">{item.sutartiesNumeris || '—'}</td>
+                    <td class="sabis-nowrap">{item.tipas || '—'}</td>
+                    <td>{item.pavadinimas || '—'}</td>
+                    <td class="sabis-nowrap"><DateValue value={item.sutartiesPasirasymoData} mono={true} /></td>
+                    <td class="sabis-nowrap"><DateValue value={item.sutartiesGaliojimoData} mono={true} /></td>
+                    <td class="cell-right sabis-nowrap"><MoneyValue value={item.suma} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </TableWrapper>
+        </div>
+      ) : (
+        <div class="sabis-sutartis mt-4">
+          <KeyValueList items={sutartiesElementai(list[0])}>
+            <dt>Laikotarpis</dt>
+            <dd>
+              <DateValue value={list[0].sutartiesPasirasymoData} mono={true} />
+              {list[0].sutartiesGaliojimoData && <> — <DateValue value={list[0].sutartiesGaliojimoData} mono={true} /></>}
+            </dd>
+            <dt>Suma</dt>
+            <dd class="amount"><MoneyValue value={list[0].suma} /></dd>
+            {(list[0].salys ?? []).map((s: any) => (
+              <>
+                <dt>{s.tipas || 'Šalis'}</dt>
+                <dd>
+                  {s.validusJarKodas
+                    ? <EntityLink kodas={s.validusJarKodas} label={salis(s)} />
+                    : salis(s) || '—'}
+                </dd>
+              </>
+            ))}
+          </KeyValueList>
+        </div>
+      )}
+
+      <h3 class="mt-6">Sąskaitos</h3>
+      {count === 0 ? (
+        <p class="text-muted text-sm mt-2">Sąskaitų nerasta.</p>
+      ) : (
+        <>
+          <p class="text-muted text-sm mt-2 mb-4">
+            {serverine ? <>Rodoma {rodomaNuo}–{rodomaIki} iš {count}</> : <>{count} vnt.</>}
+            {' · '}Bendra suma <MoneyValue value={sk.suma} mono={false} />
+            {sk.apmoketaCount > 0 && <> · Apmokėta <MoneyValue value={sk.apmoketaSuma} mono={false} /> ({sk.apmoketaCount})</>}
+            {sk.nuo && <> · <DateValue value={sk.nuo} /> — <DateValue value={sk.iki} /></>}
+          </p>
+
+          <TableWrapper>
+            <Table size="sm" className="sabis-saskaitu-table" sortable={!serverine}>
+              <thead>
+                <tr>
+                  {STULPELIAI.map((stulpelis) => {
+                    if (!serverine || !stulpelis.raktas) {
+                      return (
+                        <th
+                          class:list={[stulpelis.klase, stulpelis.raktas && !serverine ? 'sortable' : '']}
+                          data-sort-type={stulpelis.raktas && !serverine ? stulpelis.tipas : undefined}
+                        >{stulpelis.label}</th>
+                      );
+                    }
+                    const aktyvus = sk.sort === stulpelis.raktas;
+                    return (
+                      <th
+                        class:list={[stulpelis.klase, 'sortable', aktyvus && (sk.kryptis === 'asc' ? 'asc' : 'desc')]}
+                        aria-sort={aktyvus ? (sk.kryptis === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
+                        <a class="sabis-rikiavimas" href={rikiavimoNuoroda(stulpelis.raktas, stulpelis.kryptis)} title="Rikiuoti pagal šį stulpelį">{stulpelis.label}</a>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length ? rows.map((item: any) => (
+                  <tr>
+                    <td class="sabis-nowrap"><DateValue value={item.israsymoData} mono={true} /></td>
+                    <td class="cell-mono sabis-nowrap">{item.sfNumeris || '—'}</td>
+                    <td class="sabis-nowrap">{item.sfTipas || '—'}</td>
+                    {keliosSutartys && <td>{item.sutartiesPavadinimas || item.sutartiesNumeris || '—'}</td>}
+                    <td class="cell-right sabis-nowrap"><MoneyValue value={item.sumaBePvm} /></td>
+                    <td class="cell-right sabis-nowrap"><MoneyValue value={item.sumaPvm} /></td>
+                    <td class="cell-right sabis-nowrap"><MoneyValue value={item.bendraSfSuma} /></td>
+                    <td class="sabis-nowrap">{item.sfBusena || '—'}</td>
+                  </tr>
+                )) : <TableEmptyRow colspan={STULPELIAI.length} message="Sąskaitų nerasta" />}
+              </tbody>
+            </Table>
+          </TableWrapper>
+
+          {puslapiu > 1 && (
+            <div class="sabis-puslapiai">
+              <Pagination
+                currentPage={puslapis}
+                pageCount={puslapiu}
+                queryParams={kitiParametrai}
+                pageParam="saskaituPuslapis"
+                hash="sabis"
+              />
+            </div>
+          )}
+        </>
+      )}
+    </>
+  )}
+</section>
+
+<style>
+  /* Kaip ir kitose plačiose lentelėse – siaurame ekrane skrolinama
+     horizontaliai, o ne laužomas kiekvienas stulpelis. */
+  :global(.sabis-saskaitu-table) { min-width: 860px; }
+  :global(.sabis-sutartys-table) { min-width: 780px; }
+
+  :global(.sabis-saskaitu-table td.sabis-nowrap),
+  :global(.sabis-sutartys-table td.sabis-nowrap) { white-space: nowrap; }
+
+  .sabis-sutartis :global(.kv-list) { margin-top: 0; }
+
+  :global(.sabis-rikiavimas) {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  :global(.sabis-rikiavimas:hover) { text-decoration: underline; }
+
+  .sabis-puslapiai {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
+  }
+</style>

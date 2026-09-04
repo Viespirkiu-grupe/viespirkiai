@@ -87,14 +87,76 @@ function groupBy(rows: any[], key: string) {
   return map;
 }
 
-async function loadSabisSutartys(vpId: number) {
-  const sabis = await postgres.query(`SELECT * FROM sabis."sutartys" WHERE "vpId" = $1`, [vpId]).then((r: any) => r.rows);
-  if (sabis.length === 0) return sabis;
+export const SABIS_SASKAITU_LIMIT = 50;
+const SABIS_SASKAITU_MAX_LIMIT = 500;
 
-  const [sutarciuSalys, saskaitos] = await Promise.all([
-    postgres.query(`SELECT * FROM sabis."sutarciuSalys" WHERE "sutartiesId" = ANY($1)`, [sabis.map((s: any) => s.sutartiesId)]).then((r: any) => r.rows),
-    postgres.query(`SELECT * FROM sabis."saskaitos" WHERE "sutartiesUid" = ANY($1) ORDER BY "israsymoData" DESC NULLS LAST`, [sabis.map((s: any) => s.sutartiesUid)]).then((r: any) => r.rows),
+// Rikiavimo raktai gyvena serveryje: prie >50 sąskaitų kliento lentelė matytų
+// tik vieną puslapį, todėl rikiuojama duomenų bazėje.
+const SABIS_SASKAITU_RIKIAVIMAI: Record<string, string> = {
+  data: 'sk."israsymoData"',
+  numeris: 'sk."sfNumeris"',
+  tipas: 'sk."sfTipas"',
+  bePvm: 'sk."sumaBePvm"',
+  pvm: 'sk."sumaPvm"',
+  viso: 'sk."bendraSfSuma"',
+  busena: 'sk."sfBusena"',
+};
+
+interface SabisSaskatuOptions {
+  limit?: number;
+  offset?: number;
+  sort?: string;
+  kryptis?: string;
+}
+
+function tusciosSaskaitos(options: SabisSaskatuOptions = {}) {
+  return {
+    rows: [] as any[],
+    count: 0,
+    suma: null,
+    apmoketaSuma: null,
+    apmoketaCount: 0,
+    nuo: null,
+    iki: null,
+    limit: SABIS_SASKAITU_LIMIT,
+    offset: 0,
+    sort: 'data',
+    kryptis: 'desc',
+    ...options,
+  };
+}
+
+async function loadSabisSutartys(vpId: number, options: SabisSaskatuOptions = {}) {
+  const sutartys = await postgres.query(`SELECT * FROM sabis."sutartys" WHERE "vpId" = $1`, [vpId]).then((r: any) => r.rows);
+  if (sutartys.length === 0) return { sutartys, saskaitos: tusciosSaskaitos() };
+
+  const uids = sutartys.map((s: any) => s.sutartiesUid);
+  const limit = Math.min(SABIS_SASKAITU_MAX_LIMIT, Math.max(1, Number(options.limit) || SABIS_SASKAITU_LIMIT));
+  const offset = Math.max(0, Number(options.offset) || 0);
+  const sort = Object.hasOwn(SABIS_SASKAITU_RIKIAVIMAI, String(options.sort)) ? String(options.sort) : 'data';
+  const kryptis = options.kryptis === 'asc' ? 'asc' : 'desc';
+
+  const [sutarciuSalys, saskaitos, santrauka] = await Promise.all([
+    postgres.query(`SELECT * FROM sabis."sutarciuSalys" WHERE "sutartiesId" = ANY($1)`, [sutartys.map((s: any) => s.sutartiesId)]).then((r: any) => r.rows),
+    postgres.query(
+      `SELECT sk.* FROM sabis."saskaitos" sk
+       WHERE sk."sutartiesUid" = ANY($1)
+       ORDER BY ${SABIS_SASKAITU_RIKIAVIMAI[sort]} ${kryptis} NULLS LAST, sk."sfId"
+       LIMIT $2 OFFSET $3`,
+      [uids, limit, offset],
+    ).then((r: any) => r.rows),
+    postgres.query(
+      `SELECT count(*)::bigint AS "count",
+              sum(sk."bendraSfSuma") AS "suma",
+              sum(sk."bendraSfSuma") FILTER (WHERE sk."sfBusena" = 'Apmokėta') AS "apmoketaSuma",
+              count(*) FILTER (WHERE sk."sfBusena" = 'Apmokėta')::bigint AS "apmoketaCount",
+              min(sk."israsymoData") AS "nuo",
+              max(sk."israsymoData") AS "iki"
+       FROM sabis."saskaitos" sk WHERE sk."sutartiesUid" = ANY($1)`,
+      [uids],
+    ).then((r: any) => r.rows[0]),
   ]);
+
   const saskaituSalys = saskaitos.length > 0
     ? await postgres.query(`SELECT ss.*, t.tipas, v."veiklosVieta" FROM sabis."saskaituSalys" ss LEFT JOIN sabis."saskaituSalysTipai" t ON t.id = ss."tipasId" LEFT JOIN sabis."saskaituSalysVeiklosVieta" v ON v.id = ss."veiklosVietaId" WHERE ss."sfId" = ANY($1)`, [saskaitos.map((sk: any) => sk.sfId)]).then((r: any) => r.rows)
     : [];
@@ -102,14 +164,37 @@ async function loadSabisSutartys(vpId: number) {
   const sutarciuSalysById = groupBy(sutarciuSalys, 'sutartiesId');
   const saskaitosByUid = groupBy(saskaitos, 'sutartiesUid');
   const saskaituSalysBySfId = groupBy(saskaituSalys, 'sfId');
+  const sutartysByUid = new Map(sutartys.map((s: any) => [s.sutartiesUid, s]));
 
-  for (const sk of saskaitos) sk.salys = saskaituSalysBySfId.get(sk.sfId) || [];
-  for (const s of sabis) {
+  for (const sk of saskaitos) {
+    sk.salys = saskaituSalysBySfId.get(sk.sfId) || [];
+    // Kai pirkimas turi kelias SABIS sutartis, sąskaitų lentelėje reikia
+    // parodyti, kuriai iš jų sąskaita priklauso.
+    sk.sutartiesPavadinimas = (sutartysByUid.get(sk.sutartiesUid) as any)?.pavadinimas ?? null;
+  }
+  for (const s of sutartys) {
     s.salys = sutarciuSalysById.get(s.sutartiesId) || [];
+    // Suderinamumui su ankstesniu JSON formatu – tik einamojo puslapio dalis.
     s.saskaitos = saskaitosByUid.get(s.sutartiesUid) || [];
   }
   await attachJarPavadinimai([...sutarciuSalys, ...saskaituSalys]);
-  return sabis;
+
+  return {
+    sutartys,
+    saskaitos: {
+      rows: saskaitos,
+      count: Number(santrauka?.count ?? 0),
+      suma: santrauka?.suma ?? null,
+      apmoketaSuma: santrauka?.apmoketaSuma ?? null,
+      apmoketaCount: Number(santrauka?.apmoketaCount ?? 0),
+      nuo: santrauka?.nuo ?? null,
+      iki: santrauka?.iki ?? null,
+      limit,
+      offset,
+      sort,
+      kryptis,
+    },
+  };
 }
 
 async function annotateDokumentai(sutartis: any) {
@@ -175,7 +260,7 @@ async function annotateDokumentai(sutartis: any) {
   sutartis.dokumentai = dokumentai;
 }
 
-export async function loadSutartis(id: number): Promise<Sutartis | null> {
+export async function loadSutartis(id: number, options: { sabisSaskaitos?: SabisSaskatuOptions } = {}): Promise<Sutartis | null> {
   const sutartis = await postgres
     .query(sutartisPagalId([id]))
     .then((r: any) => r.rows[0]);
@@ -185,14 +270,15 @@ export async function loadSutartis(id: number): Promise<Sutartis | null> {
 
   const [panasios, sabis, , cpva, pirkimai] = await Promise.all([
     loadPanasiosSutartys(sutartis),
-    loadSabisSutartys(sutartis.sutartiesUnikalusId),
+    loadSabisSutartys(sutartis.sutartiesUnikalusId, options.sabisSaskaitos),
     annotateDokumentai(sutartis),
     loadCpvaProjektai(sutartis),
     loadPirkimoAtitikmenys(sutartis),
   ]);
 
   if (panasios.length > 0) sutartis.panasiosSutartys = panasios;
-  sutartis.sabisSutartys = sabis;
+  sutartis.sabisSutartys = sabis.sutartys;
+  sutartis.sabisSaskaitos = sabis.saskaitos;
   sutartis.cpvaProjektuSutartys = cpva;
   sutartis.pirkimoAtitikmenys = pirkimai.atitikmenys;
   // Suderinamumui su ankstesniu JSON formatu.
