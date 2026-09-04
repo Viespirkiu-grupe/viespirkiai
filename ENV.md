@@ -367,6 +367,23 @@ Kiekvienas nerastas raktas išvedamas kaip `TRŪKSTA <hash>`. Galimi
 `--store failaiInfo|dokumentai|ocrRezultatai|liteko2|eTar`, `--db`, `--page`,
 `--limit` ir `--after <hash>`.
 
+### Rizikos indikatoriai
+
+Viešųjų pirkimų rizikos „čipsai“ (`modules/risk/`, `services/procurement-risk/`).
+Duomenys gyvena `risk` schemoje **toje pačioje** DB kaip ir `public` faktai ir
+pasiekiami per tą patį `PG_*` prisijungimą — atskirų prisijungimo kintamųjų šis
+servisas neturi.
+
+| Kintamasis | Numatyta | Paaiškinimas |
+| --- | --- | --- |
+| `RISK_ENABLE_INDICATORS_CHIPS` | `false` | Rodo rizikos indikatorių „čipsus“ viešojo pirkimo puslapyje. Įjungus, `src/lib/viesiejiPirkimai.ts` kiekvienam pirkimui papildomai skaito `risk."procurementDecisions"` ir `risk."signals"`. |
+
+Prieš įjungiant reikia, kad `PG_DATABASE` nurodytoje bazėje būtų pritaikyta
+`migrations/risk/001_risk.sql` ir kad joje būtų duomenų (`npm run risk:run`).
+Jei `risk` schemos nėra, puslapis nelūžta: skaitymas apgaubtas `try/catch`
+(`modules/risk/procurementDecisionsReader.ts`), klaida patenka į logą, o pirkimas
+rodomas be čipsų.
+
 ### Kita
 
 | Kintamasis | Numatyta | Paaiškinimas |
