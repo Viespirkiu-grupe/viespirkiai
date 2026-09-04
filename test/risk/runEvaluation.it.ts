@@ -5,7 +5,7 @@
 // (test/risk/testPublicDb.ts), this test reads real canonical procurement
 // facts through the production `postgres` pool (postgres/postgres.js) —
 // exactly what a real `npm run risk:run` does — and writes through the local
-// risk-dev `riskDb` (postgres/riskDb.js, docker/risk/compose.yml). See
+// risk-dev `riskDb` (postgres/riskDb.js, docs/indicators-story/compose.yml). See
 // docs/indicators-story/risk-service-architecture.md §1/§4.
 //
 // Named procurements: a comma-separated pirkimoNumeris list — the same
@@ -38,7 +38,7 @@ const SUBJECT_COUNT = 3;
 
 /**
  * riskDb (postgres/riskDb.js) must be the local risk-dev Docker container
- * (docker/risk/compose.yml) — never the shared production database
+ * (docs/indicators-story/compose.yml) — never the shared production database
  * `postgres` (postgres/postgres.js) reads canonical facts from. Called both
  * in beforeAll and again right before the run, so a config change mid-suite
  * can't slip the guard.

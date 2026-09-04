@@ -100,6 +100,9 @@ export interface Config {
     pgAnalystMaxConnections: number;
     mcpQueryTimeout: number;
 
+    /** Rodyti rizikos indikatorių čipsus viešųjų pirkimų puslapiuose. */
+    riskEnableIndicatorsChips: boolean;
+
     [key: string]: unknown;
 }
 

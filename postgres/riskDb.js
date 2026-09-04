@@ -11,7 +11,7 @@ types.setTypeParser(1114, (str) => str);
 types.setTypeParser(1700, (val) => parseFloat(val));
 
 // Connection to the `risk` schema's database. In dev this is a local Docker
-// Postgres (docker/risk/compose.yml) — a different physical server than the
+// Postgres (docs/indicators-story/compose.yml) — a different physical server than the
 // main `postgres` pool in postgres/postgres.js, which stays pointed at the
 // real `viespirkiai` database for reading `public` canonical facts.
 //

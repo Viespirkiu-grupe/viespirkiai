@@ -6,7 +6,7 @@
 //
 // Named `.it.ts` to match this repo's integration-test convention
 // (vitest.integration.config.ts); run via `npm run test:integration`, which
-// requires the local Docker Postgres from docker/risk/compose.yml to be up.
+// requires the local Docker Postgres from docs/indicators-story/compose.yml to be up.
 //
 // Also covers the two consolidated participation queries (formerly each
 // deployed indicator's own collect.sql) and orphan-lot dropping, both moved

@@ -146,7 +146,7 @@ Directory: `modules/risk/indicators/<ID>/`.
   "end to end" block through `RiskDecisionEngine` covering the eligibility gate.
 - [ ] If Phase 3 added or changed a reader query, add/extend an integration test (`*.it.ts`, requires a live DB —
   `npm run test:integration`) proving the query itself produces the shapes the fixtures assume. **If the local risk
-  Postgres (`docker/risk/compose.yml`) isn't reachable in the current environment** (no Docker), write the test
+  Postgres (`docs/indicators-story/compose.yml`) isn't reachable in the current environment** (no Docker), write the test
   anyway — it documents and will verify the query's contract once run — but say so explicitly in the Phase 8
   handoff rather than silently skipping it; don't report `npm run test:integration` as green without having run it.
 - [ ] `npm test` and, if touched, `npm run test:integration` both green.

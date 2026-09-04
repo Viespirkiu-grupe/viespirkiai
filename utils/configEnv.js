@@ -94,6 +94,7 @@ const ENV_MAP = [
     ["RISK_PG_PASSWORD", "riskPgPassword", "string"],
     ["RISK_PG_DATABASE", "riskPgDatabase", "string"],
     ["RISK_PG_MAX_CONNECTIONS", "riskPgMaxConnections", "number"],
+    ["RISK_ENABLE_INDICATORS_CHIPS", "riskEnableIndicatorsChips", "boolean"],
 
     ["SPINTA_SERVER", "spintaServer", "string"],
     ["SPINTA_API_KEY", "spintaApiKey", "string"],

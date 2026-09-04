@@ -4,7 +4,7 @@ Status: draft — QA starting point
 
 Snapshot of the current full-data run of the **4.1 Procurement Risk Decision Service** indicators ([
 `indicators-canonical.md`](../indicators-canonical.md)), read directly from `risk.risk_signals` and
-`risk.risk_procurement_decisions` (local risk Postgres, `docker/risk/compose.yml`), cross-checked against the source
+`risk.risk_procurement_decisions` (local risk Postgres, `docs/indicators-story/compose.yml`), cross-checked against the source
 warehouse views (`v_pirkimas_v2`, `v_pirkimo_dalis_v2`, `ppa.*`) on the main database.
 
 ## 0. Run identification
@@ -336,7 +336,7 @@ produced a given run. Cheap remedy: write `git rev-parse HEAD` (plus a dirty mar
 **O-26 — [POTENTIAL BUG] The risk integration tests wipe the same database real runs write to.**
 `test/risk/runEvaluation.it.ts` opens with `DELETE FROM risk.risk_signals` / `risk_procurement_decisions` /
 `risk_evaluation_runs`, and `test/risk/write.it.ts` deletes the latter two — unscoped, against the `riskDb` pool, which
-in dev points at the same local Postgres (`docker/risk/compose.yml`, port 15432) that `npm run risk:run`
+in dev points at the same local Postgres (`docs/indicators-story/compose.yml`, port 15432) that `npm run risk:run`
 writes to. Running `npm run test:integration` therefore destroys whatever full-batch output is sitting in the local risk
 database — this is why the database currently holds exactly one run (see §0) instead of a history of past batches. The
 public-schema fixtures are careful here — `testPublicDb.ts` truncates only its own named test tables — but the `risk.*`

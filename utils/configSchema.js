@@ -113,6 +113,8 @@ const configSchema = z.object({
     riskPgPassword: z.string().default("risk_rw"),
     riskPgDatabase: z.string().default("viespirkiai"),
     riskPgMaxConnections: z.number().int().positive().default(5),
+    // Rodyti rizikos indikatorių "čipsus" (chips) viešųjų pirkimų puslapiuose.
+    riskEnableIndicatorsChips: z.boolean().default(false),
 
     spintaServer: z.string().default(""),
     spintaApiKey: z.string().default(""),
