@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import type { RiskSignal, SubjectType } from "./types.ts";
 import { riskCatalogue } from "./deployedIndicators.ts";
+import { riskProcurementSource } from "./riskCodes.ts";
 
 // Reads risk."procurementDecisions" joined to risk."signals" for
 // display on the procurement detail page
@@ -22,8 +23,14 @@ export type EnrichedRiskSignal = RiskSignal &
         limitationLt: string;
     }>;
 
-// risk."signals" columns are camelCase, so a row is already a RiskSignal —
-// except for "missingData", which the column allows NULL for.
+// The query below resolves every lookup id back to its code, so a row is
+// already a RiskSignal — except for "missingData", which the narrow schema
+// stores as NULL rather than an empty array
+// (migrations/risk/002_riskNarrow.sql §4).
+//
+// "subjectKey" arrives prefixless: '' for a procurement, '<dalis>' for a lot,
+// '<dalis>:<tiekejoKodas>' for a bid. That is exactly the key this module
+// groups by, so nothing needs stripping any more.
 type RiskSignalRow = Readonly<Omit<RiskSignal, "missingData"> & { missingData: readonly string[] | null }>;
 
 function rowToSignal(row: RiskSignalRow): RiskSignal {
@@ -71,34 +78,42 @@ function groupBy<T>(items: readonly T[], keyOf: (item: T) => string): ReadonlyMa
     return map;
 }
 
-// Strips the `${procurementSource}:${procurementId}:` prefix every lot/bid
-// subjectKey carries (see types.ts's Lot.subjektoRaktas / riskDecisionEngine.ts's
-// subjectKey construction), leaving `daliesNumeris` (lot) or
-// `daliesNumeris:tiekejoKodas` (bid).
-function stripSubjectPrefix(subjectKey: string, procurementSource: string, procurementId: string): string {
-    const prefix = `${procurementSource}:${procurementId}:`;
-    return subjectKey.startsWith(prefix) ? subjectKey.slice(prefix.length) : subjectKey;
-}
-
 export async function loadProcurementRiskView(
     procurementSource: string,
     procurementId: string,
 ): Promise<ProcurementRiskView | null> {
-    let decisionRow: { id: string; dataAsOf: unknown } | undefined;
+    let decisionRow: { id: number; dataAsOf: unknown } | undefined;
     let signalRows: readonly RiskSignalRow[] = [];
     try {
-        const { rows } = await postgres.query<{ id: string; dataAsOf: unknown }>(
-            `SELECT "id", "dataAsOf" FROM risk."procurementDecisions"
-              WHERE "procurementSource" = $1 AND "procurementId" = $2`,
-            [procurementSource, procurementId],
+        const { rows } = await postgres.query<{ id: number; dataAsOf: unknown }>(
+            `SELECT d."id", d."dataAsOf"
+               FROM risk."procurementDecisions" d
+                        JOIN risk."procurementSources" ps ON ps."id" = d."source"
+              WHERE ps."code" = $1 AND d."procurementId" = $2`,
+            [riskProcurementSource(procurementSource), procurementId],
         );
         decisionRow = rows[0];
         if (decisionRow) {
+            // Every narrow column is joined back to its lookup code here, so
+            // the shape this module returns is unchanged from the wide schema.
             const signals = await postgres.query<RiskSignalRow>(
-                `SELECT "indicatorId", "indicatorVersion", "subjectType", "subjectKey", "state",
-                        "rawValue", "threshold", "appliedParameters", "missingData"
-                   FROM risk."signals"
-                  WHERE "decisionId" = $1 AND "state" = 'triggered'`,
+                `SELECT i."code"     AS "indicatorId",
+                        i."version"  AS "indicatorVersion",
+                        sub."code"   AS "subjectType",
+                        s."subjectKey",
+                        st."code"    AS "state",
+                        s."rawValue",
+                        p."threshold",
+                        p."appliedParameters",
+                        (SELECT array_agg(mf."code" ORDER BY u.ord)
+                           FROM unnest(s."missingData") WITH ORDINALITY AS u(id, ord)
+                                    JOIN risk."missingFields" mf ON mf."id" = u.id) AS "missingData"
+                   FROM risk."signals" s
+                            JOIN risk."signalStates" st ON st."id" = s."state"
+                            JOIN risk."indicators" i ON i."id" = s."indicator"
+                            JOIN risk."subjectTypes" sub ON sub."id" = i."subjectType"
+                            LEFT JOIN risk."parameterSets" p ON p."id" = s."parameterSet"
+                  WHERE s."decisionId" = $1 AND st."code" = 'triggered'`,
                 [decisionRow.id],
             );
             signalRows = signals.rows;
@@ -122,8 +137,8 @@ export async function loadProcurementRiskView(
 
     return {
         procurement: bySubjectType("procurement"),
-        lotsByDalis: groupBy(lots, (s) => stripSubjectPrefix(s.subjectKey, procurementSource, procurementId)),
-        bidsByDalisAndTiekejas: groupBy(bids, (s) => stripSubjectPrefix(s.subjectKey, procurementSource, procurementId)),
+        lotsByDalis: groupBy(lots, (s) => s.subjectKey),
+        bidsByDalisAndTiekejas: groupBy(bids, (s) => s.subjectKey),
         dataAsOf,
     };
 }
