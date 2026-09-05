@@ -1,4 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
+import { acquireSessionLock } from "../../postgres/sessionLock.js";
 import { log } from "../../utils/log.js";
 import { runEvaluation } from "./runJob.ts";
 
@@ -61,13 +62,20 @@ async function resolveSubjects(argv: readonly string[]): Promise<readonly string
 
 async function main(): Promise<void> {
     const subjects = await resolveSubjects(process.argv.slice(2));
-    const client = await postgres.connect();
-    try {
-        const lock = await client.query("SELECT pg_try_advisory_lock(hashtext($1)::bigint) AS locked", [LOCK_KEY]);
-        if (!lock.rows[0]?.locked) {
-            throw new Error("Another Procurement Risk Service run is already in progress");
-        }
+    // Advisory locks live in the *connection*, and `postgres` is a pool behind
+    // pgbouncer: a lock taken on a pooled client lands on whatever server
+    // connection pgbouncer happened to pick, stays there after this process
+    // exits, and the unlock in `finally` usually runs on a different server
+    // connection (silently returning false). That orphans the lock until
+    // pgbouncer recycles the backend, which is why a stopped run kept
+    // reporting "already in progress". acquireSessionLock keeps its own direct
+    // connection to Postgres, so the lock dies with the process.
+    const lock = await acquireSessionLock(LOCK_KEY);
+    if (!lock) {
+        throw new Error("Another Procurement Risk Service run is already in progress");
+    }
 
+    try {
         const result = await runEvaluation({
             subjects,
         });
@@ -79,8 +87,7 @@ async function main(): Promise<void> {
             process.exitCode = 1;
         }
     } finally {
-        await client.query("SELECT pg_advisory_unlock(hashtext($1)::bigint)", [LOCK_KEY]);
-        client.release();
+        await lock.release();
     }
 }
 
