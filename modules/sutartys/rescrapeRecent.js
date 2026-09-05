@@ -22,7 +22,7 @@ if (!Number.isInteger(concurrency) || concurrency <= 0) {
 
 const snapshot = await postgres.query(
     `SELECT "unikalusId"
-       FROM "vpmSutartysAtnaujinimai"
+       FROM "vpmSutartys"."atnaujinimai"
       WHERE "matyta" >=
             (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Vilnius')
             - make_interval(mins => $1)

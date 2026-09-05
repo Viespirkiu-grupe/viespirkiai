@@ -30,7 +30,7 @@ export async function cvpIsImportArray(data, options = {}) {
 
         // Brokuoti laukai (pvz., "0000-00-00", "0022-10-12", "3.13.00")
         // nustatomi į null, kad sutartis vis tiek būtų importuota; ID
-        // fiksuojamas vpmSutartysBrokas auditui.
+        // fiksuojamas vpmSutartys."brokas" auditui.
         const markBrokas = (error) => {
             const id = Number(rawId);
             if (Number.isSafeInteger(id) && id > 0) brokuotiIds.add(id);
@@ -56,7 +56,7 @@ export async function cvpIsImportArray(data, options = {}) {
         timings.start("importPostgresBrokasUpsert");
         const ids = Array.from(brokuotiIds);
         await postgres.query(
-            `INSERT INTO public."vpmSutartysBrokas" ("unikalusId")
+            `INSERT INTO "vpmSutartys"."brokas" ("unikalusId")
              VALUES ${ids.map((_, i) => `($${i + 1})`).join(",")}
              ON CONFLICT ("unikalusId") DO UPDATE SET
                "timestamp" = timezone('Europe/Vilnius', now());`,
@@ -99,7 +99,7 @@ export async function cvpIsImportArray(data, options = {}) {
         timings.end("importPostgresFailaiUpsert");
 
         // Užtikriname, kad visos matytos sudarymo datos būtų
-        // vpmSutartysSudarymoDatos lentelėje (dienų scrapinimo sekimui).
+        // vpmSutartys."sudarymoDatos" lentelėje (dienų scrapinimo sekimui).
         // Daroma PRIEŠ vpm upsert'us: procesui nulūžus tarp šių žingsnių
         // liktų nebent perteklinė data (nekenksminga), o ne sutartis be
         // užregistruotos dienos, kuri niekada nebūtų perscrapinta.
@@ -113,7 +113,7 @@ export async function cvpIsImportArray(data, options = {}) {
         ];
         if (sudarymoDatos.length > 0) {
             await postgres.query(
-                `INSERT INTO public."vpmSutartysSudarymoDatos" ("sudarymoData")
+                `INSERT INTO "vpmSutartys"."sudarymoDatos" ("sudarymoData")
                  VALUES ${sudarymoDatos.map((_, i) => `($${i + 1})`).join(",")}
                  ON CONFLICT ("sudarymoData") DO NOTHING;`,
                 sudarymoDatos,

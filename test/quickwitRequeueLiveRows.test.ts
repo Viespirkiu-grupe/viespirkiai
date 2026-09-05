@@ -104,8 +104,8 @@ describe("requeueLiveRows transaction", () => {
     );
 
     const sql = queries.join("\n");
-    expect(sql).toContain('"vpmSutartysIndexQueue"');
-    expect(sql).toContain('JOIN "vpmSutartys"');
+    expect(sql).toContain('"vpmSutartys"."indexQueue"');
+    expect(sql).toContain('JOIN "vpmSutartys"."sutartys"');
     expect(sql).toContain('s."unikalusId"');
     expect(sql).not.toContain('"sutartysIndexQueue"');
   });

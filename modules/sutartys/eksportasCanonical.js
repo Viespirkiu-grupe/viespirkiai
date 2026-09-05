@@ -15,7 +15,7 @@ export const DEFAULT_BATCH_SIZE = 1000;
 export async function fetchCanonicalBatch(afterId, batchSize = DEFAULT_BATCH_SIZE) {
     const { rows } = await postgres.query(
         `SELECT ${DOC_JSONB_SQL} AS doc
-         FROM public."vpmSutartys" e
+         FROM "vpmSutartys"."sutartys" e
          ${DOC_JOINS_SQL}
          WHERE e."unikalusId" > $1
          ORDER BY e."unikalusId" ASC

@@ -19,9 +19,11 @@ const TABLES = {
     signal: WORK_SIGNALS.DOCUMENTS_INDEX_READY,
   },
   sutartys: {
-    queue: "vpmSutartysIndexQueue",
+    queue: "indexQueue",
+    queueSchema: "vpmSutartys",
     queueId: "unikalusId",
-    source: "vpmSutartys",
+    source: "sutartys",
+    sourceSchema: "vpmSutartys",
     sourceId: "unikalusId",
     signal: WORK_SIGNALS.SUTARTYS_CHANGED,
   },

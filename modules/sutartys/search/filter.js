@@ -38,7 +38,7 @@ export const sutartysFilter = new FilterBuilder({
                         const mainParam = addParam(v);
                         const extraParam = addParam(v);
                         return `(s."pirmoTiekejoKodas" = ${mainParam} OR EXISTS (
-                            SELECT 1 FROM public."vpmSutartysPapildomiTiekejai" pt
+                            SELECT 1 FROM "vpmSutartys"."papildomiTiekejai" pt
                             WHERE pt."unikalusId" = s."unikalusId"
                               AND pt."tiekejoKodas" = ${extraParam}
                         ))`;

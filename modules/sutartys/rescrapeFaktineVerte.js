@@ -25,8 +25,8 @@ export async function cvpIsRescrapeFaktineVerte() {
     timings.start("findOldestFaktineVerte");
     let oldestRes = await postgres.query(
         `SELECT a."unikalusId", a."atnaujinta"
-           FROM public."vpmSutartysAtnaujinimai" a
-           JOIN public."vpmSutartys" s ON s."unikalusId" = a."unikalusId"
+           FROM "vpmSutartys"."atnaujinimai" a
+           JOIN "vpmSutartys"."sutartys" s ON s."unikalusId" = a."unikalusId"
           WHERE s."faktineVerte" IS NOT NULL
             AND (a."atnaujinta" IS NULL
                  OR a."atnaujinta" < $1::timestamp)

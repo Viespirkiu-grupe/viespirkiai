@@ -21,10 +21,10 @@ import {
  */
 async function claimOne() {
     const { rows } = await postgres.query(
-        `DELETE FROM public."vpmSutartysAdpQueue"
+        `DELETE FROM "vpmSutartys"."adpQueue"
          WHERE "unikalusId" = (
              SELECT "unikalusId"
-             FROM public."vpmSutartysAdpQueue"
+             FROM "vpmSutartys"."adpQueue"
              ORDER BY "queuedAt"
              FOR UPDATE SKIP LOCKED
              LIMIT 1
@@ -37,10 +37,10 @@ async function claimOne() {
 /** Grąžina eilutę į eilę, jei sync'as nepavyko. */
 async function requeue(id) {
     await postgres.query(
-        `INSERT INTO public."vpmSutartysAdpQueue" ("unikalusId")
+        `INSERT INTO "vpmSutartys"."adpQueue" ("unikalusId")
          SELECT $1::bigint
          WHERE NOT EXISTS (
-             SELECT 1 FROM public."vpmSutartysAdpQueue" WHERE "unikalusId" = $1::bigint
+             SELECT 1 FROM "vpmSutartys"."adpQueue" WHERE "unikalusId" = $1::bigint
          )`,
         [id],
     );
@@ -58,7 +58,7 @@ export async function processSutartysAdpQueue() {
             spinta: createSutartysSpintaClient(),
         });
         log(
-            `vpmSutartysAdpQueue id=${id} | insert=${stats.insert} patch=${stats.patch} delete=${stats.delete} unchanged=${stats.unchanged}`,
+            `vpmSutartys."adpQueue" id=${id} | insert=${stats.insert} patch=${stats.patch} delete=${stats.delete} unchanged=${stats.unchanged}`,
         );
         return true;
     } catch (error) {
@@ -74,7 +74,7 @@ if (
     try {
         while (await processSutartysAdpQueue()) {}
     } catch (error) {
-        console.error("Klaida apdorojant vpmSutartysAdpQueue:", error);
+        console.error('Klaida apdorojant vpmSutartys."adpQueue":', error);
         process.exitCode = 1;
     } finally {
         await postgres.end();

@@ -8,7 +8,7 @@ export async function cvpIsScrapeOldestDeletedContract() {
     let timings = new Timings();
     timings.start("findOldestScrapedSutartis");
     let oldestRes = await postgres.query(`SELECT "unikalusId", "atnaujinta"
-    FROM public."vpmSutartysAtnaujinimai"
+    FROM "vpmSutartys"."atnaujinimai"
     WHERE "istrinta"
       AND "atnaujinta" < (
         timezone('Europe/Vilnius', now()) - INTERVAL '3 days'

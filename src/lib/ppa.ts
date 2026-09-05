@@ -9,7 +9,7 @@ export type Ppa = {
   pasiulymuEile: Record<string, any>[];
   proceduruPabaiga: Record<string, any>[];
   sutartys: Record<string, any>[];
-  /** `ppa."ataskaituSutartys".id` → the matching `vpmSutartys` record, when one was found. */
+  /** `ppa."ataskaituSutartys".id` → the matching `vpmSutartys."sutartys"` record, when one was found. */
   sutarciuAtitikmenys: Record<string, PpaSutartiesAtitikmuo>;
 };
 
@@ -21,7 +21,7 @@ export type PpaSutartiesAtitikmuo = {
 };
 
 /**
- * Match the contracts listed inside a PPA report to our own `vpmSutartys`
+ * Match the contracts listed inside a PPA report to our own `vpmSutartys."sutartys"`
  * records so the report can link straight to the contract page.
  *
  * The report gives no contract id — only the procurement number, the buyer, the
@@ -45,7 +45,7 @@ async function loadPpaSutarciuAtitikmenys(ataskaitaId: string | number): Promise
               v.verte = p."sutartiesVerte" AS "verteSutampa",
               v."sudarymoData" = p."sutartisSudarymoData" AS "dataSutampa"
        FROM ppa p
-       JOIN "vpmSutartys" v
+       JOIN "vpmSutartys"."sutartys" v
          ON v."pirkimoNumeris" = p."pirkimoNumeris"
         AND v."perkanciosiosOrganizacijosKodas" = p."perkanciosiosOrganizacijosKodas"
         AND v."pirmoTiekejoKodas" = p."tiekejosKodas"

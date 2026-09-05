@@ -77,7 +77,7 @@ describe("sutartys import validation", () => {
 
         const vpmCall = kvietimai().find(
             ([sql, params]) =>
-                sql.includes('INSERT INTO public."vpmSutartys"') &&
+                sql.includes('INSERT INTO "vpmSutartys"."sutartys"') &&
                 String(params?.[0]).includes('"unikalusId":1') &&
                 /^[a-f0-9]{32}$/.test(String(params?.[1])),
         );
@@ -111,13 +111,13 @@ describe("sutartys import validation", () => {
         ]);
 
         const brokasCall = kvietimai().find(([sql]) =>
-            sql.includes('INSERT INTO public."vpmSutartysBrokas"'),
+            sql.includes('INSERT INTO "vpmSutartys"."brokas"'),
         );
         expect(brokasCall?.[1]).toEqual([2005493961]);
 
         const vpmDocs = kvietimai()
             .filter(([sql]) =>
-                sql.includes('INSERT INTO public."vpmSutartys"'),
+                sql.includes('INSERT INTO "vpmSutartys"."sutartys"'),
             )
             .map(([, params]) => JSON.parse(params[0]));
         expect(vpmDocs.map((doc) => doc.unikalusId)).toEqual([1, 2005493961]);

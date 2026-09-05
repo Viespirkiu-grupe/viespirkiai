@@ -9,7 +9,7 @@ import {
 export const HELP = `Naudojimas:
   npm run sutartys:dropEmptyChanges -- [parinktys]
 
-Ištrina "nulinius" vpmSutartysChanges įrašus – tokius, kuriuose pasikeitė tik
+Ištrina "nulinius" vpmSutartys."changes" įrašus – tokius, kuriuose pasikeitė tik
 sutartisHash, bet kanoninio JSON laukų skirtumų nėra (tie patys, kuriuos
 sutartys:changes žymi "Matomų kanoninio JSON laukų skirtumų nėra.").
 
@@ -61,7 +61,7 @@ export function parseArgs(argv) {
 
 // Pakeitimas laikomas "nuliniu", jei žinoma tolesnė būsena (after) ir tarp
 // šio įrašo sutartis (before) bei after nėra kanoninio JSON skirtumų.
-// Jei after nežinomas (pvz. sutartis visai ištrinta iš vpmSutartys), įrašo
+// Jei after nežinomas (pvz. sutartis visai ištrinta iš vpmSutartys."sutartys"), įrašo
 // neliečiame – saugu.
 function isEmptyChange(row) {
     if (!row.after) return false;
@@ -107,7 +107,7 @@ export async function main(argv = process.argv.slice(2), db = postgres) {
 
         if (emptyIds.length > 0 && !options.dryRun) {
             const result = await db.query(
-                `DELETE FROM public."vpmSutartysChanges" WHERE id = ANY($1::integer[])`,
+                `DELETE FROM "vpmSutartys"."changes" WHERE id = ANY($1::integer[])`,
                 [emptyIds],
             );
             deleted += result.rowCount;

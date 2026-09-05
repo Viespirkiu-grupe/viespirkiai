@@ -9,23 +9,23 @@ describe("Layer 1 — parser", () => {
     });
 
     it("accepts SELECT from whitelisted table", () => {
-        expect(validateSql("SELECT * FROM vpmSutartys")).toBeNull();
+        expect(validateSql("SELECT * FROM v_sutartys")).toBeNull();
     });
 
     it("rejects INSERT", () => {
-        expect(validateSql("INSERT INTO vpmSutartys VALUES (1)")).toBeTypeOf("string");
+        expect(validateSql("INSERT INTO v_sutartys VALUES (1)")).toBeTypeOf("string");
     });
 
     it("rejects UPDATE", () => {
-        expect(validateSql("UPDATE vpmSutartys SET x = 1")).toBeTypeOf("string");
+        expect(validateSql("UPDATE v_sutartys SET x = 1")).toBeTypeOf("string");
     });
 
     it("rejects DELETE", () => {
-        expect(validateSql("DELETE FROM vpmSutartys")).toBeTypeOf("string");
+        expect(validateSql("DELETE FROM v_sutartys")).toBeTypeOf("string");
     });
 
     it("rejects DROP", () => {
-        expect(validateSql("DROP TABLE vpmSutartys")).toBeTypeOf("string");
+        expect(validateSql("DROP TABLE v_sutartys")).toBeTypeOf("string");
     });
 
     it("rejects CREATE", () => {
@@ -41,11 +41,11 @@ describe("Layer 1 — parser", () => {
     });
 
     it("accepts a CTE with a trailing semicolon", () => {
-        expect(validateSql("WITH cte AS (SELECT * FROM vpmSutartys) SELECT * FROM cte;")).toBeNull();
+        expect(validateSql("WITH cte AS (SELECT * FROM v_sutartys) SELECT * FROM cte;")).toBeNull();
     });
 
     it("still rejects two terminated statements (injection)", () => {
-        expect(validateSql("SELECT 1 FROM vpmSutartys; DROP VIEW v_dalyviai;")).toBeTypeOf("string");
+        expect(validateSql("SELECT 1 FROM v_sutartys; DROP VIEW v_dalyviai;")).toBeTypeOf("string");
     });
 
     it("rejects malformed SQL", () => {
@@ -57,7 +57,11 @@ describe("Layer 1 — parser", () => {
 
 describe("Layer 2 — table whitelist", () => {
     it("accepts whitelisted table", () => {
-        expect(validateSql("SELECT * FROM vpmSutartys")).toBeNull();
+        expect(validateSql('SELECT * FROM "atviriDuomenys"')).toBeNull();
+    });
+
+    it("rejects vpmSutartys — perkelta į savo schemą, dengia v_sutartys", () => {
+        expect(validateSql("SELECT * FROM vpmSutartys")).toBeTypeOf("string");
     });
 
     it("accepts jarAsmenys (mixed-case)", () => {
@@ -101,7 +105,7 @@ describe("Layer 2 — table whitelist", () => {
     });
 
     it("accepts CTE name in FROM", () => {
-        expect(validateSql("WITH cte AS (SELECT * FROM vpmSutartys) SELECT * FROM cte")).toBeNull();
+        expect(validateSql("WITH cte AS (SELECT * FROM v_sutartys) SELECT * FROM cte")).toBeNull();
     });
 });
 
@@ -109,35 +113,35 @@ describe("Layer 2 — table whitelist", () => {
 
 describe("Layer 3 — function whitelist", () => {
     it("accepts COUNT, SUM, DATE_TRUNC", () => {
-        expect(validateSql(`SELECT COUNT(*), SUM(verte), DATE_TRUNC('year', "sudarymoData") FROM vpmSutartys`)).toBeNull();
+        expect(validateSql(`SELECT COUNT(*), SUM(verte), DATE_TRUNC('year', "sudarymoData") FROM v_sutartys`)).toBeNull();
     });
 
     it("accepts aggregate functions", () => {
-        expect(validateSql("SELECT COUNT(*), SUM(x), AVG(x), MIN(x), MAX(x), STDDEV(x) FROM vpmSutartys")).toBeNull();
+        expect(validateSql("SELECT COUNT(*), SUM(x), AVG(x), MIN(x), MAX(x), STDDEV(x) FROM v_sutartys")).toBeNull();
     });
 
     it("accepts window function RANK()", () => {
-        expect(validateSql("SELECT RANK() OVER (ORDER BY verte) FROM vpmSutartys")).toBeNull();
+        expect(validateSql("SELECT RANK() OVER (ORDER BY verte) FROM v_sutartys")).toBeNull();
     });
 
     it("accepts window function ROW_NUMBER()", () => {
-        expect(validateSql('SELECT ROW_NUMBER() OVER (PARTITION BY "tiekejoKodas" ORDER BY verte) FROM vpmSutartys')).toBeNull();
+        expect(validateSql('SELECT ROW_NUMBER() OVER (PARTITION BY "tiekejoKodas" ORDER BY verte) FROM v_sutartys')).toBeNull();
     });
 
     it("accepts COUNT(*) OVER () window aggregate", () => {
-        expect(validateSql("SELECT COUNT(*) OVER () FROM vpmSutartys")).toBeNull();
+        expect(validateSql("SELECT COUNT(*) OVER () FROM v_sutartys")).toBeNull();
     });
 
     it("accepts COALESCE", () => {
-        expect(validateSql("SELECT COALESCE(verte, 0) FROM vpmSutartys")).toBeNull();
+        expect(validateSql("SELECT COALESCE(verte, 0) FROM v_sutartys")).toBeNull();
     });
 
     it("accepts ROUND, ABS", () => {
-        expect(validateSql("SELECT ROUND(verte, 2), ABS(verte) FROM vpmSutartys")).toBeNull();
+        expect(validateSql("SELECT ROUND(verte, 2), ABS(verte) FROM v_sutartys")).toBeNull();
     });
 
     it("accepts string functions", () => {
-        expect(validateSql("SELECT UPPER(pavadinimas), LOWER(pavadinimas), LENGTH(pavadinimas) FROM vpmSutartys")).toBeNull();
+        expect(validateSql("SELECT UPPER(pavadinimas), LOWER(pavadinimas), LENGTH(pavadinimas) FROM v_sutartys")).toBeNull();
     });
 
     it("accepts UNNEST", () => {
@@ -182,7 +186,7 @@ describe("Layer 3 — function whitelist", () => {
 
 describe("Layer 4 — complexity limits", () => {
     function buildJoinQuery(n: number): string {
-        let sql = 'SELECT s."tiekejoKodas" FROM vpmSutartys s';
+        let sql = 'SELECT s."tiekejoKodas" FROM v_sutartys s';
         for (let i = 1; i <= n; i++) {
             sql += ` JOIN "asmenys" j${i} ON j${i}."jarKodas"::text = s."tiekejoKodas"`;
         }
@@ -200,18 +204,18 @@ describe("Layer 4 — complexity limits", () => {
     });
 
     it("accepts subquery depth 1", () => {
-        expect(validateSql("SELECT * FROM (SELECT * FROM vpmSutartys) AS q")).toBeNull();
+        expect(validateSql("SELECT * FROM (SELECT * FROM v_sutartys) AS q")).toBeNull();
     });
 
     it("accepts subquery depth 3", () => {
         expect(validateSql(
-            "SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM vpmSutartys) AS q1) AS q2) AS q3"
+            "SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM v_sutartys) AS q1) AS q2) AS q3"
         )).toBeNull();
     });
 
     it("rejects subquery depth 4", () => {
         const r = validateSql(
-            "SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM vpmSutartys) AS q1) AS q2) AS q3) AS q4"
+            "SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM v_sutartys) AS q1) AS q2) AS q3) AS q4"
         );
         expect(r).toBeTypeOf("string");
         expect(r).toMatch(/depth|nesting/);
@@ -238,6 +242,6 @@ describe("Layer 4 — complexity limits", () => {
     });
 
     it("accepts non-recursive CTE", () => {
-        expect(validateSql("WITH cte AS (SELECT * FROM vpmSutartys) SELECT * FROM cte")).toBeNull();
+        expect(validateSql("WITH cte AS (SELECT * FROM v_sutartys) SELECT * FROM cte")).toBeNull();
     });
 });

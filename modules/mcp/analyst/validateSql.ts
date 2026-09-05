@@ -6,7 +6,11 @@ const { Parser } = pkg;
 const parser = new Parser();
 
 export const TABLE_WHITELIST: Set<string> = new Set([
-    "vpmSutartys",
+    // VPT sutarčių lentelė persikėlė į "vpmSutartys" schemą kaip `sutartys`,
+    // tad nekvalifikuotai jos nebėra: analyst search_path'e `sabis` eina
+    // pirmiau, o ten `sutartys` reiškia SABIS registrą (žr. žemiau). Žalios
+    // lentelės analystui ir nereikia — ją pilnai dengia `v_sutartys` view'as,
+    // į kurį nukreipia ir get_schema (COVERED_TABLES_BY_VIEWS).
     // VPT atvirų sutarčių rinkiniai iškelti į "vpmSutartys" schemą ir
     // normalizuoti; `atviriDuomenysPilni` / `atviriDuomenysImpPilni` yra
     // suderinamumo view'ai su senąja plokščia forma. Žodynai su `atviri`

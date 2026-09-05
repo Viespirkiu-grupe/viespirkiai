@@ -51,7 +51,7 @@ async function main() {
                     WHEN verte <= -1 THEN -log(-verte)
                     ELSE 0
                 END AS u
-            FROM "vpmSutartys"
+            FROM "vpmSutartys"."sutartys"
             WHERE "sudarymoData" >= DATE '${DATE_START}'
               AND "sudarymoData" <  DATE '${DATE_END}'
               AND verte IS NOT NULL

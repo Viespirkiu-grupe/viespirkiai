@@ -44,7 +44,7 @@ describe("VPM sutartis upsert", () => {
             values: [prepared.json, prepared.md5, searchText],
         });
         expect(UPSERT_SQL).toContain(
-            'WHERE "vpmSutartys".hash IS DISTINCT FROM EXCLUDED.hash',
+            'WHERE "sutartys".hash IS DISTINCT FROM EXCLUDED.hash',
         );
         expect(UPSERT_SQL).toMatch(
             /JOIN old_document old ON old\.hash IS DISTINCT FROM i\.hash/,
@@ -76,10 +76,10 @@ describe("VPM sutartis upsert", () => {
             'ON CONFLICT ("pirkejoKodas", "tiekejoKodas") DO UPDATE SET',
         );
         expect(UPSERT_SQL.match(
-            /INSERT INTO public\."vpmSutartysSumos"/g,
+            /INSERT INTO "vpmSutartys"\."sumos"/g,
         )).toHaveLength(1);
         expect(UPSERT_SQL.match(
-            /INSERT INTO public\."vpmSutartysSumosMetai"/g,
+            /INSERT INTO "vpmSutartys"\."sumosMetai"/g,
         )).toHaveLength(1);
     });
 

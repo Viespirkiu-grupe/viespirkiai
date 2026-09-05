@@ -21,7 +21,7 @@ async function main() {
         async (cursor, limit) => {
             const { rows } = await postgres.query(
                 `SELECT "unikalusId" AS "sutartiesUnikalusId"
-                 FROM public."vpmSutartys"
+                 FROM "vpmSutartys"."sutartys"
                  WHERE "unikalusId" > $1
                  ORDER BY "unikalusId"
                  LIMIT $2`,

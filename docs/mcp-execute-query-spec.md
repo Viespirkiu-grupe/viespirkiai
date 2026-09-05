@@ -381,7 +381,7 @@ Raw tables used directly (no covering view):
 All tables accessible to `execute_query` (Layer 2) and queryable by the analyst PostgreSQL role:
 
 ```
-sutartys | vpmSutartys: atviriDuomenys, atviriDuomenysImp, atviriDuomenysPilni, atviriDuomenysImpPilni, atviriTiekejai, atviriPirkejai, atviriCpvKodai, atviriObjektai, atviriValstybes, atviriPirkimoBudai
+vpmSutartys: atviriDuomenys, atviriDuomenysImp, atviriDuomenysPilni, atviriDuomenysImpPilni, atviriTiekejai, atviriPirkejai, atviriCpvKodai, atviriObjektai, atviriValstybes, atviriPirkimoBudai
 rcJar: asmenys, spintaAsmenys (data.gov.lt/Spinta), spintaKapitalas (įstatinis kapitalas per Spintą)
 eppsViesiejiPirkimai: pirkimai, vykdytojai
 pinreg: deklaracijos, juridiniaiRysiai, juridiniaiRysiaiPilni, rysiuPobudziai, teisinesFormos
@@ -545,7 +545,7 @@ GRANT USAGE ON SCHEMA cpva TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
-    "vpmSutartys", "rcJar"."asmenys",
+    "rcJar"."asmenys",
     "vpmSutartys"."atviriDuomenys", "vpmSutartys"."atviriDuomenysImp",
     "vpmSutartys"."atviriDuomenysPilni", "vpmSutartys"."atviriDuomenysImpPilni",
     "vpmSutartys"."atviriTiekejai", "vpmSutartys"."atviriPirkejai",

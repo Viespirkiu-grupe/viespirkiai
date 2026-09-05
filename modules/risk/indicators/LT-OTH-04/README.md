@@ -21,7 +21,7 @@ uses, not LT-OTH-05's "every lot must fail".
 comes from `modules/risk/procurementReader.ts`'s `PROCEDURE_OUTCOME_SQL`, the same query LT-OTH-03 reads.
 `Subject.procurement.contractSignatureDates` is new for this indicator: `procurementReader.ts`'s
 `CONTRACT_SIGNATURES_SQL` reads `public.v_pirkimo_sutartys_v2` — a new, narrow view
-(`modules/mcp/analyst/views/v_pirkimo_sutartys_v2.sql`) added for this indicator, reading `vpmSutartys` directly
+(`modules/mcp/analyst/views/v_pirkimo_sutartys_v2.sql`) added for this indicator, reading `vpmSutartys."sutartys"` directly
 rather than forking the whole, much wider `public.v_sutartys` shape (which no risk-service indicator needs yet).
 
 ## One entry per lot, not per report revision

@@ -41,7 +41,7 @@ SELECT
 FROM recent_changes recent
 LEFT JOIN LATERAL (
     SELECT later.sutartis, later."sutartisHash"
-    FROM public."vpmSutartysChanges" later
+    FROM "vpmSutartys"."changes" later
     WHERE later."unikalusId" = recent."unikalusId"
       AND later.id > recent.id
     ORDER BY later.id
@@ -75,8 +75,8 @@ LEFT JOIN LATERAL (
                         'pavadinimas', extra_name.pavadinimas
                     ) ORDER BY extra.id
                 )
-                FROM public."vpmSutartysPapildomiTiekejai" extra
-                LEFT JOIN public."vpmSutartysSalys" extra_name
+                FROM "vpmSutartys"."papildomiTiekejai" extra
+                LEFT JOIN "vpmSutartys"."salys" extra_name
                   ON extra_name.id = extra."tiekejoPavadinimoId"
                 WHERE extra."unikalusId" = current."unikalusId"
             ), '[]'::jsonb),
@@ -85,7 +85,7 @@ LEFT JOIN LATERAL (
             'bvpzKodas', current."bvpzKodas",
             'papildomiBvpzKodai', COALESCE((
                 SELECT jsonb_agg(extra_bvpz."bvpzKodas" ORDER BY extra_bvpz.id)
-                FROM public."vpmSutartysPapildomiBvpzKodai" extra_bvpz
+                FROM "vpmSutartys"."papildomiBvpzKodai" extra_bvpz
                 WHERE extra_bvpz."unikalusId" = current."unikalusId"
             ), '[]'::jsonb),
             'dokumentai', COALESCE((
@@ -95,20 +95,20 @@ LEFT JOIN LATERAL (
                         'fileId', file."fileId"
                     ) ORDER BY file.id
                 )
-                FROM public."vpmSutartysFailai" file
+                FROM "vpmSutartys"."failai" file
                 WHERE file."unikalusId" = current."unikalusId"
             ), '[]'::jsonb),
             'istrinta', current.istrinta,
             'pakeitimas', current.pakeitimas
         ) AS doc
-    FROM public."vpmSutartys" current
-    LEFT JOIN public."vpmSutartysSalys" buyer_name
+    FROM "vpmSutartys"."sutartys" current
+    LEFT JOIN "vpmSutartys"."salys" buyer_name
       ON buyer_name.id = current."perkanciosiosOrganizacijosPavadinimoId"
-    LEFT JOIN public."vpmSutartysSalys" supplier_name
+    LEFT JOIN "vpmSutartys"."salys" supplier_name
       ON supplier_name.id = current."pirmoTiekejoPavadinimoId"
-    LEFT JOIN public."vpmSutartysTipai" type_name
+    LEFT JOIN "vpmSutartys"."tipai" type_name
       ON type_name.id = current."tipasId"
-    LEFT JOIN public."vpmSutartysKategorijos" category_name
+    LEFT JOIN "vpmSutartys"."kategorijos" category_name
       ON category_name.id = current."kategorijaId"
     WHERE current."unikalusId" = recent."unikalusId"
       AND next_change.sutartis IS NULL
@@ -120,7 +120,7 @@ ORDER BY recent.id DESC
 export const RECENT_CHANGES_SQL = `
 WITH recent_changes AS MATERIALIZED (
     SELECT change.*
-    FROM public."vpmSutartysChanges" change
+    FROM "vpmSutartys"."changes" change
     WHERE ($2::bigint IS NULL OR change."unikalusId" = $2)
       AND ($3::integer IS NULL OR change.id < $3)
     ORDER BY change.id DESC
@@ -133,7 +133,7 @@ ${CHANGES_PROJECTION}`;
 export async function fetchChangedContractsPage({ limit = 20, skip = 0 } = {}, db = postgres) {
     const result = await db.query(
         `SELECT "unikalusId", COUNT(*)::int AS viso, MAX(id) AS "maxId"
-         FROM public."vpmSutartysChanges"
+         FROM "vpmSutartys"."changes"
          GROUP BY "unikalusId"
          ORDER BY "maxId" DESC
          LIMIT $1 OFFSET $2`,
@@ -144,14 +144,14 @@ export async function fetchChangedContractsPage({ limit = 20, skip = 0 } = {}, d
 
 export async function countChangedContracts(db = postgres) {
     const result = await db.query(
-        `SELECT COUNT(DISTINCT "unikalusId")::bigint AS count FROM public."vpmSutartysChanges"`,
+        `SELECT COUNT(DISTINCT "unikalusId")::bigint AS count FROM "vpmSutartys"."changes"`,
     );
     return Number(result.rows[0].count);
 }
 
 export async function countChanges(db = postgres) {
     const result = await db.query(
-        `SELECT COUNT(*)::bigint AS count FROM public."vpmSutartysChanges"`,
+        `SELECT COUNT(*)::bigint AS count FROM "vpmSutartys"."changes"`,
     );
     return Number(result.rows[0].count);
 }
@@ -163,7 +163,7 @@ export async function countChanges(db = postgres) {
 export async function countContractChanges(unikalusId, db = postgres) {
     const result = await db.query(
         `SELECT COUNT(*)::bigint AS count
-         FROM public."vpmSutartysChanges"
+         FROM "vpmSutartys"."changes"
          WHERE "unikalusId" = $1`,
         [unikalusId],
     );

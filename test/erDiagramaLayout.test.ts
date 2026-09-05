@@ -85,7 +85,7 @@ describe('piestiSvg', () => {
   });
 
   it('ciklas neišpučia drobės pločio', () => {
-    // vpmSutartys <-> vpmSutartysSearch tipo ciklas anksčiau kėlė gylį kas
+    // vpmSutartys."sutartys" <-> "search" tipo ciklas anksčiau kėlė gylį kas
     // iteraciją ir drobė išsitempdavo iki tūkstančių pikselių.
     const a = lentele('a', [['id', 'pk']]);
     const b = lentele('b', [['id', 'pk']]);

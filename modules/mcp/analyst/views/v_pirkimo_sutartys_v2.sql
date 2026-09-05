@@ -6,7 +6,7 @@
 -- public.v_sutartys view (v_sutartys.sql) carries many more columns (BVPŽ
 -- codes, company names, ...) LT-OTH-04 does not need, and forking that whole
 -- shape here would be speculative work for a future Contract Risk Decision
--- Service indicator, not this one — so this reads "vpmSutartys" directly
+-- Service indicator, not this one — so this reads vpmSutartys."sutartys" directly
 -- instead, the same base table v_sutartys.sql itself reads for these
 -- columns.
 --
@@ -30,7 +30,7 @@ CREATE OR REPLACE VIEW v_pirkimo_sutartys_v2 AS
 SELECT s."unikalusId"          AS "sutartiesUnikalusId",
        s."pirkimoNumeris"      AS "pirkimoNumeris",
        s."sudarymoData"::date  AS "sudarymoData"
-FROM "vpmSutartys" s
+FROM "vpmSutartys"."sutartys" s
 WHERE s.istrinta IS NOT TRUE
   AND s."sudarymoData" IS NOT NULL
   AND s."pirkimoNumeris" ~ '^[0-9]+$'

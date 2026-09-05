@@ -154,7 +154,7 @@ name that could be tested for "payment deadline". A schema-wide search for `%kri
 `LT-AWD-07` if a source recording per-criterion descriptions, weights, or scoring rubrics is ever ingested.
 
 **LT-COM-16** — Similar bid documents: not implementable with currently ingested data. Every document table in the
-warehouse — `viesiejiPirkimaiFailai`, `cvppFailai`, `vpmSutartysFailai`, and the planned `v_dokumentas` — is keyed to a
+warehouse — `viesiejiPirkimaiFailai`, `cvppFailai`, `vpmSutartys."failai"`, and the planned `v_dokumentas` — is keyed to a
 procurement or a contract, never to a bidder; they hold documents the buyer publishes (notices, tender dossiers, signed
 contracts), not the technical or financial proposals individual bidders submit. There is no per-bidder submission to
 compare for textual, formatting, or metadata similarity. Revisit if bidder-submitted proposal documents are ever
@@ -258,7 +258,7 @@ against; the `cvpp` counterpart of the same report section, `cvppDumpAtn1Contrac
 whose name looked promising, `xlsxPPApirkimoVertes`, turns out to be a 4-row import artifact (one row's `pavadinimas`
 literally reads "3. Pirkimo vertė (pasirinkti iš sąrašo)", an Excel dropdown-instruction string, not procurement data)
 — not a value at all. The only place a *pair* of estimated-vs-final values exists side by side in the warehouse is
-`vpmSutartys."numatomaVerte"`/`"faktineVerte"` — but that table backs the `contract` entity (`v_sutartys`), one grain up
+`vpmSutartys."sutartys"."numatomaVerte"`/`"faktineVerte"` — but that table backs the `contract` entity (`v_sutartys`), one grain up
 from `lot`, and is already the basis for the separate canonical row `LT-PRI-04` ("Final-to-estimated value ratio
 anomalous", §4.2); it does not carry a lot number and cannot substitute for a lot-grain estimate. As with `LT-PRI-01`,
 approximating a lot's estimate from its parent procurement's `numatomaVerteEUR` (17,200 of 264,415 procurements
@@ -384,7 +384,7 @@ intent — is ever ingested.
 
 **LT-PRO-09** — Unreasonable prequalification requirements: not implementable with currently ingested data. The
 concept's natural evidence entity, `v_dokumentas` (domain-model.md §1.3/§4.3), is itself unimplemented — only its raw
-warehouse sources are ingested (`dokumentai`, `viesiejiPirkimaiFailai`, `vpmSutartysFailai`, `cvppFailai`), and those
+warehouse sources are ingested (`dokumentai`, `viesiejiPirkimaiFailai`, `vpmSutartys."failai"`, `cvppFailai`), and those
 carry file *metadata* (filename, MIME type, page/word/character count), not the tender document's *content* — nothing
 records what qualification thresholds a tender document actually sets. A schema-wide search 2026-08 for a column
 matching any of the twelve OLAF-CN10–CN21 sub-concepts this canonical row bundles (`%kvalifikac%`, `%apyvart%`,
@@ -410,7 +410,7 @@ whether it names a specific brand/manufacturer/product without an "or equivalent
 2014/24/EU concept OLAF-CN20/STT-I04/OT-I10 all point at), or otherwise sets requirements only one supplier could meet.
 That content lives, if anywhere, in `v_dokumentas` (domain-model.md §1.3/§4.3, listed there as blocking both `LT-PRO-09`
 and `LT-PRO-10`), which is itself unimplemented: only its raw warehouse sources are ingested (`dokumentai`,
-`viesiejiPirkimaiFailai`, `vpmSutartysFailai`, `cvppFailai`), and every one of them carries file *metadata* (filename,
+`viesiejiPirkimaiFailai`, `vpmSutartys."failai"`, `cvppFailai`), and every one of them carries file *metadata* (filename,
 MIME type, page/word/character count, size, download link) — never the document's text. A schema-wide search for a
 structured column recording specification content, brand restrictions, or an "equivalent"
 clause (`%specifik%`, `%konkret%`, `%technin%`, `%lygiavert%`, `%zenkl%`, `%gamintoj%`) finds nothing usable: the one

@@ -109,7 +109,7 @@ function formatValue(field: string, value: unknown): string | null {
   return String(value);
 }
 
-/** Vieną `vpmSutartysChanges` eilutę paverčia matomų skirtumų sąrašu (arba null). */
+/** Vieną `vpmSutartys."changes"` eilutę paverčia matomų skirtumų sąrašu (arba null). */
 function rowToPakeitimas(row: any): SutartiesPakeitimas | null {
   if (!row.after) return null;
   const diffs = diffContractDocuments(row.before, row.after);
@@ -150,7 +150,7 @@ function rowToPakeitimas(row: any): SutartiesPakeitimas | null {
 }
 
 /**
- * Užkrauna vienos sutarties pakeitimų istoriją iš `vpmSutartysChanges`,
+ * Užkrauna vienos sutarties pakeitimų istoriją iš `vpmSutartys."changes"`,
  * paversdama kiekvieną snapshotą į matomų laukų skirtumus (before → after).
  * Pakeitimai be matomų kanoninio JSON skirtumų praleidžiami.
  */
@@ -182,7 +182,7 @@ export type SutartiesRedagavimai = {
   pavadinimas: string | null;
   perkancioKodas: string | null;
   perkancioPavadinimas: string | null;
-  /** Bendras sutarties pakeitimų skaičius `vpmSutartysChanges` lentelėje. */
+  /** Bendras sutarties pakeitimų skaičius `vpmSutartys."changes"` lentelėje. */
   viso: number;
   /** Kiek pakeitimų neparodyta (nutraukta ties keliais naujausiais). */
   praleista: number;

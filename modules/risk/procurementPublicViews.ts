@@ -53,7 +53,7 @@ const VIEWS: Readonly<Record<PublicViewName, { body: string; dependsOn: readonly
     // ppa."ataskaitos"/ppa."proceduruPabaiga" directly.
     v_pirkimo_pabaiga_v2: { body: loadViewBody("v_pirkimo_pabaiga_v2.sql"), dependsOn: [] },
     // v_pirkimo_sutartys_v2.sql likewise has no dependency on any other view —
-    // it reads vpmSutartys directly.
+    // it reads vpmSutartys."sutartys" directly.
     v_pirkimo_sutartys_v2: { body: loadViewBody("v_pirkimo_sutartys_v2.sql"), dependsOn: [] },
 };
 

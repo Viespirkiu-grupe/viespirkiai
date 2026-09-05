@@ -65,7 +65,7 @@ SELECT 'cvpp' AS saltinis,
 FROM cvpp."archyvoSkelbimai" c
          LEFT JOIN LATERAL (
              SELECT s."perkanciosiosOrganizacijosKodas"
-             FROM "vpmSutartys" s
+             FROM "vpmSutartys"."sutartys" s
              WHERE s."pirkimoNumeris" = c."pirkimoNumeris"
                AND s."perkanciosiosOrganizacijosKodas" IS NOT NULL
                AND s.istrinta = false

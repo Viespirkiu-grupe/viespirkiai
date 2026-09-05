@@ -18,7 +18,7 @@ const LENTELE = "sutartys";
 export { toRfc3339 };
 
 /**
- * Nusausina vieną `vpmSutartysIndexQueue` porciją į Quickwit.
+ * Nusausina vieną `vpmSutartys."indexQueue"` porciją į Quickwit.
  * Karkasas (tranzakcija, dedup, shard'inimas) — `quickwit/indexQueueDrainer.js`.
  *
  * @param {{ shard?: number, shardCount?: number }} [opts]
@@ -28,7 +28,8 @@ export async function processSutartysIndexQueue(opts = {}) {
     return drainIndexQueue(
         {
             lentele: LENTELE,
-            queueTable: "vpmSutartysIndexQueue",
+            queueTable: "indexQueue",
+            queueSchema: "vpmSutartys",
             keyColumn: "unikalusId",
             batchSize: BATCH_SIZE,
             commit: "auto",

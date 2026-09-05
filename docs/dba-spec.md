@@ -97,7 +97,7 @@ sluoksniais (`erIsdestymas.ts`), piešimas – `erDiagrama.ts`.
 Trys dalykai, be kurių diagrama buvo neskaitoma (visi turi regresijos testus):
 
 1. **Ciklai.** Gylį skaičiuojant „taikinys + 1“, ciklas kelia jį kas iteraciją.
-   Vienas `vpmSutartys ↔ vpmSutartysSearch` ciklas išpūtė `sutartys` grupės
+   Vienas `vpmSutartys."sutartys" ↔ "search"` ciklas išpūtė `sutartys` grupės
    drobę iki **7230 px**. Dabar pirma DFS'u sudaromas DAG, o ciklą uždarančios
    briaunos į gylį neįskaitomos (bet piešiamos, pažymėtos `er-edge--atgal`).
 2. **Ilgos briaunos.** Briauna, peršokanti kelis sluoksnius, buvo brėžiama

@@ -23,7 +23,7 @@ No field on `viesiejiPirkimai` (the primary `cvpis` source `v_pirkimas_v2` reads
 establishes a framework agreement — `pirkimoBudas` names the *procedure type* (open competition, negotiated, etc.),
 not the *contract instrument* it produces, and `type` (CfTWS/CfTDPSWS/Pmc) is a CVP IS notice-form category, not a
 framework flag either (CfTDPSWS is a Dynamic Purchasing System notice, a related but distinct instrument). The
-contract-side `vpmSutartys."tipasId"` dictionary's `PPS` ("Pagrindinė pirkimo sutartis") looked promising at first
+contract-side `vpmSutartys."sutartys"."tipasId"` dictionary's `PPS` ("Pagrindinė pirkimo sutartis") looked promising at first
 but turned out to be the generic "regular contract from a formal CVP IS procedure" bucket — 309,116 rows, far too
 broad to mean "framework" specifically (domain-model.md §6.3).
 

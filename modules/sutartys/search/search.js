@@ -300,7 +300,7 @@ export async function countSutartys(query) {
 
     if (visiIrasai) {
         const { rows } = await postgres.query(
-            `SELECT COUNT(*) AS "rowCount" FROM public."vpmSutartys" WHERE istrinta = false`,
+            `SELECT COUNT(*) AS "rowCount" FROM "vpmSutartys"."sutartys" WHERE istrinta = false`,
         );
         return Number(rows[0].rowCount);
     }

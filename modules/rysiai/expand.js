@@ -345,8 +345,8 @@ export async function expandOrg(jarKodas) {
                     seller."registravimoData"     AS "tiekejoRegistravimoData",
                     seller."statusasNuo"          AS "tiekejoStatusasNuo",
                     seller."statusoKodas"         AS "tiekejoStatusoKodas"
-             FROM   public."vpmSutartys" s
-             LEFT JOIN public."vpmSutartysTipai" st ON st.id = s."tipasId"
+             FROM   "vpmSutartys"."sutartys" s
+             LEFT JOIN "vpmSutartys"."tipai" st ON st.id = s."tipasId"
              LEFT JOIN "rcJar"."asmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
              WHERE  s."perkanciosiosOrganizacijosKodas" = $1
                AND  st."tipas" <> 'SP'
@@ -372,8 +372,8 @@ export async function expandOrg(jarKodas) {
                     buyer."registravimoData"            AS "pirkejoRegistravimoData",
                     buyer."statusasNuo"                 AS "pirkejoStatusasNuo",
                     buyer."statusoKodas"                AS "pirkejoStatusoKodas"
-             FROM   public."vpmSutartys" s
-             LEFT JOIN public."vpmSutartysTipai" st ON st.id = s."tipasId"
+             FROM   "vpmSutartys"."sutartys" s
+             LEFT JOIN "vpmSutartys"."tipai" st ON st.id = s."tipasId"
              LEFT JOIN "rcJar"."asmenys" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
              WHERE  s."pirmoTiekejoKodas" = $1
                AND  st."tipas" <> 'SP'
@@ -581,7 +581,7 @@ export async function expandProcurement(pirkimoId) {
                           COALESCE(s."paskelbimoData"::date, s."sudarymoData"::date)))::text AS "awardFromDate",
                 MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
                              COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
-         FROM   public."vpmSutartys" s
+         FROM   "vpmSutartys"."sutartys" s
          LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
          WHERE  s."pirkimoNumeris" = $1
            AND  s.istrinta = false
@@ -645,7 +645,7 @@ export async function expandContract(pirkimoNumeris) {
                               COALESCE(s."paskelbimoData"::date, s."sudarymoData"::date)))::text AS "awardFromDate",
                     MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
                                  COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
-             FROM   public."vpmSutartys" s
+             FROM   "vpmSutartys"."sutartys" s
              LEFT JOIN "rcJar"."asmenys" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
              WHERE  s."pirkimoNumeris" = $1
                AND  s.istrinta = false
@@ -741,7 +741,7 @@ export async function expandSutartis(sutartiesUnikalusId) {
                 seller."registravimoData"      AS "tiekejoRegistravimoData",
                 seller."statusasNuo"           AS "tiekejoStatusasNuo",
                 seller."statusoKodas"          AS "tiekejoStatusoKodas"
-         FROM   public."vpmSutartys" s
+         FROM   "vpmSutartys"."sutartys" s
          LEFT JOIN "rcJar"."asmenys" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
          LEFT JOIN "rcJar"."asmenys" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
          WHERE  s."unikalusId" = $1

@@ -30,8 +30,8 @@ const DOC_JSONB_SQL = `jsonb_build_object(
                         'pavadinimas', extra_name.pavadinimas
                     ) ORDER BY extra.id
                 )
-                FROM public."vpmSutartysPapildomiTiekejai" extra
-                LEFT JOIN public."vpmSutartysSalys" extra_name
+                FROM "vpmSutartys"."papildomiTiekejai" extra
+                LEFT JOIN "vpmSutartys"."salys" extra_name
                   ON extra_name.id = extra."tiekejoPavadinimoId"
                 WHERE extra."unikalusId" = e."unikalusId"
             ), '[]'::jsonb),
@@ -40,7 +40,7 @@ const DOC_JSONB_SQL = `jsonb_build_object(
             'bvpzKodas', e."bvpzKodas",
             'papildomiBvpzKodai', COALESCE((
                 SELECT jsonb_agg(extra_bvpz."bvpzKodas" ORDER BY extra_bvpz.id)
-                FROM public."vpmSutartysPapildomiBvpzKodai" extra_bvpz
+                FROM "vpmSutartys"."papildomiBvpzKodai" extra_bvpz
                 WHERE extra_bvpz."unikalusId" = e."unikalusId"
             ), '[]'::jsonb),
             'dokumentai', COALESCE((
@@ -50,20 +50,20 @@ const DOC_JSONB_SQL = `jsonb_build_object(
                         'fileId', file."fileId"
                     ) ORDER BY file.id
                 )
-                FROM public."vpmSutartysFailai" file
+                FROM "vpmSutartys"."failai" file
                 WHERE file."unikalusId" = e."unikalusId"
             ), '[]'::jsonb),
             'istrinta', e.istrinta,
             'pakeitimas', e.pakeitimas
         )`;
 
-const DOC_JOINS_SQL = `LEFT JOIN public."vpmSutartysSalys" buyer_name
+const DOC_JOINS_SQL = `LEFT JOIN "vpmSutartys"."salys" buyer_name
       ON buyer_name.id = e."perkanciosiosOrganizacijosPavadinimoId"
-    LEFT JOIN public."vpmSutartysSalys" supplier_name
+    LEFT JOIN "vpmSutartys"."salys" supplier_name
       ON supplier_name.id = e."pirmoTiekejoPavadinimoId"
-    LEFT JOIN public."vpmSutartysTipai" type_name
+    LEFT JOIN "vpmSutartys"."tipai" type_name
       ON type_name.id = e."tipasId"
-    LEFT JOIN public."vpmSutartysKategorijos" category_name
+    LEFT JOIN "vpmSutartys"."kategorijos" category_name
       ON category_name.id = e."kategorijaId"`;
 
 const UPSERT_SQL = `
@@ -72,7 +72,7 @@ WITH incoming AS MATERIALIZED (
 ),
 existing AS MATERIALIZED (
     SELECT s.*
-    FROM public."vpmSutartys" s, incoming i
+    FROM "vpmSutartys"."sutartys" s, incoming i
     WHERE s."unikalusId" = (i.doc->>'unikalusId')::bigint
     FOR UPDATE
 ),
@@ -94,13 +94,13 @@ names_to_insert AS MATERIALIZED (
     WHERE NULLIF(supplier->>'pavadinimas', '') IS NOT NULL
 ),
 inserted_names AS (
-    INSERT INTO public."vpmSutartysSalys" (pavadinimas)
+    INSERT INTO "vpmSutartys"."salys" (pavadinimas)
     SELECT pavadinimas FROM names_to_insert
     ON CONFLICT (pavadinimas) DO NOTHING
     RETURNING id, pavadinimas
 ),
 inserted_type AS (
-    INSERT INTO public."vpmSutartysTipai" (tipas)
+    INSERT INTO "vpmSutartys"."tipai" (tipas)
     SELECT i.doc->>'tipas'
     FROM incoming i
     WHERE NULLIF(i.doc->>'tipas', '') IS NOT NULL
@@ -108,7 +108,7 @@ inserted_type AS (
     RETURNING id, tipas
 ),
 inserted_category AS (
-    INSERT INTO public."vpmSutartysKategorijos" (kategorija)
+    INSERT INTO "vpmSutartys"."kategorijos" (kategorija)
     SELECT i.doc->>'kategorija'
     FROM incoming i
     WHERE NULLIF(i.doc->>'kategorija', '') IS NOT NULL
@@ -123,7 +123,7 @@ old_document AS MATERIALIZED (
     ${DOC_JOINS_SQL}
 ),
 history AS (
-    INSERT INTO public."vpmSutartysChanges" (
+    INSERT INTO "vpmSutartys"."changes" (
         "unikalusId", sutartis, "sutartisHash", "pakeitimoData"
     )
     SELECT (i.doc->>'unikalusId')::bigint, old.doc, old.hash,
@@ -133,7 +133,7 @@ history AS (
     RETURNING id
 ),
 main_upsert AS (
-    INSERT INTO public."vpmSutartys" (
+    INSERT INTO "vpmSutartys"."sutartys" (
         "unikalusId", pavadinimas,
         "sudarymoData", "galiojimoData", "faktineIvykdimoData",
         "paskelbimoData", "redagavimoData",
@@ -156,7 +156,7 @@ main_upsert AS (
         (i.doc->>'redagavimoData')::timestamp,
         i.doc->>'perkanciosiosOrganizacijosKodas',
         (
-            SELECT id FROM public."vpmSutartysSalys"
+            SELECT id FROM "vpmSutartys"."salys"
             WHERE pavadinimas = i.doc->>'perkanciosiosOrganizacijosPavadinimas'
             UNION ALL
             SELECT id FROM inserted_names
@@ -169,7 +169,7 @@ main_upsert AS (
         (i.doc->>'faktineVerte')::numeric,
         i.doc->>'pirmoTiekejoKodas',
         (
-            SELECT id FROM public."vpmSutartysSalys"
+            SELECT id FROM "vpmSutartys"."salys"
             WHERE pavadinimas = i.doc->>'pirmoTiekejoPavadinimas'
             UNION ALL
             SELECT id FROM inserted_names
@@ -178,14 +178,14 @@ main_upsert AS (
         ),
         1 + jsonb_array_length(i.doc->'papildomiTiekejai'),
         (
-            SELECT id FROM public."vpmSutartysTipai"
+            SELECT id FROM "vpmSutartys"."tipai"
             WHERE tipas = i.doc->>'tipas'
             UNION ALL
             SELECT id FROM inserted_type WHERE tipas = i.doc->>'tipas'
             LIMIT 1
         ),
         (
-            SELECT id FROM public."vpmSutartysKategorijos"
+            SELECT id FROM "vpmSutartys"."kategorijos"
             WHERE kategorija = i.doc->>'kategorija'
             UNION ALL
             SELECT id FROM inserted_category
@@ -224,7 +224,7 @@ main_upsert AS (
         istrinta = EXCLUDED.istrinta,
         pakeitimas = EXCLUDED.pakeitimas,
         hash = EXCLUDED.hash
-    WHERE "vpmSutartys".hash IS DISTINCT FROM EXCLUDED.hash
+    WHERE "sutartys".hash IS DISTINCT FROM EXCLUDED.hash
     RETURNING "unikalusId"
 ),
 target_contract AS MATERIALIZED (
@@ -233,7 +233,7 @@ target_contract AS MATERIALIZED (
     SELECT "unikalusId" FROM main_upsert
 ),
 tracking AS (
-    INSERT INTO public."vpmSutartysAtnaujinimai" (
+    INSERT INTO "vpmSutartys"."atnaujinimai" (
         "unikalusId", matyta, atnaujinta, istrinta
     )
     SELECT
@@ -246,20 +246,20 @@ tracking AS (
     RETURNING "unikalusId"
 ),
 deleted_suppliers AS (
-    DELETE FROM public."vpmSutartysPapildomiTiekejai" old
+    DELETE FROM "vpmSutartys"."papildomiTiekejai" old
     USING main_upsert changed
     WHERE old."unikalusId" = changed."unikalusId"
     RETURNING old.id
 ),
 inserted_suppliers AS (
-    INSERT INTO public."vpmSutartysPapildomiTiekejai" (
+    INSERT INTO "vpmSutartys"."papildomiTiekejai" (
         "unikalusId", "tiekejoKodas", "tiekejoPavadinimoId"
     )
     SELECT
         changed."unikalusId",
         supplier->>'kodas',
         (
-            SELECT id FROM public."vpmSutartysSalys"
+            SELECT id FROM "vpmSutartys"."salys"
             WHERE pavadinimas = supplier->>'pavadinimas'
             UNION ALL
             SELECT id FROM inserted_names
@@ -274,7 +274,7 @@ inserted_suppliers AS (
     RETURNING id
 ),
 deleted_bvpz AS (
-    DELETE FROM public."vpmSutartysPapildomiBvpzKodai" old
+    DELETE FROM "vpmSutartys"."papildomiBvpzKodai" old
     USING main_upsert changed, incoming i
     WHERE old."unikalusId" = changed."unikalusId"
       AND NOT EXISTS (
@@ -285,7 +285,7 @@ deleted_bvpz AS (
     RETURNING old.id
 ),
 inserted_bvpz AS (
-    INSERT INTO public."vpmSutartysPapildomiBvpzKodai" (
+    INSERT INTO "vpmSutartys"."papildomiBvpzKodai" (
         "unikalusId", "bvpzKodas"
     )
     SELECT changed."unikalusId", code::integer
@@ -298,13 +298,13 @@ inserted_bvpz AS (
     RETURNING id
 ),
 deleted_files AS (
-    DELETE FROM public."vpmSutartysFailai" old
+    DELETE FROM "vpmSutartys"."failai" old
     USING main_upsert changed
     WHERE old."unikalusId" = changed."unikalusId"
     RETURNING old.id
 ),
 inserted_files AS (
-    INSERT INTO public."vpmSutartysFailai" (
+    INSERT INTO "vpmSutartys"."failai" (
         "unikalusId", pavadinimas, "fileId", md5, "failoId"
     )
     SELECT
@@ -318,7 +318,7 @@ inserted_files AS (
     CROSS JOIN LATERAL jsonb_array_elements(i.doc->'dokumentai') file
     LEFT JOIN LATERAL (
         SELECT old.md5, old."failoId"
-        FROM public."vpmSutartysFailai" old
+        FROM "vpmSutartys"."failai" old
         WHERE old."unikalusId" = changed."unikalusId"
           AND old."fileId" IS NOT DISTINCT FROM (file->>'fileId')::integer
         ORDER BY old.id
@@ -327,7 +327,7 @@ inserted_files AS (
     RETURNING id
 ),
 search_upsert AS (
-    INSERT INTO public."vpmSutartysSearch" ("unikalusId", "searchTsv")
+    INSERT INTO "vpmSutartys"."search" ("unikalusId", "searchTsv")
     SELECT
         (i.doc->>'unikalusId')::bigint,
         to_tsvector('simple', $3)
@@ -431,7 +431,7 @@ agg_sumos_delta AS MATERIALIZED (
         OR SUM(contribution.pardavimu_suma) <> 0
 ),
 d_sumos AS (
-    INSERT INTO public."vpmSutartysSumos" AS current (
+    INSERT INTO "vpmSutartys"."sumos" AS current (
         "saliesKodas", pirkimai, "pirkimuSuma", pardavimai, "pardavimuSuma"
     )
     SELECT
@@ -487,7 +487,7 @@ agg_metai_delta AS MATERIALIZED (
         OR SUM(contribution.pardavimu_suma) <> 0
 ),
 d_metai AS (
-    INSERT INTO public."vpmSutartysSumosMetai" AS current (
+    INSERT INTO "vpmSutartys"."sumosMetai" AS current (
         "saliesKodas", metai,
         pirkimai, "pirkimuSuma", pardavimai, "pardavimuSuma"
     )
@@ -519,7 +519,7 @@ agg_pt_delta AS MATERIALIZED (
         OR SUM(e.sign * COALESCE(e.verte, 0)) <> 0
 ),
 d_pt AS (
-    INSERT INTO public."vpmSutartysSumosPirkejasTiekejas" AS current (
+    INSERT INTO "vpmSutartys"."sumosPirkejasTiekejas" AS current (
         "pirkejoKodas", "tiekejoKodas", pirkimai, suma
     )
     SELECT pirkejas, tiekejas, pirkimai, suma
@@ -599,8 +599,8 @@ export async function upsertVpmSutartis(prepared, db = postgres) {
 
 /**
  * Pažymi vpm sutartį kaip ištrintą šaltinyje. Vietoje tiesioginio istrinta
- * UPDATE (kuris apeitų vpmSutartysChanges archyvą ir inkrementinius
- * vpmSutartysSumos* agregatus) atstato saugomą canonical dokumentą,
+ * UPDATE (kuris apeitų vpmSutartys."changes" archyvą ir inkrementinius
+ * vpmSutartys."sumos*" agregatus) atstato saugomą canonical dokumentą,
  * nustato istrinta=true ir perleidžia per įprastą upsert kelią.
  * @returns {Promise<boolean>} true jei sutartis buvo pažymėta, false jei
  *   jos nėra arba jau ištrinta.
@@ -608,7 +608,7 @@ export async function upsertVpmSutartis(prepared, db = postgres) {
 export async function markVpmSutartisIstrinta(unikalusId, db = postgres) {
     const res = await db.query(
         `SELECT ${DOC_JSONB_SQL} AS doc
-         FROM public."vpmSutartys" e
+         FROM "vpmSutartys"."sutartys" e
          ${DOC_JOINS_SQL}
          WHERE e."unikalusId" = $1;`,
         [unikalusId],

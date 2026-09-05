@@ -50,7 +50,7 @@ function summarize(phases) {
  *
  * @param {object} cfg
  * @param {string} cfg.lentele - Quickwit lentelės vardas („sutartys", „dokumentai", …).
- * @param {string} cfg.queueTable - eilės lentelė, pvz. `vpmSutartysIndexQueue`.
+ * @param {string} cfg.queueTable - eilės lentelė, pvz. `indexQueue`.
  * @param {string} [cfg.queueSchema] - eilės schema, pagal nutylėjimą `public`.
  * @param {string} cfg.keyColumn - rakto stulpelis eilėje, pvz. `unikalusId`.
  * @param {string} [cfg.changeColumn] - keitimo stulpelis, pagal nutylėjimą `keitimas`.

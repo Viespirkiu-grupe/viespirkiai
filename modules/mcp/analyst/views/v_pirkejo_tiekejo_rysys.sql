@@ -10,12 +10,12 @@
 -- Grain: one row per (pirkejoKodas, tiekejoKodas). "rysioRaktas" is
 -- pirkejoKodas || ':' || tiekejoKodas.
 --
--- Reads "vpmSutartys" directly rather than v_sutartys: this aggregates the
+-- Reads vpmSutartys."sutartys" directly rather than v_sutartys: this aggregates the
 -- whole contract corpus, and v_sutartys adds a dozen joins per row that the
 -- aggregate does not use.
 --
 -- Only the *primary* supplier ("pirmoTiekejoKodas") forms a relationship here.
--- Additional suppliers on a joint contract ("vpmSutartysPapildomiTiekejai")
+-- Additional suppliers on a joint contract ("vpmSutartys"."papildomiTiekejai")
 -- are deliberately excluded: a consortium member is not in the same
 -- relationship with the buyer as the lead contractor, and treating them
 -- identically would inflate every concentration measure.
@@ -35,8 +35,8 @@ SELECT s."perkanciosiosOrganizacijosKodas" || ':' || s."pirmoTiekejoKodas" AS "r
        max(s."sudarymoData")::timestamp                     AS "paskutineSutartisData",
        count(DISTINCT s."bvpzKodas")                        AS "bvpzKoduSkaicius",
        count(DISTINCT t.tipas)                              AS "sutarciuTipuSkaicius"
-FROM "vpmSutartys" s
-         LEFT JOIN "vpmSutartysTipai" t ON t.id = s."tipasId"
+FROM "vpmSutartys"."sutartys" s
+         LEFT JOIN "vpmSutartys"."tipai" t ON t.id = s."tipasId"
 -- Blank and punctuation-only codes name no party, so they form no
 -- relationship. Codes are otherwise kept as recorded: whether a code resolves
 -- to a registered company is a data-sufficiency question for the indicator,

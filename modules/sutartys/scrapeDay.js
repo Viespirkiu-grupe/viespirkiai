@@ -46,7 +46,7 @@ async function cvpIsScrapeDay(date = new Date().toISOString().slice(0, 10)) {
 
 export async function cvpIsScrapeLeastRecentDate() {
     let dateRes = await postgres.query(`SELECT *
-    FROM public."vpmSutartysSudarymoDatos"
+    FROM "vpmSutartys"."sudarymoDatos"
     WHERE "atnaujinta" IS NULL OR "atnaujinta" < (
         timezone('Europe/Vilnius', now()) - INTERVAL '1 day'
     )
@@ -67,7 +67,7 @@ export async function cvpIsScrapeLeastRecentDate() {
 
     // Fiksuojame pilną dienos perėjimą
     await postgres.query(
-        `INSERT INTO public."vpmSutartysSudarymoDatos" ("sudarymoData", "atnaujinta")
+        `INSERT INTO "vpmSutartys"."sudarymoDatos" ("sudarymoData", "atnaujinta")
         VALUES ($1, timezone('Europe/Vilnius', now()))
         ON CONFLICT ("sudarymoData") DO UPDATE SET
           "atnaujinta" = timezone('Europe/Vilnius', now());`,

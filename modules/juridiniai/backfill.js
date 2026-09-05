@@ -169,7 +169,7 @@ export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
             ORDER BY k."kapitalasNuo" DESC, k."duomenuData" DESC
             LIMIT 1
         ) kapitalas ON true
-        LEFT JOIN public."vpmSutartysSumos" sutartys
+        LEFT JOIN "vpmSutartys"."sumos" sutartys
             ON sutartys."saliesKodas" = j."jarKodas"::text
         LEFT JOIN liteko."dalyviuCounts" bylos
             ON bylos."jarKodas" = j."jarKodas"::text

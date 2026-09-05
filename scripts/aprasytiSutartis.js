@@ -53,7 +53,7 @@ async function queuedContracts(limit) {
     const params = Number.isFinite(limit) ? [limit] : [];
     return streamQuery(
         `SELECT q."id" AS "queueId", q."unikalusId"
-         FROM public."vpmSutartysAprasymaiQueue" q
+         FROM "vpmSutartys"."aprasymaiQueue" q
          ORDER BY q."id"
          ${limitSql}`,
         params,
@@ -64,7 +64,7 @@ async function queuedContracts(limit) {
 async function queuedContractCount(limit) {
     const { rows } = await postgres.query(
         `SELECT COUNT(*)::int AS "count"
-         FROM public."vpmSutartysAprasymaiQueue"`,
+         FROM "vpmSutartys"."aprasymaiQueue"`,
     );
     return Number.isFinite(limit) ? Math.min(rows[0].count, limit) : rows[0].count;
 }
@@ -82,14 +82,14 @@ async function saveResultAndFinishQueue({ queueId, unikalusId, variantId, succes
     try {
         await client.query("BEGIN");
         const result = await client.query(
-            `INSERT INTO public."vpmSutartysAprasymai"
+            `INSERT INTO "vpmSutartys"."aprasymai"
                 ("unikalusId", "modelioVariantasId", "success", "aprasymas")
              VALUES ($1, $2, $3, $4)
              ON CONFLICT ("unikalusId", "modelioVariantasId") DO NOTHING`,
             [unikalusId, variantId, success, success ? aprasymas : null],
         );
         await client.query(
-            `DELETE FROM public."vpmSutartysAprasymaiQueue" WHERE "id" = $1`,
+            `DELETE FROM "vpmSutartys"."aprasymaiQueue" WHERE "id" = $1`,
             [queueId],
         );
         await client.query("COMMIT");
@@ -184,8 +184,8 @@ export async function main(argv = process.argv.slice(2)) {
         let outcome = "išsaugota";
         try {
             const alreadyDone = await postgres.query(
-                `DELETE FROM public."vpmSutartysAprasymaiQueue" q
-                 USING public."vpmSutartysAprasymai" a
+                `DELETE FROM "vpmSutartys"."aprasymaiQueue" q
+                 USING "vpmSutartys"."aprasymai" a
                  WHERE q."id" = $1
                    AND a."unikalusId" = q."unikalusId"
                    AND a."modelioVariantasId" = $2

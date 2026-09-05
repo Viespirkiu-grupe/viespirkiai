@@ -54,16 +54,16 @@ export async function spetiPavadinimaIsSutarciu(jarKodas, registroPavadinimas) {
     const { rows } = await postgres.query(
         `WITH paskutines AS (
              (SELECT v."redagavimoData", s."pavadinimas"
-              FROM public."vpmSutartys" v
-              JOIN public."vpmSutartysSalys" s ON s."id" = v."pirmoTiekejoPavadinimoId"
+              FROM "vpmSutartys"."sutartys" v
+              JOIN "vpmSutartys"."salys" s ON s."id" = v."pirmoTiekejoPavadinimoId"
               WHERE v."pirmoTiekejoKodas" = $1 AND v."istrinta" = false
               ORDER BY v."redagavimoData" DESC NULLS LAST
               LIMIT ${SUTARCIU_LIMITAS})
              UNION ALL
              (SELECT v."redagavimoData", s."pavadinimas"
-              FROM public."vpmSutartysPapildomiTiekejai" p
-              JOIN public."vpmSutartys" v ON v."unikalusId" = p."unikalusId" AND v."istrinta" = false
-              JOIN public."vpmSutartysSalys" s ON s."id" = p."tiekejoPavadinimoId"
+              FROM "vpmSutartys"."papildomiTiekejai" p
+              JOIN "vpmSutartys"."sutartys" v ON v."unikalusId" = p."unikalusId" AND v."istrinta" = false
+              JOIN "vpmSutartys"."salys" s ON s."id" = p."tiekejoPavadinimoId"
               WHERE p."tiekejoKodas" = $1
               ORDER BY v."redagavimoData" DESC NULLS LAST
               LIMIT ${SUTARCIU_LIMITAS})

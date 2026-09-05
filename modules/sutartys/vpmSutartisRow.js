@@ -29,7 +29,7 @@ export const VPM_SUTARTIS_ROW_SELECT = `
             'url', 'https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&dok_id='
                    || s."unikalusId" || '&file_id=' || f."fileId"
         ) ORDER BY f.id)
-        FROM public."vpmSutartysFailai" f
+        FROM "vpmSutartys"."failai" f
         WHERE f."unikalusId" = s."unikalusId"
     ), '[]'::jsonb) AS dokumentai,
     s."failuSkaicius" AS "dokumentuKiekis",
@@ -59,19 +59,19 @@ export const VPM_SUTARTIS_ROW_SELECT = `
 /*
 `search."searchTsv"` čia sąmoningai NĖRA: tsvector didelis, rezultatuose
 nereikalingas ir nutekėdavo į MCP/JSON atsakymus. Jungtis su
-`vpmSutartysSearch` FROM'e lieka – ja filtruoja tekstinė paieška
+`vpmSutartys."search"` FROM'e lieka – ja filtruoja tekstinė paieška
 (`searchSutartys.js`); kai stulpelių iš jos niekas neima, Postgres unikalią
 LEFT JOIN jungtį pašalina pats.
 */
 
 export const VPM_SUTARTIS_ROW_FROM = `
-    public."vpmSutartys" s
-    LEFT JOIN public."vpmSutartysSalys" buyer_name
+    "vpmSutartys"."sutartys" s
+    LEFT JOIN "vpmSutartys"."salys" buyer_name
       ON buyer_name.id = s."perkanciosiosOrganizacijosPavadinimoId"
-    LEFT JOIN public."vpmSutartysSalys" supplier_name
+    LEFT JOIN "vpmSutartys"."salys" supplier_name
       ON supplier_name.id = s."pirmoTiekejoPavadinimoId"
-    LEFT JOIN public."vpmSutartysTipai" tipas ON tipas.id = s."tipasId"
-    LEFT JOIN public."vpmSutartysKategorijos" kategorija
+    LEFT JOIN "vpmSutartys"."tipai" tipas ON tipas.id = s."tipasId"
+    LEFT JOIN "vpmSutartys"."kategorijos" kategorija
       ON kategorija.id = s."kategorijaId"
     LEFT JOIN LATERAL (
         SELECT b.code, b.checksum, b.pavadinimas
@@ -79,16 +79,16 @@ export const VPM_SUTARTIS_ROW_FROM = `
         WHERE b.code = s."bvpzKodas"::text
         LIMIT 1
     ) bvpz ON true
-    LEFT JOIN public."vpmSutartysAtnaujinimai" atn
+    LEFT JOIN "vpmSutartys"."atnaujinimai" atn
       ON atn."unikalusId" = s."unikalusId"
-    LEFT JOIN public."vpmSutartysSearch" search
+    LEFT JOIN "vpmSutartys"."search" search
       ON search."unikalusId" = s."unikalusId"
     LEFT JOIN LATERAL (
         SELECT
             array_agg(en.pavadinimas ORDER BY e.id) AS pavadinimai,
             array_agg(e."tiekejoKodas" ORDER BY e.id) AS kodai
-        FROM public."vpmSutartysPapildomiTiekejai" e
-        LEFT JOIN public."vpmSutartysSalys" en
+        FROM "vpmSutartys"."papildomiTiekejai" e
+        LEFT JOIN "vpmSutartys"."salys" en
           ON en.id = e."tiekejoPavadinimoId"
         WHERE e."unikalusId" = s."unikalusId"
     ) extra_tiekejai ON true
@@ -100,7 +100,7 @@ export const VPM_SUTARTIS_ROW_FROM = `
                 eb."bvpzKodas"::text
             ) ORDER BY eb.id) AS kodai,
             array_agg(b.pavadinimas ORDER BY eb.id) AS pavadinimai
-        FROM public."vpmSutartysPapildomiBvpzKodai" eb
+        FROM "vpmSutartys"."papildomiBvpzKodai" eb
         LEFT JOIN bvpz."kodai" b ON b.code = eb."bvpzKodas"::text
         WHERE eb."unikalusId" = s."unikalusId"
     ) extra_bvpz ON true`;

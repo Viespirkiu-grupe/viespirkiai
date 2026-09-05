@@ -100,7 +100,7 @@ export const FAILAI_SELECT_COLUMNS = `
 // LEFT JOIN'ai: žodynai, turinio hash'as ir šaltinių lentelės "istaigaJar"
 // apskaičiavimui. Raktai remiasi tik į atrenkamus stulpelius, todėl tinka ir
 // backfill'ui, ir eilės vartotojui.
-// viesiejiPirkimai.pirkimoId UNIQUE, vpmSutartys.unikalusId PK — eilučių nedaugina.
+// viesiejiPirkimai.pirkimoId UNIQUE, vpmSutartys."sutartys"."unikalusId" PK — eilučių nedaugina.
 // neskelbiamosDerybos "failoKelias" NEunikalus (PK = hash; vienas dokumentas
 // dengia kelis sutikimus), todėl jis imamas skaliariniu subquery (LIMIT 1)
 // FAILAI_SELECT_COLUMNS viduje, ne JOIN'u. Anksčiau čia buvo lyginama su
@@ -122,7 +122,7 @@ export const FAILAI_ISTAIGA_JOINS = `
             THEN f."sourceId0"::integer
             ELSE NULL
         END
-    LEFT JOIN public."vpmSutartys" s
+    LEFT JOIN "vpmSutartys"."sutartys" s
         ON s."unikalusId" = CASE
             WHEN st.title = 'sutartys' AND f."sourceId0" ~ '^[0-9]+$'
             THEN f."sourceId0"::bigint

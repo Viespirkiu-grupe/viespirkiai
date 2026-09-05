@@ -53,12 +53,12 @@ SELECT s."unikalusId" AS "sutartiesUnikalusId",
        COALESCE(et.kodai, '{}'::text[]) AS "papildomiTiekejaiKodai",
        ARRAY[s."pirmoTiekejoKodas"] || COALESCE(et.kodai, '{}'::text[]) AS "tiekejaiKodai",
        ARRAY[supplier_name.pavadinimas] || COALESCE(et.pavadinimai, '{}'::text[]) AS tiekejai
-FROM "vpmSutartys" s
-LEFT JOIN "vpmSutartysAtnaujinimai" a ON a."unikalusId" = s."unikalusId"
-LEFT JOIN "vpmSutartysSalys" buyer_name ON buyer_name.id = s."perkanciosiosOrganizacijosPavadinimoId"
-LEFT JOIN "vpmSutartysSalys" supplier_name ON supplier_name.id = s."pirmoTiekejoPavadinimoId"
-LEFT JOIN "vpmSutartysTipai" t ON t.id = s."tipasId"
-LEFT JOIN "vpmSutartysKategorijos" k ON k.id = s."kategorijaId"
+FROM "vpmSutartys"."sutartys" s
+LEFT JOIN "vpmSutartys"."atnaujinimai" a ON a."unikalusId" = s."unikalusId"
+LEFT JOIN "vpmSutartys"."salys" buyer_name ON buyer_name.id = s."perkanciosiosOrganizacijosPavadinimoId"
+LEFT JOIN "vpmSutartys"."salys" supplier_name ON supplier_name.id = s."pirmoTiekejoPavadinimoId"
+LEFT JOIN "vpmSutartys"."tipai" t ON t.id = s."tipasId"
+LEFT JOIN "vpmSutartys"."kategorijos" k ON k.id = s."kategorijaId"
 LEFT JOIN LATERAL (
     SELECT code.code, code.checksum, code.pavadinimas
     FROM bvpz."kodai" code
@@ -73,14 +73,14 @@ LEFT JOIN LATERAL (
                x."bvpzKodas"::text
            ) ORDER BY x.id) AS kodai,
            array_agg(b2.pavadinimas ORDER BY x.id) AS pavadinimai
-    FROM "vpmSutartysPapildomiBvpzKodai" x
+    FROM "vpmSutartys"."papildomiBvpzKodai" x
     LEFT JOIN bvpz."kodai" b2 ON b2.code = x."bvpzKodas"::text
     WHERE x."unikalusId" = s."unikalusId"
 ) eb ON true
 LEFT JOIN LATERAL (
     SELECT array_agg(n.pavadinimas ORDER BY x.id) AS pavadinimai,
            array_agg(x."tiekejoKodas" ORDER BY x.id) AS kodai
-    FROM "vpmSutartysPapildomiTiekejai" x
-    LEFT JOIN "vpmSutartysSalys" n ON n.id = x."tiekejoPavadinimoId"
+    FROM "vpmSutartys"."papildomiTiekejai" x
+    LEFT JOIN "vpmSutartys"."salys" n ON n.id = x."tiekejoPavadinimoId"
     WHERE x."unikalusId" = s."unikalusId"
 ) et ON true

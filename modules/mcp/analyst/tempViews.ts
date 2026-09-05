@@ -1,5 +1,9 @@
 export const COVERED_TABLES_BY_VIEWS: Record<string, string> = {
     asmenys:                "v_company",
+
+    // VPT sutartys gyvena vpmSutartys."sutartys" ir nekvalifikuotai
+    // nepasiekiamos (`sutartys` = SABIS registras), tad `vpmSutartys` čia
+    // lieka tik kaip senasis vardas — get_schema jį nukreipia į view'ą.
     vpmSutartys:            "v_sutartys",
     pirkimai:               "v_pirkimas",
     juridiniaiRysiaiPilni:  "v_person_links",

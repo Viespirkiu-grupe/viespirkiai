@@ -6,7 +6,7 @@ import type { Lentele, Rysys } from './tipai.ts';
  * Trys dalykai, be kuriu diagrama tampa neskaitoma:
  *
  *  1. Ciklai. Gyli skaiciuojant tiesiog „taikinys + 1“, ciklas kelia gyli be
- *     galo (vpmSutartys <-> vpmSutartysSearch ispute drobe iki 7000 px). Todel
+ *     galo (vpmSutartys.sutartys <-> search ispute drobe iki 7000 px). Todel
  *     pirma DFS'u sudaromas DAG, o cikla uzdarancios briaunos i gyli neiskaitomos.
  *  2. Ilgos briaunos. Briauna, persokanti kelis sluoksnius, be tarpiniu mazgu
  *     brezama tiesiai per viska, kas pakeliui. Tokioms briaunoms iterpiami

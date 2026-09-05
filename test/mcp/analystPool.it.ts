@@ -184,7 +184,7 @@ describe("v_pirkimas", () => {
 
         // @ts-ignore
         const { rows: sutartysRows } = await client.query(
-            `SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM "vpmSutartys"
+            `SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM "vpmSutartys"."sutartys"
              WHERE "pirkimoNumeris" = $1 AND "perkanciosiosOrganizacijosKodas" IS NOT NULL`,
             [row.pirkimoId],
         );

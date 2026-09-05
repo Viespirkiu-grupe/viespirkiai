@@ -12,7 +12,7 @@ import Timings from "../../utils/timings.js";
  * upsertVpmSutartis (atnaujinta bump + istrinta=false + agregatai).
  * Kai nerasta (count=0), markVpmSutartisIstrinta perleidžia saugomą
  * dokumentą per tą patį upsert kelią su istrinta=true, kad archyvas ir
- * vpmSutartysSumos* agregatai liktų teisingi. Atnaujinta bump'inama
+ * vpmSutartys."sumos*" agregatai liktų teisingi. Atnaujinta bump'inama
  * visada — ir jau ištrintai sutarčiai, kad ji nebūtų renkamasi iš naujo.
  */
 export async function pazymetiScrapeRezultata(id, count) {
@@ -26,7 +26,7 @@ export async function pazymetiScrapeRezultata(id, count) {
         await markVpmSutartisIstrinta(id);
     }
     await postgres.query(
-        `UPDATE public."vpmSutartysAtnaujinimai"
+        `UPDATE "vpmSutartys"."atnaujinimai"
          SET "atnaujinta" = timezone('Europe/Vilnius', now())
          WHERE "unikalusId" = $1;`,
         [id],
@@ -36,7 +36,7 @@ export async function pazymetiScrapeRezultata(id, count) {
 export async function cvpIsScrapeOldestContract() {
     let timings = new Timings();
     timings.start("findOldestScrapedSutartis");
-    // Seniausią eilutę paima vien indeksu (vpmSutartysAtnaujinimai_atnaujinta_idx,
+    // Seniausią eilutę paima vien indeksu (atnaujinimai_atnaujinta_idx,
     // btree atnaujinta NULLS FIRST) — vienas indekso žingsnis. Amžiaus sąlyga
     // tikrinama jau ant tos vienos eilutės: sąlyga monotoniška pagal
     // "atnaujinta" (NULL visada tinka, mažesnės reikšmės tinka labiau), todėl
@@ -44,7 +44,7 @@ export async function cvpIsScrapeOldestContract() {
     // planuotoją perskaityti visą indeksą, kai eilėje nieko nėra.
     let oldestRes = await postgres.query(`WITH seniausia AS (
         SELECT "unikalusId", "atnaujinta"
-        FROM public."vpmSutartysAtnaujinimai"
+        FROM "vpmSutartys"."atnaujinimai"
         ORDER BY "atnaujinta" ASC NULLS FIRST
         LIMIT 1
       )
