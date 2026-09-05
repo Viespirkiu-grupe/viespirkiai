@@ -41,7 +41,7 @@ interface ViewMetadata {
 export const VIEW_METADATA: Record<string, ViewMetadata> = {
     v_company: {
         tags: ["capacity", "blacklist", "labor", "domains", "court"],
-        keys: ["jarKodas", "pavadinimas", "darbuotojai", "melagingisTiekejas", "bylosSkaicius"],
+        keys: ["jarKodas", "pavadinimas", "darbuotojai", "nepatikimasTiekejasIki", "bylosSkaicius"],
         joins: [
             ["jarKodas", "asmenys.jarKodas", "strict"],
         ],
@@ -57,8 +57,11 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "darbuotojai: integer",
             "vidutinisAtlyginimas: numeric",
             "imokuSuma: numeric",
-            "melagingisTiekejas: boolean",
-            "nepatikimasTiekejas: boolean",
+            "melagingisTiekejasNuo: date -- validity interval, not a boolean: " +
+                "in force at cutoff $c iff melagingisTiekejasNuo <= $c AND (melagingisTiekejasIki IS NULL OR melagingisTiekejasIki >= $c)",
+            "melagingisTiekejasIki: date -- NULL means still in force (open-ended)",
+            "nepatikimasTiekejasNuo: date -- validity interval, same rule as melagingisTiekejas*",
+            "nepatikimasTiekejasIki: date -- NULL means still in force (open-ended)",
             "vdiPazeidimuSkaicius: bigint",
             "bylosSkaicius: bigint",
             "domenaiSkaicius: bigint",
@@ -74,7 +77,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         joins: [
             ["pirkejoKodas", "v_company.jarKodas", "strict"],
             ["tiekejoKodas", "v_company.jarKodas", "strict"],
-            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoNumeris", "semantic"],
             ["pirkimoNumeris", "v_dalyviai.pirkimoNumeris", "semantic"],
         ],
         columns: [
@@ -121,15 +124,15 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
     },
     v_pirkimas: {
         tags: ["procedures", "criteria", "lot-count", "single-bidder", "cvpp-archive"],
-        keys: ["pirkimoId", "saltinis", "jarKodas", "pirkimoBudas", "statusas", "numatomaVerteEUR"],
+        keys: ["pirkimoNumeris", "saltinis", "jarKodas", "pirkimoBudas", "statusas", "numatomaVerteEUR"],
         joins: [
             ["jarKodas", "v_company.jarKodas", "strict"],
-            ["pirkimoId", "v_sutartys.pirkimoNumeris", "semantic"],
-            ["pirkimoId", "v_dalyviai.pirkimoNumeris", "semantic"],
+            ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
+            ["pirkimoNumeris", "v_dalyviai.pirkimoNumeris", "semantic"],
         ],
         columns: [
             "saltinis: text",
-            "pirkimoId: text",
+            "pirkimoNumeris: text",
             "pavadinimas: text",
             "jarKodas: text",
             "jarKodasSaltinis: text",
@@ -147,9 +150,9 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "bvpzKodai: text[]",
             "informacija: text",
         ],
-        primaryKeys: ["pirkimoId"],
+        primaryKeys: ["pirkimoNumeris"],
         example:
-            'SELECT "pirkimoId", pavadinimas, organizatorius, statusas, "numatomaVerteEUR" FROM v_pirkimas WHERE statusas = \'Paskelbtas\'',
+            'SELECT "pirkimoNumeris", pavadinimas, organizatorius, statusas, "numatomaVerteEUR" FROM v_pirkimas WHERE statusas = \'Paskelbtas\'',
         notes:
             "Du šaltiniai (saltinis):\n" +
             "- 'cvpis': CVP IS, ~2022-09–dabar. jarKodas tiesioginis, jarKodasSaltinis=NULL.\n" +
@@ -166,7 +169,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         joins: [
             ["pirkejoKodas", "v_company.jarKodas", "strict"],
             ["tiekejoKodas", "v_company.jarKodas", "sparse"],
-            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoNumeris", "semantic"],
             ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
         ],
         columns: [
@@ -200,6 +203,40 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "eileNumeris/pasiulymoKaina — laimėtojo/ne atmestų pasiūlymų eilė konkrečioje dalyje (daliesNumeris); " +
             "atmetimoPriezastis užpildytas, jei pasiūlymas tos dalies buvo atmestas. " +
             "Abu gali būti NULL tai pačiai (pirkimas, tiekėjas, dalis) eilutei, jei duomenų nėra.",
+    },
+    v_pirkimo_dalis: {
+        tags: ["lots", "lot-grain", "risk-subjects", "single-bidder"],
+        keys: ["subjektoRaktas", "pirkimoNumeris", "daliesNumeris", "saltinis"],
+        joins: [
+            ["pirkimoNumeris", "v_dalyviai.pirkimoNumeris", "strict"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoNumeris", "semantic"],
+            ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
+        ],
+        columns: [
+            "subjektoRaktas: text",
+            "saltinis: text",
+            "pirkimoNumeris: text",
+            "daliesNumeris: text",
+            "daliesPavadinimas: text",
+            "pirkimoBudas: text",
+            "ataskaitosData: timestamp with time zone",
+        ],
+        primaryKeys: ["subjektoRaktas"],
+        example:
+            'SELECT l."subjektoRaktas", l."pirkimoNumeris", l."daliesNumeris", count(DISTINCT d."tiekejoKodas") AS dalyviu FROM v_pirkimo_dalis l JOIN v_dalyviai d ON d."pirkimoNumeris" = l."pirkimoNumeris" AND COALESCE(d."daliesNumeris", \'0\') = l."daliesNumeris" GROUP BY 1, 2, 3 HAVING count(DISTINCT d."tiekejoKodas") = 1',
+        notes:
+            "Vienas eilutė per pirkimo dalį (lot)" +
+            "Pirkimo dalis yra savarankiškai vertinama ir laimėtojas skiriamas atskirai, todėl " +
+            "konkurencijos rodikliai skaičiuojami dalies, o ne viso pirkimo lygiu (pvz. pirkimas 3897673 " +
+            "turi 77 dalis ir tik 3 skirtingus tiekėjus — 9 dalys turėjo po vieną dalyvį, ko pirkimo " +
+            "lygmenyje nesimato).\n" +
+            "Dalyvių skaičių, kainas ir atmetimus imk iš v_dalyviai ir agreguok pats — čia jų nėra sąmoningai.\n" +
+            "daliesNumeris: NULL v_dalyviai eilutėse virsta '0' ('visas pirkimas = dalis nulis').\n" +
+            "daliesPavadinimas: dalies pavadinimas iš ATN-1 ataskaitos III.5 skilties (atn1pirkimoDalys); " +
+            "NULL, jei ta skiltis nepildyta arba dalies numeris nerastas.\n" +
+            "subjektoRaktas formatas 'saltinis:pirkimoNumeris:daliesNumeris' — tai rizikos rodiklių " +
+            "(risk."procurementDecisions") subjekto raktas; saltinis NULL (rakte — 'unknown') jei pirkimo " +
+            "skelbimas dar neįkeltas (ATN-1 ataskaita gali aplenkti skelbimą).",
     },
     v_person_links: {
         tags: ["conflict-of-interest", "directors", "beneficial-owners"],

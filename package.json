@@ -16,6 +16,7 @@
         "pirkimai:aprasymu-eile": "node modules/viesiejiPirkimai/aprasymuEile.js",
         "sutartys:aprasyti": "node scripts/aprasytiSutartis.js",
         "db:schema:dump": "node postgres/dumpSchema.js",
+        "risk:run": "node services/procurement-risk/index.ts",
         "db:schema:komentarai": "node scripts/trukstamiLenteliuKomentarai.js",
         "db:schema:rasytojai": "node scripts/aptiktiLenteliuRasytojus.js",
         "cpva:projektai": "node modules/cpva/scrapeProjektai.js",

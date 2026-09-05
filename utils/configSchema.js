@@ -101,6 +101,12 @@ const configSchema = z.object({
     pgAnalystMaxConnections: z.number().int().positive().default(16),
     mcpQueryTimeout: z.number().positive().default(20),
 
+    // Procurement Risk Service — the `risk` schema lives in the main database
+    // and is reached through the main `postgres` pool, so it needs no
+    // connection settings of its own.
+    // Rodyti rizikos indikatorių "čipsus" (chips) viešųjų pirkimų puslapiuose.
+    riskEnableIndicatorsChips: z.boolean().default(false),
+
     spintaServer: z.string().default(""),
     spintaApiKey: z.string().default(""),
     spintaClient: z.string().default(""),

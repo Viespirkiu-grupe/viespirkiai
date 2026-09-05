@@ -12,7 +12,7 @@ export default defineConfig({
         },
     },
     test: {
-        include: ['test/**/*.it.ts'],
+        include: ['test/**/*.it.ts', 'modules/risk/**/*.it.ts'],
         setupFiles: ['./utils/time.js'],
         hookTimeout: 120_000,
         testTimeout: 120_000,

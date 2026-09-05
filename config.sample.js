@@ -188,6 +188,16 @@ export default {
     mcpQueryTimeout: 20,
 
     // ─────────────────────────────────────────────────────────────────────
+    // Procurement Risk Service — schema `risk` (žr. modules/risk/,
+    // services/procurement-risk/). Gyvena toje pačioje pagrindinėje DB kaip ir
+    // `public` faktai ir pasiekiama per tą patį pg* prisijungimą, todėl atskirų
+    // nustatymų neturi. Schemą kuria migrations/risk/001_risk.sql.
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Rodyti rizikos indikatorių „čipsus“ (chips) viešųjų pirkimų sąraše.
+    riskEnableIndicatorsChips: false,
+
+    // ─────────────────────────────────────────────────────────────────────
     // Spinta / Stalčius (atviri duomenys)
     // Eksportas į „spintos“ tipo API serverį. Žiūrėk modules/spinta/.
     // Palaikomi du serveriai (vienodas rašymo protokolas — NDJSON `_op`):

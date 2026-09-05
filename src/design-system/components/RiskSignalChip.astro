@@ -1,0 +1,260 @@
+---
+import Badge from './Badge.astro';
+import type { EnrichedRiskSignal } from '../../../modules/risk/procurementDecisionsReader.ts';
+
+interface Props {
+  signal: EnrichedRiskSignal;
+}
+
+const { signal } = Astro.props as Props;
+const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
+---
+
+<span class="risk-chip">
+  <button type="button" class="risk-chip-trigger" aria-expanded="false">
+    <Badge variant="danger">{signal.titleLt}</Badge>
+  </button>
+  <div class="risk-chip-tooltip" role="tooltip">
+    <button type="button" class="risk-chip-close" aria-label="Uždaryti">×</button>
+    <strong>{signal.titleLt}</strong>
+    {signal.descriptionLt && <p>{signal.descriptionLt}</p>}
+    <div class="risk-chip-meta">Duomenys nuo {dataAsOfStr}</div>
+    <button type="button" class="risk-chip-more" aria-expanded="false">daugiau informacijos</button>
+    <div class="risk-chip-details" hidden>
+      {signal.formulaLt && <p class="risk-chip-formula">{signal.formulaLt}</p>}
+      {signal.limitationLt && <p class="risk-chip-limitation">{signal.limitationLt}</p>}
+      <span class="risk-chip-id">{signal.indicatorId} v{signal.indicatorVersion}</span>
+    </div>
+  </div>
+</span>
+
+<style>
+  .risk-chip {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .risk-chip-trigger {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .risk-chip-trigger :global(.ds-badge--danger) {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .risk-chip:hover .risk-chip-trigger :global(.ds-badge--danger),
+  .risk-chip.is-open .risk-chip-trigger :global(.ds-badge--danger) {
+    background: var(--color-danger);
+    color: #fff;
+    border-color: var(--color-danger);
+  }
+
+  .risk-chip-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: var(--z-tooltip);
+    width: max-content;
+    max-width: 320px;
+    white-space: normal;
+    background: var(--black);
+    color: var(--white);
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(2px);
+    transition: opacity var(--transition), transform var(--transition), visibility var(--transition), background var(--transition), color var(--transition);
+  }
+
+  .risk-chip:hover .risk-chip-tooltip,
+  .risk-chip.is-open .risk-chip-tooltip {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .risk-chip.force-hidden .risk-chip-tooltip {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .risk-chip:hover .risk-chip-tooltip,
+  .risk-chip.is-open .risk-chip-tooltip {
+    background: #000;
+    color: #fff;
+  }
+
+  :global(.dark) .risk-chip:hover .risk-chip-tooltip,
+  :global(.dark) .risk-chip.is-open .risk-chip-tooltip {
+    background: var(--color-danger);
+    color: #fff;
+  }
+
+  .risk-chip-tooltip p {
+    margin: 6px 0 0;
+  }
+
+  .risk-chip-close {
+    display: none;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: #fff;
+    opacity: 0.7;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    line-height: 1;
+  }
+
+  .risk-chip-close:hover {
+    opacity: 1;
+  }
+
+  .risk-chip.is-open .risk-chip-close {
+    display: inline-flex;
+  }
+
+  .risk-chip-more {
+    display: block;
+    margin-top: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9em;
+    opacity: 0.85;
+  }
+
+  .risk-chip-more[hidden] {
+    display: none;
+  }
+
+  .risk-chip-details {
+    margin-top: 8px;
+  }
+
+  .risk-chip-id {
+    display: block;
+    margin-top: 8px;
+    opacity: 0.7;
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+
+  .risk-chip-formula {
+    font-family: var(--font-mono, monospace);
+    opacity: 0.85;
+  }
+
+  .risk-chip-limitation {
+    opacity: 0.7;
+    font-style: italic;
+  }
+
+  .risk-chip-meta {
+    margin-top: 8px;
+    opacity: 0.6;
+  }
+</style>
+
+<script>
+  function closeRiskChip(chip: HTMLElement) {
+    chip.classList.remove('is-open');
+    // The mouse may still be over the chip (e.g. right after clicking the
+    // close button), which would keep :hover showing the tooltip. Force it
+    // hidden until the mouse genuinely leaves the chip.
+    chip.classList.add('force-hidden');
+    chip.querySelector<HTMLElement>('.risk-chip-trigger')?.setAttribute('aria-expanded', 'false');
+    const moreButton = chip.querySelector<HTMLElement>('.risk-chip-more');
+    if (moreButton) {
+      moreButton.hidden = false;
+      moreButton.setAttribute('aria-expanded', 'false');
+    }
+    const details = chip.querySelector<HTMLElement>('.risk-chip-details');
+    if (details) details.hidden = true;
+  }
+
+  // Hiding the tooltip (visibility/pointer-events) while the mouse sits on
+  // top of it doesn't reliably fire mouseleave (the element silently drops
+  // out of hit-testing without a real cursor move), so track the cursor
+  // directly instead and clear force-hidden once it's actually outside.
+  document.addEventListener('mousemove', (event) => {
+    const forceHidden = document.querySelectorAll<HTMLElement>('.risk-chip.force-hidden');
+    forceHidden.forEach((chip) => {
+      const areas = [
+        chip.querySelector<HTMLElement>('.risk-chip-trigger'),
+        chip.querySelector<HTMLElement>('.risk-chip-tooltip'),
+      ].filter((el): el is HTMLElement => el !== null);
+      const inside = areas.some((el) => {
+        const rect = el.getBoundingClientRect();
+        return event.clientX >= rect.left && event.clientX <= rect.right &&
+          event.clientY >= rect.top && event.clientY <= rect.bottom;
+      });
+      if (!inside) chip.classList.remove('force-hidden');
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+
+    const closeButton = target.closest<HTMLElement>('.risk-chip-close');
+    if (closeButton) {
+      const chip = closeButton.closest<HTMLElement>('.risk-chip');
+      if (chip) closeRiskChip(chip);
+      return;
+    }
+
+    const moreButton = target.closest<HTMLElement>('.risk-chip-more');
+    if (moreButton) {
+      const tooltip = moreButton.closest<HTMLElement>('.risk-chip-tooltip');
+      const details = tooltip?.querySelector<HTMLElement>('.risk-chip-details');
+      if (!details) return;
+      details.hidden = false;
+      moreButton.hidden = true;
+      moreButton.setAttribute('aria-expanded', 'true');
+      return;
+    }
+
+    const trigger = target.closest<HTMLElement>('.risk-chip-trigger');
+    if (trigger) {
+      const chip = trigger.closest<HTMLElement>('.risk-chip');
+      if (!chip) return;
+      if (chip.classList.contains('is-open')) {
+        closeRiskChip(chip);
+      } else {
+        chip.classList.remove('force-hidden');
+        chip.classList.add('is-open');
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+      return;
+    }
+
+    if (!target.closest('.risk-chip')) {
+      document.querySelectorAll<HTMLElement>('.risk-chip.is-open').forEach(closeRiskChip);
+    }
+  });
+</script>

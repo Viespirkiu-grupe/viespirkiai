@@ -1,6 +1,6 @@
 CREATE OR REPLACE VIEW v_pirkimas AS
 SELECT 'cvpis' AS saltinis,
-       p."pirkimoId"::text AS "pirkimoId",
+       p."pirkimoId"::text AS "pirkimoNumeris",
        p.pavadinimas,
        p."jarKodas",
        NULL::text AS "jarKodasSaltinis",
@@ -21,7 +21,7 @@ FROM "eppsViesiejiPirkimai"."pirkimai" p
          LEFT JOIN "eppsViesiejiPirkimai"."vykdytojai" o ON o.id = p."pirkimoVykdytojasId"
 UNION ALL
 SELECT 'cvpp' AS saltinis,
-       c."pirkimoNumeris" AS "pirkimoId",
+       c."pirkimoNumeris" AS "pirkimoNumeris",
        c.pavadinimas,
        sj."perkanciosiosOrganizacijosKodas" AS "jarKodas",
        CASE WHEN sj."perkanciosiosOrganizacijosKodas" IS NOT NULL THEN 'sutartys-join' END AS "jarKodasSaltinis",

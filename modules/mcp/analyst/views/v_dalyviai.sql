@@ -22,7 +22,9 @@ SELECT a."pirkimoNumeris",
        p."daliesNumeris",
        p."eileNumeris",
        p."pasiulymoKaina",
-       p."atmetimoPriezastis"
+       p."atmetimoPriezastis",
+       p."atmetimoStatusas",
+       p."atmetimoTeisinisPagrindas"
 FROM ppa."ataskaitos" a
          LEFT JOIN ppa."pirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
          JOIN ppa."dalyviai" d ON d."ataskaitaId" = a.id
@@ -30,8 +32,17 @@ FROM ppa."ataskaitos" a
          LEFT JOIN LATERAL (
              SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
                     e."eileNumeris"                                 AS "eileNumeris",
-                    e.kaina::numeric                                AS "pasiulymoKaina",
-                    apr.pavadinimas                                 AS "atmetimoPriezastis"
+                    -- e.kaina (ppa."pasiulymuEile", "pasiūlymų eilė su kainomis") only
+                    -- carries a price for a bid that made it into the price ranking.
+                    -- ap.pasiulymoKaina (ppa."atmestiPasiulymai") carries the same fact
+                    -- for a bid that never was, recorded at rejection time — without this
+                    -- fallback a disqualified bid's price is populated for ~1% of
+                    -- disqualified bids instead of ~40% (see LT-AWD-02's README).
+                    COALESCE(NULLIF(e.kaina, '')::numeric,
+                             NULLIF(ap."pasiulymoKaina", '')::numeric)              AS "pasiulymoKaina",
+                    apr.pavadinimas                                 AS "atmetimoPriezastis",
+                    aps.pavadinimas                                 AS "atmetimoStatusas",
+                    atp.pavadinimas                                 AS "atmetimoTeisinisPagrindas"
              FROM ppa."pasiulymuEile" e
                       FULL OUTER JOIN ppa."atmestiPasiulymai" ap
                                       ON ap."ataskaitaId" = e."ataskaitaId"
@@ -39,6 +50,10 @@ FROM ppa."ataskaitos" a
                                           AND ap."daliesNumeris" = e."daliesNumeris"
                       LEFT JOIN ppa."atmetimoPriezastys" apr
                                 ON apr.id = ap."atmetimoPriezastysId"
+                      LEFT JOIN ppa."atmestuPasiulymuStatusai" aps
+                                ON aps.id = ap."statusasId"
+                      LEFT JOIN ppa."atmetimoTeisiniaiPagrindai" atp
+                                ON atp.id = ap."atmetimoTeisinisPagrindasId"
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas
          ) p ON true

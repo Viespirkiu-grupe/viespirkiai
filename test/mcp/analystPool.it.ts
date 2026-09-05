@@ -96,8 +96,10 @@ describe("v_company", () => {
         expect("jarKodas" in row, "missing jarKodas").toBe(true);
         expect("pavadinimas" in row, "missing pavadinimas").toBe(true);
         expect("darbuotojai" in row, "missing darbuotojai").toBe(true);
-        expect("melagingisTiekejas" in row, "missing melagingisTiekejas").toBe(true);
-        expect("nepatikimasTiekejas" in row, "missing nepatikimasTiekejas").toBe(true);
+        expect("melagingisTiekejasNuo" in row, "missing melagingisTiekejasNuo").toBe(true);
+        expect("melagingisTiekejasIki" in row, "missing melagingisTiekejasIki").toBe(true);
+        expect("nepatikimasTiekejasNuo" in row, "missing nepatikimasTiekejasNuo").toBe(true);
+        expect("nepatikimasTiekejasIki" in row, "missing nepatikimasTiekejasIki").toBe(true);
     });
 });
 
@@ -109,8 +111,8 @@ describe("v_sutartys", () => {
         expect(rows.length, "v_sutartys returned no rows").toBeGreaterThan(0);
         const row = rows[0];
         expect("sutartiesUnikalusId" in row, "missing sutartiesUnikalusId").toBe(true);
-        expect("pirkejas" in row, "missing pirkejas (joined from jarAsmenys)").toBe(true);
-        expect("tiekejas" in row, "missing tiekejas (joined from jarAsmenys)").toBe(true);
+        expect("pirkejas" in row, "missing pirkejas (joined from rcJar.asmenys)").toBe(true);
+        expect("tiekejas" in row, "missing tiekejas (joined from rcJar.asmenys)").toBe(true);
     });
 });
 
@@ -226,7 +228,7 @@ describe("v_dalyviai", () => {
         const row = rows[0];
         expect("pirkimoNumeris" in row, "missing pirkimoNumeris").toBe(true);
         expect("tiekejoKodas" in row, "missing tiekejoKodas").toBe(true);
-        expect("tiekejas" in row, "missing tiekejas (joined from jarAsmenys)").toBe(true);
+        expect("tiekejas" in row, "missing tiekejas (joined from rcJar.asmenys)").toBe(true);
         expect("daliesNumeris" in row, "missing daliesNumeris").toBe(true);
         expect("pasiulymoKaina" in row, "missing pasiulymoKaina").toBe(true);
         expect("atmetimoPriezastis" in row, "missing atmetimoPriezastis").toBe(true);
@@ -266,7 +268,7 @@ describe("v_person_links", () => {
         const row = rows[0];
         expect("jarKodas" in row, "missing jarKodas").toBe(true);
         expect("vardas" in row, "missing vardas").toBe(true);
-        expect("imonesVardas" in row, "missing imonesVardas (joined from jarAsmenys)").toBe(true);
+        expect("imonesVardas" in row, "missing imonesVardas (joined from rcJar.asmenys)").toBe(true);
         expect("rysioPobudzioPavadinimas" in row, "missing rysioPobudzioPavadinimas").toBe(true);
     });
 });
@@ -281,7 +283,7 @@ describe("v_bylos", () => {
         expect("bylosId" in row, "missing bylosId").toBe(true);
         expect("bylosNumeris" in row, "missing bylosNumeris").toBe(true);
         expect("jarKodas" in row, "missing jarKodas").toBe(true);
-        expect("dalyvioPavadinimas" in row, "missing dalyvioPavadinimas (joined from jarAsmenys)").toBe(true);
+        expect("dalyvioPavadinimas" in row, "missing dalyvioPavadinimas (joined from rcJar.asmenys)").toBe(true);
         expect("bylojeKaip" in row, "missing bylojeKaip").toBe(true);
     });
 });

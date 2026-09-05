@@ -1,0 +1,64 @@
+-- Risk service's own view, _v2-suffixed by the same convention as
+-- v_pirkimas_v2/v_dalyviai_v2/v_pirkimo_dalis_v2 (procurementPublicViews.ts's
+-- header explains why: applied fresh as a CTE per query rather than
+-- persisted, since the query role has no CREATE privilege on `public`).
+-- Unlike those three, there is no already-persisted non-_v2
+-- "v_pirkimo_pabaiga" in the shared analyst schema this forks from or could
+-- clash with — this entity is new — so no sibling file exists to keep in
+-- sync. The _v2 suffix here means "not yet persisted", not "forked from an
+-- existing view"; this is the definition that becomes the real view once it
+-- is eventually persisted. Also unlike those three, it reads its base tables
+-- directly and has no dependency on any other _v2 view.
+--
+-- Pirkimo procedūros pabaiga — one row per (pirkimas, dalis) procedure-ending
+-- decision recorded in the ATN-1/PPA procedure report
+-- (xlsxPPAataskaitos/xlsxPPAproceduruPabaiga).
+--
+-- Deliberately does NOT go through v_dalyviai_v2: that view only produces a
+-- row when xlsxPPAdalyviai has a matching participant, so a procedure that
+-- ended because no supplier submitted anything at all ("Per nustatytą
+-- terminą tiekėjams nepateikus nė vienos paraiškos, pasiūlymo...") would
+-- silently disappear — exactly the outcome this entity exists to keep.
+-- Reading xlsxPPAataskaitos/xlsxPPAproceduruPabaiga directly avoids that.
+--
+-- Grain: one row per (ataskaita, dalis) — NOT per (pirkimoNumeris,
+-- daliesNumeris). A procurement can carry more than one ATN-1 report (445 do
+-- warehouse-wide; one carries 14) and every revision's rows are kept, so
+-- 12,275 rows cover 10,841 distinct lots. A caller that means "this lot's
+-- outcome" must pick a revision — procurementReader.ts's
+-- PROCEDURE_OUTCOME_SQL takes the latest per lot for its "lots" aggregate,
+-- while deliberately aggregating "proceduruPabaigos" and the report-level
+-- flags across every revision. "proceduruPabaiga" is
+-- the report's own closed-vocabulary outcome label (one of a handful of
+-- statutory phrasings, e.g. "Sudarius pirkimo sutartį..." for a concluded
+-- contract, or one of several unsuccessful/terminated phrasings) — an
+-- indicator matches against a short list of known labels, the same
+-- convention v_dalyviai_v2's "atmetimoStatusas" already uses, never a
+-- free-text pattern. "preliminariSutartis" (LT-PRI-06) and "pretenzijaPateikta"
+-- (LT-TRA-07) are both procurement-level facts on the report itself, not
+-- per-lot — carried on every row of this view so the reader's GROUP BY
+-- pirkimoNumeris can bool_or() each across every lot and every report
+-- revision. "sprendimoPriezastys" (LT-TRA-06) is the report's free-text
+-- statement of why the lot's procedure ended the way it did.
+-- "ieskinysTeismui" (LT-TRA-08) is the report's sibling field to
+-- "pretenzijaPateikta", recording whether a lawsuit was filed in court —
+-- aggregated the same procurement-level way. "elektroninisPirkimas"
+-- (LT-TRA-09) is the report's self-reported flag for whether the procedure
+-- was conducted electronically through CVP IS — also procurement-level, also
+-- aggregated the same bool_or way.
+
+CREATE OR REPLACE VIEW v_pirkimo_pabaiga_v2 AS
+SELECT a."pirkimoNumeris"                    AS "pirkimoNumeris",
+       COALESCE(pb."daliesNumeris", '0')     AS "daliesNumeris",
+       a."sukurtaAt"                         AS "ataskaitosData",
+       pb."proceduruPabaiga"                 AS "proceduruPabaiga",
+       pb."sprendimoPriemimoData"            AS "sprendimoPriemimoData",
+       pb."sprendimoPriezastys"              AS "sprendimoPriezastys",
+       a."preliminariSutartis"               AS "preliminariSutartis",
+       a."pretenzijaPateikta"                AS "pretenzijaPateikta",
+       a."ieskinysTeismui"                   AS "ieskinysTeismui",
+       a."elektroninisPirkimas"              AS "elektroninisPirkimas"
+FROM ppa."ataskaitos" a
+         JOIN ppa."proceduruPabaiga" pb ON pb."ataskaitaId" = a.id
+WHERE pb."proceduruPabaiga" IS NOT NULL
+  AND pb."proceduruPabaiga" != ''

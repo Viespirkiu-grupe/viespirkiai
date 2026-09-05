@@ -1,4 +1,5 @@
 import { postgres } from '@/postgres/postgres.js';
+import config from './config.ts';
 import { buildTedNoticeViewModel } from '@/modules/ted/viewer.js';
 import { readTedXmlMany, tedMd5 } from '@/modules/ted/sidecar.js';
 import { searchSutartys } from '@/modules/sutartys/searchSutartys.js';
@@ -101,6 +102,11 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
 
   const { loadPpaForPirkimas } = await import('./ppa.js');
   pirkimas.ppa = await loadPpaForPirkimas(String(pirkimas.pirkimoId));
+
+  if (config.riskEnableIndicatorsChips) {
+    const { loadProcurementRiskView } = await import('@/modules/risk/procurementDecisionsReader.ts');
+    pirkimas.riskView = await loadProcurementRiskView('cvpis', String(pirkimas.pirkimoId));
+  }
 
   return pirkimas;
 }

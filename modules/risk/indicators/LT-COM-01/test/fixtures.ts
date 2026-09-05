@@ -1,0 +1,34 @@
+import type { LotParticipation } from "../../../types.ts";
+
+// Named participation scenarios shared by decision.test.ts. A Subject's
+// participation counts come from the Procurement Reader's own consolidated
+// batch query (modules/risk/procurementReader.ts) — these fixtures describe
+// the expected Lot.participation shape directly. The query's own correctness
+// (dedup via DISTINCT, cutoff filtering, daliesNumeris handling) is tested
+// once, for every lot-grain indicator, in test/risk/procurementReader.it.ts.
+
+export const REPORTED_AT = "2026-05-04T09:30:00Z";
+
+// Exactly one bidder, not rejected — the plain triggered case.
+export const singleBidder: LotParticipation = { totalBids: 1, validBids: 1, reportedAt: REPORTED_AT };
+
+// Two bidders submitted, one was rejected — still triggered: exactly one bid
+// survived evaluation.
+export const oneOfTwoRejected: LotParticipation = { totalBids: 2, validBids: 1, reportedAt: REPORTED_AT };
+
+// Every bid the lot received was rejected — a failed procedure, not a
+// non-competitive award, so the concept does not apply (see decision.ts).
+export const allBidsRejected: LotParticipation = { totalBids: 3, validBids: 0, reportedAt: REPORTED_AT };
+
+// The same, with only one bidder to reject: still zero valid bids.
+export const soleBidRejected: LotParticipation = { totalBids: 1, validBids: 0, reportedAt: REPORTED_AT };
+
+// Two bidders, neither rejected — not_triggered.
+export const twoValidBidders: LotParticipation = { totalBids: 2, validBids: 2, reportedAt: REPORTED_AT };
+
+// A real, rarer case — every recorded tiekejoKodas is null-coded, rather
+// than no participation being observed at all — produced by the real query
+// too (test/risk/procurementReader.it.ts's "nullCoded" scenario), not just
+// a decision-only fixture. Treated as an incomplete report, not zero
+// participation.
+export const emptyReport: LotParticipation = { totalBids: 0, validBids: 0, reportedAt: REPORTED_AT };

@@ -91,6 +91,8 @@ const ENV_MAP = [
     ["PG_ANALYST_MAX_CONNECTIONS", "pgAnalystMaxConnections", "number"],
     ["MCP_QUERY_TIMEOUT", "mcpQueryTimeout", "number"],
 
+    ["RISK_ENABLE_INDICATORS_CHIPS", "riskEnableIndicatorsChips", "boolean"],
+
     ["SPINTA_SERVER", "spintaServer", "string"],
     ["SPINTA_API_KEY", "spintaApiKey", "string"],
     ["SPINTA_CLIENT", "spintaClient", "string"],

@@ -28,8 +28,8 @@ export const description =
     "Paieškai naudok: search_sutartys, search_dokumentai, search_viesieji_pirkimai, search_juridiniai. " +
     "Pagrindinės lentelės su stulpeliais: " +
     "v_sutartys→sutartiesUnikalusId,pirkejoKodas,pirkejas,tiekejoKodas,tiekejas,verte,sudarymoData,bvpzKodas,tipas,istrinta,pirkimoNumeris,faktineIvykdimoVerte; " +
-    "v_company→jarKodas,pavadinimas,darbuotojai,vidutinisAtlyginimas,imokuSuma,melagingisTiekejas,nepatikimasTiekejas,bylosSkaicius,domenaiSkaicius,registravimoData; " +
-    "v_pirkimas→pirkimoId,jarKodas,organizatorius,pirkimoBudas,statusas,numatomaVerteEUR,esFinansavimas,bvpzKodai,paskelbimoData; " +
+    "v_company→jarKodas,pavadinimas,darbuotojai,vidutinisAtlyginimas,imokuSuma,melagingisTiekejasNuo,melagingisTiekejasIki,nepatikimasTiekejasNuo,nepatikimasTiekejasIki,bylosSkaicius,domenaiSkaicius,registravimoData; " +
+    "v_pirkimas→pirkimoNumeris,jarKodas,organizatorius,pirkimoBudas,statusas,numatomaVerteEUR,esFinansavimas,bvpzKodai,paskelbimoData; " +
     "v_person_links→id,vardas,pavarde,jarKodas,imonesVardas,pareigos,irasoTipas,rysioPradzia,rysioPabaiga,yraJuridinisAsmuo,registruotaLietuvoje; " +
     "v_dalyviai→pirkimoNumeris,pirkejoKodas,tiekejoKodas,tiekejas,daliesNumeris,eileNumeris,pasiulymoKaina,atmetimoPriezastis,interesuKonfliktasNustatytas; " +
     "v_bylos→bylosId,jarKodas,bylosNumeris,bylosRusis,bylosData,teismas,bylojeKaip. " +
