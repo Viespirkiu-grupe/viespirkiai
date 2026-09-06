@@ -4,6 +4,11 @@ Pilietinės iniciatyvos Viešpirkiai puslapio https://viespirkiai.org kodas.
 
 Daugiau informacijos el. paštu viespirkiai@viespirkiai.org
 
+## Dokumentacija
+
+- [Visi `npm run` skriptai](docs/npm-skriptai.md) – ką kiekvienas daro ir kada jį leisti
+- [Aplinkos kintamieji](ENV.md)
+
 ## Tailwind CSS
 
 Astro port (`src/`) now uses Tailwind v4 directly through Astro/Vite.
@@ -18,13 +23,13 @@ The main stylesheet entrypoint is `src/styles/global.css`, which imports Tailwin
 - Astro development:
 
 ```bash
-npm run dev:astro
+npm run dev
 ```
 
 - Astro production build:
 
 ```bash
-npm run build:astro
+npm run build
 ```
 
 ### Project setup files
