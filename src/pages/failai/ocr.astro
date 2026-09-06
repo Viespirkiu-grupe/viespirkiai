@@ -51,7 +51,7 @@ const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocr
       COALESCE(SUM(s.results), 0) AS "results",
       COALESCE(SUM(s.pages), 0) AS "pages",
       COALESCE(SUM(s.words), 0) AS "words"
-    FROM public."ocrNuskaitytojai" n
+    FROM infra."ocrNuskaitytojai" n
     -- Dabartinės rezervacijos, o ne kaupiamas skaitiklis: status = -3 pjūvis mažas,
     -- o daliniam indeksui (filesOcrStatus_rezervuoti_idx) tai index-only scan.
     LEFT JOIN LATERAL (

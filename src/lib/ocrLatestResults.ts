@@ -47,7 +47,7 @@ export async function loadLatestOcrResults(limit = 15): Promise<any[]> {
     LEFT JOIN public.files f ON f.id = o.id
     LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
     LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
-    LEFT JOIN public."ocrNuskaitytojai" n ON n.id = o."nodeId"
+    LEFT JOIN infra."ocrNuskaitytojai" n ON n.id = o."nodeId"
     WHERE o."ocrTimestamp" IS NOT NULL
     ORDER BY o."ocrTimestamp" DESC
     LIMIT $1

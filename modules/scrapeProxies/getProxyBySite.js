@@ -34,7 +34,7 @@ export async function getProxyBySite(site, { type = "httpReverse" } = {}) {
         rows = cached.rows;
     } else {
         const res = await postgres.query(
-            `SELECT * FROM "scrapeProxies" WHERE enabled = true AND site = $1 AND type = ANY($2)`,
+            `SELECT * FROM infra."scrapeProxies" WHERE enabled = true AND site = $1 AND type = ANY($2)`,
             [site, types],
         );
         rows = res.rows;

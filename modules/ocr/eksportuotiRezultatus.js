@@ -53,7 +53,7 @@ async function run(outputDir) {
                     d."pageCount" AS "puslapiuSkaicius",
                     d."wordCount" AS "zodziuSkaicius"
              FROM public."filesOcrStatus" o
-             LEFT JOIN public."ocrNuskaitytojai" n ON n.id = o."nodeId"
+             LEFT JOIN infra."ocrNuskaitytojai" n ON n.id = o."nodeId"
              LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
              WHERE o."resultHash" IS NOT NULL
              ORDER BY o.id ASC`,

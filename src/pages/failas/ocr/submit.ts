@@ -77,7 +77,7 @@ export const POST: APIRoute = async ({ request }) => {
     const extractionQueued = await iEile([id], client);
 
     await client.query(
-      `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
+      `UPDATE infra."ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
       [user.id],
     );
     // Blob'as turi būti patvariai įrašytas prieš paskelbiant jo resultHash.

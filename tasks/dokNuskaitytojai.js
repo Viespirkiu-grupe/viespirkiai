@@ -38,7 +38,7 @@ export function startDokNuskaitytojai(runner) {
         if (stopped) return;
         try {
             const { rows } = await postgres.query(`
-                SELECT * FROM "dokNuskaitytojai" WHERE enabled = true
+                SELECT * FROM infra."dokNuskaitytojai" WHERE enabled = true
             `);
             if (stopped) return;
 

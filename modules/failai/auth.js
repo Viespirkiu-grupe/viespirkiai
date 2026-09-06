@@ -7,7 +7,7 @@ export async function validateOcrApiKey(apiKey, options = {}) {
     const result = await postgres.query(
         `
         SELECT o.*
-        FROM public."ocrNuskaitytojai" o
+        FROM infra."ocrNuskaitytojai" o
         JOIN auth."raktai" a ON a.id = o."apiRaktasId"
         WHERE a."apiKey" = $1
         LIMIT 1

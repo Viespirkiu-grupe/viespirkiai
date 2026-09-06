@@ -176,7 +176,7 @@ export async function pazymetiOcrRezultata(
     // Kaupiamasis nuskaitytojo skaitiklis — pernuskaitymas skaičiuojamas kaip
     // atskiras nuskaitymas (kaip ir filesOcrStatus."resultsCount").
     await klientas.query(
-        `UPDATE public."ocrNuskaitytojai"
+        `UPDATE infra."ocrNuskaitytojai"
          SET "nuskaitytiDokumentai" = COALESCE("nuskaitytiDokumentai", 0) + 1
          WHERE id = $1`,
         [nodeId],

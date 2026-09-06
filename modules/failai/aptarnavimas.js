@@ -231,7 +231,7 @@ export async function fetchFailasMetadata(id, failas = null) {
                 o."lockTimestamp", n.pavadinimas AS node,
                 d."pageCount", d."wordCount"
          FROM public."filesOcrStatus" o
-         LEFT JOIN public."ocrNuskaitytojai" n ON n.id = o."nodeId"
+         LEFT JOIN infra."ocrNuskaitytojai" n ON n.id = o."nodeId"
          LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
          WHERE o.id = $1`,
         [id],

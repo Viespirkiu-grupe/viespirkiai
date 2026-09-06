@@ -67,7 +67,7 @@ async function nuskaitytiDokNuskaitytojuje(
         const res = await postgres.query(
             `
             SELECT d.*, a."apiKey"
-            FROM public."dokNuskaitytojai" d
+            FROM infra."dokNuskaitytojai" d
             JOIN auth."raktai" a ON a.id = d."apiRaktasId"
             WHERE d.id = $1
             AND d.enabled = true
@@ -84,7 +84,7 @@ async function nuskaitytiDokNuskaitytojuje(
         const res = await postgres.query(
             `
             SELECT d.*, a."apiKey"
-            FROM public."dokNuskaitytojai" d
+            FROM infra."dokNuskaitytojai" d
             JOIN auth."raktai" a ON a.id = d."apiRaktasId"
             WHERE d.enabled = true
             ORDER BY RANDOM()
@@ -166,7 +166,7 @@ async function nuskaitytiDokNuskaitytojuje(
     timings.start("nuskaitytojaUpdate");
     await postgres.query(
         `
-      UPDATE public."dokNuskaitytojai"
+      UPDATE infra."dokNuskaitytojai"
       SET nuskaitytiDokumentai = nuskaitytiDokumentai + 1
       WHERE id = $1;
     `,
