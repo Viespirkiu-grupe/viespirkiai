@@ -366,7 +366,7 @@ async function upsertForms(client, rows) {
         FROM input WHERE "formosKodas" IS NOT NULL AND "formosPavadinimas" IS NOT NULL
         GROUP BY "formosKodas"
         ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
-        WHERE "rcJar"."formos".pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
+        WHERE "rcJar"."formos"."pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
     `, [JSON.stringify(rows)]);
 }
 
@@ -382,7 +382,7 @@ async function upsertRegistered(client, rows) {
         WHERE "statusoKodas" IS NOT NULL AND "statusoPavadinimas" IS NOT NULL
         GROUP BY "statusoKodas"
         ON CONFLICT ("kodas") DO UPDATE SET "pavadinimas" = EXCLUDED."pavadinimas"
-        WHERE "rcJar"."statusai".pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
+        WHERE "rcJar"."statusai"."pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
     `, [JSON.stringify(rows)]);
     return upsertPeople(client, rows, false);
 }
