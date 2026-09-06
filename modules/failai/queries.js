@@ -4,7 +4,7 @@ import { FILES_JOINS, FILES_SELECT, papildytiFaila } from "./filesSkaitymas.js";
 
 const FAILO_BAZĖ = `
     SELECT ${FILES_SELECT}
-    FROM public.files f
+    FROM files.files f
     ${FILES_JOINS}`;
 
 /*
@@ -69,11 +69,11 @@ export async function findArchyvoVaikai(parentId) {
                 d."wordCount" AS "zodziuSkaicius", d."pageCount" AS "puslapiuSkaicius",
                 CASE WHEN d.status < 0 THEN d.status ELSE d.version END AS nuskaitytas,
                 f."downloadStatus" AS parsiustas
-         FROM public.files f
-         LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
-         LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-         LEFT JOIN public."filesMd5" m ON m.id = f."md5Id"
-         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+         FROM files.files f
+         LEFT JOIN files."filenames" fn ON fn.id = f."filenameId"
+         LEFT JOIN files."extensions" e ON e.id = f."extensionId"
+         LEFT JOIN files."md5" m ON m.id = f."md5Id"
+         LEFT JOIN files."dataExtraction" d ON d.id = f.id
          WHERE f.parent = $1
          ORDER BY fn.filename ASC`,
         [parentId],
@@ -86,9 +86,9 @@ const dezePagalMd5 = preparedStatement(
     "dezePagalMd5",
     `SELECT m.md5, d.pavadinimas AS deze, b.filesize AS dydis,
             d.url, d.speed, d.pavadinimas, a."apiKey"
-     FROM public."filesMd5Boxes" b
-     JOIN public."filesMd5" m ON m.id = b."md5Id"
-     JOIN public.dezes d ON d.id = b."boxId"
+     FROM files."md5Boxes" b
+     JOIN files."md5" m ON m.id = b."md5Id"
+     JOIN files.dezes d ON d.id = b."boxId"
      JOIN auth."raktai" a ON a.id = d."apiRaktasId"
      WHERE m.md5 = $1
      ORDER BY -LN(random()) / NULLIF(d.speed, 0)
@@ -101,13 +101,13 @@ export async function getDezeForMd5(md5) {
 }
 
 /**
- * Grąžina failo „nerodymo" įrašą iš `filesHidden` (jei toks yra), arba null.
+ * Grąžina failo „nerodymo" įrašą iš `files."hidden"` (jei toks yra), arba null.
  * `priezastis` — vieša priežastis, `status` — HTTP statusas (pvz. 451).
  */
 export async function getFailasNerodymas(id) {
     if (id == null || isNaN(id)) return null;
     const result = await postgres.query(
-        `SELECT reason AS priezastis, status FROM public."filesHidden" WHERE id = $1 LIMIT 1`,
+        `SELECT reason AS priezastis, status FROM files."hidden" WHERE id = $1 LIMIT 1`,
         [id],
     );
     return result.rows[0] ?? null;

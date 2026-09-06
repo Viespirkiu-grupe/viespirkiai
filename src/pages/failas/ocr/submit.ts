@@ -45,9 +45,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Rezervacija ir yra autorizacija: eilutė paimama tik jei ją laiko būtent šis node'as.
     const queueRes = await client.query(
-      `DELETE FROM public."filesOcrQueue" q
-       USING public.files f
-       LEFT JOIN public."filesMd5" m ON m.id = f."md5Id"
+      `DELETE FROM files."ocrQueue" q
+       USING files.files f
+       LEFT JOIN files."md5" m ON m.id = f."md5Id"
        WHERE q.id = $1 AND q."lockedBy" = $2 AND f.id = q.id
        RETURNING q."lockedAt", m.md5`,
       [id, user.pavadinimas],

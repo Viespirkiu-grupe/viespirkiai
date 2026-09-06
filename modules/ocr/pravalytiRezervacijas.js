@@ -9,20 +9,20 @@ import { OCR_BANDYMAI } from "../failai/ocr.js";
 export async function pravalytiOcrRezervacijas() {
     const limit = 10;
 
-    // Eilutė grąžinama į eilę arba pašalinama, o filesOcrStatus gauna
+    // Eilutė grąžinama į eilę arba pašalinama, o files."ocrStatus" gauna
     // -6 (viršijo bandymus) arba 0 (vėl rekomenduojama).
     const res = await postgres.query(
         `
         WITH stale AS (
             SELECT id, attempts
-            FROM public."filesOcrQueue"
+            FROM files."ocrQueue"
             WHERE "lockedBy" IS NOT NULL
               AND "lockedAt" <= NOW() - INTERVAL '1 hour'
             LIMIT $1
             FOR UPDATE SKIP LOCKED
         ),
         bumped AS (
-            UPDATE public."filesOcrQueue" q
+            UPDATE files."ocrQueue" q
             SET "lockedBy" = NULL,
                 "lockedAt" = NULL,
                 attempts   = s.attempts + 1
@@ -31,11 +31,11 @@ export async function pravalytiOcrRezervacijas() {
             RETURNING q.id, q.attempts
         ),
         pasalinti AS (
-            DELETE FROM public."filesOcrQueue"
+            DELETE FROM files."ocrQueue"
             WHERE id IN (SELECT id FROM bumped WHERE attempts >= $2)
             RETURNING id
         )
-        UPDATE public."filesOcrStatus" o
+        UPDATE files."ocrStatus" o
         SET status          = CASE WHEN b.attempts >= $2 THEN -6 ELSE 0 END,
             "nodeId"        = NULL,
             "lockTimestamp" = NULL,

@@ -3,7 +3,7 @@ import { postgres } from '../../lib/failai.js';
 
 export const GET: APIRoute = async () => {
   const { rows } = await postgres.query(
-    'SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM public."filesLocations"'
+    'SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM files."locations"'
   );
 
   const points = (rows as any[]).map((row) => [Number(row.lat), Number(row.lon)]);

@@ -69,7 +69,7 @@ async function buildPayload(row, caches) {
 //
 // Dauguma jų keliauja tik į sidecar: pati documents.documents eilutė turinio
 // metaduomenų nedubliuoja – md5, pavadinimą, autorių, plėtinį, šaltinio ID ir
-// apimtis ji paveldi iš public.files per "fileId" (žr. documents."documentsFull").
+// apimtis ji paveldi iš files.files per "fileId" (žr. documents."documentsFull").
 //
 // "istaigaJar" — perkančiosios / paskelbusios organizacijos JAR kodas, paimtas
 // pagal šaltinį iš susijusios lentelės (žr. FILES_ISTAIGA_JOINS). cvpp neturi
@@ -107,15 +107,15 @@ export const FAILAI_SELECT_COLUMNS = `
 // 'https://eviesiejipirkimai.lt/' || sourceId0, o šaltinis duoda santykinį
 // kelią — sąlyga nesutapdavo niekada ir "istaigaJar" likdavo tuščias.
 //
-// filesLocations čia nebejungiamas: koordinates dokumentas paveldi iš failo.
+// files."locations" čia nebejungiamas: koordinates dokumentas paveldi iš failo.
 export const FAILAI_ISTAIGA_JOINS = `
-    LEFT JOIN public."filesMd5"            m   ON m.id   = f."md5Id"
-    LEFT JOIN public."filesFilenames"      fn  ON fn.id  = f."filenameId"
-    LEFT JOIN public."filesExtensions"     e   ON e.id   = f."extensionId"
-    LEFT JOIN public."filesAuthors"        a   ON a.id   = f."authorId"
-    LEFT JOIN public."filesSourceTitles"   st  ON st.id  = f."sourceTitleId"
-    LEFT JOIN public."filesDataExtraction" d   ON d.id   = f.id
-    LEFT JOIN public."filesInfoFiles"      i   ON i.id   = f.id
+    LEFT JOIN files."md5"            m   ON m.id   = f."md5Id"
+    LEFT JOIN files."filenames"      fn  ON fn.id  = f."filenameId"
+    LEFT JOIN files."extensions"     e   ON e.id   = f."extensionId"
+    LEFT JOIN files."authors"        a   ON a.id   = f."authorId"
+    LEFT JOIN files."sourceTitles"   st  ON st.id  = f."sourceTitleId"
+    LEFT JOIN files."dataExtraction" d   ON d.id   = f.id
+    LEFT JOIN files."infoFiles"      i   ON i.id   = f.id
     LEFT JOIN "eppsViesiejiPirkimai"."pirkimai" vp
         ON vp."pirkimoId" = CASE
             WHEN st.title = 'cvpIs' AND f."sourceId0" ~ '^[0-9]+$'
@@ -200,7 +200,7 @@ export async function upsertBatch(rows, db = postgres) {
 export async function fetchFailaiSlice(afterId, limit) {
     const { rows } = await postgres.query(
         `SELECT ${FAILAI_SELECT_COLUMNS}
-         FROM public.files f
+         FROM files.files f
          ${FAILAI_ISTAIGA_JOINS}
          WHERE f.id > $1
          ORDER BY f.id
@@ -215,7 +215,7 @@ export async function fetchFailaiByIds(ids, db = postgres) {
     if (!ids.length) return [];
     const { rows } = await db.query(
         `SELECT ${FAILAI_SELECT_COLUMNS}
-         FROM public.files f
+         FROM files.files f
          ${FAILAI_ISTAIGA_JOINS}
          WHERE f.id = ANY($1)`,
         [ids],
@@ -234,8 +234,8 @@ export async function deleteDocumentsByFileIds(fileIds, db = postgres) {
         `WITH doomed AS (
             SELECT d.id, m.md5
             FROM documents.documents d
-            JOIN public.files f    ON f.id = d."fileId"
-            LEFT JOIN public."filesMd5" m ON m.id = f."md5Id"
+            JOIN files.files f    ON f.id = d."fileId"
+            LEFT JOIN files."md5" m ON m.id = f."md5Id"
             WHERE d."fileId" = ANY($1)
          ), removed AS (
             DELETE FROM documents.documents

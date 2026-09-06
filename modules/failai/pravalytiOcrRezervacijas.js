@@ -5,11 +5,11 @@ import { iOcrEile } from "./ocrEile.js";
 const logger = new Logger();
 
 /**
- * Išvalo užstrigusias OCR rezervacijas (filesOcrStatus.status = -3, kurių
+ * Išvalo užstrigusias OCR rezervacijas (files."ocrStatus".status = -3, kurių
  * lockTimestamp senesnis nei 30 minučių).
  *
  * Skirtumas nuo kitų dviejų valytojų: OCR rezervacija gyvena dviejose lentelėse —
- * lock'as eilėje ir būsena filesOcrStatus. Node'ui kritus būsena lieka amžinai,
+ * lock'as eilėje ir būsena files."ocrStatus". Node'ui kritus būsena lieka amžinai,
  * failas rodomas kaip „Rezervuota“ ir OCR jam nebedaromas, net jei eilės lock'as
  * jau atlaisvintas. Tad čia nuimama ir būsena, o iš eilės iškritę failai (pvz.
  * po eilės migracijos) grąžinami atgal — jų neatstatytų niekas kitas, nes eilę
@@ -22,7 +22,7 @@ export async function pravalytiOcrRezervacijas() {
         `
         WITH stale AS (
             SELECT id, "resultHash" IS NOT NULL AS "turiRezultata"
-            FROM public."filesOcrStatus"
+            FROM files."ocrStatus"
             WHERE status = -3
               AND ("lockTimestamp" IS NULL
                    OR "lockTimestamp" <= NOW() - INTERVAL '30 minutes')
@@ -30,7 +30,7 @@ export async function pravalytiOcrRezervacijas() {
             FOR UPDATE SKIP LOCKED
         ),
         bumped AS (
-            UPDATE public."filesOcrQueue" q
+            UPDATE files."ocrQueue" q
             SET attempts = q.attempts + 1,
                 "nextAttempt" = NOW() + LEAST(
                     INTERVAL '1 day',
@@ -43,20 +43,20 @@ export async function pravalytiOcrRezervacijas() {
             RETURNING q.id, q.attempts
         ),
         pasalinti AS (
-            DELETE FROM public."filesOcrQueue"
+            DELETE FROM files."ocrQueue"
             WHERE id IN (SELECT id FROM bumped WHERE attempts >= $2)
             RETURNING id
         ),
         -- Rezultatas realiai yra: failas buvo pernuskaitomas ir pakibo jau po to.
         baigtos AS (
-            UPDATE public."filesOcrStatus"
+            UPDATE files."ocrStatus"
             SET status = 1, "lockTimestamp" = NULL
             WHERE id IN (SELECT id FROM stale WHERE "turiRezultata")
             RETURNING id
         ),
         -- Be rezultato eilutėje nėra ko saugoti — lieka tik negaliojantis lock'as.
         istrintos AS (
-            DELETE FROM public."filesOcrStatus"
+            DELETE FROM files."ocrStatus"
             WHERE id IN (SELECT id FROM stale WHERE NOT "turiRezultata")
             RETURNING id
         )

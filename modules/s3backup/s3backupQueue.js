@@ -22,8 +22,8 @@ busy_timeout suderina).
 
 Numatytai einam per VISUS md5 nuo pradžių. Kursorius (`bukle.queueCursor`) tinka
 tik atsistatymui po nutrūkimo, bet ne kasdieniam paleidimui: tinkamumo sąlyga
-priklauso nuo `filesMd5Boxes` / `files."downloadStatus"`, o šie atsiranda vėliau
-nei pats `filesMd5` įrašas. Praleidus mažesnius id, seni md5, tapę tinkami po
+priklauso nuo `files."md5Boxes"` / `files.files."downloadStatus"`, o šie atsiranda vėliau
+nei pats `files."md5"` įrašas. Praleidus mažesnius id, seni md5, tapę tinkami po
 praėjusio rato, į eilę nebepatektų niekada. Pilnas ratas pigus — `INSERT … ON
 CONFLICT DO NOTHING`, tad kartotiniai md5 nieko nekainuoja.
 
@@ -31,13 +31,13 @@ CONFLICT DO NOTHING`, tad kartotiniai md5 nieko nekainuoja.
   npm run s3backup:queue -- --testi            # tęsti nuo kursoriaus (po nutrūkimo)
   npm run s3backup:queue -- --page 50000 --limit 200000
 
-Šaltinis: md5, kuriems realiai yra baitų — t. y. yra `filesMd5Boxes` įrašas
-(dėžė turi blob'ą) ARBA yra `files."downloadStatus" = 1` eilutė. Praktiškai tai
+Šaltinis: md5, kuriems realiai yra baitų — t. y. yra `files."md5Boxes"` įrašas
+(dėžė turi blob'ą) ARBA yra `files.files."downloadStatus" = 1` eilutė. Praktiškai tai
 tas pats rinkinys (3 432 700 vs 3 432 700), bet ne visiškai: patikra rado 1 md5,
 esantį dėžėje be nė vienos `downloadStatus = 1` eilutės. Backup'ui geriau
 paimti per daug nei pamesti failą, todėl imam sąjungą.
 
-Dydis imamas iš `filesMd5Boxes.filesize` — jo reikia ir maršrutizavimui
+Dydis imamas iš `files."md5Boxes".filesize` — jo reikia ir maršrutizavimui
 (RAM vs diskas), ir baitiniam progresui; jei nežinomas, lieka 0 ir įkėlimas
 susitvarko srauto metu.
 */
@@ -52,18 +52,18 @@ const DB_PATH = typeof args.db === "string" ? args.db : getS3backupSqlitePath();
 
 const logger = new Logger(import.meta.url);
 
-/** Vienas keyset puslapis md5 didėjančia `filesMd5.id` tvarka. */
+/** Vienas keyset puslapis md5 didėjančia `files."md5".id` tvarka. */
 async function fetchPage(cursor, pageSize) {
     const { rows } = await postgres.query(
         `SELECT m.id AS "md5Id",
                 m.md5 AS "md5",
                 COALESCE((SELECT MAX(b.filesize)
-                          FROM public."filesMd5Boxes" b
+                          FROM files."md5Boxes" b
                           WHERE b."md5Id" = m.id), 0)::bigint AS "dydis"
-         FROM public."filesMd5" m
+         FROM files."md5" m
          WHERE ($1::int IS NULL OR m.id > $1)
-           AND (EXISTS (SELECT 1 FROM public."filesMd5Boxes" b WHERE b."md5Id" = m.id)
-                OR EXISTS (SELECT 1 FROM public.files f
+           AND (EXISTS (SELECT 1 FROM files."md5Boxes" b WHERE b."md5Id" = m.id)
+                OR EXISTS (SELECT 1 FROM files.files f
                            WHERE f."md5Id" = m.id AND f."downloadStatus" = 1))
          ORDER BY m.id
          LIMIT $2`,
@@ -80,14 +80,14 @@ async function main() {
     logger.log(
         `SQLite: ${DB_PATH}` +
             (startAfter
-                ? `, tęsiam nuo filesMd5.id > ${nf(startAfter)}`
+                ? `, tęsiam nuo files."md5".id > ${nf(startAfter)}`
                 : ", pilnas ratas nuo pradžių"),
     );
 
     const { rows: countRows } = await postgres.query(
-        `SELECT COUNT(*) AS c FROM public."filesMd5" m
-         WHERE EXISTS (SELECT 1 FROM public."filesMd5Boxes" b WHERE b."md5Id" = m.id)
-            OR EXISTS (SELECT 1 FROM public.files f
+        `SELECT COUNT(*) AS c FROM files."md5" m
+         WHERE EXISTS (SELECT 1 FROM files."md5Boxes" b WHERE b."md5Id" = m.id)
+            OR EXISTS (SELECT 1 FROM files.files f
                        WHERE f."md5Id" = m.id AND f."downloadStatus" = 1)`,
     );
     const isViso = Number(countRows[0].c);

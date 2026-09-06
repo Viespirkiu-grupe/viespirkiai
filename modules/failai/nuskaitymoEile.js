@@ -3,10 +3,10 @@ import { FILES_JOINS, FILES_SELECT, papildytiFaila } from "./filesSkaitymas.js";
 import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 /*
-Failų nuskaitymo eilė — `filesExtractionQueue`.
+Failų nuskaitymo eilė — `files."extractionQueue"`.
 
 Eilėje laikomi tik neatlikti darbai: reikia nuskaityti — eilutė yra, nebereikia — eilutės nėra.
-Būsena (versija, klaidos kodas) gyvena `filesDataExtraction`, o eilė saugo tik tai, ko ta
+Būsena (versija, klaidos kodas) gyvena `files."dataExtraction"`, o eilė saugo tik tai, ko ta
 lentelė nežino: bandymų skaičių, atidėjimą ir rezervaciją.
 
 Eilę pildo kodas (ne DB trigeris) tuose taškuose, kur failas tampa nuskaitomu:
@@ -47,11 +47,11 @@ export async function iEile(failuId, klientas = postgres) {
     // Sąlyga: parsiųsta arba iš archyvo, tinkamas plėtinys, nuskaitymo versija
     // senesnė už dabartinę (dar nenuskaitytų versija — 0).
     const res = await klientas.query(
-        `INSERT INTO public."filesExtractionQueue" (id)
+        `INSERT INTO files."extractionQueue" (id)
          SELECT f.id
-         FROM public.files f
-         LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+         FROM files.files f
+         LEFT JOIN files."extensions" e ON e.id = f."extensionId"
+         LEFT JOIN files."dataExtraction" d ON d.id = f.id
          WHERE f.id = ANY($1::int[])
            AND f."downloadStatus" IN (1, -5)
            AND LOWER(e.extension) = ANY($2::text[])
@@ -62,7 +62,7 @@ export async function iEile(failuId, klientas = postgres) {
 
     if (klientas === postgres && res.rowCount > 0) {
         signalWork(WORK_SIGNALS.FILES_EXTRACTION_READY, {
-            source: "filesExtractionQueue",
+            source: "files.extractionQueue",
             count: res.rowCount,
         });
     }
@@ -80,7 +80,7 @@ export async function isEiles(failuId, klientas = postgres) {
     if (!failuId?.length) return 0;
 
     const res = await klientas.query(
-        `DELETE FROM public."filesExtractionQueue" WHERE id = ANY($1::int[])`,
+        `DELETE FROM files."extractionQueue" WHERE id = ANY($1::int[])`,
         [failuId],
     );
 
@@ -99,13 +99,13 @@ export async function paimtiNuskaitymui(nodeName, failasId = null, klientas = po
     if (failasId) {
         const { rows } = await klientas.query(
             `WITH locked AS (
-                UPDATE public."filesExtractionQueue" q
+                UPDATE files."extractionQueue" q
                 SET "lockedBy" = $1, "lockedAt" = NOW()
                 WHERE q.id = $2 AND q."lockedBy" IS NULL
                 RETURNING q.id
             )
             SELECT ${FILES_SELECT}
-            FROM public.files f
+            FROM files.files f
             ${FILES_JOINS}
             WHERE f.id = (SELECT id FROM locked)`,
             [nodeName, failasId],
@@ -117,7 +117,7 @@ export async function paimtiNuskaitymui(nodeName, failasId = null, klientas = po
         // Nebandyti failai (attempts = 0, nextAttempt NULL) imami pirma, naujesni
         // pirmiau; klaidos — tik atėjus jų atidėjimo laikui.
         `WITH cte AS (
-            SELECT q.id FROM public."filesExtractionQueue" q
+            SELECT q.id FROM files."extractionQueue" q
             WHERE q."lockedBy" IS NULL
               AND q.attempts < $2
               AND (q."nextAttempt" IS NULL OR q."nextAttempt" <= NOW())
@@ -126,13 +126,13 @@ export async function paimtiNuskaitymui(nodeName, failasId = null, klientas = po
             FOR UPDATE SKIP LOCKED
         ),
         locked AS (
-            UPDATE public."filesExtractionQueue" q
+            UPDATE files."extractionQueue" q
             SET "lockedBy" = $1, "lockedAt" = NOW()
             FROM cte WHERE q.id = cte.id
             RETURNING q.id
         )
         SELECT ${FILES_SELECT}
-        FROM public.files f
+        FROM files.files f
         ${FILES_JOINS}
         WHERE f.id = (SELECT id FROM locked)`,
         [nodeName, NUSKAITYMO_BANDYMAI],
@@ -150,7 +150,7 @@ export async function paimtiNuskaitymui(nodeName, failasId = null, klientas = po
 export async function pazymetiNuskaitymoBandyma(id, klientas = postgres) {
     await klientas.query(
         `WITH bumped AS (
-            UPDATE public."filesExtractionQueue"
+            UPDATE files."extractionQueue"
             SET attempts = attempts + 1,
                 "nextAttempt" = NOW() + LEAST(
                     INTERVAL '1 day',
@@ -161,7 +161,7 @@ export async function pazymetiNuskaitymoBandyma(id, klientas = postgres) {
             WHERE id = $1
             RETURNING id, attempts
         )
-        DELETE FROM public."filesExtractionQueue"
+        DELETE FROM files."extractionQueue"
         WHERE id IN (SELECT id FROM bumped WHERE attempts >= $2)`,
         [id, NUSKAITYMO_BANDYMAI],
     );

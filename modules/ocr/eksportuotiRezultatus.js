@@ -40,7 +40,7 @@ async function run(outputDir) {
     openNextFile();
 
     // Rezultatų istorijos nebėra — eksportuojamas paskutinis kiekvieno failo
-    // rezultatas iš filesOcrStatus. `md5` čia yra resultHash (raktas į FS),
+    // rezultatas iš files."ocrStatus". `md5` čia yra resultHash (raktas į FS),
     // o puslapių/žodžių skaičiai — iš po OCR atlikto nuskaitymo.
     const stream = await streamQuery(
         `SELECT o.id AS failas,
@@ -52,9 +52,9 @@ async function run(outputDir) {
                     o."resultsCount",
                     d."pageCount" AS "puslapiuSkaicius",
                     d."wordCount" AS "zodziuSkaicius"
-             FROM public."filesOcrStatus" o
+             FROM files."ocrStatus" o
              LEFT JOIN infra."ocrNuskaitytojai" n ON n.id = o."nodeId"
-             LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
+             LEFT JOIN files."dataExtraction" d ON d.id = o.id
              WHERE o."resultHash" IS NOT NULL
              ORDER BY o.id ASC`,
     );

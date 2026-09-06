@@ -167,8 +167,8 @@ async function resolveRelatedFiles(failas) {
     // Archyvo vaikų kelias archyve yra sourceId0 (žr. files_child_uniq).
     const result = await postgres.query(
         `SELECT f.id, f."sourceId0" AS "saltinioId", e.extension
-         FROM public.files f
-         LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+         FROM files.files f
+         LEFT JOIN files."extensions" e ON e.id = f."extensionId"
          WHERE f.parent = $1 AND f."sourceId0" = ANY($2)`,
         [failas.id, paths],
     );
@@ -207,13 +207,13 @@ function parseTekstas(tekstasRaw) {
 export async function fetchFailasMetadata(id, failas = null) {
     let failasHash = failas?.failasHash;
 
-    // failasHash gyvena atskiroje filesInfoFiles lentelėje. Jei jo dar neturime,
+    // failasHash gyvena atskiroje files."infoFiles" lentelėje. Jei jo dar neturime,
     // pasiimame jį atskira užklausa.
     if (failasHash === undefined) {
         const r = await postgres.query(
             `SELECT i."fileHash" AS "failasHash"
-             FROM public.files f
-             LEFT JOIN public."filesInfoFiles" i ON i.id = f.id
+             FROM files.files f
+             LEFT JOIN files."infoFiles" i ON i.id = f.id
              WHERE f.id = $1`,
             [id],
         );
@@ -223,16 +223,16 @@ export async function fetchFailasMetadata(id, failas = null) {
     }
 
     // Naujoje schemoje OCR rezultatų istorijos nėra — laikomas tik paskutinis
-    // rezultatas (filesOcrStatus) ir bendras jų skaičius (resultsCount).
+    // rezultatas (files."ocrStatus") ir bendras jų skaičius (resultsCount).
     // Puslapių ir žodžių skaičiai — iš po OCR atlikto nuskaitymo, nes būtent jis
     // suskaičiuoja OCR gautą tekstą.
     const ocrRes = await postgres.query(
         `SELECT o."resultHash", o."resultsCount", o.duration, o."ocrTimestamp",
                 o."lockTimestamp", n.pavadinimas AS node,
                 d."pageCount", d."wordCount"
-         FROM public."filesOcrStatus" o
+         FROM files."ocrStatus" o
          LEFT JOIN infra."ocrNuskaitytojai" n ON n.id = o."nodeId"
-         LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
+         LEFT JOIN files."dataExtraction" d ON d.id = o.id
          WHERE o.id = $1`,
         [id],
     );

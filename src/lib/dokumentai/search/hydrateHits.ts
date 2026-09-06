@@ -37,7 +37,7 @@ export async function hydrateHits(
      LEFT JOIN "rcJar"."spintaAsmenys" j ON j."jarKodas" = d."institutionJarCode"::text
      WHERE d.id = ANY($1)
        AND NOT EXISTS (
-         SELECT 1 FROM public."filesHidden" n WHERE n.id = d."fileId"
+         SELECT 1 FROM files."hidden" n WHERE n.id = d."fileId"
        )`,
     [ids],
   );

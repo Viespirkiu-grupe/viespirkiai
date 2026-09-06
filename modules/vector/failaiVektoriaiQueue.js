@@ -54,14 +54,14 @@ function tekstasToString(tekstas) {
 }
 
 // Vienas keyset puslapis. fileHash imam atskira užklausa `WHERE id = ANY(...)` —
-// kitaip planner'is renkasi Merge Join su filesInfoFiles ir skenuoja milijonus
+// kitaip planner'is renkasi Merge Join su files."infoFiles" ir skenuoja milijonus
 // eilučių nuo pradžios (žr. EXPLAIN). Du index scan'ai (files_source_lookup_idx +
 // PK lookup'ai) = akimirksnis.
 async function fetchPage(cursor, pageSize) {
     const { rows } = await postgres.query(
         `SELECT f."id", f."sourceId0", f."sourceId1", f."sourceId2"
-         FROM public.files f
-         JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+         FROM files.files f
+         JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
          WHERE st.title = 'cvpIs'
            AND ($1::bigint IS NULL OR f."id" > $1)
          ORDER BY f."id"
@@ -71,7 +71,7 @@ async function fetchPage(cursor, pageSize) {
     if (rows.length > 0) {
         const ids = rows.map((r) => r.id);
         const { rows: infoRows } = await postgres.query(
-            `SELECT "id", "fileHash" AS "failasHash" FROM public."filesInfoFiles" WHERE "id" = ANY($1::bigint[])`,
+            `SELECT "id", "fileHash" AS "failasHash" FROM files."infoFiles" WHERE "id" = ANY($1::bigint[])`,
             [ids],
         );
         const hashById = new Map(infoRows.map((r) => [r.id, r.failasHash]));
@@ -193,8 +193,8 @@ async function main() {
     } else {
         const tc = performance.now();
         const { rows: countRows } = await postgres.query(
-            `SELECT COUNT(*) AS c FROM public.files f
-             WHERE f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'cvpIs')`,
+            `SELECT COUNT(*) AS c FROM files.files f
+             WHERE f."sourceTitleId" = (SELECT id FROM files."sourceTitles" WHERE title = 'cvpIs')`,
         );
         totalFailai = Number(countRows[0].c);
         console.log(`COUNT(*): ${nf(totalFailai)} cvpIs failų per ${secs(performance.now() - tc)}s`);

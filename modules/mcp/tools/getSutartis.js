@@ -87,9 +87,9 @@ export async function handler({ id }) {
                         `SELECT f.id,
                                 (f."downloadStatus" > 0) AS parsiustas,
                                 (d.version IS NOT NULL AND d.version > 0) AS nuskaitytas
-                         FROM public.files f
-                         JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
-                         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+                         FROM files.files f
+                         JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
+                         LEFT JOIN files."dataExtraction" d ON d.id = f.id
                          WHERE st.title = 'sutartys'
                            AND f."sourceId0" = $1::text AND f."sourceId1" = $2::text`,
                         [String(failas.dok_id), String(failas.file_id)],

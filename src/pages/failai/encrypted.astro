@@ -24,15 +24,15 @@ const slaptazodis = query.slaptazodis === 'yra' || query.slaptazodis === 'nera' 
 
 // „Apsaugoti" = arba teksto atpažinimas grąžino -2 („No password given", žr.
 // modules/failai/nuskaitytiTeksta.js), arba failui yra žinomas slaptažodis
-// atskiroje `filesPasswords` lentelėje (tokių pasitaiko ir su kita būsena — jau
+// atskiroje `files."passwords"` lentelėje (tokių pasitaiko ir su kita būsena — jau
 // atrakintų). Sąrašas surenkamas CTE'ju, kad būtų panaudotas dalinis indeksas
-// filesDataExtraction_status_idx (WHERE status <> 0) ir filesPasswords PK, o ne
+// filesDataExtraction_status_idx (WHERE status <> 0) ir files."passwords" PK, o ne
 // seq scan per visą `files`.
 const CTE = `
    WITH apsaugoti AS (
-     SELECT id FROM public."filesDataExtraction" WHERE status = -2
+     SELECT id FROM files."dataExtraction" WHERE status = -2
      UNION
-     SELECT id FROM public."filesPasswords"
+     SELECT id FROM files."passwords"
    )`;
 const conditions: string[] = [];
 const params: any[] = [];
@@ -42,11 +42,11 @@ if (slaptazodis === 'nera') conditions.push('p.id IS NULL');
 const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 const FROM_JOINS = `
      FROM apsaugoti a
-     JOIN public.files f ON f.id = a.id
-     LEFT JOIN public."filesPasswords" p ON p.id = f.id
-     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
-     LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
-     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"`;
+     JOIN files.files f ON f.id = a.id
+     LEFT JOIN files."passwords" p ON p.id = f.id
+     LEFT JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
+     LEFT JOIN files."filenames" fn ON fn.id = f."filenameId"
+     LEFT JOIN files."extensions" e ON e.id = f."extensionId"`;
 const SELECT_COLS = `
      f.id, fn.filename AS pavadinimas, e.extension,
      COALESCE(st.title, 'sutartys') AS saltinis, f.filesize AS dydis,
@@ -71,8 +71,8 @@ const [countRes, sumosRes, saltiniaiRes] = await Promise.all([
     `${CTE}
      SELECT COALESCE(st.title, 'sutartys') AS saltinis, COUNT(*)::int AS n
      FROM apsaugoti a
-     JOIN public.files f ON f.id = a.id
-     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     JOIN files.files f ON f.id = a.id
+     LEFT JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
      GROUP BY 1 ORDER BY n DESC`
   ),
 ]);

@@ -35,7 +35,7 @@ describe("processFilesDocumentsQueue", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.client.query.mockImplementation(async (sql: string) => {
-            if (sql.includes('FROM public."filesDocumentsQueue"')) {
+            if (sql.includes('FROM files."documentsQueue"')) {
                 return { rows: [{ id: "91", failoId: 42, keitimas: "insert" }] };
             }
             return { rows: [] };
@@ -50,12 +50,12 @@ describe("processFilesDocumentsQueue", () => {
         expect(mocks.fetchFailaiByIds).toHaveBeenCalledWith([42], mocks.client);
         expect(mocks.upsertBatch).toHaveBeenCalledWith([{ id: 42 }], mocks.client);
         const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
-        const deleteAt = sqlCalls.findIndex((sql) => sql.includes('DELETE FROM public."filesDocumentsQueue"'));
+        const deleteAt = sqlCalls.findIndex((sql) => sql.includes('DELETE FROM files."documentsQueue"'));
         const commitAt = sqlCalls.indexOf("COMMIT");
         expect(deleteAt).toBeGreaterThan(0);
         expect(commitAt).toBeGreaterThan(deleteAt);
         expect(mocks.signalWork).toHaveBeenCalledWith("documents.index.ready", {
-            source: "filesDocumentsQueue",
+            source: "files.documentsQueue",
             count: 1,
         });
         expect(mocks.signalWork.mock.invocationCallOrder[0])
@@ -70,7 +70,7 @@ describe("processFilesDocumentsQueue", () => {
 
         const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
         expect(sqlCalls).toContain("ROLLBACK");
-        expect(sqlCalls.some((sql) => sql.includes('DELETE FROM public."filesDocumentsQueue"'))).toBe(false);
+        expect(sqlCalls.some((sql) => sql.includes('DELETE FROM files."documentsQueue"'))).toBe(false);
         expect(mocks.signalWork).not.toHaveBeenCalled();
         expect(mocks.client.release).toHaveBeenCalledOnce();
     });

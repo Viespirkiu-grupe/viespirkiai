@@ -13,24 +13,24 @@ export async function deleteFile(id) {
     // IŠKOMENTUOTA — fizinio failo trynimas buvo klaidingas.
     //
     // md5 nėra unikalus: tas pats turinys dedubliuojamas per daug failų
-    // (`files."md5Id"` nėra unique). Šis ciklas ištrindavo blobą iš visų dėžių pagal
+    // (`files.files."md5Id"` nėra unique). Šis ciklas ištrindavo blobą iš visų dėžių pagal
     // md5, todėl kartu „nudegdavo" ir kiti failai, rodantys į tą patį turinį.
     // Antra klaida — objekto vardas `{md5}.{extension}` imamas iš trinamo failo,
     // nors įkeliant galėjo būti naudotas kito failo plėtinys (dabar tikrąjį
-    // plėtinį laiko `filesMd5Boxes."extensionId"`).
+    // plėtinį laiko files."md5Boxes"."extensionId").
     //
-    // Taisymas (kai bus files schema): trinti tik jei niekas kitas nebesiremia md5,
-    // o vardą imti iš filesMd5Boxes."extensionId", ne iš files.
+    // Taisymas: trinti tik jei niekas kitas nebesiremia md5, o vardą imti iš
+    // files."md5Boxes"."extensionId", ne iš files.files.
     //
-    //   DELETE FROM "filesMd5Boxes" b
+    //   DELETE FROM files."md5Boxes" b
     //   WHERE b."md5Id" = $1
-    //     AND NOT EXISTS (SELECT 1 FROM files f WHERE f."md5Id" = b."md5Id" AND f.id <> $2)
+    //     AND NOT EXISTS (SELECT 1 FROM files.files f WHERE f."md5Id" = b."md5Id" AND f.id <> $2)
     //   RETURNING b."boxId", b."extensionId"
     //
     // Trinamas tik DB įrašas; blobas dėžėse lieka (žr. komentarą aukščiau).
     // Šoninės lentelės ir eilės nusitrina per ON DELETE CASCADE.
     const deleted = await postgres.query(
-        `DELETE FROM public.files WHERE id = $1;`,
+        `DELETE FROM files.files WHERE id = $1;`,
         [id],
     );
     if (deleted.rowCount > 0) {

@@ -161,8 +161,8 @@ async function resolveArchiveFiles(failas: Failas) {
   if (!paths.length) return;
   const related = await postgres.query(
     `SELECT f.id, f."sourceId0" AS "saltinioId", e.extension
-     FROM public.files f
-     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+     FROM files.files f
+     LEFT JOIN files."extensions" e ON e.id = f."extensionId"
      WHERE f.parent = $1 AND f."sourceId0" = ANY($2)`,
     [failas.id, paths],
   );
@@ -215,8 +215,8 @@ export async function findFailasIdBySaltinioId(saltinis: string, saltinioId: str
   const [s0, s1, s2, s3] = skaidytiSaltinioId(saltinis, saltinioId);
   const result = await postgres.query(
     `SELECT f.id
-     FROM public.files f
-     JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     FROM files.files f
+     JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
      WHERE st.title = $1
        AND f."sourceId0" IS NOT DISTINCT FROM $2
        AND f."sourceId1" IS NOT DISTINCT FROM $3

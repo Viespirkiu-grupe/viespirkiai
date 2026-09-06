@@ -40,17 +40,17 @@ const [nuskaitytojasRes, ocrStatsDayRes] = await Promise.all([
      -- Dabartinės rezervacijos — tas pats pjūvis kaip /failai/ocr sąraše.
      LEFT JOIN LATERAL (
        SELECT COUNT(*)::int AS rezervacijos
-       FROM public."filesOcrStatus" o
+       FROM files."ocrStatus" o
        WHERE o."nodeId" = n.id AND o.status = -3
      ) r ON TRUE
-     LEFT JOIN public."filesOcrStatsDay" s ON s."nodeId" = n.id
+     LEFT JOIN files."ocrStatsDay" s ON s."nodeId" = n.id
      WHERE n.id = $1
      GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", r.rezervacijos`,
     [nodeId],
   ),
   postgres.query(
     `SELECT s.date, s.results, s.pages, s.words
-     FROM public."filesOcrStatsDay" s
+     FROM files."ocrStatsDay" s
      WHERE s."nodeId" = $1
      ORDER BY s.date DESC`,
     [nodeId],

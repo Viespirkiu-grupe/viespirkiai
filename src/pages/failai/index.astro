@@ -10,7 +10,7 @@ import config from '../../lib/config.ts';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-// Gyvos sumos tiesiai iš `filesStats` (tas pats šaltinis kaip SSE) — ne precomputed.
+// Gyvos sumos tiesiai iš `files."stats"` (tas pats šaltinis kaip SSE) — ne precomputed.
 let stats: Awaited<ReturnType<typeof gautiFailuStatistika>> | null = null;
 try {
   stats = await gautiFailuStatistika();
@@ -28,7 +28,7 @@ const pending = kiekiai?.pending ?? 0;
 const unarchived = kiekiai?.unarchived ?? 0;
 const atpazinta = nusk?.nuskaityti ?? 0;
 const nuskKlaidos = nusk?.klaidos ?? 0;
-// „Eilėje" — tikras filesExtractionQueue ilgis, atėmus jau nepavykusius (min 0).
+// „Eilėje" — tikras files."extractionQueue" ilgis, atėmus jau nepavykusius (min 0).
 const likoNuskaityti = Math.max(0, (nusk?.eilesApprox ?? 0) - nuskKlaidos);
 const zodziai = nusk?.zodziai.total ?? 0;
 const puslapiai = nusk?.puslapiai ?? 0;

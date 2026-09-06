@@ -8,7 +8,7 @@ import '@/utils/linksniai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
-const { rows } = await postgres.query('SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM public."filesLocations"');
+const { rows } = await postgres.query('SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM files."locations"');
 const locations = (rows as any[]).map((r) => [Number(r.lat), Number(r.lon)]);
 const mapConfig = {
   mode: 'points',

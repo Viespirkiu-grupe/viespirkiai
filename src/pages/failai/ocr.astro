@@ -30,18 +30,18 @@ const OCR_PSEUDO_STATES: Record<string, string> = {
   neparuosta: 'Neparuošta',
 };
 
-// Būsenų kiekiai imami iš filesStats (ji per plėtinį). „Nepalaikoma" — išvada iš
+// Būsenų kiekiai imami iš files."stats" (ji per plėtinį). „Nepalaikoma" — išvada iš
 // plėtinio, „galima" — iš OCR eilės dydžio (žr. žemiau); jie nėra būsenos.
 const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocrEilesDydisRes, ocrLatestResults] = await Promise.all([
   postgres.query(`
     SELECT e.extension, s.files, s."ocrDone", s."ocrFailed",
            s."ocrPending", s."ocrReserved", s."ocrExceeded"
-    FROM public."filesStats" s
-    JOIN public."filesExtensions" e ON e.id = s."extensionId"
+    FROM files."stats" s
+    JOIN files."extensions" e ON e.id = s."extensionId"
   `),
   postgres.query(`
     SELECT date, SUM(results)::int AS results, SUM(pages)::bigint AS pages, SUM(words)::bigint AS words
-    FROM public."filesOcrStatsDay"
+    FROM files."ocrStatsDay"
     GROUP BY date
     ORDER BY date DESC
   `),
@@ -56,10 +56,10 @@ const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocr
     -- o daliniam indeksui (filesOcrStatus_rezervuoti_idx) tai index-only scan.
     LEFT JOIN LATERAL (
       SELECT COUNT(*)::int AS rezervacijos
-      FROM public."filesOcrStatus" o
+      FROM files."ocrStatus" o
       WHERE o."nodeId" = n.id AND o.status = -3
     ) r ON TRUE
-    LEFT JOIN public."filesOcrStatsDay" s ON s."nodeId" = n.id
+    LEFT JOIN files."ocrStatsDay" s ON s."nodeId" = n.id
     GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", r.rezervacijos
     ORDER BY n."nuskaitytiDokumentai" DESC
     LIMIT 100
@@ -71,8 +71,8 @@ const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocr
       COUNT(*)::int AS results,
       COALESCE(SUM(d."pageCount"), 0)::bigint AS pages,
       COALESCE(SUM(d."wordCount"), 0)::bigint AS words
-    FROM public."filesOcrStatus" o
-    LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
+    FROM files."ocrStatus" o
+    LEFT JOIN files."dataExtraction" d ON d.id = o.id
     WHERE o."ocrTimestamp" >= NOW() - INTERVAL '60 minutes'
   `),
   // „Galima" imama iš eilės, o ne iš plėtinių: eilėje lieka ir nepavykę bei bandymus
@@ -80,8 +80,8 @@ const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocr
   // kurie dar neturi jokios būsenos. Eilė maža, tad užklausa pigi.
   postgres.query(`
     SELECT COUNT(*)::bigint AS galima
-    FROM public."filesOcrQueue" q
-    LEFT JOIN public."filesOcrStatus" o ON o.id = q.id
+    FROM files."ocrQueue" q
+    LEFT JOIN files."ocrStatus" o ON o.id = q.id
     WHERE o.status IS NULL
   `),
   loadLatestOcrResults(15),
@@ -108,7 +108,7 @@ for (const r of ocrStatsPerExtRes.rows as any[]) {
 ocrSuma.galima = Number(ocrEilesDydisRes.rows[0]?.galima || 0);
 
 // Likutis: tinkamo plėtinio failai be OCR būsenos ir dar ne eilėje — jiems tik
-// neištrauktas tekstas (filesDataExtraction), tad į OCR eilę dar nepateko.
+// neištrauktas tekstas (files."dataExtraction"), tad į OCR eilę dar nepateko.
 const ocrTaikoma = visoFailu - ocrSuma.nepalaikoma;
 ocrSuma.neparuosta = Math.max(0, ocrTaikoma
   - ocrSuma.baigta - ocrSuma.rekomenduojama - ocrSuma.nepavyko

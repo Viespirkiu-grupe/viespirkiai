@@ -236,7 +236,7 @@ const QUERIES = [
         desc: "documents: apimčių agregacija pagal domeną/tipą",
         // Skenuojama fizinė documents.documents (vaizdas documentsFull ctid neturi).
         // Apimtis failais paremtose eilutėse yra NULL – paveldima iš
-        // public."filesDataExtraction" per "fileId", kaip daro pats vaizdas.
+        // files."dataExtraction" per "fileId", kaip daro pats vaizdas.
         // Grupuojama pagal domeną ir tipą: savivaldybė iš schemos išmesta (buvo 100 % NULL).
         sql: `
             SELECT
@@ -253,7 +253,7 @@ const QUERIES = [
             JOIN documents.types   t  ON t.id = d."typeId"
             JOIN documents.hosts   h  ON h.id = d."hostId"
             JOIN documents.domains dm ON dm.id = h."domainId"
-            LEFT JOIN public."filesDataExtraction" fd ON fd.id = d."fileId"
+            LEFT JOIN files."dataExtraction" fd ON fd.id = d."fileId"
             GROUP BY 1, 2
             ORDER BY zodziu_viso DESC NULLS LAST
             LIMIT 200`,

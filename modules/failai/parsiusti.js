@@ -54,7 +54,7 @@ export async function parsiustiFaila(options = {}) {
     const dezeRes = await postgres.query(
         `
     SELECT d.*, a."apiKey"
-    FROM public.dezes d
+    FROM files.dezes d
     JOIN auth."raktai" a ON a.id = d."apiRaktasId"
     WHERE d.used < d.max
     ORDER BY d."priority" DESC
@@ -221,7 +221,7 @@ export async function parsiustiFaila(options = {}) {
     });
     let { totalSizeBytes } = await usedReq.json();
 
-    await postgres.query("UPDATE dezes SET used = $1 WHERE id = $2", [
+    await postgres.query("UPDATE files.dezes SET used = $1 WHERE id = $2", [
         totalSizeBytes,
         deze.id,
     ]);

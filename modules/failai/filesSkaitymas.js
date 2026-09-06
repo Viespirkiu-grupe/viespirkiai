@@ -15,7 +15,7 @@ stulpelius. Kad nereikėtų vienu metu perrašyti ir schemos, ir visų vartotoj�
   - `saltinioId` atkuriamas iš `sourceId0..3` (sujungtiSaltinioId — atvirkštinė
     skaidymo operacija), tad linkų konstruktoriams nieko keisti nereikia;
   - senų stulpelių atitikmenys pervadinami atgal (`downloadStatus` → `parsiustas`,
-    `filesDataExtraction.version/status` → `nuskaitytas`, `filesOcrStatus.status` → `ocrState`).
+    `files."dataExtraction".version/status` → `nuskaitytas`, `files."ocrStatus".status` → `ocrState`).
 
 Naujus vartotojus geriau rašyti tiesiai ant `sourceId0..3` — jie grąžinami taip pat.
 */
@@ -52,8 +52,8 @@ export const FILES_SELECT = `
     COALESCE(
         ARRAY(
             SELECT tn.type
-            FROM public."filesSpecialTypes" fst
-            JOIN public."filesSpecialTypeNames" tn ON tn.id = fst."typeId"
+            FROM files."specialTypes" fst
+            JOIN files."specialTypeNames" tn ON tn.id = fst."typeId"
             WHERE fst.id = f.id
             ORDER BY tn.type
         ),
@@ -63,17 +63,17 @@ export const FILES_SELECT = `
 
 /** JOIN'ai, kurių reikia FILES_SELECT stulpeliams. */
 export const FILES_JOINS = `
-    LEFT JOIN public."filesFilenames"    fn  ON fn.id  = f."filenameId"
-    LEFT JOIN public."filesExtensions"   e   ON e.id   = f."extensionId"
-    LEFT JOIN public."filesMd5"          m   ON m.id   = f."md5Id"
-    LEFT JOIN public."filesAuthors"      a   ON a.id   = f."authorId"
-    LEFT JOIN public."filesSourceTitles" st  ON st.id  = f."sourceTitleId"
-    LEFT JOIN public."filesDataExtraction" d ON d.id   = f.id
-    LEFT JOIN public."filesOcrStatus"    o   ON o.id   = f.id
-    LEFT JOIN infra."ocrNuskaitytojai"  ocrn ON ocrn.id = o."nodeId"
-    LEFT JOIN public."filesPasswords"    p   ON p.id   = f.id
-    LEFT JOIN public."filesLocations"    loc ON loc.id = f.id
-    LEFT JOIN public."filesInfoFiles"    i   ON i.id   = f.id
+    LEFT JOIN files."filenames"      fn   ON fn.id   = f."filenameId"
+    LEFT JOIN files."extensions"     e    ON e.id    = f."extensionId"
+    LEFT JOIN files."md5"            m    ON m.id    = f."md5Id"
+    LEFT JOIN files."authors"        a    ON a.id    = f."authorId"
+    LEFT JOIN files."sourceTitles"   st   ON st.id   = f."sourceTitleId"
+    LEFT JOIN files."dataExtraction" d    ON d.id    = f.id
+    LEFT JOIN files."ocrStatus"      o    ON o.id    = f.id
+    LEFT JOIN infra."ocrNuskaitytojai" ocrn ON ocrn.id = o."nodeId"
+    LEFT JOIN files."passwords"      p    ON p.id    = f.id
+    LEFT JOIN files."locations"      loc  ON loc.id  = f.id
+    LEFT JOIN files."infoFiles"      i    ON i.id    = f.id
 `;
 
 /**
@@ -121,7 +121,7 @@ export function papildytiFaila(eilute) {
  */
 export async function gautiFaila(id, klientas = postgres) {
     const { rows } = await klientas.query(
-        `SELECT ${FILES_SELECT} FROM public.files f ${FILES_JOINS} WHERE f.id = $1`,
+        `SELECT ${FILES_SELECT} FROM files.files f ${FILES_JOINS} WHERE f.id = $1`,
         [id],
     );
     return papildytiFaila(rows[0] ?? null);
@@ -135,7 +135,7 @@ export async function gautiFaila(id, klientas = postgres) {
 export async function gautiFailus(ids, klientas = postgres) {
     if (!ids?.length) return [];
     const { rows } = await klientas.query(
-        `SELECT ${FILES_SELECT} FROM public.files f ${FILES_JOINS} WHERE f.id = ANY($1::int[])`,
+        `SELECT ${FILES_SELECT} FROM files.files f ${FILES_JOINS} WHERE f.id = ANY($1::int[])`,
         [ids],
     );
     return rows.map(papildytiFaila);

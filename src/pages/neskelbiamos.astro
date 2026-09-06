@@ -92,12 +92,12 @@ const sort = SORTS[query.sort ?? ''] ? (query.sort ?? '') : '';
 const ISVADA_JOIN = `
   JOIN "neskelbiamosDerybos"."isvados" i ON i."id" = nd."isvadaId"`;
 
-// `failoKelias` saugomas tokiu pat pavidalu kaip files."sourceId0" (santykinis
+// `failoKelias` saugomas tokiu pat pavidalu kaip files.files."sourceId0" (santykinis
 // kelias su `sutikimai_laikini/`), tad jungiama lygybe.
 const FILE_JOIN = `
-  LEFT JOIN public.files f
+  LEFT JOIN files.files f
     ON f."sourceId0" = nd."failoKelias"
-    AND f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'neskelbiamosDerybos')
+    AND f."sourceTitleId" = (SELECT id FROM files."sourceTitles" WHERE title = 'neskelbiamosDerybos')
     AND f."downloadStatus" = 1`;
 
 const timed = async <T,>(promise: Promise<T>): Promise<{ value: T; ms: number }> => {

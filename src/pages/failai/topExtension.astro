@@ -25,8 +25,8 @@ const [extensionRes, totalsRes] = await Promise.all([
             s.extracted,
             s.words,
             s.pages
-       FROM public."filesStats" s
-       JOIN public."filesExtensions" e ON e.id = s."extensionId"
+       FROM files."stats" s
+       JOIN files."extensions" e ON e.id = s."extensionId"
       WHERE s.files > 0
       ORDER BY s.files DESC, e.extension ASC
       LIMIT $1 OFFSET $2`,
@@ -37,7 +37,7 @@ const [extensionRes, totalsRes] = await Promise.all([
             COUNT(*) FILTER (WHERE extracted > 0)             AS processed_ext,
             COALESCE(SUM(files), 0)                           AS total_files,
             COALESCE(SUM(files) FILTER (WHERE extracted > 0), 0) AS processed_files
-       FROM public."filesStats"`,
+       FROM files."stats"`,
   ),
 ]);
 

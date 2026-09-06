@@ -85,7 +85,7 @@ export async function loadLegalActDocument(teisesAktoId, versijosId = "original"
         `SELECT d.id, d.md5, d.type, d.source, d.title AS pavadinimas, d.url,
                 d."fileId" AS "failasId",
                 EXISTS (
-                    SELECT 1 FROM public."filesHidden" h WHERE h.id = d."fileId"
+                    SELECT 1 FROM files."hidden" h WHERE h.id = d."fileId"
                 ) AS pasleptas
            FROM documents."documentsFull" d
           WHERE d.class = 'teisekura'

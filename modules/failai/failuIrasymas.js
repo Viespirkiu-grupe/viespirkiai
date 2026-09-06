@@ -175,7 +175,7 @@ function normalizuoti(eilute) {
 /**
  * Užtikrina žodyno eilutes ir grąžina reikšmė → id žemėlapį.
  * @param {import("pg").ClientBase} klientas
- * @param {string} lentele - pvz. "filesExtensions"
+ * @param {string} lentele - `files` schemos žodyno lentelė, pvz. "extensions"
  * @param {string} stulpelis - pvz. "extension"
  * @param {Array<string|null>} reiksmes
  * @returns {Promise<Map<string, number>>}
@@ -185,7 +185,7 @@ async function zodynoId(klientas, lentele, stulpelis, reiksmes) {
     if (!unikalios.length) return new Map();
 
     await klientas.query(
-        `INSERT INTO public."${lentele}" ("${stulpelis}")
+        `INSERT INTO files."${lentele}" ("${stulpelis}")
          SELECT DISTINCT v FROM unnest($1::text[]) v
          ON CONFLICT ("${stulpelis}") DO NOTHING`,
         [unikalios],
@@ -193,7 +193,7 @@ async function zodynoId(klientas, lentele, stulpelis, reiksmes) {
 
     const { rows } = await klientas.query(
         `SELECT id, "${stulpelis}" AS reiksme
-         FROM public."${lentele}"
+         FROM files."${lentele}"
          WHERE "${stulpelis}" = ANY($1::text[])`,
         [unikalios],
     );
@@ -210,10 +210,10 @@ async function irasytiIFiles(klientas, eilutes) {
 
     // Nuosekliai, ne Promise.all: tas pats klientas tranzakcijoje gali vykdyti
     // tik po vieną užklausą.
-    const pavadinimai = await zodynoId(klientas, "filesFilenames", "filename", eilutes.map((e) => e.pavadinimas));
-    const pletiniai = await zodynoId(klientas, "filesExtensions", "extension", eilutes.map((e) => e.extension));
-    const saltiniai = await zodynoId(klientas, "filesSourceTitles", "title", eilutes.map((e) => e.saltinis));
-    const md5ai = await zodynoId(klientas, "filesMd5", "md5", eilutes.map((e) => e.md5));
+    const pavadinimai = await zodynoId(klientas, "filenames", "filename", eilutes.map((e) => e.pavadinimas));
+    const pletiniai = await zodynoId(klientas, "extensions", "extension", eilutes.map((e) => e.extension));
+    const saltiniai = await zodynoId(klientas, "sourceTitles", "title", eilutes.map((e) => e.saltinis));
+    const md5ai = await zodynoId(klientas, "md5", "md5", eilutes.map((e) => e.md5));
 
     // Tėvai ir vaikai turi skirtingus unikalumo raktus, tad rašoma dviem sakiniais.
     const tevai = eilutes.filter((e) => e.parent == null);
@@ -243,7 +243,7 @@ async function irasytiIFiles(klientas, eilutes) {
 
     if (tevai.length) {
         const { rows } = await klientas.query(
-            `INSERT INTO public.files ${stulpeliai}
+            `INSERT INTO files.files ${stulpeliai}
              SELECT * FROM ${unnest}
              ON CONFLICT ("sourceTitleId", "sourceId0", "sourceId1", "sourceId2", "sourceId3")
                  WHERE child = false DO NOTHING
@@ -255,7 +255,7 @@ async function irasytiIFiles(klientas, eilutes) {
 
     if (vaikai.length) {
         const { rows } = await klientas.query(
-            `INSERT INTO public.files ${stulpeliai}
+            `INSERT INTO files.files ${stulpeliai}
              SELECT * FROM ${unnest}
              ON CONFLICT (parent, "sourceId0") WHERE child = true DO NOTHING
              RETURNING id`,
@@ -270,8 +270,8 @@ async function irasytiIFiles(klientas, eilutes) {
     // taip nereikia sieti grąžintų id su įvesties eilutėmis.
     if (ids.length) {
         const queued = await klientas.query(
-            `INSERT INTO public."filesDownloadQueue" (id)
-             SELECT f.id FROM public.files f
+            `INSERT INTO files."downloadQueue" (id)
+             SELECT f.id FROM files.files f
              WHERE f.id = ANY($1::int[]) AND f."downloadStatus" IN (0, -1)
              ON CONFLICT (id) DO NOTHING`,
             [ids],

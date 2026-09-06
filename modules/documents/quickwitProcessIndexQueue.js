@@ -175,7 +175,7 @@ export async function processDocumentsIndexQueue(opts = {}) {
                 sidecars.clear();
                 pendingBuilds = 0;
                 // Skaitom iš vaizdo: jis išsprendžia žodynus ir paveldi
-                // laukus iš public.files.
+                // laukus iš files.files.
                 const { rows } = await client.query(
                     `SELECT
                         id, md5, class, type, parent, "fileId",

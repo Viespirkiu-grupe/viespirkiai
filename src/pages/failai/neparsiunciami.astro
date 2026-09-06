@@ -55,11 +55,11 @@ const params: any[] = [];
 if (saltinis) { params.push(saltinis); conditions.push(`st.title = $${params.length}`); }
 const where = `WHERE ${conditions.join(' AND ')}`;
 const FROM_JOINS = `
-     FROM public.files f
-     LEFT JOIN public."filesDownloadQueue" q ON q.id = f.id
-     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
-     LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
-     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"`;
+     FROM files.files f
+     LEFT JOIN files."downloadQueue" q ON q.id = f.id
+     LEFT JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
+     LEFT JOIN files."filenames" fn ON fn.id = f."filenameId"
+     LEFT JOIN files."extensions" e ON e.id = f."extensionId"`;
 const SELECT_COLS = `
      f.id, fn.filename AS pavadinimas, e.extension,
      f."sourceId0", f."sourceId1", f."sourceId2", f."sourceId3",
@@ -74,14 +74,14 @@ const total = parseInt(countRes.rows[0].total, 10) || 0;
 // „Pagal plėtinį" — agreguojama pagal pasirinktą šaltinį (jei nurodytas).
 const [saltiniaiRes, pletiniaiRes] = await Promise.all([
   postgres.query(`SELECT COALESCE(st.title, 'sutartys') AS saltinis, COUNT(*)::int AS n
-     FROM public.files f
-     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     FROM files.files f
+     LEFT JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
      WHERE f."downloadStatus" = -1
      GROUP BY 1 ORDER BY n DESC`),
   postgres.query(`SELECT COALESCE(e.extension, '—') AS extension, COUNT(*)::int AS n
-     FROM public.files f
-     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     FROM files.files f
+     LEFT JOIN files."extensions" e ON e.id = f."extensionId"
+     LEFT JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
      WHERE f."downloadStatus" = -1${saltinis ? ' AND st.title = $1' : ''}
      GROUP BY 1 ORDER BY n DESC LIMIT 8`, saltinis ? [saltinis] : []),
 ]);

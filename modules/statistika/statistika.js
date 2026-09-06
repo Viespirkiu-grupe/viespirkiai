@@ -286,7 +286,7 @@ export async function gautiStatistika() {
         COALESCE(SUM(words), 0)            AS "zodziuSuma",
         COALESCE(SUM(pages), 0)            AS "puslapiuSuma",
         COALESCE(SUM(characters), 0)       AS "simboliuSuma"
-      FROM public."filesStats";`),
+      FROM files."stats";`),
     // Užklausa gyvena modules/statistika/lenteliuDydziai.js – ja dalinasi ir
     // /duomenys/lenteles. Imam visas schemas: lentelių sąrašą žemiau filtruojam į
     // `public` (kad dokumentacijos schema `dba` nepatektų į bendrą statistiką), o
@@ -298,7 +298,7 @@ export async function gautiStatistika() {
     postgres.query(`SELECT client_addr::text AS client_addr, state, sent_lsn::text AS sent_lsn, write_lsn::text AS write_lsn, flush_lsn::text AS flush_lsn, replay_lsn::text AS replay_lsn, write_lag::text AS write_lag, flush_lag::text AS flush_lag, replay_lag::text AS replay_lag, extract(epoch from write_lag) AS write_lag_seconds, extract(epoch from flush_lag) AS flush_lag_seconds, extract(epoch from replay_lag) AS replay_lag_seconds, pg_current_wal_lsn()::text AS primary_current_lsn, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_behind FROM pg_stat_replication;`),
   ]);
 
-  // filesStats yra per plėtinį, tad bendros reikšmės — SUM(...) (žr. užklausą aukščiau).
+  // files."stats" yra per plėtinį, tad bendros reikšmės — SUM(...) (žr. užklausą aukščiau).
   const counts = Object.fromEntries(
     Object.entries(failaiCountsRes.rows[0] ?? {}).map(([k, v]) => [k, Number(v)]),
   );
@@ -307,7 +307,7 @@ export async function gautiStatistika() {
 
   // Būsenos nesidubliuoja ir sudaro visumą: parsiusti + klaida + neparsiusti
   // (dar eilėje) + isArchyvu (išskleisti iš archyvo, downloadStatus = -5) = visi.
-  // `filesStats` laiko tikrus baitus pagal būseną — nebeekstrapoliuojam iš
+  // `files."stats"` laiko tikrus baitus pagal būseną — nebeekstrapoliuojam iš
   // vidutinio parsiųsto failo dydžio (žr. ir /failai statistiką).
   const kiekiai = {
     visi: counts.visi,
@@ -364,7 +364,7 @@ export async function gautiStatistika() {
   });
 
   // Metrikos, kurių naujoje schemoje nebėra (failai su >0 žodžių, pjūvis pagal
-  // nuskaitymo versiją), išmestos — `filesStats` laiko tik sumas ir būsenų kiekius.
+  // nuskaitymo versiją), išmestos — `files."stats"` laiko tik sumas ir būsenų kiekius.
   statistika.nuskaitymas = {
     zodziai: {
       total: counts.zodziuSuma,

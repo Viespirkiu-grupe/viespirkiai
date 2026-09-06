@@ -81,23 +81,23 @@ Ryšys pirkimas → failai: `sourceTitleId = 'cvpIs'`, `sourceId0 = pirkimoId`
 const FAILAI_PARUOSTI_SQL = `
     NOT EXISTS (
         SELECT 1
-        FROM public.files f
+        FROM files.files f
         WHERE f."sourceTitleId" = (
-                  SELECT id FROM public."filesSourceTitles" WHERE title = 'cvpIs'
+                  SELECT id FROM files."sourceTitles" WHERE title = 'cvpIs'
               )
           AND f."sourceId0" = q."pirkimoId"::text
           AND (
-              EXISTS (SELECT 1 FROM public."filesDownloadQueue"   d WHERE d.id = f.id)
-           OR EXISTS (SELECT 1 FROM public."filesExtractionQueue" e WHERE e.id = f.id)
-           OR EXISTS (SELECT 1 FROM public."filesOcrQueue"        o WHERE o.id = f.id)
+              EXISTS (SELECT 1 FROM files."downloadQueue"   d WHERE d.id = f.id)
+           OR EXISTS (SELECT 1 FROM files."extractionQueue" e WHERE e.id = f.id)
+           OR EXISTS (SELECT 1 FROM files."ocrQueue"        o WHERE o.id = f.id)
            OR EXISTS (
                   SELECT 1
-                  FROM public.files c
+                  FROM files.files c
                   WHERE c.parent = f.id AND c.child = true
                     AND (
-                        EXISTS (SELECT 1 FROM public."filesDownloadQueue"   d2 WHERE d2.id = c.id)
-                     OR EXISTS (SELECT 1 FROM public."filesExtractionQueue" e2 WHERE e2.id = c.id)
-                     OR EXISTS (SELECT 1 FROM public."filesOcrQueue"        o2 WHERE o2.id = c.id)
+                        EXISTS (SELECT 1 FROM files."downloadQueue"   d2 WHERE d2.id = c.id)
+                     OR EXISTS (SELECT 1 FROM files."extractionQueue" e2 WHERE e2.id = c.id)
+                     OR EXISTS (SELECT 1 FROM files."ocrQueue"        o2 WHERE o2.id = c.id)
                     )
               )
           )

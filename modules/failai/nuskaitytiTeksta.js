@@ -114,11 +114,11 @@ async function nuskaitytiDokNuskaitytojuje(
     };
 
     // Jei failas jau OCR'intas, jo tekstą paduodam nuskaitytojui. Rodyklę į FS
-    // rezultatą laiko filesOcrStatus."resultHash".
+    // rezultatą laiko files."ocrStatus"."resultHash".
     timings.start("ocrRezultatai");
     try {
         const res = await postgres.query(
-            `SELECT "resultHash" FROM public."filesOcrStatus"
+            `SELECT "resultHash" FROM files."ocrStatus"
              WHERE id = $1 AND "resultHash" IS NOT NULL`,
             [dokumentas.id],
         );
@@ -160,7 +160,7 @@ async function nuskaitytiDokNuskaitytojuje(
         throw new Error("Nuskaitytojo klaida: nėra rezultato.");
     }
 
-    // Kuris nuskaitytojas apdorojo — įrašoma į filesDataExtraction."nodeId".
+    // Kuris nuskaitytojas apdorojo — įrašoma į files."dataExtraction"."nodeId".
     data.result.nuskaitytojoId = nuskaitytojas.id;
 
     timings.start("nuskaitytojaUpdate");

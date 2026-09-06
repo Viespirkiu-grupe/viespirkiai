@@ -27,7 +27,7 @@ function formatLtDateTime(value: unknown) {
 /**
  * Paskutiniai OCR rezultatai.
  *
- * Rezultatų istorijos nebėra — `filesOcrStatus` laiko po vieną (paskutinę) eilutę
+ * Rezultatų istorijos nebėra — `files."ocrStatus"` laiko po vieną (paskutinę) eilutę
  * failui, tad sąrašas rodo vėliausiai OCR'intus failus. Skirtumas nuo senosios
  * versijos vienintelis: jei tas pats failas OCR'intas kelis kartus, jis rodomas
  * vieną kartą. Puslapių ir žodžių skaičiai imami iš po OCR atlikto nuskaitymo.
@@ -43,10 +43,10 @@ export async function loadLatestOcrResults(limit = 15): Promise<any[]> {
       d."pageCount" AS "puslapiuSkaicius",
       d."wordCount" AS "zodziuSkaicius",
       fn.filename AS pavadinimas
-    FROM public."filesOcrStatus" o
-    LEFT JOIN public.files f ON f.id = o.id
-    LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
-    LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
+    FROM files."ocrStatus" o
+    LEFT JOIN files.files f ON f.id = o.id
+    LEFT JOIN files."filenames" fn ON fn.id = f."filenameId"
+    LEFT JOIN files."dataExtraction" d ON d.id = o.id
     LEFT JOIN infra."ocrNuskaitytojai" n ON n.id = o."nodeId"
     WHERE o."ocrTimestamp" IS NOT NULL
     ORDER BY o."ocrTimestamp" DESC

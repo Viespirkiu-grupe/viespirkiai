@@ -197,9 +197,9 @@ export async function fetchMd5Lookup(rows) {
     if (!dokIds.length) return lookup;
     const { rows: md5Rows } = await postgres.query(
         `SELECT f."sourceId0"::int AS "dokId", f."sourceId1"::int AS "fileId", m.md5
-         FROM public.files f
-         JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
-         JOIN public."filesMd5" m ON m.id = f."md5Id"
+         FROM files.files f
+         JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
+         JOIN files."md5" m ON m.id = f."md5Id"
          JOIN unnest($1::int[], $2::int[]) AS x("dokId", "fileId")
            ON f."sourceId0" = x."dokId"::text AND f."sourceId1" = x."fileId"::text
          WHERE st.title = 'sutartys'`,

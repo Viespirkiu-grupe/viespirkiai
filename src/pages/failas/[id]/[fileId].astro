@@ -13,10 +13,10 @@ const { value: fileId } = stripJsonSuffix(rawFileId ?? '');
 if (isNaN(Number(dokId)) || isNaN(Number(fileId))) return new Response(null, { status: 404 });
 
 // Nerodomo failo patikra atliekama nukreipimo tiksle (/failas/{id}), kuris
-// naudoja `filesHidden` pagal failo id.
+// naudoja `files."hidden"` pagal failo id.
 const result = await postgres.query(
-  `SELECT f.id FROM public.files f
-   JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+  `SELECT f.id FROM files.files f
+   JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
    WHERE st.title = 'sutartys' AND f."sourceId0" = $1::text AND f."sourceId1" = $2::text
    LIMIT 1`,
   [String(dokId), String(fileId)],

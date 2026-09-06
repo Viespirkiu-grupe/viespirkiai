@@ -33,7 +33,7 @@ describe('gautiFaila', () => {
     const failas = await gautiFaila(42);
 
     expect(failas?.specialTypes).toEqual(['PPA']);
-    expect(String(mocks.query.mock.calls[0][0])).toContain('"filesSpecialTypes"');
-    expect(String(mocks.query.mock.calls[0][0])).toContain('"filesSpecialTypeNames"');
+    expect(String(mocks.query.mock.calls[0][0])).toContain('files."specialTypes"');
+    expect(String(mocks.query.mock.calls[0][0])).toContain('files."specialTypeNames"');
   });
 });

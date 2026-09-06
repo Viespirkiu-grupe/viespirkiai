@@ -14,14 +14,14 @@ export async function pravalytiNuskaitymoRezervacijas() {
         `
         WITH stale AS (
             SELECT id
-            FROM public."filesExtractionQueue"
+            FROM files."extractionQueue"
             WHERE "lockedBy" IS NOT NULL
               AND "lockedAt" <= NOW() - INTERVAL '30 minutes'
             LIMIT $1
             FOR UPDATE SKIP LOCKED
         ),
         bumped AS (
-            UPDATE public."filesExtractionQueue" q
+            UPDATE files."extractionQueue" q
             SET attempts = q.attempts + 1,
                 "nextAttempt" = NOW() + LEAST(
                     INTERVAL '1 day',
@@ -34,7 +34,7 @@ export async function pravalytiNuskaitymoRezervacijas() {
             RETURNING q.id, q.attempts
         ),
         pasalinti AS (
-            DELETE FROM public."filesExtractionQueue"
+            DELETE FROM files."extractionQueue"
             WHERE id IN (SELECT id FROM bumped WHERE attempts >= $2)
             RETURNING id
         )

@@ -587,15 +587,15 @@ const PPA_TIPAS = "PPA";
 const DEFAULT_CONCURRENCY = 1;
 const MAX_CONCURRENCY = 64;
 
-/** Įrašo PPA apdorojimo versiją (arba -1 klaidai) į filesSpecialTypes. */
+/** Įrašo PPA apdorojimo versiją (arba -1 klaidai) į files."specialTypes". */
 async function pazymetiPpa(fileId, statusas, db = postgres) {
     await db.query(
         `WITH tipas AS (
-            INSERT INTO public."filesSpecialTypeNames" (type) VALUES ($1)
+            INSERT INTO files."specialTypeNames" (type) VALUES ($1)
             ON CONFLICT (type) DO UPDATE SET type = EXCLUDED.type
             RETURNING id
         )
-        INSERT INTO public."filesSpecialTypes" (id, "typeId", status)
+        INSERT INTO files."specialTypes" (id, "typeId", status)
         SELECT $2, t.id, $3 FROM tipas t
         ON CONFLICT (id, "typeId") DO UPDATE SET status = EXCLUDED.status`,
         [PPA_TIPAS, fileId, statusas],
@@ -605,8 +605,8 @@ async function pazymetiPpa(fileId, statusas, db = postgres) {
 async function rezervuotiPpa(client) {
     const { rows } = await client.query(
         `SELECT st.id
-         FROM public."filesSpecialTypes" st
-         JOIN public."filesSpecialTypeNames" tn ON tn.id = st."typeId"
+         FROM files."specialTypes" st
+         JOIN files."specialTypeNames" tn ON tn.id = st."typeId"
          WHERE tn.type = $1
            AND ((st.status < $2 AND st.status >= 0) OR st.status IS NULL)
          ORDER BY st.id

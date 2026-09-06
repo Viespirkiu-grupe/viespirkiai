@@ -29,7 +29,7 @@ describe('loadSutartis', () => {
       if (sql.includes('"vpmSutartys"."atviriDuomenysImp"')) return Promise.resolve({ rows: [] });
       if (sql.includes('"vpmSutartys"."sutartys" s') && sql.includes('WHERE "sutartiesUnikalusId" != $1')) return Promise.resolve({ rows: [] });
       if (sql.includes('FROM sabis."sutartys"')) return Promise.resolve({ rows: [] });
-      if (sql.includes('FROM public.files f')) return Promise.resolve({ rows: [] });
+      if (sql.includes('FROM files.files f')) return Promise.resolve({ rows: [] });
       throw new Error(`Netikėta užklausa: ${sql}`);
     });
   });

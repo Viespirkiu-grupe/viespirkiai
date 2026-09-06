@@ -1,5 +1,5 @@
 /*
-Suvienodina filesExtractionQueue su files lentele.
+Suvienodina files."extractionQueue" su files lentele.
 
 Eilę įprastai pildo kodas (žr. nuskaitymoEile.js), tad šitas scriptas reikalingas tada, kai failai
 buvo pakeisti aplenkiant tuos taškus:
@@ -28,7 +28,7 @@ export async function papildytiEile() {
 
     for (;;) {
         const { rows } = await postgres.query(
-            `SELECT id FROM public.files
+            `SELECT id FROM files.files
              WHERE id > $1
              ORDER BY id
              LIMIT $2`,
@@ -55,10 +55,10 @@ export async function papildytiEile() {
  */
 export async function isvalytiEile() {
     const res = await postgres.query(
-        `DELETE FROM public."filesExtractionQueue" q
-         USING public.files f
-         LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+        `DELETE FROM files."extractionQueue" q
+         USING files.files f
+         LEFT JOIN files."extensions" e ON e.id = f."extensionId"
+         LEFT JOIN files."dataExtraction" d ON d.id = f.id
          WHERE f.id = q.id
            AND q."lockedBy" IS NULL
            AND (

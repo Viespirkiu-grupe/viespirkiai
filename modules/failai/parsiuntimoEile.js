@@ -2,11 +2,11 @@ import { postgres } from "../../postgres/postgres.js";
 import { FILES_JOINS, FILES_SELECT, papildytiFaila } from "./filesSkaitymas.js";
 
 /*
-Parsiuntimo eilė — `filesDownloadQueue`.
+Parsiuntimo eilė — `files."downloadQueue"`.
 
 Eilėje tik neatlikti darbai: reikia parsiųsti — eilutė yra, nebereikia — nėra.
 Būsena (`files.downloadStatus`, `md5Id`, `filesize`) ir dėžių žemėlapis
-(`filesMd5Boxes`) gyvena `files` pusėje, eilė saugo tik bandymų skaičių,
+(`files."md5Boxes"`) gyvena `files` pusėje, eilė saugo tik bandymų skaičių,
 atidėjimą ir rezervaciją.
 
 Pakartojimo atidėjimas
@@ -34,7 +34,7 @@ const ATIDEJIMAS_SQL = `
 export async function paimtiParsiuntimui(nodeName, klientas = postgres) {
     const { rows } = await klientas.query(
         `WITH cte AS (
-            SELECT q.id FROM public."filesDownloadQueue" q
+            SELECT q.id FROM files."downloadQueue" q
             WHERE q."lockedBy" IS NULL
               AND (q."nextAttempt" IS NULL OR q."nextAttempt" <= NOW())
             ORDER BY q.attempts, q.id
@@ -42,7 +42,7 @@ export async function paimtiParsiuntimui(nodeName, klientas = postgres) {
             FOR UPDATE SKIP LOCKED
         ),
         locked AS (
-            UPDATE public."filesDownloadQueue" q
+            UPDATE files."downloadQueue" q
             SET "lockedBy" = $1,
                 "lockedAt" = NOW(),
                 attempts = q.attempts + 1,
@@ -51,7 +51,7 @@ export async function paimtiParsiuntimui(nodeName, klientas = postgres) {
             RETURNING q.id
         )
         SELECT ${FILES_SELECT}
-        FROM public.files f
+        FROM files.files f
         ${FILES_JOINS}
         WHERE f.id = (SELECT id FROM locked)`,
         [nodeName],
@@ -63,8 +63,8 @@ export async function paimtiParsiuntimui(nodeName, klientas = postgres) {
 /**
  * Pažymi failą kaip parsiųstą ir užregistruoja dėžę.
  *
- * `filesMd5Boxes."extensionId"` fiksuoja plėtinį, su kuriuo failas įkeltas —
- * dėžėje objektas vadinasi "{md5}.{extension}", o `files."extensionId"` vėliau
+ * `files."md5Boxes"."extensionId"` fiksuoja plėtinį, su kuriuo failas įkeltas —
+ * dėžėje objektas vadinasi "{md5}.{extension}", o `files.files."extensionId"` vėliau
  * gali būti pataisytas (pataisytiExtension.js).
  *
  * @param {Object} p
@@ -84,12 +84,12 @@ export async function pazymetiParsiusta({
 }, klientas = postgres) {
     const { rows } = await klientas.query(
         `WITH md5_id AS (
-            INSERT INTO public."filesMd5" (md5) VALUES ($1)
+            INSERT INTO files."md5" (md5) VALUES ($1)
             ON CONFLICT (md5) DO UPDATE SET md5 = EXCLUDED.md5
             RETURNING id
         ),
         ext_id AS (
-            INSERT INTO public."filesExtensions" (extension)
+            INSERT INTO files."extensions" (extension)
             SELECT $2::text WHERE $2 IS NOT NULL
             ON CONFLICT (extension) DO UPDATE SET extension = EXCLUDED.extension
             RETURNING id
@@ -101,19 +101,19 @@ export async function pazymetiParsiusta({
     const { md5Id, extensionId } = rows[0];
 
     await klientas.query(
-        `INSERT INTO public."filesMd5Boxes" ("md5Id", "boxId", filesize, "extensionId")
+        `INSERT INTO files."md5Boxes" ("md5Id", "boxId", filesize, "extensionId")
          VALUES ($1, $2, $3, $4)
          ON CONFLICT ("md5Id", "boxId") DO NOTHING`,
         [md5Id, dezeId, dydis, extensionId],
     );
     await klientas.query(
-        `UPDATE public.files
+        `UPDATE files.files
          SET "downloadStatus" = 1, "md5Id" = $1, filesize = $2
          WHERE id = $3`,
         [md5Id, dydis, id],
     );
     await klientas.query(
-        `DELETE FROM public."filesDownloadQueue" WHERE id = $1`,
+        `DELETE FROM files."downloadQueue" WHERE id = $1`,
         [id],
     );
 }
@@ -126,11 +126,11 @@ export async function pazymetiParsiusta({
  */
 export async function pazymetiKlaida(id, klientas = postgres) {
     await klientas.query(
-        `UPDATE public.files SET "downloadStatus" = -1 WHERE id = $1`,
+        `UPDATE files.files SET "downloadStatus" = -1 WHERE id = $1`,
         [id],
     );
     await klientas.query(
-        `UPDATE public."filesDownloadQueue"
+        `UPDATE files."downloadQueue"
          SET "lockedBy" = NULL,
              "lockedAt" = NULL
          WHERE id = $1`,

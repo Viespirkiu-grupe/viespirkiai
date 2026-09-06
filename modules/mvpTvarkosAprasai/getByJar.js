@@ -42,9 +42,9 @@ export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
         const failaiRes = await postgres.query(
             `SELECT f."sourceId0" AS "saltinioId", f."id",
                     f."downloadStatus" AS "parsiustas", f."filesize" AS "dydis", e."extension"
-           FROM public.files f
-           LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-           WHERE f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'mvpAprasai')
+           FROM files.files f
+           LEFT JOIN files."extensions" e ON e.id = f."extensionId"
+           WHERE f."sourceTitleId" = (SELECT id FROM files."sourceTitles" WHERE title = 'mvpAprasai')
              AND f."sourceId0" = ANY($1)`,
             [Array.from(allSaltinioIds)],
         );

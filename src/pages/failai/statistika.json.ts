@@ -19,7 +19,7 @@ export async function gautiFailuStatistika() {
       COALESCE(SUM("ocrDone"), 0)             AS "ocrDone",
       COALESCE(SUM("ocrFailed"), 0)           AS "ocrFailed",
       COALESCE(SUM("ocrPending"), 0)          AS "ocrPending"
-    FROM public."filesStats";`);
+    FROM files."stats";`);
 
   const c = Object.fromEntries(Object.entries(rows[0] ?? {}).map(([k, v]) => [k, Number(v)]));
   const neparsiusti = Math.max(0, c.visi - c.parsiusti - c.klaida);
@@ -27,7 +27,7 @@ export async function gautiFailuStatistika() {
   // Tikras nuskaitymo eilės ilgis — apytikslis pg gyvų eilučių skaičius.
   const { rows: queueRows } = await postgres.query(
     `SELECT COALESCE(n_live_tup, 0)::bigint AS approx
-       FROM pg_stat_user_tables WHERE relname = 'filesExtractionQueue'`,
+       FROM pg_stat_user_tables WHERE relname = 'files."extractionQueue"'`,
   );
   const eilesApprox = Number(queueRows[0]?.approx ?? 0);
 

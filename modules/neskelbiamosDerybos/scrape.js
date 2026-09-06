@@ -95,7 +95,7 @@ async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
  *
  * Šaltinis duoda SANTYKINĮ kelią (`sutikimai_laikini/2024-12/BodyPart_….docx`),
  * o kai dokumento nėra – literalų `#`. Toks pat kelias saugomas ir
- * public.files."sourceId0", tad jungiama lygybe, be jokio `replace()`.
+ * files.files."sourceId0", tad jungiama lygybe, be jokio `replace()`.
  *
  * @param {string} link Nuoroda iš sąrašo
  * @returns {string|null} Santykinis kelias arba `null`, jei dokumento nėra

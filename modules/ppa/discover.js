@@ -10,7 +10,7 @@ const BATCH_SIZE = 1_000;
 const SEARCH_QUERY = '(extension:"xlsx") AND "VII.3 PASIULYMU VERTINIMAS"';
 
 const HELP = `Pagal dokumento turinio frazę suranda PPA XLSX failus Quickwit indekse
-ir pasirinktinai pažymi juos filesSpecialTypes lentelėje.
+ir pasirinktinai pažymi juos files."specialTypes" lentelėje.
 
 Naudojimas:
   node modules/ppa/discover.js [parinktys]
@@ -63,16 +63,16 @@ async function insertPpaIds(fileIds) {
     if (!fileIds.length) return 0;
     const { rowCount } = await postgres.query(
         `WITH tipas AS (
-             INSERT INTO public."filesSpecialTypeNames" (type)
+             INSERT INTO files."specialTypeNames" (type)
              VALUES ($1)
              ON CONFLICT (type) DO UPDATE SET type = EXCLUDED.type
              RETURNING id
          )
-         INSERT INTO public."filesSpecialTypes" (id, "typeId", status)
+         INSERT INTO files."specialTypes" (id, "typeId", status)
          SELECT DISTINCT f.id, t.id, NULL::smallint
          FROM unnest($2::int[]) AS f(id)
          CROSS JOIN tipas t
-         JOIN public.files pf ON pf.id = f.id
+         JOIN files.files pf ON pf.id = f.id
          ON CONFLICT (id, "typeId") DO NOTHING`,
         [PPA_TIPAS, fileIds],
     );

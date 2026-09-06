@@ -5,12 +5,12 @@ import { atnaujintiFilesPhotos } from "./photosLentele.js";
 import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 /*
-OCR eilė — `filesOcrQueue`, būsena — `filesOcrStatus`.
+OCR eilė — `files."ocrQueue"`, būsena — `files."ocrStatus"`.
 
 Rezultatų istorijos nėra: laikoma tik rodyklė į paskutinį FS rezultatą
 (`resultHash`, ją nuskaitymas paduoda dokNuskaitytojui) ir bendras rezultatų
 skaičius (`resultsCount`, rodomas failo puslapyje). Dienos pjūvį kaupia
-`filesOcrStatsDay`.
+`files."ocrStatsDay"`.
 
 Prioritetai:
   0 — OCR rekomenduojamas (status = 0)
@@ -30,17 +30,17 @@ export async function iOcrEile(failuId, klientas = postgres) {
     if (!failuId?.length) return 0;
 
     const res = await klientas.query(
-        `INSERT INTO public."filesOcrQueue" (id, priority)
+        `INSERT INTO files."ocrQueue" (id, priority)
          SELECT f.id,
                 CASE
                     WHEN o.status = 0 THEN 0
                     WHEN LOWER(e.extension) = ANY($2::text[]) THEN 1
                     ELSE 2
                 END
-         FROM public.files f
-         LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-         LEFT JOIN public."filesOcrStatus" o ON o.id = f.id
-         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+         FROM files.files f
+         LEFT JOIN files."extensions" e ON e.id = f."extensionId"
+         LEFT JOIN files."ocrStatus" o ON o.id = f.id
+         LEFT JOIN files."dataExtraction" d ON d.id = f.id
          WHERE f.id = ANY($1::int[])
            AND (
                o.status = 0
@@ -60,7 +60,7 @@ export async function iOcrEile(failuId, klientas = postgres) {
 
     if (klientas === postgres && res.rowCount > 0) {
         signalWork(WORK_SIGNALS.FILES_OCR_READY, {
-            source: "filesOcrQueue",
+            source: "files.ocrQueue",
             count: res.rowCount,
         });
     }
@@ -77,7 +77,7 @@ export async function iOcrEile(failuId, klientas = postgres) {
 export async function paimtiOcr(node, klientas = postgres) {
     const { rows } = await klientas.query(
         `WITH cte AS (
-            SELECT q.id FROM public."filesOcrQueue" q
+            SELECT q.id FROM files."ocrQueue" q
             WHERE q."lockedBy" IS NULL
               AND q.attempts < $2
               AND (q."nextAttempt" IS NULL OR q."nextAttempt" <= NOW())
@@ -86,7 +86,7 @@ export async function paimtiOcr(node, klientas = postgres) {
             FOR UPDATE SKIP LOCKED
         ),
         locked AS (
-            UPDATE public."filesOcrQueue" q
+            UPDATE files."ocrQueue" q
             SET "lockedBy" = $1,
                 "lockedAt" = NOW()
             FROM cte
@@ -94,7 +94,7 @@ export async function paimtiOcr(node, klientas = postgres) {
             RETURNING q.id
         )
         SELECT ${FILES_SELECT}
-        FROM public.files f
+        FROM files.files f
         ${FILES_JOINS}
         WHERE f.id = (SELECT id FROM locked)`,
         [node.pavadinimas, OCR_BANDYMAI],
@@ -105,7 +105,7 @@ export async function paimtiOcr(node, klientas = postgres) {
 
     // Būsena — rezervuota (-3).
     await klientas.query(
-        `INSERT INTO public."filesOcrStatus" (id, status, "nodeId", "lockTimestamp")
+        `INSERT INTO files."ocrStatus" (id, status, "nodeId", "lockTimestamp")
          VALUES ($1, -3, $2, NOW())
          ON CONFLICT (id) DO UPDATE SET
             status          = -3,
@@ -138,7 +138,7 @@ export async function pazymetiOcrRezultata(
     klientas = postgres,
 ) {
     await klientas.query(
-        `INSERT INTO public."filesOcrStatus"
+        `INSERT INTO files."ocrStatus"
             (id, status, "nodeId", "lockTimestamp", duration, "ocrTimestamp", "resultHash", "resultsCount")
          VALUES ($1, 1, $2, NULL, $3, NOW(), $4, 1)
          ON CONFLICT (id) DO UPDATE SET
@@ -148,12 +148,12 @@ export async function pazymetiOcrRezultata(
             duration        = EXCLUDED.duration,
             "ocrTimestamp"  = EXCLUDED."ocrTimestamp",
             "resultHash"    = EXCLUDED."resultHash",
-            "resultsCount"  = public."filesOcrStatus"."resultsCount" + 1`,
+            "resultsCount"  = files."ocrStatus"."resultsCount" + 1`,
         [id, nodeId, duration, md5],
     );
 
     await klientas.query(
-        `DELETE FROM public."filesOcrQueue" WHERE id = $1`,
+        `DELETE FROM files."ocrQueue" WHERE id = $1`,
         [id],
     );
 
@@ -163,18 +163,18 @@ export async function pazymetiOcrRezultata(
 
     // Dienos statistika — vietoj buvusių trijų failaiOcrRezultataiStats* lentelių.
     await klientas.query(
-        `INSERT INTO public."filesOcrStatsDay" (date, "nodeId", results, pages, words, duration)
+        `INSERT INTO files."ocrStatsDay" (date, "nodeId", results, pages, words, duration)
          VALUES ((NOW() AT TIME ZONE 'Europe/Vilnius')::date, $1, 1, $2, $3, $4)
          ON CONFLICT (date, "nodeId") DO UPDATE SET
-            results  = public."filesOcrStatsDay".results + 1,
-            pages    = public."filesOcrStatsDay".pages + EXCLUDED.pages,
-            words    = public."filesOcrStatsDay".words + EXCLUDED.words,
-            duration = public."filesOcrStatsDay".duration + EXCLUDED.duration`,
+            results  = files."ocrStatsDay".results + 1,
+            pages    = files."ocrStatsDay".pages + EXCLUDED.pages,
+            words    = files."ocrStatsDay".words + EXCLUDED.words,
+            duration = files."ocrStatsDay".duration + EXCLUDED.duration`,
         [nodeId, pageCount, wordCount, duration],
     );
 
     // Kaupiamasis nuskaitytojo skaitiklis — pernuskaitymas skaičiuojamas kaip
-    // atskiras nuskaitymas (kaip ir filesOcrStatus."resultsCount").
+    // atskiras nuskaitymas (kaip ir files."ocrStatus"."resultsCount").
     await klientas.query(
         `UPDATE infra."ocrNuskaitytojai"
          SET "nuskaitytiDokumentai" = COALESCE("nuskaitytiDokumentai", 0) + 1

@@ -5,7 +5,7 @@ import { readFailaiFs } from "./failaiFs.js";
 import { matmenys, NUOTRAUKU_PLETINIAI } from "./photosLentele.js";
 
 /*
-Vienkartinis `filesPhotos` užpildymas esamais failais.
+Vienkartinis `files."photos"` užpildymas esamais failais.
 
   npm run failai:photos-backfill
 
@@ -22,11 +22,11 @@ const PAKETAS = 1000;
 async function kandidatai() {
     const { rows } = await postgres.query(
         `SELECT f.id, i."fileHash"
-         FROM public."filesOcrStatus" o
-         JOIN public.files f ON f.id = o.id
-         JOIN public."filesExtensions" e ON e.id = f."extensionId"
-         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
-         LEFT JOIN public."filesInfoFiles" i ON i.id = f.id
+         FROM files."ocrStatus" o
+         JOIN files.files f ON f.id = o.id
+         JOIN files."extensions" e ON e.id = f."extensionId"
+         LEFT JOIN files."dataExtraction" d ON d.id = f.id
+         LEFT JOIN files."infoFiles" i ON i.id = f.id
          WHERE o.status = 1
            AND (d."wordCount" IS NULL OR d."wordCount" <= 10)
            AND lower(e.extension) = ANY($1::text[])`,
@@ -38,7 +38,7 @@ async function kandidatai() {
 async function irasytiPaketa(eilutes) {
     if (!eilutes.length) return;
     await postgres.query(
-        `INSERT INTO public."filesPhotos" (id, width, height)
+        `INSERT INTO files."photos" (id, width, height)
          SELECT * FROM UNNEST($1::int[], $2::int[], $3::int[])
          ON CONFLICT (id) DO UPDATE SET
             width  = EXCLUDED.width,
@@ -58,7 +58,7 @@ async function main() {
 
     // Nebeatitinkantys išmetami — kad pakartotinis paleidimas lentelę suvienodintų.
     await postgres.query(
-        `DELETE FROM public."filesPhotos" WHERE id <> ALL($1::int[])`,
+        `DELETE FROM files."photos" WHERE id <> ALL($1::int[])`,
         [rows.map((r) => r.id)],
     );
 
@@ -86,12 +86,12 @@ async function main() {
 
     await irasytiPaketa(paketas);
     irasyta += paketas.length;
-    logger.log(`Baigta: ${irasyta} eilučių filesPhotos lentelėje.`);
+    logger.log(`Baigta: ${irasyta} eilučių files."photos" lentelėje.`);
 }
 
 main()
     .catch((error) => {
-        console.error("Nepavyko užpildyti filesPhotos:", error);
+        console.error("Nepavyko užpildyti files.photos:", error);
         process.exitCode = 1;
     })
     .finally(async () => {

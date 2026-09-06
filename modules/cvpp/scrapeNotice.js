@@ -117,8 +117,8 @@ async function getExistingCvppIdSet(idsToCheck) {
 
     const existsResult = await postgres.query(
         `SELECT f."sourceId0", f."sourceId1", f."sourceId2"
-         FROM public.files f
-         JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+         FROM files.files f
+         JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
          JOIN unnest($1::text[], $2::text[]) AS x(dvid, lid)
            ON f."sourceId1" = x.dvid AND f."sourceId2" = x.lid
          WHERE st.title = 'cvpp'`,
@@ -151,16 +151,16 @@ async function updateLegacyIds(toUpdate) {
     const nauji = toUpdate.map((f) => skaidytiSaltinioId("cvpp", f.saltinioId));
 
     const result = await postgres.query(
-        `UPDATE public.files AS f
+        `UPDATE files.files AS f
          SET "sourceId0" = m.pid
          FROM unnest($1::text[], $2::text[], $3::text[]) AS m(pid, dvid, lid)
-         JOIN public."filesSourceTitles" st ON st.title = 'cvpp'
+         JOIN files."sourceTitles" st ON st.title = 'cvpp'
          WHERE f."sourceTitleId" = st.id
            AND f."sourceId0" = '-1'
            AND f."sourceId1" = m.dvid
            AND f."sourceId2" = m.lid
            AND NOT EXISTS (
-               SELECT 1 FROM public.files AS x
+               SELECT 1 FROM files.files AS x
                WHERE x."sourceTitleId" = st.id
                  AND x."sourceId0" = m.pid
                  AND x."sourceId1" = m.dvid

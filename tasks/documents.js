@@ -18,7 +18,7 @@ export default [
         job: processETarDocumentsQueue,
     },
     {
-        // files -> documents (upsert iš filesDocumentsQueue)
+        // files -> documents (upsert iš files."documentsQueue")
         name: "processFailaiDokumentaiQueue",
         mode: "asap",
         priority: 5,

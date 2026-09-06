@@ -35,7 +35,7 @@ if (format === 'png') {
   });
 }
 
-// Ar failas paslėptas (filesHidden) — jei taip, rodom skirtą puslapį su
+// Ar failas paslėptas (files."hidden") — jei taip, rodom skirtą puslapį su
 // vieša priežastimi ir lentelėje nurodytu HTTP statusu (numatyta 451).
 const nerodymas = await getFailasNerodymas(failas.id);
 const isPasalintas = !!nerodymas;

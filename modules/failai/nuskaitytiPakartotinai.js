@@ -1,6 +1,6 @@
 /*
 Avarinis įrankis: failus, nuskaitytus su klaidomis (-1 arba -4), grąžina į eilę.
-Įprastai pakartojimą tvarko eilės atidėjimas (filesExtractionQueue.nextAttempt).
+Įprastai pakartojimą tvarko eilės atidėjimas (files."extractionQueue".nextAttempt).
 */
 
 import { postgres } from "../../postgres/postgres.js";
@@ -13,12 +13,12 @@ async function nuskaitytiPakartotinai(kiekis = 10, workerId) {
     const query = `
         WITH to_update AS (
             SELECT id
-            FROM public."filesDataExtraction"
+            FROM files."dataExtraction"
             WHERE status IN (-1, -4)
             LIMIT $1
             FOR UPDATE SKIP LOCKED
         )
-        UPDATE public."filesDataExtraction" d
+        UPDATE files."dataExtraction" d
         SET status = 0
         FROM to_update t
         WHERE d.id = t.id

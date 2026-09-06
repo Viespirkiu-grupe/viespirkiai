@@ -7,7 +7,7 @@ const font = getFont(Astro.cookies);
 // tad čia lieka seq scan per ~31k eilučių — be join'ų ir be FS skaitymų.
 const { rows: images } = await postgres.query(`
   SELECT id, width, height
-  FROM public."filesPhotos"
+  FROM files."photos"
   ORDER BY random()
   LIMIT 50`);
 ---

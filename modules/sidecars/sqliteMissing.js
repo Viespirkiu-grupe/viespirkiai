@@ -11,7 +11,7 @@ import { sidecarDbPath, sidecarKeyColumn, sidecarTable } from "../../utils/sidec
 // Postgres'e paimti referencinius hash'us.
 const SIDECAR_SALTINIAI = {
     failaiInfo: {
-        fromSql: `FROM public."filesInfoFiles" WHERE "fileHash" IS NOT NULL`,
+        fromSql: `FROM files."infoFiles" WHERE "fileHash" IS NOT NULL`,
         keySql: `"fileHash"`,
     },
     dokumentai: {
@@ -21,7 +21,7 @@ const SIDECAR_SALTINIAI = {
         keySql: `md5`,
     },
     ocrRezultatai: {
-        fromSql: `FROM public."filesOcrStatus" WHERE "resultHash" IS NOT NULL`,
+        fromSql: `FROM files."ocrStatus" WHERE "resultHash" IS NOT NULL`,
         keySql: `"resultHash"`,
     },
     liteko2: {

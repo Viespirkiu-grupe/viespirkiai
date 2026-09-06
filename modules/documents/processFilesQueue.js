@@ -19,7 +19,7 @@ export async function processFilesDocumentsQueue() {
         // An error rolls the claim back instead of losing the entire batch.
         const { rows: queue } = await client.query(
             `SELECT id, "fileId" AS "failoId", change AS keitimas
-             FROM public."filesDocumentsQueue"
+             FROM files."documentsQueue"
              ORDER BY id
              LIMIT $1
              FOR UPDATE SKIP LOCKED`,
@@ -70,20 +70,20 @@ export async function processFilesDocumentsQueue() {
         }
 
         await client.query(
-            `DELETE FROM public."filesDocumentsQueue" WHERE id = ANY($1::bigint[])`,
+            `DELETE FROM files."documentsQueue" WHERE id = ANY($1::bigint[])`,
             [queue.map((row) => row.id)],
         );
         await client.query("COMMIT");
 
         if (inserted + deleted > 0) {
             signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
-                source: "filesDocumentsQueue",
+                source: "files.documentsQueue",
                 count: inserted + deleted,
             });
         }
 
         logger.log(
-            `filesDocumentsQueue: claimed ${queue.length} (deduped ${deduped.size}) | upserted ${inserted} | skipped ${skipped} | deleted ${deleted}`,
+            `files."documentsQueue": claimed ${queue.length} (deduped ${deduped.size}) | upserted ${inserted} | skipped ${skipped} | deleted ${deleted}`,
         );
         return true;
     } catch (err) {

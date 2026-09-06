@@ -95,7 +95,7 @@ async function getDezeByName(name) {
     const result = await postgres.query(
         `
         SELECT d.*, a."apiKey"
-        FROM public.dezes d
+        FROM files.dezes d
         JOIN auth."raktai" a ON a.id = d."apiRaktasId"
         WHERE d.pavadinimas = $1
         LIMIT 1
@@ -107,35 +107,35 @@ async function getDezeByName(name) {
 }
 
 async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
-    // Dėžių žemėlapis dabar yra filesMd5Boxes (md5Id → boxId), o dėžės atpažįstamos
+    // Dėžių žemėlapis dabar yra files."md5Boxes" (md5Id → boxId), o dėžės atpažįstamos
     // per dezes.id, ne pavadinimą. `sourceDeze`/`dydis`/`pavadinimas` vardai išlaikyti,
     // kad likęs scripto kodas nesikeistų.
     const result = await postgres.query(
         `
         WITH kandidatai AS (
             SELECT m.id AS "md5Id", m.md5
-            FROM public."filesMd5" m
+            FROM files."md5" m
             WHERE ($3::text IS NULL OR m.md5 > $3)
               AND EXISTS (
                   SELECT 1
-                  FROM public."filesMd5Boxes" b
-                  JOIN public.dezes sd ON sd.id = b."boxId"
+                  FROM files."md5Boxes" b
+                  JOIN files.dezes sd ON sd.id = b."boxId"
                   WHERE b."md5Id" = m.id
                     AND b.filesize > 0
                     AND ($1::text IS NULL OR sd.pavadinimas = $1)
               )
               AND EXISTS (
                   SELECT 1
-                  FROM public.files f
-                  LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+                  FROM files.files f
+                  LEFT JOIN files."extensions" e ON e.id = f."extensionId"
                   WHERE f."md5Id" = m.id
                     AND f."downloadStatus" = 1
                     AND ($2::text IS NULL OR lower(e.extension) = lower($2))
               )
               AND NOT EXISTS (
                   SELECT 1
-                  FROM public."filesMd5Boxes" t
-                  JOIN public.dezes td ON td.id = t."boxId"
+                  FROM files."md5Boxes" t
+                  JOIN files.dezes td ON td.id = t."boxId"
                   WHERE t."md5Id" = m.id
                     AND td.pavadinimas = $4
               )
@@ -157,9 +157,9 @@ async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
                 sd.pavadinimas AS "sourceDeze",
                 b.filesize AS dydis,
                 storage_extension.extension AS "storageExtension"
-            FROM public."filesMd5Boxes" b
-            JOIN public.dezes sd ON sd.id = b."boxId"
-            LEFT JOIN public."filesExtensions" storage_extension
+            FROM files."md5Boxes" b
+            JOIN files.dezes sd ON sd.id = b."boxId"
+            LEFT JOIN files."extensions" storage_extension
                    ON storage_extension.id = b."extensionId"
             WHERE b."md5Id" = k."md5Id"
               AND b.filesize > 0
@@ -172,9 +172,9 @@ async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
                 f.id AS "firstId",
                 fn.filename AS pavadinimas,
                 e.extension
-            FROM public.files f
-            LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
-            LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+            FROM files.files f
+            LEFT JOIN files."filenames" fn ON fn.id = f."filenameId"
+            LEFT JOIN files."extensions" e ON e.id = f."extensionId"
             WHERE f."md5Id" = k."md5Id"
               AND f."downloadStatus" = 1
               AND ($2::text IS NULL OR lower(e.extension) = lower($2))
@@ -183,8 +183,8 @@ async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
         ) first_failas ON TRUE
         JOIN LATERAL (
             SELECT ARRAY_AGG(f.id ORDER BY f.id) AS "fileIds"
-            FROM public.files f
-            LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+            FROM files.files f
+            LEFT JOIN files."extensions" e ON e.id = f."extensionId"
             WHERE f."md5Id" = k."md5Id"
               AND f."downloadStatus" = 1
               AND ($2::text IS NULL OR lower(e.extension) = lower($2))
@@ -203,7 +203,7 @@ async function getDezesByNames(names) {
     const result = await postgres.query(
         `
         SELECT d.*, a."apiKey"
-        FROM public.dezes d
+        FROM files.dezes d
         JOIN auth."raktai" a ON a.id = d."apiRaktasId"
         WHERE d.pavadinimas = ANY($1::text[])
         `,
@@ -231,7 +231,7 @@ async function updateDezeUsage(deze) {
 
     const { totalSizeBytes } = await response.json();
 
-    await postgres.query(`UPDATE public.dezes SET used = $1 WHERE id = $2`, [
+    await postgres.query(`UPDATE files.dezes SET used = $1 WHERE id = $2`, [
         totalSizeBytes,
         deze.id,
     ]);
@@ -366,10 +366,10 @@ export async function kopijuotiFailus(from, to, options = {}) {
 
         await postgres.query(
             `
-            INSERT INTO public."filesMd5Boxes" ("md5Id", "boxId", filesize, "extensionId")
+            INSERT INTO files."md5Boxes" ("md5Id", "boxId", filesize, "extensionId")
             SELECT m.id, $2::int, $3::bigint, e.id
-            FROM public."filesMd5" m
-            LEFT JOIN public."filesExtensions" e ON e.extension = $4::text
+            FROM files."md5" m
+            LEFT JOIN files."extensions" e ON e.extension = $4::text
             WHERE m.md5 = $1
             ON CONFLICT ("md5Id", "boxId") DO NOTHING
             `,

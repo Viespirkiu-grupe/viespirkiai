@@ -2,7 +2,7 @@
  * Statistics-page helpers for `/failai`.
  *
  * The "no query" view of /failai is a stats dashboard fed by SSE updates.
- * `buildStatistika` formats the raw `filesStats`-derived stat object into
+ * `buildStatistika` formats the raw `files."stats"`-derived stat object into
  * the strings the dashboard renders; the same shape is later sent over SSE
  * so the client-side updater can swap text nodes in place.
  */
@@ -35,7 +35,7 @@ export interface StatistikaPayload {
 }
 
 /**
- * Convert the raw stat aggregate (from `filesStats`) into pre-formatted strings
+ * Convert the raw stat aggregate (from `files."stats"`) into pre-formatted strings
  * ready to render in the dashboard.  The same shape is pushed through SSE so the
  * client can update spans without re-rendering.
  *

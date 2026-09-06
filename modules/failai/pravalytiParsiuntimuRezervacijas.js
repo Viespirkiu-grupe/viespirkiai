@@ -11,14 +11,14 @@ export async function pravalytiParsiuntimoRezervacijas() {
     const res = await postgres.query(
         `
         WITH atlaisvinti AS (
-            UPDATE public."filesDownloadQueue"
+            UPDATE files."downloadQueue"
             SET "lockedBy" = NULL,
                 "lockedAt" = NULL
             WHERE "lockedBy" IS NOT NULL
               AND "lockedAt" <= NOW() - INTERVAL '15 minutes'
             RETURNING id
         )
-        UPDATE public.files f
+        UPDATE files.files f
         SET "downloadStatus" = -1
         FROM atlaisvinti a
         WHERE f.id = a.id

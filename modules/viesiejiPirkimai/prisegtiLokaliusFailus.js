@@ -29,9 +29,9 @@ export async function prisegtiLokaliusFailus(pirkimoId, failai, klientas = postg
 
     const { rows } = await klientas.query(
         `SELECT ${FILES_SELECT}
-         FROM public.files f
+         FROM files.files f
          ${FILES_JOINS}
-         WHERE f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'cvpIs')
+         WHERE f."sourceTitleId" = (SELECT id FROM files."sourceTitles" WHERE title = 'cvpIs')
            AND f."sourceId0" = $1`,
         [String(pirkimoId)],
     );

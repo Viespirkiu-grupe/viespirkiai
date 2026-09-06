@@ -9,7 +9,7 @@ import { irasytiFailus } from "../failai/failuIrasymas.js";
 
 /**
  * Nuoroda -> kelias be protokolo ir hosto. Toks pat pavidalas saugomas
- * "mvpAprasai"."tvarkos"."rinkmenos" ir public.files."sourceId0".
+ * "mvpAprasai"."tvarkos"."rinkmenos" ir files.files."sourceId0".
  */
 function saltinioIdIsHref(href) {
     return href.replace(/^https?:\/\/[^/]+/i, "").replace(/^\/+/, "");
@@ -164,7 +164,7 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
         // Dublikatus atmeta files unikalūs indeksai (žr. failuIrasymas.js).
         const nauji = await irasytiFailus(merged);
         if (nauji.length) {
-            log(`Inserted ${nauji.length} rows into public.files`);
+            log(`Inserted ${nauji.length} rows into files.files`);
         }
     } catch (err) {
         console.error("Klaida insertinant i failai:", err);

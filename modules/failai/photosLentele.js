@@ -1,14 +1,14 @@
 import { postgres } from "../../postgres/postgres.js";
 
 /*
-`filesPhotos` — galerijai (/failai/galerija) tinkamų nuotraukų aibė.
+`files."photos"` — galerijai (/failai/galerija) tinkamų nuotraukų aibė.
 
 Dokumento skenas ar dokumento nuotrauka turi žodžių, tad `wordCount <= 10` sąlyga
 juos atmeta — lentelėje lieka tik realios nuotraukos. Aibė palaikoma šviežia iš
 dviejų taškų, kur rašomi sąlygos dėmenys:
 
   nuskaitymoRezultatas.js  pazymetiNuskaityta()   — wordCount + matmenys
-  ocrEile.js               pazymetiOcrRezultata() — filesOcrStatus.status = 1
+  ocrEile.js               pazymetiOcrRezultata() — files."ocrStatus".status = 1
 
 Vienkartiniam esamų failų sukėlimui — backfillPhotos.js.
 */
@@ -41,7 +41,7 @@ export function matmenys(metaduomenys) {
 }
 
 /**
- * Įrašo failą į `filesPhotos` arba pašalina, jei jis (nebe)atitinka galerijos
+ * Įrašo failą į `files."photos"` arba pašalina, jei jis (nebe)atitinka galerijos
  * sąlygos. Visi lookup'ai eina per PK, tad kaina nuskaitymo kelyje nereikšminga.
  *
  * Matmenys nebūtini: OCR kelias jų neturi, juos užpildo po OCR sekantis
@@ -53,25 +53,25 @@ export function matmenys(metaduomenys) {
  */
 export async function atnaujintiFilesPhotos(id, dydis = {}, klientas = postgres) {
     const { rowCount } = await klientas.query(
-        `INSERT INTO public."filesPhotos" (id, width, height)
+        `INSERT INTO files."photos" (id, width, height)
          SELECT f.id, $2, $3
-         FROM public.files f
-         JOIN public."filesOcrStatus" o ON o.id = f.id
-         JOIN public."filesExtensions" e ON e.id = f."extensionId"
-         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+         FROM files.files f
+         JOIN files."ocrStatus" o ON o.id = f.id
+         JOIN files."extensions" e ON e.id = f."extensionId"
+         LEFT JOIN files."dataExtraction" d ON d.id = f.id
          WHERE f.id = $1
            AND o.status = 1
            AND (d."wordCount" IS NULL OR d."wordCount" <= 10)
            AND lower(e.extension) = ANY($4::text[])
          ON CONFLICT (id) DO UPDATE SET
-            width  = COALESCE(EXCLUDED.width,  public."filesPhotos".width),
-            height = COALESCE(EXCLUDED.height, public."filesPhotos".height)`,
+            width  = COALESCE(EXCLUDED.width,  files."photos".width),
+            height = COALESCE(EXCLUDED.height, files."photos".height)`,
         [id, dydis.width ?? null, dydis.height ?? null, NUOTRAUKU_PLETINIAI],
     );
 
     // Nieko neįrašyta — failas sąlygos neatitinka (pvz. pernuskaičius atsirado
     // žodžių), tad iš lentelės išimamas.
     if (rowCount === 0) {
-        await klientas.query(`DELETE FROM public."filesPhotos" WHERE id = $1`, [id]);
+        await klientas.query(`DELETE FROM files."photos" WHERE id = $1`, [id]);
     }
 }

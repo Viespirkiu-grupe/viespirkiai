@@ -216,11 +216,11 @@ async function annotateDokumentai(sutartis: any) {
             (f."downloadStatus" > 0) AS parsiustas,
             (d.version IS NOT NULL AND d.version > 0) AS nuskaitytas,
             f.id, fn.filename AS pavadinimas, e.extension
-     FROM public.files f
-     JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
-     LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
-     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-     LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+     FROM files.files f
+     JOIN files."sourceTitles" st ON st.id = f."sourceTitleId"
+     LEFT JOIN files."filenames" fn ON fn.id = f."filenameId"
+     LEFT JOIN files."extensions" e ON e.id = f."extensionId"
+     LEFT JOIN files."dataExtraction" d ON d.id = f.id
      WHERE st.title = 'sutartys' AND f."sourceId0" = $1::text`,
     [String(sutartis.sutartiesUnikalusId)],
   ).then((r: any) => r.rows);

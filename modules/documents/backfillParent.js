@@ -25,7 +25,7 @@ async function runPass() {
     while (true) {
         const { rows } = await postgres.query(
             `SELECT id
-             FROM public.files
+             FROM files.files
              WHERE parent IS NOT NULL AND id > $1
              ORDER BY id
              LIMIT $2`,
@@ -40,7 +40,7 @@ async function runPass() {
         const updParent = await postgres.query(
             `WITH src AS (
                 SELECT d.id AS doc_id, p.id AS parent_doc_id
-                FROM public.files f
+                FROM files.files f
                 JOIN documents.documents d
                     ON d."fileId" = f.id AND d.parent IS NULL
                 JOIN documents.documents p
@@ -57,7 +57,7 @@ async function runPass() {
         const updJar = await postgres.query(
             `WITH src AS (
                 SELECT d.id AS doc_id, p."institutionJarCode" AS parent_jar
-                FROM public.files f
+                FROM files.files f
                 JOIN documents.documents d
                     ON d."fileId" = f.id AND d."institutionJarCode" IS NULL
                 JOIN documents.documents p
@@ -104,7 +104,7 @@ async function run() {
         rows: [{ count }],
     } = await postgres.query(
         `SELECT COUNT(*)::int AS count
-         FROM public.files f
+         FROM files.files f
          JOIN documents.documents d ON d."fileId" = f.id
          WHERE f.parent IS NOT NULL AND d.parent IS NULL`,
     );
@@ -117,7 +117,7 @@ async function run() {
         rows: [{ count: jarCount }],
     } = await postgres.query(
         `SELECT COUNT(*)::int AS count
-         FROM public.files f
+         FROM files.files f
          JOIN documents.documents d ON d."fileId" = f.id AND d."institutionJarCode" IS NULL
          JOIN documents.documents p ON p."fileId" = f.parent AND p."institutionJarCode" IS NOT NULL
          WHERE f.parent IS NOT NULL`,
