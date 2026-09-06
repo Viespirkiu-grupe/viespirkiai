@@ -96,6 +96,15 @@ export interface Config {
     /** Bendras visų e-TAR etapų vienu metu laikomų API užklausų limitas. */
     eTarMaxInflight: number;
 
+    /** RC dok.php užklausų per sekundę riba (bendra visiems lygiagretiems workeriams). */
+    rcJarDokumentaiRps: number;
+    /** Kiek dok.php užklausų vykdoma vienu metu. */
+    rcJarDokumentaiConcurrency: number;
+    /** Kiek JAR kodų paimama į vieną porciją. */
+    rcJarDokumentaiBatch: number;
+    /** Po kiek dienų tas pats JAR kodas skaitomas iš naujo. */
+    rcJarDokumentaiIntervalDays: number;
+
     enableGraph: boolean;
 
     enableExecuteQueryMcp: boolean;

@@ -471,6 +471,25 @@ Adapterio adresui ir Bearer raktui naudojami `ETAR_API_URL` bei
 `modules/eSeimas/schema2.sql`. TaskRunner schemos pats nekeičia. FE ir dokumentų
 indeksavimas šiame etape nejungiami.
 
+### RC JAR pateikti dokumentai (`modules/rcJarDokumentai`)
+
+`https://www.registrucentras.lt/jar/p/dok.php?kod=<jarKodas>` rodo pilną
+juridiniam asmeniui JAR-ui pateiktų dokumentų sąrašą su RC dokumento ID, gavimo
+data ir lapų skaičiumi. Atviri duomenys (`JAR_DOKUMENTAI_*.csv` →
+`rcJar."dokumentai"`) turi tik steigimo dokumentus, tad šis scraperis rašo į
+atskirą `rcJar."pateiktiDokumentai"`. Eilė – `rcJar."dokumentuEile"`, po eilutę
+kiekvienam JAR kodui.
+
+| Kintamasis | Numatyta | Paaiškinimas |
+| --- | --- | --- |
+| `RC_JAR_DOKUMENTAI_RPS` | `1` | Bendra užklausų per sekundę riba, dalijama visų lygiagrečių užklausų. 548 tūkst. kodų per 14 dienų ≈ 0,45 užkl./s, likusi dalis – atsarga pirmam ratui. |
+| `RC_JAR_DOKUMENTAI_CONCURRENCY` | `4` | Kiek dok.php užklausų vykdoma vienu metu (tempą vis tiek riboja RPS). |
+| `RC_JAR_DOKUMENTAI_BATCH` | `50` | Kiek JAR kodų paimama į vieną porciją. |
+| `RC_JAR_DOKUMENTAI_INTERVAL_DAYS` | `14` | Po kiek dienų tas pats kodas skaitomas iš naujo (±10 % atsitiktinumo, kad ratas neišsilygiuotų). |
+
+Prieš pirmą paleidimą pritaikoma `migrations/rcJar/001_pateiktiDokumentai.sql`,
+tada `npm run rcjar:dokumentai:eile` pripildo eilę.
+
 ### Spinta / Stalčius (atviri duomenys)
 
 Eksportas į „spintos" tipo API serverį (`modules/spinta/`). Klientas pasirenka

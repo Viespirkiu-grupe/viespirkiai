@@ -77,6 +77,13 @@ const configSchema = z.object({
     eSeimasRefreshHours: z.number().positive().default(3),
     eSeimasMaxInflight: z.number().int().positive().default(6),
 
+    // RC dok.php (JAR-ui pateikti dokumentai). 548 tūkst. JAR kodų / 14 d. ≈
+    // 0,45 užkl./s, tad 1 užkl./s duoda atsargos pirmam ratui ir atsilikimams.
+    rcJarDokumentaiRps: z.number().positive().default(1),
+    rcJarDokumentaiConcurrency: z.number().int().positive().default(4),
+    rcJarDokumentaiBatch: z.number().int().positive().default(50),
+    rcJarDokumentaiIntervalDays: z.number().positive().default(14),
+
     internalFileBase: z.string().default("https://failai.viespirkiai.org"),
     ocrBandymai: z.number().int().positive().default(5),
 

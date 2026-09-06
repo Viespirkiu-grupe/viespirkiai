@@ -292,6 +292,170 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         example:
             'SELECT "bylosId", "bylosNumeris", teismas, "dalyvioPavadinimas", "bylojeKaip" FROM v_bylos WHERE "jarKodas" = \'302556251\'',
     },
+    v_skelbimas: {
+        tags: ["notices", "advertising", "prior-publication", "market-consultation", "award-timing"],
+        keys: ["skelbimoRaktas", "pirkimoNumeris", "skelbimoRusis", "paskelbimoData", "saltinis"],
+        joins: [
+            ["pirkimoNumeris", "v_pirkimas.pirkimoNumeris", "semantic"],
+            ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
+            ["pirkimoNumeris", "v_pirkimo_dalis.pirkimoNumeris", "semantic"],
+        ],
+        columns: [
+            "skelbimoRaktas: text",
+            "saltinis: text",
+            "pirkimoNumeris: text",
+            "skelbimoTipas: text",
+            "skelbimoRusis: text",
+            "paskelbimoData: timestamp without time zone",
+            "ikelimoData: timestamp without time zone",
+            "statusas: text",
+            "nuoroda: text",
+        ],
+        primaryKeys: ["skelbimoRaktas"],
+        example:
+            'SELECT "pirkimoNumeris", min("paskelbimoData") FILTER (WHERE "skelbimoRusis" = \'pirkimas\') AS paskelbtas, min("paskelbimoData") FILTER (WHERE "skelbimoRusis" = \'sutartis\') AS skirta FROM v_skelbimas GROUP BY 1 HAVING count(*) FILTER (WHERE "skelbimoRusis" = \'pirkimas\') > 0',
+        notes:
+            "Viena eilutė per paskelbtą skelbimą; skelbimoRaktas = saltinis || ':' || skelbimo id.\n" +
+            "Filtruok pagal normalizuotą \"skelbimoRusis\", ne pagal \"skelbimoTipas\": abu šaltiniai tą pačią " +
+            "skelbimo rūšį vadina skirtingai, o žalias lietuviškas pavadinimas paliktas tik pasitikrinti.\n" +
+            "skelbimoRusis reikšmės: 'pirkimas', 'sutartis', 'pataisa', 'isankstinis', 'projektoKonkursas', " +
+            "'projektoKonkursoRezultatai', o tik 'cvpp' eilutėse dar 'savanoriskasExAnte', 'sutartiesPakeitimas', " +
+            "'rinkosKonsultacija', 'techSpecProjektas', 'kvalifikacijosSistema'; nepatenkantys – 'kita'.\n" +
+            "Du šaltiniai (saltinis): 'cvpis' (CVP IS, turi \"ikelimoData\") ir 'cvpp' (CVPP archyvas, " +
+            "\"ikelimoData\" visada NULL, o \"paskelbimoData\" yra skelbimo išsiuntimo data).",
+    },
+    v_pirkimo_planas: {
+        tags: ["planning", "transparency", "unplanned-award", "buyer-grain"],
+        keys: ["planoRaktas", "pirkejoKodas", "pavadinimas", "numatomaVerte", "pirkimoPradziosData"],
+        joins: [
+            ["pirkejoKodas", "v_company.jarKodas", "strict"],
+        ],
+        columns: [
+            "planoRaktas: text",
+            "pirkejoKodas: text",
+            "pirkejoPavadinimas: text",
+            "pavadinimas: text",
+            "aprasymas: text",
+            "pirkimoTipas: text",
+            "pirkimoBudas: text",
+            "direktyva: text",
+            "numatomaVerte: numeric",
+            "kiekiai: text",
+            "pirkimoPradziosData: timestamp without time zone",
+            "pasiulymuTeikimoData: timestamp without time zone",
+            "numatomaSutartiesTrukmeMenesiais: numeric",
+            "preliminariPirkimoSukurimoData: timestamp without time zone",
+            "bvpzKodai: text[]",
+            "bvpzKoduSkaicius: integer",
+        ],
+        primaryKeys: ["planoRaktas"],
+        example:
+            'SELECT "pirkejoKodas", "pirkejoPavadinimas", count(*) AS planuota, sum("numatomaVerte") FROM v_pirkimo_planas WHERE "pirkimoPradziosData" >= \'2024-01-01\' GROUP BY 1, 2 ORDER BY 4 DESC NULLS LAST LIMIT 20',
+        notes:
+            "Viena eilutė per planuojamą pirkimą; planoRaktas – plano id tekstu.\n" +
+            "Planas neturi pirkimo numerio, todėl su v_pirkimas jį sieti galima tik per pirkėją, objektą " +
+            "ir laikotarpį, niekada ne per raktą. Tai šaltinio savybė: VPT plano ir skelbimų registrų " +
+            "irgi nesujungia.\n" +
+            "\"numatomaVerte\" – pirkėjo apskaičiuota kaina plano metu, ne sutarties vertė.",
+    },
+    v_rinka: {
+        tags: ["market", "concentration", "cpv-division", "market-grain"],
+        keys: ["rinkosRaktas", "kodas", "pavadinimas", "pirkimuSkaicius", "pirkejuSkaicius"],
+        joins: [],
+        columns: [
+            "rinkosRaktas: text",
+            "lygis: text",
+            "kodas: text",
+            "pavadinimas: text",
+            "pirkimuSkaicius: bigint",
+            "pirkejuSkaicius: bigint",
+            "bvpzKoduSkaicius: bigint",
+            "pirmasPirkimas: timestamp without time zone",
+            "paskutinisPirkimas: timestamp without time zone",
+        ],
+        primaryKeys: ["rinkosRaktas"],
+        example:
+            'SELECT "rinkosRaktas", kodas, pavadinimas, "pirkimuSkaicius", "pirkejuSkaicius" FROM v_rinka ORDER BY "pirkimuSkaicius" DESC LIMIT 20',
+        notes:
+            "Viena eilutė per dviženklį BVPŽ (CPV) skyrių; rinkosRaktas = 'bvpz:' || skyrius, " +
+            "tad raktas pats pasako, kokiame klasifikacijos lygyje rinka apibrėžta.\n" +
+            "Rinka su v_pirkimas siejama ne raktu, o BVPŽ kodo prefiksu: " +
+            "left(kodas, 2) = v_rinka.kodas, kur kodas imamas iš v_pirkimas.\"bvpzKodai\" per unnest.\n" +
+            "Sąmoningai be langinės statistikos: kiekvienas rinkos rodiklis skaičiuoja savo laikotarpį, " +
+            "tad stulpelis „sutartys per paskutinius N mėnesių\" būtų arba ne tas langas, arba stulpelis " +
+            "kiekvienam langui. Skaičiai čia – visos stebimos istorijos suvestinė.\n" +
+            "pavadinimas NULL, jei BVPŽ žodyne nėra XX000000 kodo; rinka vis tiek egzistuoja.",
+    },
+    v_pirkejo_tiekejo_rysys: {
+        tags: ["relationship", "concentration", "repeat-awards", "pair-grain"],
+        keys: ["rysioRaktas", "pirkejoKodas", "tiekejoKodas", "sutarciuSkaicius", "bendraSuma"],
+        joins: [
+            ["pirkejoKodas", "v_company.jarKodas", "strict"],
+            ["tiekejoKodas", "v_company.jarKodas", "sparse"],
+        ],
+        columns: [
+            "rysioRaktas: text",
+            "pirkejoKodas: text",
+            "tiekejoKodas: text",
+            "sutarciuSkaicius: bigint",
+            "sutarciuSuPirkimoNumeriu: bigint",
+            "bendraSuma: numeric",
+            "bendraFaktineSuma: numeric",
+            "maziausiaSuma: numeric",
+            "didziausiaSuma: numeric",
+            "pirmaSutartisData: timestamp without time zone",
+            "paskutineSutartisData: timestamp without time zone",
+            "bvpzKoduSkaicius: bigint",
+            "sutarciuTipuSkaicius: bigint",
+        ],
+        primaryKeys: ["rysioRaktas"],
+        example:
+            'SELECT "rysioRaktas", "pirkejoKodas", "tiekejoKodas", "sutarciuSkaicius", "bendraSuma" FROM v_pirkejo_tiekejo_rysys WHERE "sutarciuSkaicius" >= 10 ORDER BY "bendraSuma" DESC LIMIT 20',
+        notes:
+            "Viena eilutė per (pirkėjas, tiekėjas) porą; rysioRaktas = pirkejoKodas || ':' || tiekejoKodas.\n" +
+            "Suvestinė per visą sutarčių korpusą (vpmSutartys), ne per langą — langą rodiklis pjauna pats " +
+            "iš v_sutartys.\n" +
+            "Ryšį sudaro tik pagrindinis tiekėjas. Jungtinės veiklos partneriai " +
+            "(\"papildomiTiekejai\") sąmoningai neįtraukti: konsorciumo narys nėra tame pačiame santykyje " +
+            "su pirkėju kaip pagrindinis rangovas, o sulyginus abu, kiekvienas koncentracijos matas išpūstų.\n" +
+            "Kodai imami tokie, kokie įrašyti (įskaitant užsienio); praleidžiami tik tušti ar vien skyrybos " +
+            "ženklų kodai. Ar kodas atitinka registruotą įmonę – duomenų pakankamumo klausimas rodikliui.",
+    },
+    v_dalyviu_pora: {
+        tags: ["co-bidding", "bid-rotation", "collusion", "pair-grain"],
+        keys: ["porosRaktas", "tiekejoKodasA", "tiekejoKodasB", "kartuDaliuSkaicius", "laimejoA", "laimejoB"],
+        joins: [
+            ["tiekejoKodasA", "v_company.jarKodas", "sparse"],
+            ["tiekejoKodasB", "v_company.jarKodas", "sparse"],
+        ],
+        columns: [
+            "porosRaktas: text",
+            "tiekejoKodasA: text",
+            "tiekejoKodasB: text",
+            "tiekejasA: text",
+            "tiekejasB: text",
+            "kartuDaliuSkaicius: bigint",
+            "kartuPirkimuSkaicius: bigint",
+            "laimejoA: bigint",
+            "laimejoB: bigint",
+            "laimejoKitas: bigint",
+            "pirmasKartas: timestamp with time zone",
+            "paskutinisKartas: timestamp with time zone",
+        ],
+        primaryKeys: ["porosRaktas"],
+        example:
+            'SELECT "porosRaktas", "tiekejasA", "tiekejasB", "kartuDaliuSkaicius", "laimejoA", "laimejoB" FROM v_dalyviu_pora WHERE "kartuDaliuSkaicius" >= 5 ORDER BY "kartuDaliuSkaicius" DESC LIMIT 20',
+        notes:
+            "Viena eilutė per netvarkingą (be eiliškumo) tiekėjų porą; porosRaktas = tiekejoKodasA || ':' || " +
+            "tiekejoKodasB, kur A visada leksikografiškai mažesnis. Poros (X, Y) ir (Y, X) yra tas pats " +
+            "subjektas ir abi egzistuoti negali — jungdamas pats naudok least()/greatest().\n" +
+            "Kartu dalyvauta skaičiuojama pirkimo dalies (lot) lygiu, tad \"kartuDaliuSkaicius\" paprastai " +
+            "didesnis už \"kartuPirkimuSkaicius\".\n" +
+            "laimejoA + laimejoB + laimejoKitas = kartuDaliuSkaicius. Laimėtoju laikomas dalyvis, kurio " +
+            "eileNumeris = 1 ir pasiūlymas neatmestas; nežinoma eilė laimėtoju nelaikoma.\n" +
+            "Aprėptis lygiai tokia, kaip v_dalyviai: poros, kurios čia nėra, ne \u201enepriklausomos\u201c, o " +
+            "tiesiog nestebėtos.",
+    },
 };
 
 assertViewMetadataCompleteness();

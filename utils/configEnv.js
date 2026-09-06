@@ -72,6 +72,11 @@ const ENV_MAP = [
     ["ESEIMAS_REFRESH_HOURS", "eSeimasRefreshHours", "number"],
     ["ESEIMAS_MAX_INFLIGHT", "eSeimasMaxInflight", "number"],
 
+    ["RC_JAR_DOKUMENTAI_RPS", "rcJarDokumentaiRps", "number"],
+    ["RC_JAR_DOKUMENTAI_CONCURRENCY", "rcJarDokumentaiConcurrency", "number"],
+    ["RC_JAR_DOKUMENTAI_BATCH", "rcJarDokumentaiBatch", "number"],
+    ["RC_JAR_DOKUMENTAI_INTERVAL_DAYS", "rcJarDokumentaiIntervalDays", "number"],
+
     ["INTERNAL_FILE_BASE", "internalFileBase", "string"],
     ["OCR_BANDYMAI", "ocrBandymai", "number"],
 

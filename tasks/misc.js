@@ -15,6 +15,8 @@ import { pravalytiOcrRezervacijas } from "../modules/ocr/pravalytiRezervacijas.j
 import { geolocateJarAddress } from "../modules/juridiniai/findCoordinates.js";
 import { nuskaitytiInformaciniusLeidinius } from "../modules/registruCentrasPranesimai/scrape.js";
 import { nuskaitytiInformaciniLeidini } from "../modules/registruCentrasPranesimai/scrapeContent.js";
+import { nuskaitytiRcJarDokumentus } from "../modules/rcJarDokumentai/scrape.js";
+import { papildytiDokumentuEile } from "../modules/rcJarDokumentai/papildytiEile.js";
 import { nuskaitytiVisasNeskelbiamasDerybas } from "../modules/neskelbiamosDerybos/scrape.js";
 import { importuotiMelagingusTiekejus } from "../modules/vptSarasai/melagingiScrape.js";
 import { importuotiNepatikimusTiekejus } from "../modules/vptSarasai/nepatikimiScrape.js";
@@ -163,6 +165,25 @@ export default [
         cooldown: 60,
         errorCooldown: 10,
         job: nuskaitytiInformaciniLeidini,
+    },
+    {
+        // Nauji JAR kodai į dok.php eilę; po JAR CSV importo paprastai keli
+        // šimtai, dažniausiai – nė vieno.
+        name: "papildytiRcJarDokumentuEile",
+        schedule: "23 4 * * *",
+        job: papildytiDokumentuEile,
+    },
+    {
+        // dok.php – vienintelis šaltinis, rodantis pilną JAR-ui pateiktų
+        // dokumentų sąrašą (atviri duomenys turi tik steigimo dokumentus).
+        // Tempą riboja ne šis cooldown, o RC_JAR_DOKUMENTAI_RPS ir eilės
+        // "nextAttempt": kai visi kodai perskaityti, darbas grąžina false.
+        name: "nuskaitytiRcJarDokumentus",
+        mode: "asap",
+        priority: 3,
+        cooldown: 300,
+        errorCooldown: 60,
+        job: () => nuskaitytiRcJarDokumentus(),
     },
     {
         name: "nuskaitytiVisasNeskelbiamasDerybas",
