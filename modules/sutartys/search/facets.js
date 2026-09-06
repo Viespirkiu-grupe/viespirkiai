@@ -1,4 +1,3 @@
-import { createScraperFetch } from "../../../utils/scrapeFetch.js";
 import { getDeadRatio, countDocs as quickwitCountDocs } from "../../../quickwit/quickwit.js";
 import { QW_URL } from "../../../quickwit/qwHttp.js";
 import { postgres } from "../../../postgres/postgres.js";
@@ -12,8 +11,6 @@ import {
     QUICKWIT_LENTELE,
 } from "./quickwitQuery.js";
 
-const scrapeFetch = createScraperFetch("sutartys", { operation: "searchSutartys" });
-
 // ── Facetai (Quickwit agregacijos) ───────────────────────────────────────────
 // Kaip /dokumentai: kiekvienas facetas — term agregacija, apskaičiuota pagal
 // užklausą, iš kurios pašalintas TO PATIES faceto filtras, kad matytųsi visos
@@ -23,7 +20,7 @@ const scrapeFetch = createScraperFetch("sutartys", { operation: "searchSutartys"
 /** Viena Quickwit term agregacija. Grąžina [{ value, count }]. */
 async function qwFacet(field, query, size) {
     try {
-        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -48,7 +45,7 @@ export async function sutartysQuickwitAggregates(query) {
     try {
         const [deadRatio, res] = await Promise.all([
             getDeadRatio(QUICKWIT_LENTELE),
-            scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+            fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

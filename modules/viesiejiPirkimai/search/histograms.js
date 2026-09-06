@@ -1,12 +1,9 @@
-import { createScraperFetch } from "../../../utils/scrapeFetch.js";
 import { QW_URL } from "../../../quickwit/qwHttp.js";
 import {
     buildViesiejiPirkimaiQuickwitQuery,
     QUICKWIT_LENTELE,
     qwDate,
 } from "./quickwitQuery.js";
-
-const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "searchViesiejiPirkimai" });
 
 // Vertės pasiskirstymo (histogramos) log-skalės kraštinės (€): ~5 žingsniai
 // dekadai (1,2,3,5,7) nuo 10 iki 100 mln. Paskutinis kaušas — „nuo 100 mln."
@@ -36,7 +33,7 @@ export async function viesiejiPirkimaiVerteHistogram(query) {
 
     const qwQuery = buildViesiejiPirkimaiQuickwitQuery(query, { exclude: ["verte"] });
     try {
-        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -114,7 +111,7 @@ export async function viesiejiPirkimaiLaikotarpisHistogram(query) {
         `paskelbimoData:[${boundMin} TO ${boundMax}]`,
     ].join(" AND ");
     try {
-        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

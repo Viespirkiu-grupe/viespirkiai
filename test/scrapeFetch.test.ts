@@ -1,8 +1,10 @@
 import { Readable } from "node:stream";
 import { Response as NodeFetchResponse } from "node-fetch";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-ignore JS modulis be tipų
 import { createScrapeFetch, createScraperFetch, scrapeAddressParts } from "../utils/scrapeFetch.js";
+// @ts-ignore JS modulis be tipų
+import { registerScrapeOrigin, resetScrapeOrigins, scrapeTargetUrl } from "../utils/scrapeTarget.js";
 
 describe("scrapeAddressParts", () => {
     it("išskiria host, domain ir rekonstruojamą path", () => {
@@ -113,5 +115,66 @@ describe("createScrapeFetch", () => {
         const fetch = createScrapeFetch(vi.fn(async () => original), { enabled: false, emit });
         expect(await fetch("https://example.lt")).toBe(original);
         expect(emit).not.toHaveBeenCalled();
+    });
+});
+
+describe("loginis šaltinio adresas", () => {
+    afterEach(() => resetScrapeOrigins());
+
+    it("pakeičia proxy origin viešuoju, kelią ir query palikdamas", () => {
+        registerScrapeOrigin("http://10.1.10.2:9203", "https://eviesiejipirkimai.lt");
+        expect(scrapeTargetUrl("http://10.1.10.2:9203/download.php?dok_id=5&file_id=7"))
+            .toBe("https://eviesiejipirkimai.lt/download.php?dok_id=5&file_id=7");
+    });
+
+    it("neregistruoto adreso nekeičia", () => {
+        expect(scrapeTargetUrl("http://10.9.9.9:1234/x")).toBe("http://10.9.9.9:1234/x");
+    });
+
+    it("į logą rašo šaltinį, o ne proxy, per kurį užklausa nuėjo", async () => {
+        registerScrapeOrigin("http://10.1.10.2:9203", "https://eviesiejipirkimai.lt");
+        const emit = vi.fn();
+        const fetchImpl = vi.fn(async () => new Response(null, { status: 200 }));
+        const fetch = createScrapeFetch(fetchImpl, { enabled: true, emit });
+
+        await fetch("http://10.1.10.2:9203/index.php?option=com_profile", undefined, {
+            scraper: "neskelbiamosDerybos",
+            operation: "scrape",
+        });
+
+        expect((fetchImpl.mock.calls[0] as any[])[0]).toBe("http://10.1.10.2:9203/index.php?option=com_profile");
+        expect(emit.mock.calls[0][0]).toMatchObject({
+            scheme: "https",
+            host: "eviesiejipirkimai.lt",
+            domain: "eviesiejipirkimai.lt",
+            path: "/index.php?option=com_profile",
+        });
+    });
+
+    it("`targetUrl` perrašo adresą, kai užklausą fiziškai atlieka kitas servisas", async () => {
+        const emit = vi.fn();
+        const fetch = createScrapeFetch(
+            vi.fn(async () => new Response("{}", { status: 200 })),
+            { enabled: true, emit },
+        );
+
+        const response = await fetch("http://deze1.lan:8080/download-url", { method: "POST" }, {
+            scraper: "failai",
+            operation: "parsiusti",
+            item: 42,
+            targetUrl: "https://eviesiejipirkimai.lt/download.php?dok_id=1&file_id=2",
+        });
+        await response.json();
+
+        expect(emit.mock.calls[0][0]).toMatchObject({
+            scraper: "failai",
+            operation: "parsiusti",
+            item: "42",
+            method: "POST",
+            host: "eviesiejipirkimai.lt",
+            path: "/download.php?dok_id=1&file_id=2",
+        });
+        // Dėžės adresas į logą nepatenka nė viename lauke.
+        expect(JSON.stringify(emit.mock.calls[0][0])).not.toContain("deze1.lan");
     });
 });

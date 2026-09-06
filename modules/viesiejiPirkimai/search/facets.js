@@ -1,4 +1,3 @@
-import { createScraperFetch } from "../../../utils/scrapeFetch.js";
 import { countDocs as quickwitCountDocs } from "../../../quickwit/quickwit.js";
 import { QW_URL } from "../../../quickwit/qwHttp.js";
 import { postgres } from "../../../postgres/postgres.js";
@@ -12,8 +11,6 @@ import {
     viesiejiPirkimaiVerteHistogram,
 } from "./histograms.js";
 
-const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "searchViesiejiPirkimai" });
-
 // ── Facetai (Quickwit agregacijos) ───────────────────────────────────────────
 // Kaip /sutartys: kiekvienas facetas — term agregacija, apskaičiuota pagal
 // užklausą, iš kurios pašalintas TO PATIES faceto filtras, kad matytųsi visos
@@ -23,7 +20,7 @@ const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "searchV
 /** Viena Quickwit term agregacija. Grąžina [{ value, count }]. */
 async function qwFacet(field, query, size) {
     try {
-        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

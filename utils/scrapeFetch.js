@@ -6,6 +6,7 @@ import {
     enqueueScrapeLog,
     scrapeLogEnabled,
 } from "../quickwit/scrapeLogIngest.js";
+import { scrapeTargetUrl } from "./scrapeTarget.js";
 
 const MAX_PATH_LENGTH = 4_096;
 const SECRET_QUERY_KEY = /(?:^|[_-])(api[_-]?key|access[_-]?token|token|secret|signature|sig|password|pass|auth|code)(?:$|[_-])/i;
@@ -155,11 +156,18 @@ export function createScrapeFetch(fetchImpl = dynamicGlobalFetch, {
     defaultMeta = {},
 } = {}) {
     return async function scrapeFetchWithContext(input, init, meta = {}) {
-        if (!enabled) return fetchImpl(input, init);
+        const context = { ...defaultMeta, ...meta };
+        // Transportą galima pakeisti ir vienai užklausai: SOCKS5 proxy reikia
+        // node-fetch, nes globalus fetch `agent` opcijos nepriima.
+        const impl = context.fetchImpl ?? fetchImpl;
+        if (!enabled) return impl(input, init);
 
         const startedAt = new Date();
         const started = performance.now();
-        const context = { ...defaultMeta, ...meta };
+        // Loge rašomas šaltinio adresas, o ne transportas: proxy ir mirror'ai
+        // perrašomi automatiškai, o kai užklausą fiziškai atlieka kitas servisas
+        // (pvz. dėžė parsiunčia failą), tikrasis tikslas paduodamas per `targetUrl`.
+        const target = context.targetUrl ?? scrapeTargetUrl(input);
         const base = {
             ts: startedAt.toISOString(),
             requestId: crypto.randomUUID(),
@@ -169,12 +177,12 @@ export function createScrapeFetch(fetchImpl = dynamicGlobalFetch, {
             operation: String(context.operation || "request").slice(0, 100),
             ...(context.item != null ? { item: String(context.item).slice(0, 500) } : {}),
             method: String(init?.method ?? input?.method ?? "GET").toUpperCase(),
-            ...scrapeAddressParts(input),
+            ...scrapeAddressParts(target),
         };
 
         let response;
         try {
-            response = await fetchImpl(input, init);
+            response = await impl(input, init);
         } catch (error) {
             emit({
                 ...base,
@@ -189,7 +197,9 @@ export function createScrapeFetch(fetchImpl = dynamicGlobalFetch, {
         }
 
         const ttfbMs = performance.now() - started;
-        const finalAddress = scrapeAddressParts(response.url || input);
+        const finalAddress = scrapeAddressParts(
+            context.targetUrl ?? scrapeTargetUrl(response.url || input),
+        );
         const addressChanged = finalAddress.scheme !== base.scheme
             || finalAddress.host !== base.host
             || finalAddress.path !== base.path;

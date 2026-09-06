@@ -199,6 +199,13 @@ formatu. Logavimas best-effort: Quickwit siunčiama paketais fone, o gedimas
 scraperio nestabdo. Senus indeksus galima valyti su
 `pruneScrapeLogIndexes({ keepDays: 30 })`.
 
+Loge rašomas šaltinio adresas, o ne transportas. Dalis šaltinių imami per
+reverse proxy (`scrapeProxies`) arba per vidinį mirror (`*_URL` kintamieji), tad
+`utils/scrapeTarget.js` origin'ą perrašo atgal į viešąjį — kitaip `host` būtų
+vidinis IP ir filtras `domain: eviesiejipirkimai.lt` nerastų nieko. Kai užklausą
+fiziškai atlieka kitas servisas (pvz. failą iš šaltinio parsiunčia dėžė),
+tikrasis tikslas paduodamas per `targetUrl` metaduomenį.
+
 Pilnas URL nesaugomas. Jis išskaidomas į `scheme`, `host`, `domain` ir `path`
 (`pathname + query`); slapti query parametrai maskuojami. `domain` yra paskutiniai
 du hostname segmentai, IP ir `localhost` paliekami nepakeisti. Redirect atveju

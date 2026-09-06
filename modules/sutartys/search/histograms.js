@@ -1,4 +1,3 @@
-import { createScraperFetch } from "../../../utils/scrapeFetch.js";
 import { QW_URL } from "../../../quickwit/qwHttp.js";
 import {
     buildSutartysQuickwitQuery,
@@ -6,8 +5,6 @@ import {
     qwDate,
 } from "./quickwitQuery.js";
 import { sumaBaze } from "./sumaBaze.js";
-
-const scrapeFetch = createScraperFetch("sutartys", { operation: "searchSutartys" });
 
 // Sumos pasiskirstymo (histogramos) log-skalės kraštinės (€): ~5 žingsniai
 // dekadai (1,2,3,5,7) nuo 10 iki 100 mln. Paskutinis kaušas — „nuo 100 mln."
@@ -44,7 +41,7 @@ export async function sutartysSumaHistogram(query) {
 
     const qwQuery = buildSutartysQuickwitQuery(query, { exclude: ["suma"] });
     try {
-        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -140,7 +137,7 @@ export async function sutartysDataHistogram(query) {
         `sudarymoData:[${boundMin} TO ${boundMax}]`,
     ].join(" AND ");
     try {
-        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

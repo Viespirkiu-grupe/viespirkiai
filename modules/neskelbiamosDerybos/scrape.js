@@ -6,7 +6,7 @@ import { createScraperFetch } from "../../utils/scrapeFetch.js";
 const scrapeFetch = createScraperFetch("neskelbiamosDerybos", { operation: "scrape" });
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
-import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
+import { proxyRequest } from "../scrapeProxies/proxyRequest.js";
 import { irasytiFailus } from "../failai/failuIrasymas.js";
 import { parseHTML } from "linkedom";
 import crypto from "crypto";
@@ -17,25 +17,26 @@ import crypto from "crypto";
  * @returns {Promise<Array>} Grąžina neskelbiamas derybas
  */
 async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
-    let proxy = await getProxyBySite("eviesiejipirkimai");
-
-    let url = `/index.php?option=com_profile&task=sutikimai&filter_limit=50&Itemid=98&limitstart=${start * 50}`;
-    let requestUrl;
-    if (proxy) {
-        requestUrl = proxy.url + url;
-    } else {
-        requestUrl = "https://eviesiejipirkimai.lt" + url;
-    }
+    const url = "https://eviesiejipirkimai.lt"
+        + `/index.php?option=com_profile&task=sutikimai&filter_limit=50&Itemid=98&limitstart=${start * 50}`;
+    const { url: requestUrl, init, meta } = await proxyRequest("eviesiejipirkimai", url);
 
     let startTime = new Date();
 
     // Atliekama užklausa
     var response = await scrapeFetch(requestUrl, {
+        ...init,
         headers: {
             "User-Agent":
                 "Pilietine iniciatyva Viespirkiai <viespirkiai@viespirkiai.org>",
         },
-    });
+    }, meta);
+
+    // Nepavykusi užklausa neturi virsti "rasta įrašų: 0" — tuščias sąrašas čia
+    // reiškia paskutinį puslapį, tad proxy 502 tyliai nutrauktų nuskaitymą.
+    const proxyError = response.headers.get("x-proxy-error");
+    if (proxyError) throw new Error(`Proxy nepasiekė šaltinio (${proxyError})`);
+    if (!response.ok) throw new Error(`Netinkamas atsakymo statusas: ${response.status}`);
 
     const html = await response.text();
 

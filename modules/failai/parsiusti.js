@@ -4,6 +4,8 @@ Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 
 import { postgres } from "../../postgres/postgres.js";
 import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+import { scrapeTargetUrl } from "../../utils/scrapeTarget.js";
 import config from "../../utils/config.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -19,6 +21,12 @@ import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const slowAgent = new Agent({ headersTimeout: 30 * 60_000 }); // 30 min
 const nodeName = process.env.NODE_NAME || "default";
+
+// Patį failą iš šaltinio parsiunčia dėžė, tad išeinanti užklausa iš šio proceso
+// eina į dėžę. Į scrapeLog rašomas šaltinio adresas, kur failas pagal idėją
+// imamas — kitaip šie parsiuntimai loge nesimato visai.
+// `bytes` čia — dėžės atsakymo dydis; tikrasis failo dydis lieka DB (`dydis`).
+const scrapeFetch = createScraperFetch("failai", { operation: "parsiusti" });
 
 /** Sujungia dėžės url su keliu — dėžės url gali turėti brūkšnį gale (pvz. lempa2). */
 function dezesUrl(baseUrl, pathname) {
@@ -64,6 +72,7 @@ export async function parsiustiFaila(options = {}) {
     try {
         // Pateikiame parsisiuntimo užklausą
         let url;
+        let targetUrl;
         let saltinis = failas.saltinis;
         if (!saltinis) {
             saltinis = "sutartys";
@@ -123,6 +132,10 @@ export async function parsiustiFaila(options = {}) {
                     `Netinkamas CVPP saltinioId formatas: ${failas.saltinioId}`,
                 );
             url = proxy.url + `/${lid}/${dvid}`;
+            // CVPP proxy turi savo kelių schemą, tad viešas adresas atkuriamas
+            // iš to paties šablono, kurį naudoja `modules/cvpp/scrapePirkimai.js`.
+            targetUrl = "https://pirkimai.eviesiejipirkimai.lt"
+                + `/app/docmgmt/downloadPublicDocument.asp?LID=${lid}&DVID=${dvid}`;
         } else {
             throw new Error(`Nežinomas šaltinis: ${saltinis}`);
         }
@@ -132,7 +145,7 @@ export async function parsiustiFaila(options = {}) {
         const controller = new AbortController();
         const fetchTimeout = setTimeout(() => controller.abort(), 1000 * 60 * 9); // 9min
         try {
-            response = await fetch(dezesUrl(deze.url, "/download-url"), {
+            response = await scrapeFetch(dezesUrl(deze.url, "/download-url"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -144,6 +157,9 @@ export async function parsiustiFaila(options = {}) {
                 }),
                 signal: controller.signal,
                 dispatcher: slowAgent
+            }, {
+                item: failas.id,
+                targetUrl: targetUrl ?? scrapeTargetUrl(url),
             });
         } finally {
             clearTimeout(fetchTimeout);

@@ -32,11 +32,16 @@ const TOR_CONTROL_TIMEOUT_MS = 10_000;
 const proxyAgent = new SocksProxyAgent(config.torAddress);
 
 // Tinklo klaidų kodai, kuriuos domreg'as grąžina blokuodamas exit node'ą.
+// EPROTO — kai užblokuotas exit node'as į TLS jungtį atsako plaintext HTTP
+// ("HTTP/1.1 400 Bad Request" vietoje TLS record), ir OpenSSL tai praneša kaip
+// "wrong version number". Ne domeno klaida, o tos pačios grandinės problema:
+// tokį atvejį irgi sprendžia nauja Tor tapatybė.
 const RATE_LIMIT_ERROR_CODES = new Set([
     "ECONNRESET",
     "ECONNREFUSED",
     "EPIPE",
     "ETIMEDOUT",
+    "EPROTO",
 ]);
 
 /**

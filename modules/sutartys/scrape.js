@@ -6,7 +6,7 @@ Kaip argumentą galima pateikti puslapio numerį, nuo kurio pradėti nuskaitymą
 import { createScraperFetch } from "../../utils/scrapeFetch.js";
 const scrapeFetch = createScraperFetch("sutartys", { operation: "scrape" });
 import { postgres } from "../../postgres/postgres.js";
-import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
+import { proxyRequest } from "../scrapeProxies/proxyRequest.js";
 import { cvpIsImportArray } from "./import.js";
 import { log } from "../../utils/log.js";
 import { DateTime } from "luxon";
@@ -40,22 +40,14 @@ export async function cvpIsScrapePageContent(url, options = {}) {
     timings.start("cvpIsScrapePageContent");
 
     timings.start("findProxy");
-    let proxy = options.useProxy === false
-        ? null
-        : await getProxyBySite("eviesiejipirkimai");
-
-    let requestUrl = url;
-    if (proxy) {
-        const urlObj = new URL(url);
-        const proxyUrlObj = new URL(proxy.url);
-        urlObj.host = proxyUrlObj.host;
-        urlObj.protocol = proxyUrlObj.protocol;
-        requestUrl = urlObj.toString();
-    }
+    const { url: requestUrl, init, meta } = await proxyRequest("eviesiejipirkimai", url, {
+        useProxy: options.useProxy,
+    });
     timings.end("findProxy");
 
     timings.start("cvpIsRequest");
     var response = await scrapeFetch(requestUrl, {
+        ...init,
         headers: {
             "User-Agent":
                 "Pilietine iniciatyva Viespirkiai +<viespirkiai@viespirkiai.org>",
@@ -66,7 +58,7 @@ export async function cvpIsScrapePageContent(url, options = {}) {
             "Accept-Encoding": "gzip, deflate, br",
             Connection: "keep-alive",
         },
-    });
+    }, meta);
 
     if (response.status === 403) {
         if (options.recordFailures !== false) {
@@ -75,6 +67,23 @@ export async function cvpIsScrapePageContent(url, options = {}) {
             timings.end("insertCvpIsGedimai");
         }
         throw new Error("Gauta 403 klaida, užklausa blokuojama");
+    }
+
+    // Proxy savo nesėkmę (pvz. neprisijungė prie SOCKS) pažymi antrašte. Toks
+    // atsakymas nėra šaltinio puslapis: jį parsinant gautųsi "nerasta lentelė",
+    // o CVP IS gedimų žurnale atsirastų gedimas, kurio nebuvo.
+    const proxyError = response.headers.get("x-proxy-error");
+    if (proxyError) {
+        throw new Error(`Proxy nepasiekė šaltinio (${proxyError})`);
+    }
+
+    if (!response.ok) {
+        if (options.recordFailures !== false) {
+            timings.start("insertCvpIsGedimai");
+            await recordCvpIsFailure(`statusas${response.status}`);
+            timings.end("insertCvpIsGedimai");
+        }
+        throw new Error(`Netinkamas atsakymo statusas: ${response.status}`);
     }
 
     const htmlBuffer = await response.arrayBuffer();
