@@ -76,6 +76,25 @@ function logRequest({ etapas, id, keitimas, fetchMs, dbMs, detalė, pavadinimas 
     );
 }
 
+/**
+ * Trukmė log'ui: iki 10 s — milisekundėmis, toliau sekundėmis. Klaidos eilutėje
+ * svarbu iškart matyti, ar užklausa sudegė greitai (404), ar prieš tai kabojo
+ * minutę timeout'uose — nuo to skiriasi ir kaltininkas, ir ką verta kartoti.
+ */
+const trukmė = (ms) => (ms < 10_000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)} s`);
+
+/**
+ * Klaidos eilutės laikai — kad iš karto matytųsi, kur dingo laikas:
+ * `paieška` — DB užklausa, kuri šį elementą atrado (visos porcijos laikas,
+ * bendras jos elementams), `užklausa` — paskutinis bandymas į e-Seimas,
+ * `DB` — klaidos įrašymas atgal. `iš viso` rodomas tik kai bandymų buvo ne
+ * vienas: tada tarp jų dar būta pauzių, ir suma nesutampa su dalimis.
+ */
+const laikai = ({ paieškaMs, užklausaMs, visasMs }, bandymai, dbMs) =>
+    `paieška ${trukmė(paieškaMs)}, užklausa ${trukmė(užklausaMs)}`
+    + (dbMs === undefined ? "" : `, DB ${trukmė(dbMs)}`)
+    + (bandymai > 1 ? `, iš viso ${trukmė(visasMs)}` : "");
+
 const simboliai = (payload) => {
     const n = payload?.official_text?.text?.length ?? 0;
     return `${n.toLocaleString("lt-LT")} simb.`;
@@ -285,26 +304,34 @@ function stageSpecs(runner, { rescrapeDays, trace = false }) {
             pick: (take, praleisti) =>
                 pickDaysToScrape({ limit: take, rescrapeOlderThanDays: rescrapeDays, exclude: praleisti }),
             work: day => runner.scrapeDay(day),
-            onError: (day, error, bandymai) => log(`Diena ${day} nepavyko po ${bandymai} bandymų: ${error.message}`),
+            onError: (day, error, bandymai, ms) =>
+                log(`Diena ${day} nepavyko po ${bandymai} bandymų (${laikai(ms, bandymai)}): ${error.message}`),
         },
         documents: {
             label: "dokumentai",
             key: act => `${act.category}\0${act.legalActId}`,
             pick: (take, praleisti) => pickActsToScrape("document", { limit: take, exclude: praleisti }),
             work: (act, attempt) => runner.scrapeDocument(act.category, act.legalActId, { attempt }),
-            onError: async (act, error, bandymai) => {
+            onError: async (act, error, bandymai, ms) => {
                 // Su `--trace` prie klaidos parodom, iš kurios paieškos aktas
                 // apskritai atsirado — 404 kaltininko ieškom ten, ne čia.
                 const atradimas = trace
                     ? ` [${formatDiscovery((await getActDiscoveries(act.category, act.legalActId, { limit: 1 }))[0])}]`
                     : "";
-                log(`dokumentas ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų${atradimas}: ${error.message}`);
-                if (trace) {
-                    await recordDocumentOutcome(act.category, act.legalActId,
-                        error instanceof ESeimasNotFoundError ? "notFound" : "error",
-                        { attempts: bandymai, error });
+                // Įrašom PRIEŠ log'ą, kad eilutėje matytųsi ir DB dalis; `finally` —
+                // kad nepavykęs įrašymas nenuslėptų pačios klaidos.
+                const dbPradžia = Date.now();
+                try {
+                    if (trace) {
+                        await recordDocumentOutcome(act.category, act.legalActId,
+                            error instanceof ESeimasNotFoundError ? "notFound" : "error",
+                            { attempts: bandymai, error });
+                    }
+                    await recordFailure(act.category, act.legalActId, error);
+                } finally {
+                    log(`dokumentas ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų`
+                        + ` (${laikai(ms, bandymai, Date.now() - dbPradžia)})${atradimas}: ${error.message}`);
                 }
-                await recordFailure(act.category, act.legalActId, error);
             },
         },
         editions: {
@@ -312,9 +339,14 @@ function stageSpecs(runner, { rescrapeDays, trace = false }) {
             key: act => `${act.category}\0${act.legalActId}`,
             pick: (take, praleisti) => pickActsToScrape("editions", { limit: take, exclude: praleisti }),
             work: act => runner.scrapeEditionList(act.category, act.legalActId),
-            onError: async (act, error, bandymai) => {
-                log(`redakcijų sąrašas ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų: ${error.message}`);
-                await recordFailure(act.category, act.legalActId, error);
+            onError: async (act, error, bandymai, ms) => {
+                const dbPradžia = Date.now();
+                try {
+                    await recordFailure(act.category, act.legalActId, error);
+                } finally {
+                    log(`redakcijų sąrašas ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų`
+                        + ` (${laikai(ms, bandymai, Date.now() - dbPradžia)}): ${error.message}`);
+                }
             },
         },
         asr: {
@@ -322,9 +354,14 @@ function stageSpecs(runner, { rescrapeDays, trace = false }) {
             key: act => `${act.category}\0${act.legalActId}`,
             pick: (take, praleisti) => pickActsToScrape("asr", { limit: take, exclude: praleisti }),
             work: act => runner.scrapeConsolidated(act.category, act.legalActId),
-            onError: async (act, error, bandymai) => {
-                log(`suvestinė ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų: ${error.message}`);
-                await recordFailure(act.category, act.legalActId, error);
+            onError: async (act, error, bandymai, ms) => {
+                const dbPradžia = Date.now();
+                try {
+                    await recordFailure(act.category, act.legalActId, error);
+                } finally {
+                    log(`suvestinė ${act.category}/${act.legalActId} nepavyko po ${bandymai} bandymų`
+                        + ` (${laikai(ms, bandymai, Date.now() - dbPradžia)}): ${error.message}`);
+                }
             },
         },
         historical: {
@@ -332,9 +369,14 @@ function stageSpecs(runner, { rescrapeDays, trace = false }) {
             key: edition => `${edition.category}\0${edition.legalActId}\0${edition.editionToken}`,
             pick: (take, praleisti) => pickEditionsToScrape({ limit: take, exclude: praleisti }),
             work: edition => runner.scrapeHistoricalEdition(edition),
-            onError: async (edition, error, bandymai) => {
-                log(`istorinė redakcija ${edition.category}/${edition.legalActId}/${edition.editionToken} nepavyko po ${bandymai} bandymų: ${error.message}`);
-                await recordEditionFailure(edition.category, edition.legalActId, edition.editionToken, error);
+            onError: async (edition, error, bandymai, ms) => {
+                const dbPradžia = Date.now();
+                try {
+                    await recordEditionFailure(edition.category, edition.legalActId, edition.editionToken, error);
+                } finally {
+                    log(`istorinė redakcija ${edition.category}/${edition.legalActId}/${edition.editionToken}`
+                        + ` nepavyko po ${bandymai} bandymų (${laikai(ms, bandymai, Date.now() - dbPradžia)}): ${error.message}`);
+                }
             },
         },
     };
@@ -396,6 +438,9 @@ const REFILL_MAX_ERRORS = 12;
 export async function runPipeline(specs, { concurrency, limit = Infinity, attempts = DEFAULT_ATTEMPTS }) {
     const state = Object.entries(specs).map(([name, spec]) => ({
         ...spec, name, buffer: [], inFlight: new Set(), skipped: new Map(),
+        // Kiek užtruko porcijos užklausa, atradusi šį elementą — kad klaidos
+        // eilutė galėtų parodyti ir „paieškos" dalį.
+        pickMs: new Map(),
         done: 0, failed: 0, logged: 0,
     }));
 
@@ -434,7 +479,9 @@ export async function runPipeline(specs, { concurrency, limit = Infinity, attemp
             // būti fiksuotos ribos: pirmi neperduoti elementai vėl užpildytų visą
             // SQL LIMIT langą, atmintyje būtų atmesti kaip `skipped`, o tuščias
             // buferis būtų klaidingai palaikytas darbo pabaiga.
+            const pradžia = Date.now();
             const items = await s.pick(take, [...s.skipped.values()]);
+            const pickMs = Date.now() - pradžia;
             for (const item of items) {
                 // Elementas, kuris jau yra darbe arba buferyje: DB žymos dar nėra,
                 // tad `pick` jį grąžina pakartotinai. Be šito du darbininkai imtų
@@ -444,6 +491,7 @@ export async function runPipeline(specs, { concurrency, limit = Infinity, attemp
                 // pabaigos užklausa galėjo išeiti su dar senu sąrašu.
                 if (s.inFlight.has(key) || s.skipped.has(key)) continue;
                 s.inFlight.add(key);
+                s.pickMs.set(key, pickMs);
                 s.buffer.push(item);
             }
         }));
@@ -540,16 +588,21 @@ export async function runPipeline(specs, { concurrency, limit = Infinity, attemp
      */
     async function suBandymais(stage, item) {
         for (let attempt = 1; ; attempt++) {
+            const pradžia = Date.now();
             try {
                 return await stage.work(item, attempt);
             } catch (error) {
                 if (attempt >= attempts || galutinė(error)) {
-                    if (error instanceof Error) error.bandymai = attempt;
+                    if (error instanceof Error) {
+                        error.bandymai = attempt;
+                        error.užklausaMs = Date.now() - pradžia;
+                    }
                     throw error;
                 }
                 const pauzė = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
                 log(`${stage.label}: ${stage.key(item).replace(/\0/g, "/")} bandymas ${attempt}/${attempts}`
-                    + ` nepavyko (${error.message}) — kartojam po ${Math.round(pauzė / 1000)} s`);
+                    + ` nepavyko po ${trukmė(Date.now() - pradžia)} (${error.message})`
+                    + ` — kartojam po ${Math.round(pauzė / 1000)} s`);
                 await sleep(pauzė);
             }
         }
@@ -560,17 +613,25 @@ export async function runPipeline(specs, { concurrency, limit = Infinity, attemp
             const job = await nextJob();
             if (!job) return;
             const { stage, item } = job;
+            const key = stage.key(item);
+            const paieškaMs = stage.pickMs.get(key) ?? 0;
+            const pradžia = Date.now();
             try {
                 await suBandymais(stage, item);
                 stage.done++;
             } catch (error) {
                 stage.failed++;
-                stage.skipped.set(stage.key(item), item);
-                await stage.onError(item, error, error?.bandymai ?? attempts);
+                stage.skipped.set(key, item);
+                await stage.onError(item, error, error?.bandymai ?? attempts, {
+                    paieškaMs,
+                    užklausaMs: error?.užklausaMs ?? (Date.now() - pradžia),
+                    visasMs: Date.now() - pradžia,
+                });
             } finally {
                 busy--;
                 darboVersija++;
-                stage.inFlight.delete(stage.key(item));
+                stage.pickMs.delete(key);
+                stage.inFlight.delete(key);
                 wakeAll();
             }
             if (stage.done + stage.failed - stage.logged >= PIPELINE_LOG_EVERY) {
@@ -651,13 +712,15 @@ export async function runStage(stage, options = {}) {
  */
 async function searchSuBandymais(api, params, attempts = DEFAULT_ATTEMPTS) {
     for (let attempt = 1; ; attempt++) {
+        const pradžia = Date.now();
         try {
             return await api.searchLegalActs(params);
         } catch (error) {
             if (attempt >= attempts || galutinė(error)) throw error;
             const pauzė = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
             log(`paieška ${params.to} psl. ${params.page} bandymas ${attempt}/${attempts}`
-                + ` nepavyko (${error.message}) — kartojam po ${Math.round(pauzė / 1000)} s`);
+                + ` nepavyko po ${trukmė(Date.now() - pradžia)} (${error.message})`
+                + ` — kartojam po ${Math.round(pauzė / 1000)} s`);
             await sleep(pauzė);
         }
     }
@@ -804,9 +867,14 @@ export async function runDayPromises({
         },
         // Klaidą irgi įrašom: kitaip ta pati diena amžinai grįžtų į eilę, o
         // dabar matyti, kurios dienos šaltiniui apskritai neatsiveria.
-        onError: async (day, error, bandymai) => {
-            log(`pažadas ${day} nepavyko po ${bandymai} bandymų: ${error.message}`);
-            await recordDayPromise(day, { error });
+        onError: async (day, error, bandymai, ms) => {
+            const dbPradžia = Date.now();
+            try {
+                await recordDayPromise(day, { error });
+            } finally {
+                log(`pažadas ${day} nepavyko po ${bandymai} bandymų`
+                    + ` (${laikai(ms, bandymai, Date.now() - dbPradžia)}): ${error.message}`);
+            }
         },
     };
 
