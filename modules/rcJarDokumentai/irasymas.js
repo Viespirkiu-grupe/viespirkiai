@@ -6,6 +6,13 @@ import { postgres } from "../../postgres/postgres.js";
  * nes CTE'os viena kitos įterptų eilučių nemato (žr.
  * modules/registruCentrasPranesimai/scrapeContent.js).
  *
+ * Žodynų INSERT'ai atsirenka `NOT EXISTS` prieš `ON CONFLICT DO NOTHING`, nes
+ * konfliktuojanti eilutė identity sekos reikšmę vis tiek sunaudoja: be šito
+ * filtro kiekvienas puslapis degino po ~10 id, ir 192 realių tipų lentelė
+ * per 20 tūkst. įmonių išnaudojo visą smallint seką (žr.
+ * migrations/rcJar/002_pateiktuDokumentuTipaiInteger.sql). `ON CONFLICT`
+ * paliekamas lenktynėms tarp lygiagrečių scrape'ų.
+ *
  * Du INSERT'ai, nes eilutės skirstosi į dvi rūšis su skirtingais daliniais
  * unikaliais indeksais (žr. migrations/rcJar/001_pateiktiDokumentai.sql).
  * Aibės nesikerta, tad viename sakinyje jos viena kitai netrukdo.
@@ -25,12 +32,19 @@ WITH i AS (
 ins_tipai AS (
     INSERT INTO "rcJar"."pateiktuDokumentuTipai" ("pavadinimas")
     SELECT DISTINCT i."tipas" FROM i
+    WHERE NOT EXISTS (
+        SELECT 1 FROM "rcJar"."pateiktuDokumentuTipai" t
+        WHERE t."pavadinimas" = i."tipas")
     ON CONFLICT ("pavadinimas") DO NOTHING
     RETURNING "id", "pavadinimas"
 ),
 ins_aprasymai AS (
     INSERT INTO "rcJar"."pateiktuDokumentuAprasymai" ("pavadinimas")
-    SELECT DISTINCT i."aprasymas" FROM i WHERE i."aprasymas" IS NOT NULL
+    SELECT DISTINCT i."aprasymas" FROM i
+    WHERE i."aprasymas" IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM "rcJar"."pateiktuDokumentuAprasymai" a
+        WHERE a."pavadinimas" = i."aprasymas")
     ON CONFLICT ("pavadinimas") DO NOTHING
     RETURNING "id", "pavadinimas"
 ),
