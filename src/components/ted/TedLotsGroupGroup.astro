@@ -1,7 +1,8 @@
 ---
 import TedSubgroup from './TedSubgroup.astro';
+import TedRestFields from './TedRestFields.astro';
 
-const { group, shortUrl, subgroupTitles } = Astro.props;
+const { group, shortUrl, subgroupTitles, parentNodeTitles = {}, parentNodeAliases = {} } = Astro.props;
 
 function f(id: string) {
   return (group.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
@@ -33,6 +34,12 @@ for (const sg of (group.subGroups || [])) {
 }
 
 const acType = sgByType.find((s: any) => s.nodeId === 'ND-LotsGroupAwardCriterion');
+
+const usedIds = [
+  'BT-21-LotsGroup', 'BT-22-LotsGroup', 'BT-137-LotsGroup', 'BT-157-LotsGroup', 'BT-271-LotsGroup',
+  'BT-24-LotsGroup', 'BT-300-LotsGroup', 'BT-726-LotsGroup', 'BT-27-LotsGroup',
+  ...(value?.fieldId ? [value.fieldId] : []),
+];
 ---
 
 <div class="card">
@@ -105,5 +112,13 @@ const acType = sgByType.find((s: any) => s.nodeId === 'ND-LotsGroupAwardCriterio
         </div>
       </>
     ))}
+
+    <TedRestFields
+      fields={group.fields}
+      usedIds={usedIds}
+      shortUrl={shortUrl}
+      parentNodeTitles={parentNodeTitles}
+      parentNodeAliases={parentNodeAliases}
+    />
   </div>
 </div>

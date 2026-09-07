@@ -1,17 +1,20 @@
 ---
 import KeyValueList from '@design-system/components/KeyValueList.astro';
+import { formatTedDate, isTechnical } from './tedFields';
 
 interface FieldValue {
+  fieldId: string;
   name: string;
   type: string;
   values: string[];
 }
 
 const { fields = [], shortUrl } = Astro.props;
+const visible = (fields as FieldValue[]).filter((fv) => !isTechnical(fv));
 ---
 
 <KeyValueList>
-  {(fields as FieldValue[]).map((fv: FieldValue) => (
+  {visible.map((fv: FieldValue) => (
     <>
       <dt>{fv.name}</dt>
       <dd>
@@ -31,7 +34,7 @@ const { fields = [], shortUrl } = Astro.props;
           fv.values.map((v: string, i: number) => (
             <>
               {i > 0 && <br />}
-              {v}
+              {fv.type === 'date' ? formatTedDate(v) : v}
             </>
           ))
         )}

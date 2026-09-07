@@ -2,8 +2,9 @@
 import Timeline from '@design-system/components/Timeline.astro';
 import TimelineItem from '@design-system/components/TimelineItem.astro';
 import TedSubgroup from './TedSubgroup.astro';
+import TedRestFields from './TedRestFields.astro';
 
-const { group, totalGroups = 1, shortUrl, subgroupTitles, formatDate } = Astro.props;
+const { group, totalGroups = 1, shortUrl, subgroupTitles, formatDate, parentNodeTitles = {}, parentNodeAliases = {} } = Astro.props;
 
 function f(id: string) {
   return (group.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
@@ -23,8 +24,8 @@ function fUrl(id: string) {
 
 function isNullValue(v: string) {
   if (!v) return true;
-  const l = v.toLowerCase();
-  return l === 'ne' || l.includes('nėra') || l.includes('nerezervuotas');
+  const l = v.trim().toLowerCase();
+  return l === 'ne' || l === 'netaikoma';
 }
 
 const title = group.label || f('BT-21-Lot');
@@ -34,7 +35,9 @@ const description = f('BT-24-Lot');
 const quantity = f('BT-25-Lot');
 const cpv = f('BT-262-Lot');
 const otherObjects = f('BT-531-Lot');
-const value = fType('amount');
+const valueField = group.fields.find((x: any) => /^BT-27[-(]/.test(x.fieldId)) || fType('amount');
+// Realiuose skelbimuose vertė dažnai pateikiama kaip 0,00 EUR – tokios nerodome.
+const value = /^[0\s\u00a0]*,?0*\s/.test(String(valueField?.values?.[0] ?? '')) ? null : valueField;
 const durationStart = f('BT-536-Lot');
 const durationEnd = f('BT-537-Lot');
 const infoDeadlineD = f('BT-13(d)-Lot');
@@ -79,11 +82,11 @@ const participationFields = [
 const allSubs = group.subGroups || [];
 const placePerf = allSubs.filter((sg: any) => sg.nodeId === 'ND-LotPlacePerformance' || sg.nodeId === 'ND-PartPlacePerformance');
 const restList = allSubs.filter((sg: any) =>
-  sg.nodeId !== 'ND-LotPlacePerformance' && sg.nodeId !== 'ND-PartPlacePerformance'
-  && sg.nodeId !== 'ND-LotProcurementDocument' && sg.nodeId !== 'ND-PartProcurementDocument',
+  sg.nodeId !== 'ND-LotPlacePerformance' && sg.nodeId !== 'ND-PartPlacePerformance',
 );
 
 const SG_ORDER = [
+  'ND-LotProcurementDocument', 'ND-PartProcurementDocument',
   'ND-LotAwardCriterion', 'ND-LotsGroupAwardCriterion',
   'ND-SelectionCriteria',
   'ND-SubcontractingObligation',
@@ -150,11 +153,28 @@ const lotTlItems = [
 function isPast(d?: string) {
   return Boolean(d && new Date(`${d}T00:00:00`).getTime() < Date.now());
 }
+
+const usedIds = [
+  'BT-21-Lot', 'BT-22-Lot', 'BT-23-Lot', 'BT-24-Lot', 'BT-25-Lot', 'BT-262-Lot', 'BT-531-Lot',
+  'BT-536-Lot', 'BT-537-Lot', 'BT-13(d)-Lot', 'BT-13(t)-Lot', 'BT-1311(d)-Lot', 'BT-1311(t)-Lot',
+  'BT-17-Lot', 'BT-18-Lot', 'BT-97-Lot', 'BT-115-Lot', 'BT-726-Lot', 'BT-765-Lot', 'BT-766-Lot',
+  'BT-767-Lot', 'BT-764-Lot', 'BT-71-Lot', 'BT-736-Lot', 'BT-76-Lot', 'BT-751-Lot', 'BT-75-Lot',
+  'BT-801-Lot', 'BT-802-Lot',
+  ...(valueField ? [valueField.fieldId] : []),
+  // ID nuorodos į patį save nieko nepasako skaitytojui.
+  'BT-137-Lot', 'BT-137-Part',
+].concat(
+  // Tie patys laukai ND-Part sekcijoje turi `-Part` galūnę.
+  ['BT-21', 'BT-22', 'BT-23', 'BT-24', 'BT-25', 'BT-262', 'BT-531', 'BT-536', 'BT-537',
+    'BT-13(d)', 'BT-13(t)', 'BT-1311(d)', 'BT-1311(t)', 'BT-17', 'BT-18', 'BT-97', 'BT-115',
+    'BT-726', 'BT-765', 'BT-766', 'BT-767', 'BT-764', 'BT-71', 'BT-736', 'BT-76', 'BT-751',
+    'BT-75', 'BT-801', 'BT-802'].map((bt) => `${bt}-Part`),
+);
 ---
 
 <div class="card">
   <div class="card-header">
-    <h3>{title}{internalId && totalGroups > 1 && <span class="text-muted text-sm"> ({internalId})</span>}</h3>
+    <h3>{title}{internalId && internalId !== title && <span class="text-muted text-sm"> ({internalId})</span>}</h3>
     {value && <span class="amount">{value.values[0]}</span>}
   </div>
   <div class="card-body">
@@ -290,5 +310,13 @@ function isPast(d?: string) {
         </div>
       </div>
     )}
+
+    <TedRestFields
+      fields={group.fields}
+      usedIds={usedIds}
+      shortUrl={shortUrl}
+      parentNodeTitles={parentNodeTitles}
+      parentNodeAliases={parentNodeAliases}
+    />
   </div>
 </div>

@@ -1,10 +1,11 @@
 ---
-import TedAddressFields from './TedAddressFields.astro';
 import TedGroup from './TedGroup.astro';
-import TedKvList from './TedKvList.astro';
 import TedLotGroup from './TedLotGroup.astro';
 import TedLotsGroupGroup from './TedLotsGroupGroup.astro';
 import TedOrgGroup from './TedOrgGroup.astro';
+import TedRestFields from './TedRestFields.astro';
+import TedFieldColumns from './TedFieldColumns.astro';
+import { byParent as byParentNode, formatTedDate } from './tedFields';
 
 const {
   section,
@@ -16,41 +17,13 @@ const {
   parentNodeTitles,
   parentNodeAliases,
   subgroupTitles,
+  ltRegCode,
 } = Astro.props;
 
 const sectionId = section.nodeId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
 
 function f(id: string) {
   return (section.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
-}
-
-function byParent(fields: any[]) {
-  const result: any[] = [];
-  const seen = new Map();
-  for (const field of fields) {
-    const canonical = parentNodeAliases[field.parentNodeId] || field.parentNodeId || '__root__';
-    if (!seen.has(canonical)) {
-      const item = { label: parentNodeTitles[canonical] || null, pid: canonical, fields: [] };
-      seen.set(canonical, item);
-      result.push(item);
-    }
-    seen.get(canonical).fields.push(field);
-  }
-  return result;
-}
-
-function splitMax5(groups: any[]) {
-  const out: any[] = [];
-  for (const fg of groups) {
-    if (fg.fields.length <= 5) {
-      out.push(fg);
-      continue;
-    }
-    for (let i = 0; i < fg.fields.length; i += 5) {
-      out.push({ label: i === 0 ? fg.label : null, pid: fg.pid, fields: fg.fields.slice(i, i + 5) });
-    }
-  }
-  return out;
 }
 
 function getOrgId(group: any) {
@@ -94,67 +67,26 @@ const orgGroups = section.groups
   .filter((group: any) => group.fields.some((field: any) => ORG_FIELD_PREFIXES.some((prefix) => field.fieldId.startsWith(prefix))))
   .sort((a: any, b: any) => sortOrder(a) - sortOrder(b));
 
-const isScopeSection = section.nodeId === 'ND-ProcedureProcurementScope' || section.nodeId === 'ND-ProcurementProject';
 const isProcedureSection = section.nodeId === 'ND-ProcedureTenderingProcess' || section.nodeId === 'ND-TenderingProcess';
 const isTermsSection = section.nodeId === 'ND-ProcedureTerms' || section.nodeId === 'ND-TenderingTerms';
 const isOrgSection = ['ND-RootExtension', 'ND-ContractingParty', 'ND-Organization', 'ND-ReviewBody', 'ND-MediationBody', 'ND-ReviewOrganization'].includes(section.nodeId);
-const isMetaSection = section.nodeId === 'ND-Root' || section.nodeId === 'ND-GazetteReference';
-const fieldCols = splitMax5(byParent(section.fields));
+const isMetaSection = section.nodeId === 'ND-Root';
+const fieldCols = byParentNode(section.fields, parentNodeTitles, parentNodeAliases);
+
+// ND-RootExtension sekcijoje šalia organizacijų gyvena ir sutartys, pasiūlymai bei
+// dalyvių grupės – jų negalima tyliai numesti kartu su filtru.
+const nonOrgGroups = isOrgSection
+  ? section.groups.filter((group: any) => !orgGroups.includes(group))
+  : [];
+
+const restProps = {
+  shortUrl,
+  parentNodeTitles,
+  parentNodeAliases,
+};
 ---
 
-{isScopeSection ? (
-  <>
-    {(() => {
-      const internalId = f('BT-22-Procedure');
-      const contractType = f('BT-23-Procedure');
-      const description = f('BT-24-Procedure');
-      const mainCpv = f('BT-262-Procedure');
-      const addInfo = f('BT-300-Procedure');
-      const otherObjects = f('BT-531-Procedure');
-      const addrFields = section.fields.filter((field: any) => field.parentNodeId === 'ND-ProcedurePlacePerformance' || field.parentNodeId === 'ND-ProcedurePlacePerformanceAdditionalInformation');
-      const splitCpv = (value: string) => {
-        const text = String(value || '').trim();
-        if (!text) return { code: '', label: '' };
-        const parts = text.split(' – ');
-        return parts.length > 1 ? { code: parts[0].trim(), label: parts.slice(1).join(' – ').trim() } : { code: text, label: '' };
-      };
-      const mainCpvParts = splitCpv(mainCpv);
-      const addCpvParts = f('BT-263-Procedure')
-        ? f('BT-263-Procedure').split(',').map((item: string) => item.trim()).filter(Boolean).map(splitCpv)
-        : [];
-      return (
-        <section id="pirkimo-objektas">
-          <h2 class="mb-7">Pirkimo objektas</h2>
-          {description && <p>{description}</p>}
-          {(internalId || contractType) && <p class="text-sm text-muted">{[internalId, contractType].filter(Boolean).join(' · ')}</p>}
-          {addInfo && <p class="text-sm text-muted">{addInfo}</p>}
-          {mainCpvParts.code && (
-            <>
-              <h3 class="mb-2">BVPŽ</h3>
-              <div class="flex flex-col gap-2">
-                <div>
-                  <div class="font-medium">{mainCpvParts.label || mainCpvParts.code}{mainCpvParts.code && <span class="text-muted font-normal text-xs"> {mainCpvParts.code}</span>}</div>
-                </div>
-                {addCpvParts.map((cpvItem: any) => (
-                  <div>
-                    <div class="font-medium">{cpvItem.label || cpvItem.code}{cpvItem.code && <span class="text-muted font-normal text-xs"> {cpvItem.code}</span>}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-          {otherObjects && <p class="text-sm text-muted">Taip pat: {otherObjects}</p>}
-          {addrFields.length > 0 && (
-            <>
-              <p class="section-title text-sm">Vykdymo vieta</p>
-              <TedAddressFields addrFields={addrFields} />
-            </>
-          )}
-        </section>
-      );
-    })()}
-  </>
-) : isProcedureSection ? (
+{isProcedureSection ? (
   <>
     {(() => {
       const procType = f('BT-105-Procedure');
@@ -164,7 +96,7 @@ const fieldCols = splitMax5(byParent(section.fields));
       const features = f('BT-88-Procedure');
       const cols = [
         features && { label: 'Procedūros ypatumai', text: features },
-        accelerated === 'Taip' && { label: 'Pagreitinta procedūra', text: accelDesc || 'Taip' },
+        accelerated.toLowerCase() === 'taip' && { label: 'Pagreitinta procedūra', text: accelDesc || 'Taip' },
         lotsConstr && { label: 'Dalių apribojimai', text: lotsConstr },
       ].filter(Boolean);
       return (
@@ -181,6 +113,11 @@ const fieldCols = splitMax5(byParent(section.fields));
               ))}
             </div>
           )}
+          <TedRestFields
+            fields={section.fields}
+            usedIds={['BT-105-Procedure', 'BT-106-Procedure', 'BT-1351-Procedure', 'BT-763-Procedure', 'BT-88-Procedure']}
+            {...restProps}
+          />
         </section>
       );
     })()}
@@ -196,9 +133,10 @@ const fieldCols = splitMax5(byParent(section.fields));
       const crossBorder = f('BT-09(a)-Procedure');
       const crossBorderDesc = f('BT-09(b)-Procedure');
       const hasContent = exclusion || exclusionDesc || maxSubmit || maxAwarded || crossBorder || crossBorderDesc;
-      return hasContent ? (
+      return section.fields.length > 0 ? (
         <section id="dalyvavimo-salygos">
           <h2 class="mb-7">Dalyvavimo sąlygos</h2>
+          {hasContent && (
           <div class="grid-3">
             {(exclusion || exclusionDesc) && (
               <div>
@@ -222,17 +160,41 @@ const fieldCols = splitMax5(byParent(section.fields));
               </div>
             )}
           </div>
+          )}
+          <TedRestFields
+            fields={section.fields}
+            usedIds={['BT-67(a)-Procedure', 'BT-67(b)-Procedure', 'BT-806-Procedure', 'BT-31-Procedure', 'BT-33-Procedure', 'BT-09(a)-Procedure', 'BT-09(b)-Procedure']}
+            divider={hasContent}
+            {...restProps}
+          />
         </section>
       ) : null;
     })()}
   </>
 ) : isOrgSection ? (
-  orgGroups.length > 0 && (
+  (orgGroups.length > 0 || nonOrgGroups.length > 0 || section.fields.length > 0) && (
     <section id={sectionId}>
       <h2 class="mb-7">{section.title}</h2>
-      <div class="grid-3">
-        {orgGroups.map((group: any) => <TedOrgGroup group={group} roleLabel={getRole(group)} />)}
-      </div>
+      {orgGroups.length > 0 && (
+        <div class="grid-3">
+          {orgGroups.map((group: any) => <TedOrgGroup group={group} roleLabel={getRole(group)} ltRegCode={ltRegCode} {...restProps} />)}
+        </div>
+      )}
+      {nonOrgGroups.length > 0 && (
+        <div class="flex flex-col gap-4 mt-7">
+          {nonOrgGroups.map((group: any, idx: number) => (
+            <TedGroup
+              group={group}
+              idx={idx}
+              shortUrl={shortUrl}
+              parentNodeTitles={parentNodeTitles}
+              parentNodeAliases={parentNodeAliases}
+              subgroupTitles={subgroupTitles}
+            />
+          ))}
+        </div>
+      )}
+      <TedRestFields fields={section.fields} usedIds={[]} divider={false} {...restProps} />
     </section>
   )
 ) : isMetaSection ? (
@@ -240,7 +202,8 @@ const fieldCols = splitMax5(byParent(section.fields));
     {(() => {
       const legalBasis = f('BT-01-notice');
       const noticeType = f('BT-02-notice');
-      const sentDate = f('BT-05(a)-notice');
+      const sentTime = f('BT-05(b)-notice').replace(/[+-]\d{2}:\d{2}$/, '');
+      const sentDate = [formatTedDate(f('BT-05(a)-notice')), sentTime].filter(Boolean).join(' ');
       const noticeId = f('BT-701-notice');
       const langs = f('BT-702(a)-notice');
       const version = f('BT-757-notice');
@@ -258,6 +221,11 @@ const fieldCols = splitMax5(byParent(section.fields));
           <dl class="kv-list">
             {items.map((item) => <><dt>{item.label}</dt><dd>{item.value}</dd></>)}
           </dl>
+          <TedRestFields
+            fields={section.fields}
+            usedIds={['BT-01-notice', 'BT-02-notice', 'BT-05(a)-notice', 'BT-05(b)-notice', 'BT-701-notice', 'BT-702(a)-notice', 'BT-757-notice']}
+            {...restProps}
+          />
         </section>
       );
     })()}
@@ -265,24 +233,13 @@ const fieldCols = splitMax5(byParent(section.fields));
 ) : (
   <section id={sectionId}>
     <h2 class="mb-7">{section.title}</h2>
-    {section.fields.length > 0 && (
-      <div class="grid-auto">
-        {fieldCols.map((fg) => (
-          <div>
-            {fg.label && <h3>{fg.label}</h3>}
-            {(fg.pid === 'ND-ProcedurePlacePerformance' || fg.pid === 'ND-LotPlacePerformance' || fg.pid === 'ND-PartPlacePerformance')
-              ? <TedAddressFields addrFields={fg.fields} />
-              : <TedKvList fields={fg.fields} shortUrl={shortUrl} />}
-          </div>
-        ))}
-      </div>
-    )}
+    {section.fields.length > 0 && <TedFieldColumns columns={fieldCols} shortUrl={shortUrl} heading="h3" />}
     <div class="flex flex-col gap-4">
       {section.groups.map((group: any, idx: number) => (
         (section.nodeId === 'ND-Lot' || section.nodeId === 'ND-Part')
-          ? <TedLotGroup group={group} idx={idx} totalGroups={section.groups.length} shortUrl={shortUrl} subgroupTitles={subgroupTitles} formatDate={Astro.props.formatDate} />
+          ? <TedLotGroup group={group} idx={idx} totalGroups={section.groups.length} shortUrl={shortUrl} subgroupTitles={subgroupTitles} formatDate={Astro.props.formatDate} parentNodeTitles={parentNodeTitles} parentNodeAliases={parentNodeAliases} />
           : section.nodeId === 'ND-LotsGroup'
-            ? <TedLotsGroupGroup group={group} idx={idx} totalGroups={section.groups.length} shortUrl={shortUrl} subgroupTitles={subgroupTitles} />
+            ? <TedLotsGroupGroup group={group} idx={idx} totalGroups={section.groups.length} shortUrl={shortUrl} subgroupTitles={subgroupTitles} parentNodeTitles={parentNodeTitles} parentNodeAliases={parentNodeAliases} />
             : <TedGroup group={group} idx={idx} shortUrl={shortUrl} parentNodeTitles={parentNodeTitles} parentNodeAliases={parentNodeAliases} subgroupTitles={subgroupTitles} />
       ))}
     </div>

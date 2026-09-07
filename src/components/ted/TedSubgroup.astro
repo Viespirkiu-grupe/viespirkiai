@@ -1,8 +1,11 @@
 ---
 import TedAddressFields from './TedAddressFields.astro';
 import TedKvList from './TedKvList.astro';
+import TedRestFields from './TedRestFields.astro';
 
-const { sg, shortUrl } = Astro.props;
+const { sg, shortUrl, parentNodeTitles = {}, parentNodeAliases = {} } = Astro.props;
+
+const restProps = { shortUrl, parentNodeTitles, parentNodeAliases, title: null, divider: false };
 
 function f(id: string) {
   return (sg.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
@@ -32,6 +35,7 @@ function fArr(id: string) {
           {type && <p class="font-medium text-sm mb-1">{type}</p>}
           {desc && <p class="text-sm text-muted mb-1">{desc}</p>}
           {meta && <p class="text-xs text-muted mb-0">{meta}</p>}
+          <TedRestFields fields={sg.fields} usedIds={['BT-809-Lot', 'BT-750-Lot', 'BT-40-Lot']} {...restProps} />
         </>
       );
     })()}
@@ -48,6 +52,11 @@ function fArr(id: string) {
           {(weight || type) && <p class="font-medium text-sm mb-1">{weight && <><span class="amount amount-sm">{weight}%</span> – </>}{type || ''}</p>}
           {name && <p class="text-sm mb-1">{name}</p>}
           {desc && <p class="text-sm text-muted mb-0">{desc}</p>}
+          <TedRestFields
+            fields={sg.fields}
+            usedIds={['BT-734-Lot', 'BT-734-LotsGroup', 'BT-539-Lot', 'BT-539-LotsGroup', 'BT-541-Lot-WeightNumber', 'BT-541-LotsGroup-WeightNumber', 'BT-540-Lot', 'BT-540-LotsGroup']}
+            {...restProps}
+          />
         </>
       );
     })()}
@@ -71,6 +80,11 @@ function fArr(id: string) {
           {url?.values?.map((v: string) => <p class="text-sm mb-1"><a href={v} target="_blank" rel="noopener">{shortUrl(v)}</a></p>)}
           {access && <p class="text-sm text-muted mb-1">{access}</p>}
           {allLangs.length > 0 && <p class="text-xs text-muted mb-0">{allLangs.join(', ')}</p>}
+          <TedRestFields
+            fields={sg.fields}
+            usedIds={['OPT-140-Lot', 'OPT-140-Part', 'BT-14-Lot', 'BT-14-Part', 'BT-15-Lot', 'BT-15-Part', 'BT-615-Lot', 'BT-615-Part', 'BT-708-Lot', 'BT-708-Part', 'BT-737-Lot', 'BT-737-Part']}
+            {...restProps}
+          />
         </>
       );
     })()}

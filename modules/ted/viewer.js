@@ -174,6 +174,21 @@ const PARENT_NODE_TITLES = {
     'ND-LotsGroupProcurementScope': 'Aprašymas',
 }
 
+// Vidiniai eForms kryžminių nuorodų raktai (ORG-0001, RES-0001, TEN-0001…).
+// Reikalingi vaidmenims susieti, bet puslapyje jų rodyti nereikia.
+export const TECHNICAL_FIELD_IDS = new Set([
+    'OPT-200-Organization-Company',
+    'OPT-201-Organization-TouchPoint',
+    'OPT-202-UBO',
+    'OPT-210-Tenderer',
+    'OPT-316-Contract',
+    'OPT-321-Tender',
+    'OPT-322-LotResult',
+    'BT-137-Lot',
+    'BT-137-LotsGroup',
+    'BT-137-Part',
+])
+
 const PARENT_NODE_ALIASES = {
     'ND-ProcedureAdditionalCommodityClassification': 'ND-ProcedureMainClassification',
     'ND-LotAdditionalClassification': 'ND-LotMainClassification',
@@ -470,9 +485,23 @@ function detectNotice(doc) {
     const documentTypeLabel = DOCUMENT_TYPE_LABELS[documentTypeId] ?? rootElement
 
     const noticeTypeCode = selectText(doc, '/*/cbc:NoticeTypeCode') ?? ''
-    const subTypeId = noticeTypeCode
-    const subType = data.noticeSubTypes?.find((item) => item.subTypeId === subTypeId)
-    const subTypeDescription = subType?.description ?? ''
+    const legalBasis = (selectText(doc, '/*/cbc:RegulatoryDomain') ?? '').trim()
+
+    // NoticeTypeCode XML'e yra `type` (pvz. `cn-standard`), o ne skaitinis `subTypeId`.
+    // Tas pats `type` gali turėti kelis potipius, kuriuos skiria teisinis pagrindas.
+    const subTypeCandidates = (data.noticeSubTypes ?? []).filter((item) => item.type === noticeTypeCode)
+    const subType =
+        subTypeCandidates.find((item) => item.documentType === documentTypeId && item.legalBasis === legalBasis)
+        ?? subTypeCandidates.find((item) => item.documentType === documentTypeId)
+        ?? subTypeCandidates[0]
+        ?? data.noticeSubTypes?.find((item) => item.subTypeId === noticeTypeCode)
+
+    const subTypeId = subType?.subTypeId ?? noticeTypeCode
+    const subTypeDescription =
+        resolveCode('notice-subtype', subTypeId)
+        ?? resolveCode('notice-type', noticeTypeCode)
+        ?? subType?.description
+        ?? ''
     const formType = subType?.formType ?? ''
 
     const id = selectText(doc, '/*/cbc:ID') ?? ''
@@ -486,6 +515,7 @@ function detectNotice(doc) {
         subTypeId,
         subTypeDescription,
         formType,
+        legalBasis,
         id,
         issueDate,
     }
@@ -537,9 +567,24 @@ function pickMultilingualValues(nodes) {
     return langless
 }
 
+// eForms XML dažnai turi adresus be schemos („www.vialietuva.lt“). Palikti tokius
+// href'e reiškia reliatyvią nuorodą (/ted/www.vialietuva.lt), tad schemą pridedame.
+function absoluteUrl(value) {
+    const text = String(value ?? '').trim()
+    if (!text) return text
+    if (/^[a-z][a-z0-9+.-]*:/i.test(text) || text.startsWith('//')) return text
+    return `https://${text}`
+}
+
 function extractValues(nodes, fieldDef) {
     if (!nodes.length) return []
     const { type, codelistId } = fieldDef
+
+    if (type === 'url') {
+        return nodes
+            .map((node) => absoluteUrl(node.textContent))
+            .filter(Boolean)
+    }
 
     if (type === 'text-multilingual') {
         return pickMultilingualValues(nodes)
@@ -602,6 +647,10 @@ function extractValues(nodes, fieldDef) {
                 if (codelistId === 'cpv' || codelistId === 'nuts-lvl3') {
                     return label ? `${raw} – ${label}` : raw
                 }
+                // `applicability` ir panašūs sąrašai grąžina „taip“ / „ne“ mažąja raide,
+                // o `indicator` tipas – „Taip“ / „Ne“. Suvienodiname, kad palyginimai veiktų.
+                if (label === 'taip') return 'Taip'
+                if (label === 'ne') return 'Ne'
                 return label || raw
             })
             .filter(Boolean)
@@ -649,8 +698,88 @@ function splitCpvLabel(value) {
 
 function flatFields(group) {
     const acc = [...(group.fields || [])]
-    for (const subGroup of (group.subGroups || [])) acc.push(...(subGroup.fields || []))
+    for (const subGroup of (group.subGroups || [])) {
+        acc.push(...(subGroup.fields || []))
+        for (const item of (subGroup.items || [])) acc.push(...(item.fields || []))
+    }
     return acc
+}
+
+function allSectionFields(section) {
+    const acc = [...(section.fields || [])]
+    for (const group of (section.groups || [])) acc.push(...flatFields(group))
+    return acc
+}
+
+// Laukus renkamės pagal BT numerį, o ne pagal lietuvišką etiketę – etiketės keičiasi
+// ir jų rašyba (didžioji raidė) jau kartą tyliai išjungė BVPŽ bloką.
+function btField(fields, bt) {
+    const exact = new RegExp(`^BT-${bt}[-(]`)
+    return (fields || []).find((f) => exact.test(f.fieldId)) ?? null
+}
+
+function btValue(fields, bt) {
+    return btField(fields, bt)?.values?.join(', ') || ''
+}
+
+function parseAmount(formatted) {
+    const number = Number.parseFloat(
+        String(formatted ?? '')
+            .replace(/[\s\u00a0]/g, '')
+            .replace(/[^\d,.-]/g, '')
+            .replace(/\.(?=\d{3}\b)/g, '')
+            .replace(',', '.')
+    )
+    return Number.isNaN(number) ? null : number
+}
+
+function amountIsMeaningful(field) {
+    const number = parseAmount(field?.values?.[0])
+    return number !== null && number > 0
+}
+
+function formatAmount(number, currency) {
+    const formatted = number.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return currency ? `${formatted} ${currency}` : formatted
+}
+
+function sumLotValues(sections) {
+    const lotSection = sections.find((s) => s.nodeId === 'ND-Lot')
+    if (!lotSection) return null
+
+    let total = 0
+    let currency = ''
+    let count = 0
+    for (const group of (lotSection.groups || [])) {
+        const field = btField(group.fields, '27')
+        const raw = field?.values?.[0]
+        const number = parseAmount(raw)
+        if (number === null || number <= 0) continue
+        total += number
+        count += 1
+        if (!currency) currency = String(raw).replace(/[\d\s\u00a0,.]/g, '').trim()
+    }
+
+    if (!count) return null
+    return {
+        fieldId: 'BT-27-Lot',
+        name: count > 1 ? `Numatoma dalių vertė be PVM (${count} dalys)` : 'Numatoma vertė be PVM',
+        type: 'amount',
+        values: [formatAmount(total, currency)],
+        computed: true,
+    }
+}
+
+const LT_REG_CODE = /^\d{7,9}$/
+
+// /asmuo/ veikia tik su lietuviškais JAR kodais – užsienio registracijos numeriai
+// (`EU-PO`, `123 456 789`) sukurtų mirusias nuorodas.
+function ltRegCode(reg, countryValue) {
+    const value = String(reg ?? '').trim()
+    if (!LT_REG_CODE.test(value)) return null
+    const country = String(countryValue ?? '').trim().toLowerCase()
+    if (country && !country.startsWith('lietuv')) return null
+    return value
 }
 
 export function buildTedNoticeViewModel(xmlString) {
@@ -708,8 +837,9 @@ export function buildTedNoticeViewModel(xmlString) {
 
         for (let gIdx = 0; gIdx < groupInstances.length; gIdx += 1) {
             const instance = groupInstances[gIdx]
-            const captionNode = allCaptionNodes.find((candidate) => isDescendantOf(candidate, instance))
-            const groupLabel = captionNode?.textContent?.trim() || null
+            const captionNodes = allCaptionNodes.filter((candidate) => isDescendantOf(candidate, instance))
+            // Daugiakalbiuose skelbimuose pavadinimas kartojasi kiekviena kalba – renkamės lietuvišką.
+            const groupLabel = pickMultilingualValues(captionNodes)[0] || null
 
             if (!subGroupNodeXpath) {
                 const groupFieldNodes = allFieldNodes.filter((node) => isDescendantOf(node, instance))
@@ -849,39 +979,50 @@ export function buildTedNoticeViewModel(xmlString) {
     }
 
     const orgFields = firstOrg ? flatFields(firstOrg) : []
-    const orgEmail = orgFields.find((f) => f.type === 'email')
-    const orgUrl = orgFields.find((f) => f.type === 'url' && !f.name?.includes('galinis taškas'))
-    const orgReg = orgFields.find((f) => f.fieldId === 'BT-501-Organization-Company') || orgFields.find((f) => f.name?.includes('Registracijos numeris'))
-    const orgCity = orgFields.find((f) => f.name?.toLowerCase().includes('miestas'))
+    const orgEmail = btField(orgFields, '506') || orgFields.find((f) => f.type === 'email')
+    const orgUrl = btField(orgFields, '505') || orgFields.find((f) => f.type === 'url' && f.fieldId !== 'BT-509-Organization-Company')
+    const orgReg = btField(orgFields, '501')
+    const orgCity = btField(orgFields, '513')
+    const orgCountry = btField(orgFields, '514')
 
-    let deadline = null
-    outer: for (const section of sections) {
-        for (const group of (section.groups || [])) {
-            for (const field of (group.fields || [])) {
-                if (field.type === 'date' && field.fieldId?.startsWith('BT-131')) {
-                    deadline = field
-                    break outer
-                }
+    // Terminas: surenkame visus (ir sekcijų, ir grupių, ir subgrupių) ir imame anksčiausią,
+    // nes daugiadaliuose skelbimuose kiekviena dalis gali turėti savo terminą.
+    const deadlineValues = []
+    for (const section of sections) {
+        for (const field of allSectionFields(section)) {
+            if (field.type === 'date' && field.fieldId?.startsWith('BT-131')) {
+                deadlineValues.push(...field.values)
             }
         }
     }
+    const uniqueDeadlines = [...new Set(deadlineValues)].sort()
+    const deadline = uniqueDeadlines[0] ?? null
 
-    const scopeInternalId = scope?.fields?.find((f) => f.fieldId === 'BT-22-Procedure')?.values?.join(', ') || ''
-    const scopeContractType = scope?.fields?.find((f) => f.fieldId === 'BT-23-Procedure')?.values?.join(', ') || ''
-    const scopeDescription = scope?.fields?.find((f) => f.fieldId === 'BT-24-Procedure')?.values?.join(', ') || ''
-    const scopeAddInfo = scope?.fields?.find((f) => f.fieldId === 'BT-300-Procedure')?.values?.join(', ') || ''
-    const scopeOtherObj = scope?.fields?.find((f) => f.fieldId === 'BT-531-Procedure')?.values?.join(', ') || ''
-    const scopeTitle = scope?.fields?.find((f) => f.name?.startsWith('Pavadinimas'))
-    const scopeCpv = scope?.fields?.find((f) => f.name?.includes('pagrindinis klasifikacijos kodas'))
-    const scopeAddCpv = scope?.fields?.find((f) => f.name?.includes('kiti klasifikacijos kodai'))
-    const scopeValue = scope?.fields?.find((f) => f.type === 'amount') || sections.flatMap((s) => s.fields).find((f) => f.type === 'amount')
-    const scopeAddrFields = scope?.fields?.filter((f) => f.parentNodeId === 'ND-ProcedurePlacePerformance' || f.parentNodeId === 'ND-ProcedurePlacePerformanceAdditionalInformation') || []
+    const scopeFields = scope?.fields ?? []
+    const scopeInternalId = btValue(scopeFields, '22')
+    const scopeContractType = btValue(scopeFields, '23')
+    const scopeDescription = btValue(scopeFields, '24')
+    const scopeAddInfo = btValue(scopeFields, '300')
+    const scopeOtherObj = btValue(scopeFields, '531')
+    const scopeTitle = btField(scopeFields, '21')
+    const scopeCpv = btField(scopeFields, '262')
+    const scopeAddCpv = btField(scopeFields, '263')
+    const scopeAddrFields = scopeFields.filter((f) => f.parentNodeId === 'ND-ProcedurePlacePerformance' || f.parentNodeId === 'ND-ProcedurePlacePerformanceAdditionalInformation')
     const scopeCpvParts = splitCpvLabel(scopeCpv?.values?.[0] || '')
     const scopeAddCpvParts = (scopeAddCpv?.values || []).map((value) => splitCpvLabel(value)).filter((item) => item.code || item.label)
 
+    // Vertė: procedūros BT-27; jei jos nėra arba ji nulinė – dalių BT-27 suma.
+    const procedureValue = btField(scopeFields, '27')
+    // Realiuose LT skelbimuose vertė dažnai pateikiama kaip 0,00 EUR – tokios nerodome.
+    const scopeValue = amountIsMeaningful(procedureValue) ? procedureValue : sumLotValues(sections)
+
     const timelineItems = [
         notice.issueDate && { label: 'Paskelbta', date: notice.issueDate, text: formatDate(notice.issueDate) },
-        deadline && { label: 'Pasiūlymų terminas', date: deadline.values[0], text: formatDate(deadline.values[0]) },
+        deadline && {
+            label: uniqueDeadlines.length > 1 ? `Pasiūlymų terminas (anksčiausias iš ${uniqueDeadlines.length})` : 'Pasiūlymų terminas',
+            date: deadline,
+            text: formatDate(deadline),
+        },
     ].filter(Boolean)
 
     return {
@@ -917,6 +1058,7 @@ export function buildTedNoticeViewModel(xmlString) {
             ? {
                 label: firstOrg.label,
                 reg: orgReg?.values?.[0] || '',
+                regLink: ltRegCode(orgReg?.values?.[0], orgCountry?.values?.[0]),
                 city: orgCity?.values?.[0] || '',
                 email: orgEmail?.values?.[0] || '',
                 url: orgUrl?.values?.[0] || '',
@@ -924,13 +1066,7 @@ export function buildTedNoticeViewModel(xmlString) {
             }
             : null,
         formatDate,
-        escapeHtml(value) {
-            return String(value)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-        },
+        ltRegCode,
         shortUrl(value) {
             try {
                 return new URL(value).hostname

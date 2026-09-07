@@ -28,7 +28,7 @@ const pageDescription = view.documentTypeLabel + (view.issueDateText ? ` · ${vi
 <Layout
   pageTitle={pageTitle}
   pageDescription={pageDescription}
-  pageImage="https://viespirkiai.org/ted.png"
+  pageImage={`https://viespirkiai.org/ted/${noticeId}.png`}
   colorScheme={colorScheme}
   font={font}
 >
@@ -62,7 +62,7 @@ const pageDescription = view.documentTypeLabel + (view.issueDateText ? ` · ${vi
           {view.documentTypeLabel}{view.subTypeDescription && <> · {view.subTypeDescription}</>}
         </Fragment>
         {view.pageTitle}
-        {view.procScope?.value && <> <span class="amount">{view.procScope.value.values[0]}</span></>}
+        {view.procScope?.value?.values?.[0] && <> <span class="amount">{view.procScope.value.values[0]}</span></>}
         <Fragment slot="actions">
           <div class="text-muted text-sm text-right">
             {noticeId && <>ID: {noticeId}<br /></>}
@@ -78,7 +78,7 @@ const pageDescription = view.documentTypeLabel + (view.issueDateText ? ` · ${vi
           <h2>Perkančioji organizacija</h2>
           {view.primaryOrg && (
             <>
-              <h3 class="mb-1">{view.primaryOrg.reg ? <a href={`/asmuo/${view.primaryOrg.reg}`}>{view.primaryOrg.label}</a> : view.primaryOrg.label}</h3>
+              <h3 class="mb-1">{view.primaryOrg.regLink ? <a href={`/asmuo/${view.primaryOrg.regLink}`}>{view.primaryOrg.label}</a> : view.primaryOrg.label}</h3>
               {view.primaryOrg.reg && <p class="text-muted text-sm mb-1">{view.primaryOrg.reg}</p>}
               {view.primaryOrg.city && <p class="text-sm text-muted mb-0">{view.primaryOrg.city}</p>}
               {view.primaryOrg.email && <p class="text-sm mb-1"><a href={`mailto:${view.primaryOrg.email}`}>{view.primaryOrg.email}</a></p>}
@@ -92,13 +92,15 @@ const pageDescription = view.documentTypeLabel + (view.issueDateText ? ` · ${vi
           {view.procScope.description && <p class="text-sm ted-preline">{view.procScope.description}</p>}
           {(view.procScope.internalId || view.procScope.contractType || view.procScope.otherObj) && <p class="text-sm text-muted">{[view.procScope.internalId, view.procScope.contractType, view.procScope.otherObj].filter(Boolean).join(' · ')}</p>}
           {view.procScope.addInfo && <p class="text-sm text-muted ted-preline">{view.procScope.addInfo}</p>}
-          {view.procScope.bvpzKodas && (
+          {(view.procScope.bvpzKodas || view.procScope.papildomiBvpzKodai.length > 0) && (
             <>
               <h3 class="mb-2">BVPŽ</h3>
               <div class="flex flex-col gap-2">
-                <div>
-                  <div class="font-medium">{view.procScope.bvpzPavadinimas}{view.procScope.bvpzKodas && <span class="text-muted font-normal text-xs"> {view.procScope.bvpzKodas}</span>}</div>
-                </div>
+                {view.procScope.bvpzKodas && (
+                  <div>
+                    <div class="font-medium">{view.procScope.bvpzPavadinimas}<span class="text-muted font-normal text-xs"> {view.procScope.bvpzKodas}</span></div>
+                  </div>
+                )}
                 {view.procScope.papildomiBvpzKodai?.map((code: any, i: number) => (
                   <div>
                     <div class="font-medium">{view.procScope.papildomiBvpzPavadinimai[i]}{code && <span class="text-muted font-normal text-xs"> {code}</span>}</div>
@@ -151,6 +153,7 @@ const pageDescription = view.documentTypeLabel + (view.issueDateText ? ` · ${vi
               reviewBodyOrgIds={view.reviewBodyOrgIds}
               mediationBodyOrgIds={view.mediationBodyOrgIds}
               eSenderOrgIds={view.eSenderOrgIds}
+              ltRegCode={view.ltRegCode}
               parentNodeTitles={view.PARENT_NODE_TITLES}
               parentNodeAliases={view.PARENT_NODE_ALIASES}
               subgroupTitles={view.SUBGROUP_TITLES}

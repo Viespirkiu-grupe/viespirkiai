@@ -1,0 +1,38 @@
+---
+import TedFieldColumns from './TedFieldColumns.astro';
+import { byParent, rest } from './tedFields';
+
+/**
+ * Rodo laukus, kurių nerodo ranka sudėlioti blokai. Be šito kiekvienas naujas
+ * eForms laukas tyliai dingtų iš puslapio.
+ */
+const {
+  fields = [],
+  usedIds = [],
+  shortUrl,
+  parentNodeTitles = {},
+  parentNodeAliases = {},
+  title = 'Kita informacija',
+  divider = true,
+} = Astro.props;
+
+const columns = byParent(rest(fields, usedIds), parentNodeTitles, parentNodeAliases);
+---
+
+{columns.length > 0 && (
+  <div class={divider ? 'ted-rest ted-rest-divider' : 'ted-rest'}>
+    {title && <p class="section-title">{title}</p>}
+    <TedFieldColumns columns={columns} shortUrl={shortUrl} />
+  </div>
+)}
+
+<style>
+  .ted-rest {
+    margin-top: 16px;
+  }
+
+  .ted-rest-divider {
+    padding-top: 16px;
+    border-top: var(--border);
+  }
+</style>

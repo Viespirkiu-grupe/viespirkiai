@@ -1,41 +1,14 @@
 ---
-import TedKvList from './TedKvList.astro';
+import TedFieldColumns from './TedFieldColumns.astro';
 import TedSubgroup from './TedSubgroup.astro';
+import { byParent, groupKind } from './tedFields';
 
 const { group, idx = 0, shortUrl, parentNodeTitles, parentNodeAliases, subgroupTitles } = Astro.props;
-const groupLabel = group.label || String(idx + 1);
+const kind = groupKind(group);
+const groupLabel = [kind, group.label || String(idx + 1)].filter(Boolean).join(' ');
 const isLabeled = Boolean(group.label);
 
-function byParent(fields: any[]) {
-  const result: any[] = [];
-  const seen = new Map();
-  for (const f of fields) {
-    const canonical = parentNodeAliases[f.parentNodeId] || f.parentNodeId || '__root__';
-    if (!seen.has(canonical)) {
-      const g = { label: parentNodeTitles[canonical] || null, pid: canonical, fields: [] };
-      seen.set(canonical, g);
-      result.push(g);
-    }
-    seen.get(canonical).fields.push(f);
-  }
-  return result;
-}
-
-function splitMax5(groups: any[]) {
-  const out: any[] = [];
-  for (const fg of groups) {
-    if (fg.fields.length <= 5) {
-      out.push(fg);
-      continue;
-    }
-    for (let i = 0; i < fg.fields.length; i += 5) {
-      out.push({ label: i === 0 ? fg.label : null, pid: fg.pid, fields: fg.fields.slice(i, i + 5) });
-    }
-  }
-  return out;
-}
-
-const fieldCols = splitMax5(byParent(group.fields));
+const fieldCols = byParent(group.fields, parentNodeTitles, parentNodeAliases);
 const sgByType: any[] = [];
 const sgTypeMap = new Map();
 for (const sg of (group.subGroups || [])) {
@@ -46,23 +19,32 @@ for (const sg of (group.subGroups || [])) {
   }
   sgTypeMap.get(sg.nodeId).instances.push(sg);
 }
+
+// Vienos ar dviejų instancijų subgrupė telpa į tą pačią stulpelių eilę kaip ir
+// grupės laukai; platesnės (daug instancijų) lieka atskiru bloku po jais.
+const inlineSubgroups = sgByType.filter((sgType: any) => sgType.instances.length <= 2);
+const wideSubgroups = sgByType.filter((sgType: any) => sgType.instances.length > 2);
+const hasRow = group.fields.length > 0 || inlineSubgroups.length > 0;
 ---
 
 <div>
   {isLabeled ? <h3>{groupLabel}</h3> : <p class="section-title">{groupLabel}</p>}
 
-  {group.fields.length > 0 && (
+  {hasRow && (
     <div class="grid-auto">
-      {fieldCols.map((fg) => (
-        <div>
-          {fg.label && <h4>{fg.label}</h4>}
-          <TedKvList fields={fg.fields} shortUrl={shortUrl} />
+      {group.fields.length > 0 && <TedFieldColumns columns={fieldCols} shortUrl={shortUrl} bare />}
+      {inlineSubgroups.map((sgType: any) => (
+        <div class="flex flex-col gap-2">
+          <div>
+            <h4>{subgroupTitles[sgType.nodeId] || sgType.nodeId}</h4>
+            {sgType.instances.map((sg: any) => <TedSubgroup sg={sg} shortUrl={shortUrl} />)}
+          </div>
         </div>
       ))}
     </div>
   )}
 
-  {sgByType.map((sgType) => (
+  {wideSubgroups.map((sgType: any) => (
     <>
       <h4>{subgroupTitles[sgType.nodeId] || sgType.nodeId}</h4>
       <div class={`grid-${Math.min(sgType.instances.length, 3)}`}>

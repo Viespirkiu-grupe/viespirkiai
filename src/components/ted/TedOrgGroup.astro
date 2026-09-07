@@ -1,7 +1,8 @@
 ---
 import Badge from '@design-system/components/Badge.astro';
+import TedRestFields from './TedRestFields.astro';
 
-const { group, roleLabel } = Astro.props;
+const { group, roleLabel, ltRegCode, shortUrl, parentNodeTitles = {}, parentNodeAliases = {} } = Astro.props;
 
 function f(id: string) {
   return (group.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
@@ -31,12 +32,24 @@ const buyerLegalType = f('BT-11-Procedure-Buyer');
 const utilityActivity = f('BT-610-Procedure-Buyer');
 const hasKv = buyerLegalType || buyerActivity || utilityActivity;
 const hasContact = phone || email || street1 || zip || city || contactName || contactEmail;
+// Į /asmuo/ vedame tik lietuviškus JAR kodus – užsienio registracijos numeriai duotų 404.
+const regLink = ltRegCode ? ltRegCode(regNum, country) : null;
+
+const usedIds = [
+  'BT-500-Organization-Company', 'BT-501-Organization-Company', 'BT-502-Organization-TouchPoint',
+  'BT-500-Organization-TouchPoint', 'BT-503-Organization-Company', 'BT-503-Organization-TouchPoint',
+  'BT-505-Organization-Company', 'BT-506-Organization-Company', 'BT-506-Organization-TouchPoint',
+  'BT-507-Organization-Company', 'BT-510(a)-Organization-Company', 'BT-510(b)-Organization-Company',
+  'BT-512-Organization-Company', 'BT-513-Organization-Company', 'BT-514-Organization-Company',
+  'BT-508-Procedure-Buyer', 'BT-10-Procedure-Buyer', 'BT-11-Procedure-Buyer', 'BT-610-Procedure-Buyer',
+  'OPT-200-Organization-Company',
+];
 ---
 
 <div class="card h-full flex flex-col">
   {(name || roleLabel) && (
     <div class="card-header">
-      {name && <h3>{regNum ? <a href={`/asmuo/${regNum}`} class="no-style">{name}</a> : name}</h3>}
+      {name && <h3>{regLink ? <a href={`/asmuo/${regLink}`} class="no-style">{name}</a> : name}</h3>}
       {roleLabel && <Badge>{roleLabel}</Badge>}
     </div>
   )}
@@ -65,6 +78,14 @@ const hasContact = phone || email || street1 || zip || city || contactName || co
         {website?.values?.map((v: string) => <p class="text-sm m-0"><a href={v} target="_blank" rel="noopener">{v}</a></p>)}
       </div>
     )}
+
+    <TedRestFields
+      fields={group.fields}
+      usedIds={usedIds}
+      shortUrl={shortUrl}
+      parentNodeTitles={parentNodeTitles}
+      parentNodeAliases={parentNodeAliases}
+    />
   </div>
   {profile && (
     <div class="card-footer">

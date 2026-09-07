@@ -1,0 +1,47 @@
+---
+import TedAddressFields from './TedAddressFields.astro';
+import TedKvList from './TedKvList.astro';
+import { packColumns, PLACE_PERFORMANCE_NODES } from './tedFields';
+
+/**
+ * Atvaizduoja laukų blokus (sugrupuotus pagal eForms tėvinį mazgą) subalansuotais
+ * stulpeliais: keli maži blokai telpa į vieną stulpelį, o ne kiekvienas į savo.
+ */
+// `bare` – atiduoda tik stulpelius, kad juos būtų galima sudėti į tėvinį
+// `grid-auto` kartu su kitokiu turiniu (pvz. subgrupėmis).
+const { columns = [], shortUrl, heading = 'h4', maxColumns = 3, bare = false } = Astro.props;
+const Heading = heading;
+const packed = packColumns(columns, { maxColumns });
+---
+
+{packed.length > 0 && (
+  bare ? (
+    packed.map((blocks) => (
+      <div class="flex flex-col gap-2">
+        {blocks.map((block) => (
+          <div>
+            {block.label && <Heading>{block.label}</Heading>}
+            {PLACE_PERFORMANCE_NODES.has(block.pid)
+              ? <TedAddressFields addrFields={block.fields} />
+              : <TedKvList fields={block.fields} shortUrl={shortUrl} />}
+          </div>
+        ))}
+      </div>
+    ))
+  ) : (
+    <div class="grid-auto">
+      {packed.map((blocks) => (
+        <div class="flex flex-col gap-2">
+          {blocks.map((block) => (
+            <div>
+              {block.label && <Heading>{block.label}</Heading>}
+              {PLACE_PERFORMANCE_NODES.has(block.pid)
+                ? <TedAddressFields addrFields={block.fields} />
+                : <TedKvList fields={block.fields} shortUrl={shortUrl} />}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+)}
