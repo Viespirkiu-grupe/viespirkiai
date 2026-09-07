@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
 import { writeJsonlFile } from "../../utils/jsonl.js";
-import { iterateCanonicalBatches } from "./eksportasCanonical.js";
+import { streamCanonicalDocs } from "./eksportasCanonical.js";
 
 // Kanoninis sutarčių JSON → exports/sutartysCanonical.jsonl.
 //   npm run export:sutartys-canonical
@@ -10,27 +10,41 @@ import { iterateCanonicalBatches } from "./eksportasCanonical.js";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_PATH = path.resolve(HERE, "../../exports/sutartysCanonical.jsonl");
 
-async function* records(onBatch) {
-    for await (const { rows, afterId } of iterateCanonicalBatches()) {
-        for (const row of rows) yield row.doc;
-        onBatch(afterId);
+const PROGRESS_MS = 2000;
+
+/**
+ * PG jau grąžina dokumentą JSON tekstu – tik ištraukiam stulpelį.
+ * Progresas spausdinamas pagal laiką, ne pagal eilučių skaičių: prieš pirmą
+ * eilutę užklausa dar sudeda vaikinių lentelių hash'us, tad fiksuotas „kas N
+ * eilučių" žingsnis tą laiką paliktų be jokio išvedimo.
+ */
+async function* docs(stream, onProgress) {
+    let n = 0;
+    let nextAt = Date.now() + PROGRESS_MS;
+    for await (const row of stream) {
+        n++;
+        if (Date.now() >= nextAt) {
+            nextAt = Date.now() + PROGRESS_MS;
+            onProgress(n);
+        }
+        yield row.doc;
     }
 }
 
 async function main() {
     const t0 = Date.now();
-    let written = 0;
+    const elapsed = () => ((Date.now() - t0) / 1000).toFixed(1);
+
+    console.log(`Renkam sutartis į ${OUTPUT_PATH}…`);
+    const stream = await streamCanonicalDocs();
 
     const total = await writeJsonlFile(
         OUTPUT_PATH,
-        records((afterId) => {
-            const dt = ((Date.now() - t0) / 1000).toFixed(1);
-            console.log(`${written} sutarčių (${dt}s, last id ${afterId})`);
-        }),
-        { onProgress: (n) => { written = n; } },
+        docs(stream, (n) => console.log(`${n} sutarčių (${elapsed()}s)`)),
+        { serialize: String },
     );
 
-    console.log(`Exported ${total} sutarčių to ${OUTPUT_PATH}`);
+    console.log(`Exported ${total} sutarčių to ${OUTPUT_PATH} (${elapsed()}s)`);
 }
 
 main()

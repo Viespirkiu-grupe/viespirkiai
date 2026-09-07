@@ -5,7 +5,48 @@ import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 // Canonical dokumento atstatymas iš normalizuotų lentelių; eilutės alias — "e".
 // Naudojama ir UPSERT_SQL old_document CTE, ir markVpmSutartisIstrinta selecte.
-const DOC_JSONB_SQL = `jsonb_build_object(
+const TIEKEJAI_SUBQUERY_SQL = `(
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'kodas', extra."tiekejoKodas",
+                        'pavadinimas', extra_name.pavadinimas
+                    ) ORDER BY extra.id
+                )
+                FROM "vpmSutartys"."papildomiTiekejai" extra
+                LEFT JOIN "vpmSutartys"."salys" extra_name
+                  ON extra_name.id = extra."tiekejoPavadinimoId"
+                WHERE extra."unikalusId" = e."unikalusId"
+            )`;
+
+const BVPZ_SUBQUERY_SQL = `(
+                SELECT jsonb_agg(extra_bvpz."bvpzKodas" ORDER BY extra_bvpz.id)
+                FROM "vpmSutartys"."papildomiBvpzKodai" extra_bvpz
+                WHERE extra_bvpz."unikalusId" = e."unikalusId"
+            )`;
+
+const DOKUMENTAI_SUBQUERY_SQL = `(
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'pavadinimas', file.pavadinimas,
+                        'fileId', file."fileId"
+                    ) ORDER BY file.id
+                )
+                FROM "vpmSutartys"."failai" file
+                WHERE file."unikalusId" = e."unikalusId"
+            )`;
+
+/**
+ * Canonical dokumento jsonb_build_object su pakeičiamais vaikinių lentelių
+ * masyvų šaltiniais. Pagal nutylėjimą – koreliuotos subužklausos (viena eilutė
+ * vienu metu, kaip reikia upsert'ui). Masiniam eksportui perduodami iš anksto
+ * agreguotų LEFT JOIN'ų stulpeliai – tada vietoj milijonų indekso paieškų
+ * lieka trys hash join'ai (žr. eksportasCanonical.js).
+ */
+const docJsonbSql = ({
+    tiekejai = TIEKEJAI_SUBQUERY_SQL,
+    bvpzKodai = BVPZ_SUBQUERY_SQL,
+    dokumentai = DOKUMENTAI_SUBQUERY_SQL,
+} = {}) => `jsonb_build_object(
             'unikalusId', e."unikalusId",
             'pavadinimas', e.pavadinimas,
             'sudarymoData', e."sudarymoData",
@@ -23,39 +64,17 @@ const DOC_JSONB_SQL = `jsonb_build_object(
             'faktineVerte', e."faktineVerte",
             'pirmoTiekejoKodas', e."pirmoTiekejoKodas",
             'pirmoTiekejoPavadinimas', supplier_name.pavadinimas,
-            'papildomiTiekejai', COALESCE((
-                SELECT jsonb_agg(
-                    jsonb_build_object(
-                        'kodas', extra."tiekejoKodas",
-                        'pavadinimas', extra_name.pavadinimas
-                    ) ORDER BY extra.id
-                )
-                FROM "vpmSutartys"."papildomiTiekejai" extra
-                LEFT JOIN "vpmSutartys"."salys" extra_name
-                  ON extra_name.id = extra."tiekejoPavadinimoId"
-                WHERE extra."unikalusId" = e."unikalusId"
-            ), '[]'::jsonb),
+            'papildomiTiekejai', COALESCE(${tiekejai}, '[]'::jsonb),
             'tipas', type_name.tipas,
             'kategorija', category_name.kategorija,
             'bvpzKodas', e."bvpzKodas",
-            'papildomiBvpzKodai', COALESCE((
-                SELECT jsonb_agg(extra_bvpz."bvpzKodas" ORDER BY extra_bvpz.id)
-                FROM "vpmSutartys"."papildomiBvpzKodai" extra_bvpz
-                WHERE extra_bvpz."unikalusId" = e."unikalusId"
-            ), '[]'::jsonb),
-            'dokumentai', COALESCE((
-                SELECT jsonb_agg(
-                    jsonb_build_object(
-                        'pavadinimas', file.pavadinimas,
-                        'fileId', file."fileId"
-                    ) ORDER BY file.id
-                )
-                FROM "vpmSutartys"."failai" file
-                WHERE file."unikalusId" = e."unikalusId"
-            ), '[]'::jsonb),
+            'papildomiBvpzKodai', COALESCE(${bvpzKodai}, '[]'::jsonb),
+            'dokumentai', COALESCE(${dokumentai}, '[]'::jsonb),
             'istrinta', e.istrinta,
             'pakeitimas', e.pakeitimas
         )`;
+
+const DOC_JSONB_SQL = docJsonbSql();
 
 const DOC_JOINS_SQL = `LEFT JOIN "vpmSutartys"."salys" buyer_name
       ON buyer_name.id = e."perkanciosiosOrganizacijosPavadinimoId"
@@ -621,4 +640,4 @@ export async function markVpmSutartisIstrinta(unikalusId, db = postgres) {
     return true;
 }
 
-export { UPSERT_SQL, DOC_JSONB_SQL, DOC_JOINS_SQL };
+export { UPSERT_SQL, DOC_JSONB_SQL, DOC_JOINS_SQL, docJsonbSql };
