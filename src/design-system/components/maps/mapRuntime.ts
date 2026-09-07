@@ -19,10 +19,24 @@ function ensureCssOnce() {
   document.head.appendChild(link);
 }
 
+// Leaflet guesses the default marker image folder by reading the
+// `background-image` of a `.leaflet-default-icon-path` element from its CSS
+// (`_detectIconPath`). Mūsų CSS ir JS krauna lygiagrečiai, tad script.onload
+// dažnai įvyksta anksčiau, nei naršyklė pritaiko `/dist/leaflet.css` — tada
+// spėjimas grąžina tuščią kelią, jis įsikeša (`L.Icon.Default.imagePath`) ir
+// visi to puslapio žymekliai prašo `marker-icon.png` reliatyviai puslapiui
+// (pvz. `/asmuo/marker-icon.png`) → 404 ir nematomas POI. Nustatome kelią
+// tiesiogiai, kad spėjimo iš viso neprireiktų.
+function setDefaultIconPath() {
+  const icon = window.L?.Icon?.Default;
+  if (icon) icon.imagePath = '/dist/images/';
+}
+
 function waitForLeafletGlobal(resolve: () => void) {
   const check = () => {
     if (window.L && window.L.map) {
       if (window.__vpLeaflet) window.__vpLeaflet.loaded = true;
+      setDefaultIconPath();
       resolve();
     } else {
       setTimeout(check, 25);
@@ -117,6 +131,7 @@ export function ensureLeafletRuntime() {
     script.dataset.vpLeafletJs = '1';
     script.onload = () => {
       state.loaded = true;
+      setDefaultIconPath();
       resolve();
     };
     script.onerror = () => reject(new Error('Failed to load Leaflet'));
