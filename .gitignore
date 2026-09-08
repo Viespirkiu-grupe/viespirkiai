@@ -33,6 +33,7 @@ plausible/event-data
 plausible/plausible-conf.env
 
 # Exports / datasets
+/exports
 *.csv
 *.zip
 !modules/bvpz/cpv.zip
