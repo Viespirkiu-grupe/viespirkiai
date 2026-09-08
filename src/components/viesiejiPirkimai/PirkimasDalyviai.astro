@@ -1,28 +1,63 @@
 ---
-import DataTable from '@design-system/components/DataTable.astro';
 import RiskSignalChip from '@design-system/components/RiskSignalChip.astro';
+import PirkimasPasiulymuDalis from './PirkimasPasiulymuDalis.astro';
+import { formatuotiDaliuRuozus, palygintiDalis } from '../../lib/ppa.js';
 import type { PpaSantrauka } from '../../lib/ppa.js';
-import type { ProcurementRiskView } from '../../../modules/risk/procurementDecisionsReader.ts';
+import type { EnrichedRiskSignal, ProcurementRiskView } from '../../../modules/risk/procurementDecisionsReader.ts';
 
 const { ppa, riskView } = Astro.props as { ppa: PpaSantrauka; riskView?: ProcurementRiskView | null };
-const dalyviai = ppa.dalyviai ?? [];
-const eile = ppa.pasiulymuEile ?? [];
-const val = (v: any) => (v == null || v === '' ? '—' : v);
-const asmuoLink = (kodas: any, fizinisAsmuo: any, pavadinimas: any) =>
-  kodas && fizinisAsmuo !== true ? { href: `/asmuo/${kodas}`, text: val(pavadinimas) } : null;
-const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesNumeris) > 1);
 
+/** Kiek dalių rodoma iš karto — likusias slepia „Rodyti likusias dalis“. */
+const RODOMA_DALIU = 12;
+
+const dalyviai = ppa.dalyviai ?? [];
+// Duomenų bazėje dalies numeris — tekstas, todėl rikiuojam skaitiškai patys
+// (kitaip po „1“ eina „11“, o „2“ atsiduria sąrašo gale).
+const eile = [...(ppa.pasiulymuEile ?? [])].sort(
+  (a, b) => palygintiDalis(a.daliesNumeris, b.daliesNumeris) || palygintiDalis(a.eileNumeris, b.eileNumeris),
+);
+
+const val = (v: any) => (v == null || v === '' ? '—' : v);
 const dalisKey = (daliesNumeris: any) => String(daliesNumeris ?? '0');
-const riskFor = (e: any) => {
-  if (!riskView) return [];
-  const lot = riskView.lotsByDalis.get(dalisKey(e.daliesNumeris)) ?? [];
-  const bid = riskView.bidsByDalisAndTiekejas.get(`${dalisKey(e.daliesNumeris)}:${e.dalyvioKodas}`) ?? [];
-  return [...lot, ...bid];
-};
+
+// Pasiūlymai grupuojami į dalis: viena dalis — viena kortelė. Devyniasdešimties
+// eilučių lentelė su besikartojančiu dalies stulpeliu taip virsta į kelias
+// dešimtis trumpų blokų, sudėliotų per visą puslapio plotį.
+const daliuGrupes = eile.reduce((map, e) => {
+  const key = dalisKey(e.daliesNumeris);
+  const grupe = map.get(key);
+  if (grupe) grupe.pasiulymai.push(e);
+  else map.set(key, { key, numeris: e.daliesNumeris, pasiulymai: [e] });
+  return map;
+}, new Map<string, { key: string; numeris: any; pasiulymai: Record<string, any>[] }>());
+const dalys = [...daliuGrupes.values()];
+// Dalies numerį rodom tik tada, kai pirkimas iš tikrųjų skaidytas į dalis.
+const keliosDalys = dalys.length > 1 || dalys.some((d) => Number(d.numeris) > 1);
+
+const lotRizika = (key: string) => riskView?.lotsByDalis.get(key) ?? [];
+const bidRizika = (e: Record<string, any>) =>
+  riskView?.bidsByDalisAndTiekejas.get(`${dalisKey(e.daliesNumeris)}:${e.dalyvioKodas}`) ?? [];
+
+// Dalių lygmens signalai daugiadaliame pirkime kartojasi beveik kiekvienoje
+// dalyje — įdėti juos į kiekvieną kortelę reikštų dešimtis vienodų raudonų
+// žymų. Vietoj to signalas parodomas kartą, nurodant dalių ruožą.
+const signaluSantrauka = dalys
+  .flatMap((d) => lotRizika(d.key).map((signal) => ({ signal, numeris: d.numeris })))
+  .reduce((map, { signal, numeris }) => {
+    const key = `${signal.indicatorId}/${signal.indicatorVersion}`;
+    const esamas = map.get(key);
+    if (esamas) esamas.numeriai.push(numeris);
+    else map.set(key, { signal, numeriai: [numeris] });
+    return map;
+  }, new Map<string, { signal: EnrichedRiskSignal; numeriai: unknown[] }>());
+const rizikosSantrauka = [...signaluSantrauka.values()];
+
+const rodomosDalys = dalys.slice(0, RODOMA_DALIU);
+const slepiamosDalys = dalys.slice(RODOMA_DALIU);
 ---
 
 <section class="dalyviai-section">
-  <div class="flex justify-between items-center mb-4">
+  <div class="dalyviai-antraste">
     <h2 class="mb-0">Dalyviai</h2>
     <a href={`/failas/${ppa.failasId}`} class="btn btn-outline btn-sm" aria-label="Atidaryti pilną PPA ataskaitą">
       <span aria-hidden="true">↗</span> Pilna PPA ataskaita
@@ -30,68 +65,149 @@ const riskFor = (e: any) => {
   </div>
 
   {dalyviai.length > 0 ? (
-    <DataTable size="sm" columns={[{ label: 'Dalyvis' }, { label: 'Šalis' }]}>
-      {dalyviai.map((d) => {
-        const l = asmuoLink(d.kodas, d.fizinisAsmuo, d.pavadinimas);
-        return (
-          <tr>
-            <td>{l ? <a href={l.href}>{l.text}</a> : val(d.pavadinimas)}</td>
-            <td>{val(d.salis)}</td>
-          </tr>
-        );
-      })}
-    </DataTable>
+    <ul class="dalyviu-sarasas">
+      {dalyviai.map((d) => (
+        <li class="dalyvis">
+          {d.kodas && d.fizinisAsmuo !== true
+            ? <a href={`/asmuo/${d.kodas}`}>{val(d.pavadinimas)}</a>
+            : <span>{val(d.pavadinimas)}</span>}
+          {d.salis && d.salis !== 'Lietuva' && <span class="dalyvio-salis">{d.salis}</span>}
+        </li>
+      ))}
+    </ul>
   ) : (
     <p class="text-muted text-sm">Dalyvių sąrašas nepateiktas.</p>
   )}
 
   {eile.length > 0 && (
     <>
-      <h3 class="mt-6 mb-3">Pasiūlymų eilė</h3>
-      <DataTable
-        size="sm"
-        fixed
-        wrapperClassName="pasiulymu-eile-wrapper"
-        columns={[
-          ...(keliosDalys ? [{ label: 'Dalis', headerClassName: 'dalyviai-col-num' }] : []),
-          { label: 'Eilė', headerClassName: 'dalyviai-col-num' },
-          { label: 'Dalyvis' },
-          { label: 'Kaina', headerClassName: 'cell-right dalyviai-col-kaina' },
-          { label: 'Rizika', headerClassName: 'dalyviai-col-risk' },
-        ]}
-      >
-        {eile.map((e) => {
-          const l = asmuoLink(e.dalyvioKodas, false, e.dalyvioPavadinimas);
-          const risk = riskFor(e);
-          return (
-            <tr>
-              {keliosDalys && <td class="cell-mono">{val(e.daliesNumeris)}</td>}
-              <td class="cell-mono">{val(e.eileNumeris)}</td>
-              <td>{l ? <a href={l.href}>{l.text}</a> : val(e.dalyvioPavadinimas)}</td>
-              <td class="cell-mono cell-right">{e.kaina ? `${e.kaina}${e.kainosIsraiska ? ` ${e.kainosIsraiska}` : ''}` : '—'}</td>
-              <td class="dalyviai-col-risk">
-                {risk.length > 0 && (
-                  <div class="flex flex-wrap gap-1">
-                    {risk.map((signal) => (
-                      <RiskSignalChip signal={signal} />
-                    ))}
-                  </div>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </DataTable>
+      <h3 class="mt-8 mb-3">Pasiūlymų eilė</h3>
+
+      {rizikosSantrauka.length > 0 && (
+        <ul class="rizikos-santrauka">
+          {rizikosSantrauka.map(({ signal, numeriai }) => (
+            <li>
+              <RiskSignalChip
+                signal={signal}
+                kontekstas={keliosDalys
+                  ? (numeriai.length >= dalys.length
+                    ? 'Visose pirkimo dalyse'
+                    : `Dalys: ${formatuotiDaliuRuozus(numeriai)}`)
+                  : undefined}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div class="daliu-tinklelis">
+        {rodomosDalys.map((dalis) => (
+          <PirkimasPasiulymuDalis
+            numeris={dalis.numeris}
+            rodytiAntraste={keliosDalys}
+            pasiulymai={dalis.pasiulymai}
+            lotRizika={lotRizika(dalis.key)}
+            bidRizika={bidRizika}
+          />
+        ))}
+      </div>
+
+      {slepiamosDalys.length > 0 && (
+        <details class="daugiau">
+          <summary>Rodyti likusias dalis ({slepiamosDalys.length})</summary>
+          <div class="daliu-tinklelis mt-3">
+            {slepiamosDalys.map((dalis) => (
+              <PirkimasPasiulymuDalis
+                numeris={dalis.numeris}
+                rodytiAntraste={keliosDalys}
+                pasiulymai={dalis.pasiulymai}
+                lotRizika={lotRizika(dalis.key)}
+                bidRizika={bidRizika}
+              />
+            ))}
+          </div>
+        </details>
+      )}
     </>
   )}
 </section>
 
 <style>
-  .dalyviai-col-num { width: 4rem; }
-  .dalyviai-col-kaina { width: 7rem; }
+  .dalyviai-antraste {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
 
-  .dalyviai-col-risk { width: 220px; }
-  .dalyviai-col-risk :global(.ds-badge) { white-space: normal; }
+  /* Dalyviai — vardų juosta, o ne dviejų stulpelių lentelė: 27 pavadinimai
+     telpa į kelias eilutes vietoj 27 lentelės eilučių per visą aukštį. */
+  .dalyviu-sarasas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
 
-  :global(.pasiulymu-eile-wrapper) { overflow: visible; }
+  .dalyvis {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 3px 10px;
+    border: var(--border);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+  }
+
+  .dalyvio-salis {
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
+
+  .daugiau {
+    margin-top: 12px;
+  }
+
+  .daugiau > summary {
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+
+  .daugiau > summary:hover {
+    color: var(--black);
+  }
+
+  /* Dalių lygmens signalai kartojasi beveik visose dalyse, todėl rodomi kartą
+     bendra juosta; kurios tai dalys — signalo paaiškinime, kortelėse lieka tik
+     skaitiklis. */
+  .rizikos-santrauka {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    margin: 0 0 20px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rizikos-santrauka li {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  /* Stulpeliai, o ne grid: dalių kortelės būna skirtingo aukščio (nuo vieno iki
+     dešimties pasiūlymų), tad grid eilutėse liktų tuščios properšos. */
+  .daliu-tinklelis {
+    columns: 3 320px;
+    column-gap: var(--col-gap, 24px);
+  }
+
+  .daliu-tinklelis > :global(*) {
+    break-inside: avoid;
+    margin-bottom: var(--col-gap, 24px);
+  }
 </style>

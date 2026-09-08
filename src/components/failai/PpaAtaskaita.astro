@@ -4,9 +4,11 @@ import DataTable from '@design-system/components/DataTable.astro';
 import Badge from '@design-system/components/Badge.astro';
 import EntityLink from '@design-system/components/EntityLink.astro';
 import { fmtEurOrNull } from '../../lib/formatters.js';
-import { grupuotiPagalDalis, sujungtiGretimas, palygintiDalis, type Ppa } from '../../lib/ppa.js';
+import RiskSignalChip from '@design-system/components/RiskSignalChip.astro';
+import { grupuotiPagalDalis, sujungtiGretimas, palygintiDalis, formatuotiDaliuRuozus, type Ppa } from '../../lib/ppa.js';
+import type { EnrichedRiskSignal, ProcurementRiskView } from '../../../modules/risk/procurementDecisionsReader.ts';
 
-const { ppa } = Astro.props as { ppa: Ppa };
+const { ppa, riskView } = Astro.props as { ppa: Ppa; riskView?: ProcurementRiskView | null };
 const a = ppa.ataskaita;
 
 const yesNo = (v: any) => (v === true ? 'Taip' : v === false ? 'Ne' : '—');
@@ -54,7 +56,10 @@ const atmesti = [...ppa.atmestiPasiulymai].sort(
     palygintiDalis(x.daliesNumeris, y.daliesNumeris),
 );
 const dalyvioRaktas = (r: Record<string, any>) => `${r.dalyvioKodas ?? ''}|${r.dalyvioPavadinimas ?? ''}`;
-const eileGrupes = sujungtiGretimas(eile, dalyvioRaktas);
+// Eilė rikiuota pagal dalį, tad gretimos eilutės gali būti skirtingų dalių;
+// tiekėjas liejamas tik dalies viduje, kitaip vienas langelis apjungdavo dvi
+// dalis ir antroji atrodydavo be tiekėjo.
+const eileGrupes = sujungtiGretimas(eile, (r) => `${r.daliesNumeris ?? ''}\u0000${dalyvioRaktas(r)}`);
 const atmestiGrupes = sujungtiGretimas(atmesti, dalyvioRaktas);
 // Sutarčių lentelėje kartojasi ne tik tiekėjas, bet ir datos bei ta pati mūsų
 // sutartis — kiekvienas toks stulpelis liejamas atskirai, bet visada tiekėjo
@@ -77,6 +82,30 @@ const eileIsraiska = bendraReiksme(eile, 'kainosIsraiska');
 const atmestiIsraiska = bendraReiksme(atmesti, 'kainosIsraiska');
 
 // Skundų sekcija dažniausiai būna vien „Ne“ — tada užtenka vienos eilutės.
+// Rizikos signalai. Dalies lygmens signalai daugiadaliame pirkime kartojasi
+// beveik kiekvienoje dalyje, tad — kaip ir pirkimo puslapyje
+// (PirkimasDalyviai.astro) — kiekvienas rodomas kartą, nurodant dalių ruožą.
+const dalisKey = (daliesNumeris: any) => String(daliesNumeris ?? '0');
+const bidRizika = (r: Record<string, any>): readonly EnrichedRiskSignal[] =>
+  riskView?.bidsByDalisAndTiekejas.get(`${dalisKey(r.daliesNumeris)}:${r.dalyvioKodas}`) ?? [];
+const daliuSkaicius = Number(a.daliuSkaicius) || ppa.pirkimoDalys.length;
+const keliosDalys = daliuSkaicius > 1;
+const daliuSignalai = [...(riskView?.lotsByDalis ?? new Map())]
+  .flatMap(([numeris, signalai]) => signalai.map((signal: EnrichedRiskSignal) => ({ signal, numeris })))
+  .reduce((map, { signal, numeris }) => {
+    const key = `${signal.indicatorId}/${signal.indicatorVersion}`;
+    const esamas = map.get(key);
+    if (esamas) esamas.numeriai.push(numeris);
+    else map.set(key, { signal, numeriai: [numeris] });
+    return map;
+  }, new Map<string, { signal: EnrichedRiskSignal; numeriai: unknown[] }>());
+const daliuRizika = [...daliuSignalai.values()];
+const pirkimoRizika = riskView?.procurement ?? [];
+// Pasiūlymo lygmens signalų stulpelį rodom tik tada, kai lentelėje bent vienas
+// yra — kitaip visiems pirkimams atsirastų tuščias stulpelis.
+const eileTuriRizika = eile.some((e) => bidRizika(e).length > 0);
+const atmestiTuriRizika = atmesti.some((r) => bidRizika(r).length > 0);
+
 const skundaiTusti =
   !a.pretenzijaPateikta &&
   !a.ieskinysTeismui &&
@@ -87,6 +116,25 @@ const skundaiTusti =
 ---
 
 <div class="ppa flex flex-col gap-8">
+  {(pirkimoRizika.length > 0 || daliuRizika.length > 0) && (
+    <section>
+      <h3 class="ppa-head no-style">Rizikos signalai <span class="ppa-count">{pirkimoRizika.length + daliuRizika.length}</span></h3>
+      <div class="ppa-rizika">
+        {pirkimoRizika.map((signal) => (<RiskSignalChip signal={signal} />))}
+        {daliuRizika.map(({ signal, numeriai }) => (
+          <RiskSignalChip
+            signal={signal}
+            kontekstas={keliosDalys
+              ? (numeriai.length >= daliuSkaicius
+                ? 'Visose pirkimo dalyse'
+                : `Dalys: ${formatuotiDaliuRuozus(numeriai)}`)
+              : undefined}
+          />
+        ))}
+      </div>
+    </section>
+  )}
+
   <section>
     <h3 class="ppa-head no-style">Bendra informacija</h3>
     <KeyValueList>
@@ -229,6 +277,7 @@ const skundaiTusti =
         { label: 'Statusas' },
         { label: atmestiIsraiska ? `Kaina (${atmestiIsraiska})` : 'Kaina', headerClassName: 'cell-right' },
         { label: 'Atmetimo priežastys' },
+        ...(atmestiTuriRizika ? [{ label: 'Rizika' }] : []),
       ]}>
         {atmestiGrupes.map(({ eilute: d, apjungti, rodyti }) => (
           <tr>
@@ -241,6 +290,9 @@ const skundaiTusti =
             <td>{val(d.statusas)}</td>
             <td class="cell-mono cell-right">{eur(d.pasiulymoKaina)}</td>
             <td>{val(d.atmetimoPriezastys)}</td>
+            {atmestiTuriRizika && (
+              <td><span class="ppa-rizikos-zymos">{bidRizika(d).map((signal) => <RiskSignalChip signal={signal} />)}</span></td>
+            )}
           </tr>
         ))}
       </DataTable>
@@ -255,6 +307,7 @@ const skundaiTusti =
         { label: 'Eilė' },
         { label: 'Dalyvis' },
         { label: eileIsraiska ? `Kaina (${eileIsraiska})` : 'Kaina', headerClassName: 'cell-right' },
+        ...(eileTuriRizika ? [{ label: 'Rizika' }] : []),
       ]}>
         {eileGrupes.map(({ eilute: d, apjungti, rodyti }) => (
           <tr>
@@ -266,6 +319,9 @@ const skundaiTusti =
               </td>
             )}
             <td class="cell-mono cell-right">{eur(d.kaina)}</td>
+            {eileTuriRizika && (
+              <td><span class="ppa-rizikos-zymos">{bidRizika(d).map((signal) => <RiskSignalChip signal={signal} />)}</span></td>
+            )}
           </tr>
         ))}
       </DataTable>
@@ -443,6 +499,20 @@ const skundaiTusti =
   }
 
   .ppa-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Žymos guli eilute ir persikelia į kitą tik pritrūkus pločio — ne sąrašas,
+     kad kiekviena neatsidurtų atskiroje eilutėje. */
+  .ppa-rizika {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ppa-rizikos-zymos {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;

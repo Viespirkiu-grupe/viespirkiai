@@ -21,7 +21,12 @@ function phone(v) {
 function cell(r, idx) {
     if (!r) return null;
     const v = r[idx];
-    return v === "" || v === undefined ? null : v;
+    // SheetJS klaidos ir kai kurie tušti langeliai grįžta kaip NaN — `str()` jį
+    // paverstų tekstu "NaN" ir toks jis nukeliautų į duomenų bazę (matėsi
+    // „Atmestų pasiūlymų" dalies stulpelyje).
+    if (v === "" || v === undefined) return null;
+    if (typeof v === "number" && Number.isNaN(v)) return null;
+    return v;
 }
 
 function str(v) {

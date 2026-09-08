@@ -1,0 +1,142 @@
+---
+import RiskSignalChip from '@design-system/components/RiskSignalChip.astro';
+import { fmtEur } from '../../lib/formatters.js';
+import type { EnrichedRiskSignal } from '../../../modules/risk/procurementDecisionsReader.ts';
+
+/** Vienos pirkimo dalies pasiūlymų eilė — kortelė `PirkimasDalyviai` tinklelyje. */
+interface Props {
+  /** Dalies numeris; `null`, kai pirkimas neskaidytas (tada antraštės nėra). */
+  numeris?: any;
+  /** Ar rodyti dalies antraštę su numeriu ir rizikos skaitikliu. */
+  rodytiAntraste: boolean;
+  pasiulymai: Record<string, any>[];
+  /** Dalies lygmens signalai — kortelėje tik suskaičiuojami, išvardyti santraukoje. */
+  lotRizika: readonly EnrichedRiskSignal[];
+  /** Konkretaus pasiūlymo signalai pagal `dalyvioKodas`. */
+  bidRizika: (pasiulymas: Record<string, any>) => readonly EnrichedRiskSignal[];
+}
+
+const { numeris, rodytiAntraste, pasiulymai, lotRizika, bidRizika } = Astro.props as Props;
+
+const val = (v: any) => (v == null || v === '' ? '—' : v);
+const kainosTekstas = (e: any) => {
+  if (!e.kaina) return '—';
+  const skaicius = Number(e.kaina);
+  if (!Number.isFinite(skaicius)) return `${e.kaina}${e.kainosIsraiska ? ` ${e.kainosIsraiska}` : ''}`;
+  return e.kainosIsraiska === 'EUR' ? `${fmtEur(skaicius)} €` : `${fmtEur(skaicius)} ${e.kainosIsraiska ?? ''}`.trim();
+};
+---
+
+<article class="dalis-blokas">
+  {rodytiAntraste && (
+    <header class="dalis-antraste">
+      <span class="dalis-nr">{val(numeris)} dalis</span>
+      {lotRizika.length > 0 && (
+        <span class="dalies-rizika" title={lotRizika.map((s) => s.titleLt).join('\n')}>
+          <span aria-hidden="true">⚠</span> {lotRizika.length}
+        </span>
+      )}
+    </header>
+  )}
+  <ol class="pasiulymai">
+    {pasiulymai.map((e) => {
+      const href = e.dalyvioKodas ? `/asmuo/${e.dalyvioKodas}` : null;
+      const rizika = bidRizika(e);
+      return (
+        <li class="pasiulymas">
+          <span class="pasiulymo-vieta">{val(e.eileNumeris)}</span>
+          <span class="pasiulymo-dalyvis">
+            {href ? <a href={href}>{val(e.dalyvioPavadinimas)}</a> : val(e.dalyvioPavadinimas)}
+          </span>
+          <span class="pasiulymo-kaina cell-mono">{kainosTekstas(e)}</span>
+          {rizika.length > 0 && (
+            <span class="pasiulymo-rizika">
+              {rizika.map((signal) => <RiskSignalChip signal={signal} />)}
+            </span>
+          )}
+        </li>
+      );
+    })}
+  </ol>
+</article>
+
+<style>
+  .dalis-blokas {
+    border: var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .dalis-antraste {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--shade-2);
+    border-bottom: var(--border);
+    font-size: var(--text-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray);
+  }
+
+  .dalis-nr {
+    font-weight: 600;
+  }
+
+  .dalies-rizika {
+    color: var(--color-danger);
+    letter-spacing: 0;
+    white-space: nowrap;
+    cursor: help;
+  }
+
+  .pasiulymai {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pasiulymas {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr auto;
+    align-items: baseline;
+    gap: 4px 10px;
+    padding: 7px 12px;
+    font-size: var(--text-sm);
+  }
+
+  .pasiulymas + .pasiulymas {
+    border-top: var(--border);
+  }
+
+  /* Pirmasis eilėje — su kuriuo sudaroma sutartis; jį paryškinam. */
+  .pasiulymai > .pasiulymas:first-child {
+    font-weight: 600;
+  }
+
+  .pasiulymo-vieta {
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+  }
+
+  .pasiulymo-dalyvis {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .pasiulymo-kaina {
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .pasiulymo-rizika {
+    grid-column: 2 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-weight: 400;
+  }
+</style>

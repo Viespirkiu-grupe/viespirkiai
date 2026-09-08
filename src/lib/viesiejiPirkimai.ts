@@ -1,6 +1,6 @@
 import { postgres } from '@/postgres/postgres.js';
 import config from './config.ts';
-import { buildTedNoticeViewModel } from '@/modules/ted/viewer.js';
+import { buildTedNoticeSummary } from '@/modules/ted/viewer.js';
 import { readTedXmlMany, tedMd5 } from '@/modules/ted/sidecar.js';
 import { searchSutartys } from '@/modules/sutartys/searchSutartys.js';
 import { assembleTurinys } from '@/modules/viesiejiPirkimai/assembleTurinys.js';
@@ -63,7 +63,9 @@ async function annotateTedSkelbimai(turinys: any) {
     const tedTurinys = availableNotices.get(tedNoticeNumber);
     if (tedTurinys) {
       try {
-        const tedView = buildTedNoticeViewModel(tedTurinys);
+        // Tik antraštė: viso skelbimo modelio statyba dideliame XML užtrunka
+        // kelias sekundes, o čia tereikia nuorodos pavadinimo.
+        const tedView = buildTedNoticeSummary(tedTurinys);
         pavadinimas = tedView?.documentTypeLabel || tedView?.subTypeDescription || pavadinimas;
       } catch {}
     }

@@ -4,7 +4,6 @@ import DateValue from '@design-system/components/DateValue.astro';
 import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import MoneyValue from '@design-system/components/MoneyValue.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
-import SutartisCard from '../../components/content/SutartisCard.astro';
 import PirkimasVykdytojas from '../../components/viesiejiPirkimai/PirkimasVykdytojas.astro';
 import PirkimasTerminai from '../../components/viesiejiPirkimai/PirkimasTerminai.astro';
 import PirkimasKlasifikacija from '../../components/viesiejiPirkimai/PirkimasKlasifikacija.astro';
@@ -14,6 +13,7 @@ import PirkimasDokumentai from '../../components/viesiejiPirkimai/PirkimasDokume
 import PirkimasSkelbimai from '../../components/viesiejiPirkimai/PirkimasSkelbimai.astro';
 import PirkimasTedNuorodos from '../../components/viesiejiPirkimai/PirkimasTedNuorodos.astro';
 import PirkimasDalyviai from '../../components/viesiejiPirkimai/PirkimasDalyviai.astro';
+import PirkimasSutartys from '../../components/viesiejiPirkimai/PirkimasSutartys.astro';
 import PirkimasAiSantrauka from '../../components/viesiejiPirkimai/PirkimasAiSantrauka.astro';
 import RiskSignalChip from '@design-system/components/RiskSignalChip.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
@@ -103,10 +103,18 @@ const aiSantrauka = Astro.cookies.get('showAi')?.value === 'false'
       <PirkimasVykdytojas pirkimas={pirkimas} />
       <PirkimasTerminai items={timelineItems} />
       <PirkimasKlasifikacija pirkimas={pirkimas} />
-      {pirkimas.ppa && <PirkimasDalyviai ppa={pirkimas.ppa} riskView={pirkimas.riskView} />}
       <PirkimasVerte pirkimas={pirkimas} />
       <PirkimasSalygos pirkimas={pirkimas} />
     </div>
+
+    {/* Dalyvių ir pasiūlymų eilė yra ilgiausias pirkimo sąrašas (šimtai eilučių
+        daugiadaliuose pirkimuose), todėl jam skiriamas visas plotis — trečdalio
+        stulpelyje jis ištęsdavo gretimas korteles per kelis ekranus. */}
+    {pirkimas.ppa && (
+      <div class="mb-10">
+        <PirkimasDalyviai ppa={pirkimas.ppa} riskView={pirkimas.riskView} />
+      </div>
+    )}
 
     <section class="grid-3">
       <div class="dok-span-2">
@@ -126,18 +134,13 @@ const aiSantrauka = Astro.cookies.get('showAi')?.value === 'false'
         )}
       </div>
       <PirkimasTedNuorodos korteles={tedKorteles} />
-
-      {pirkimas.sutartys && pirkimas.sutartys.length > 0 && (
-        <section class="mb-7">
-          <h2>Sutartys</h2>
-          <div class="result-list mt-4">
-            {pirkimas.sutartys.map((item: any) => (
-              <SutartisCard item={item} showRedagavimoData={false} />
-            ))}
-          </div>
-        </section>
-      )}
     </section>
+
+    {/* Sutartys — atskira lentelė per visą plotį: stambesniuose pirkimuose jų
+        būna kelios dešimtys, o kortelių krūva trečdalio stulpelyje netilpo. */}
+    {pirkimas.sutartys && pirkimas.sutartys.length > 0 && (
+      <PirkimasSutartys sutartys={pirkimas.sutartys} />
+    )}
   </main>
 </Layout>
 

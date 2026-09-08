@@ -1,0 +1,138 @@
+---
+import DataTable from '@design-system/components/DataTable.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import EntityLink from '@design-system/components/EntityLink.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
+
+/**
+ * Pirkimo sutartys viena lentele per visą puslapio plotį.
+ *
+ * Kortelių krūva trečdalio stulpelyje netiko: didesniuose pirkimuose sutarčių
+ * būna keliolika ar kelios dešimtys, o kortelėje kartojasi tas pats pirkėjas
+ * (jis visoms vienodas — tai pirkimo vykdytojas), tad lentelėje jo neberodom.
+ */
+const { sutartys } = Astro.props as { sutartys: Record<string, any>[] };
+
+const skaicius = (v: unknown): number | null => {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+// `verte` — numatoma sudarant sutartį, `faktineIvykdimoVerte` — faktinė. Rodom
+// faktinę (net kai ji 0 — sutartis neįvykdyta), o skiriantis nuo numatytos,
+// pastarąją paliekam perbrauktą šalia.
+const eilutes = sutartys.map((s) => {
+  const numatoma = skaicius(s.verte);
+  const faktine = skaicius(s.faktineIvykdimoVerte);
+  const verte = faktine ?? numatoma;
+  const tiekejai: string[] = s.tiekejai?.length ? s.tiekejai : s.tiekejas != null ? [s.tiekejas] : [];
+  const kodai: string[] = s.tiekejaiKodai?.length ? s.tiekejaiKodai : s.tiekejoKodas != null ? [s.tiekejoKodas] : [];
+  return {
+    s,
+    numatoma,
+    verte,
+    rodytiNumatoma: faktine != null && numatoma != null && Math.round(faktine * 100) !== Math.round(numatoma * 100),
+    tiekejai,
+    kodai,
+  };
+});
+
+const yraDokumentu = sutartys.some((s) => (s.dokumentuKiekis ?? 0) > 0);
+---
+
+<section class="mb-7">
+  <h2 class="mb-4">Sutartys<span class="sutarciu-count">{sutartys.length}</span></h2>
+
+  {/* `fixed` — kad pavadinimų stulpelis pasiimtų visą likusį plotį ir daugtaškis
+      atsirastų tik tada, kai tekstas iš tikrųjų netelpa. */}
+  <DataTable
+    size="sm"
+    sortable
+    fixed
+    className="sutartys-lentele"
+    columns={[
+      { label: 'Sudaryta', headerClassName: 'cell-nowrap sutartys-col-data', sortType: 'date' },
+      { label: 'Galioja iki', headerClassName: 'cell-nowrap sutartys-col-data', sortType: 'date' },
+      { label: 'Nr.', headerClassName: 'sutartys-col-nr' },
+      { label: 'Sutartis' },
+      { label: 'Tiekėjas', headerClassName: 'sutartys-col-tiekejas' },
+      ...(yraDokumentu ? [{ label: 'Dok.', headerClassName: 'cell-right sutartys-col-dok', sortType: 'number' as const }] : []),
+      { label: 'Vertė', headerClassName: 'cell-right sutartys-col-verte', sortType: 'number' as const },
+    ]}
+  >
+    {eilutes.map(({ s, numatoma, verte, rodytiNumatoma, tiekejai, kodai }) => (
+      <tr>
+        <td class="cell-mono cell-nowrap">{s.sudarymoData ? <DateValue value={s.sudarymoData} /> : '—'}</td>
+        <td class="cell-mono cell-nowrap">{s.galiojimoData ? <DateValue value={s.galiojimoData} /> : '—'}</td>
+        <td class="cell-mono cell-nowrap">
+          <a href={`/sutartis/${s.sutartiesUnikalusId}`}>{s.sutartiesNumeris ?? s.sutartiesUnikalusId}</a>
+        </td>
+        <td>
+          {/* Pavadinimai vienoje eilutėje su daugtaškiu — jie ilgi ir dažnai
+              beveik vienodi, tad išskleisti jie tik ištęstų lentelę. */}
+          <a href={`/sutartis/${s.sutartiesUnikalusId}`} class="sutarties-pavadinimas" title={s.pavadinimas || undefined}>
+            {s.pavadinimas?.length ? s.pavadinimas : <em class="text-muted">Nenurodyta</em>}
+          </a>
+        </td>
+        <td>
+          {tiekejai.length > 0
+            ? tiekejai.map((t, i) => (
+                <div><EntityLink kodas={kodai[i]} label={t || 'Nenurodytas'} /></div>
+              ))
+            : '—'}
+        </td>
+        {yraDokumentu && <td class="cell-mono cell-right">{(s.dokumentuKiekis ?? 0) > 0 ? s.dokumentuKiekis : '—'}</td>}
+        <td class="cell-right cell-nowrap" data-sort={verte ?? ''}>
+          {rodytiNumatoma && (
+            <s class="verte-numatoma" title="Numatoma sutarties vertė">
+              <MoneyValue value={numatoma} suffix={' €'} mono={false} />
+            </s>
+          )}
+          <MoneyValue value={verte} suffix={' €'} className={(verte ?? 0) > 10000 ? 'font-bold' : undefined} />
+        </td>
+      </tr>
+    ))}
+  </DataTable>
+</section>
+
+<style>
+  .sutarciu-count {
+    margin-left: 8px;
+    font-size: var(--text-xs);
+    font-weight: 400;
+    color: var(--gray);
+  }
+
+  /* Pavadinimas viena eilute; daugtaškis atsiranda tik netelpant, nes plotį
+     duoda pats stulpelis (žr. `fixed` lentelę). Pilnas tekstas — `title`. */
+  .sutarties-pavadinimas {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Fiksuotame išdėstyme stulpeliai be pločio dalytųsi likutį po lygiai, tad
+     visiems, išskyrus pavadinimą, plotis nurodytas — likutis atitenka jam.
+     `min-width` neleidžia siaurame ekrane viską suspausti: tada slenkam. */
+  /* `:global`, nes `th` elementus atiduoda DataTable — komponento apimties
+     stilius jų nepasiektų. Klasės vardai su `sutartys-` prefiksu, kad
+     nesusidurtų su kitomis lentelėmis. */
+  :global(.sutartys-lentele) { min-width: 58rem; }
+  :global(.sutartys-col-data) { width: 7rem; }
+  :global(.sutartys-col-nr) { width: 7rem; }
+  :global(.sutartys-col-tiekejas) { width: 16rem; }
+  :global(.sutartys-col-dok) { width: 4rem; }
+  :global(.sutartys-col-verte) { width: 9rem; }
+
+  /* Perbraukta numatoma vertė prieš faktinę (pvz. „2̶6̶ ̶0̶0̶0̶ ̶€̶ 0 €" —
+     sutartis liko neįvykdyta). */
+  .verte-numatoma {
+    display: block;
+    color: var(--gray);
+    font-weight: 400;
+    white-space: nowrap;
+    text-decoration-thickness: 1px;
+  }
+</style>

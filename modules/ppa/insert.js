@@ -14,6 +14,17 @@ const ZODYNAI = Object.freeze({
     pirkimoObjektoRusis: "pirkimoObjektoRusys",
 });
 
+/**
+ * Kainos tekstą („1,234.56") paverčia skaičiumi. `parseFloat` netinkamam
+ * tekstui grąžina NaN, o tekstiniame stulpelyje jis virsdavo eilute "NaN" —
+ * todėl netinkamos reikšmės nuleidžiamos į NULL.
+ */
+function kaina(rawValue) {
+    if (!rawValue) return null;
+    const value = parseFloat(String(rawValue).replace(/,/g, ""));
+    return Number.isFinite(value) ? value : null;
+}
+
 function zodynoReiksme(rawValue) {
     return rawValue == null ? null : String(rawValue).trim() || null;
 }
@@ -309,11 +320,7 @@ export async function upsertPpa(
                     d.atsiemimoPriezastys,
                     atmetimoTeisiniaiPagrindai.get(zodynoReiksme(d.atmetimoTeisinisPagrindas)) ?? null,
                     atmetimoPriezastys.get(zodynoReiksme(d.atmetimoPriezastys)) ?? null,
-                    d.pasiulymoKainaSanaudos
-                        ? parseFloat(
-                              d.pasiulymoKainaSanaudos.replace(/,/g, ""),
-                          )
-                        : null,
+                    kaina(d.pasiulymoKainaSanaudos),
                     kainosIsraiskos.get(zodynoReiksme(d.kainosSanauduIsraiska)) ?? null,
                 ]),
             );
@@ -335,9 +342,7 @@ export async function upsertPpa(
                     d.dalyvioKodas,
                     d.dalyvioPavadinimas,
                     d.kainosKokybesSantykis,
-                    d.kainaSanaudos
-                        ? parseFloat(d.kainaSanaudos.replace(/,/g, ""))
-                        : null,
+                    kaina(d.kainaSanaudos),
                     kainosIsraiskos.get(zodynoReiksme(d.kainosSanauduIsraiska)) ?? null,
                 ]),
             );
@@ -380,9 +385,7 @@ export async function upsertPpa(
                     d.sutartiesSudarymoData ?? null,
                     d.sutartiesGaliojimoTerminas,
                     d.sutartiesGaliojimoPastaba,
-                    d.sutartiesVerte
-                        ? parseFloat(d.sutartiesVerte.replace(/,/g, ""))
-                        : null,
+                    kaina(d.sutartiesVerte),
                     d.arOrientacineVerte,
                     d.arKetinamaSubranga,
                     d.subrangosInfo,

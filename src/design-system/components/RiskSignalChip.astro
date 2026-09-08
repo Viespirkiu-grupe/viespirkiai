@@ -4,9 +4,11 @@ import type { EnrichedRiskSignal } from '../../../modules/risk/procurementDecisi
 
 interface Props {
   signal: EnrichedRiskSignal;
+  /** Kur signalas suveikė, kai ta pati žyma apibendrina kelias dalis („Dalys 7, 19–20"). */
+  kontekstas?: string;
 }
 
-const { signal } = Astro.props as Props;
+const { signal, kontekstas } = Astro.props as Props;
 const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
 ---
 
@@ -17,6 +19,7 @@ const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
   <div class="risk-chip-tooltip" role="tooltip">
     <button type="button" class="risk-chip-close" aria-label="Uždaryti">×</button>
     <strong>{signal.titleLt}</strong>
+    {kontekstas && <p class="risk-chip-context">{kontekstas}</p>}
     {signal.descriptionLt && <p>{signal.descriptionLt}</p>}
     <div class="risk-chip-meta">Duomenys nuo {dataAsOfStr}</div>
     <button type="button" class="risk-chip-more" aria-expanded="false">daugiau informacijos</button>
@@ -61,7 +64,7 @@ const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
     left: 0;
     z-index: var(--z-tooltip);
     width: max-content;
-    max-width: 320px;
+    max-width: min(320px, calc(100vw - 16px));
     white-space: normal;
     background: var(--black);
     color: var(--white);
@@ -73,7 +76,9 @@ const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transform: translateY(2px);
+    /* --nuokrypis: horizontalus poslinkis, kurį skaičiuoja skriptas, kad prie
+       dešinio krašto esančio ženklo burbulas neišliptų už ekrano. */
+    transform: translate(var(--nuokrypis, 0px), 2px);
     transition: opacity var(--transition), transform var(--transition), visibility var(--transition), background var(--transition), color var(--transition);
   }
 
@@ -82,7 +87,7 @@ const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transform: translateY(0);
+    transform: translate(var(--nuokrypis, 0px), 0);
   }
 
   .risk-chip.force-hidden .risk-chip-tooltip {
@@ -101,6 +106,16 @@ const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
   :global(.dark) .risk-chip.is-open .risk-chip-tooltip {
     background: var(--color-danger);
     color: #fff;
+  }
+
+  /* Kai vienas burbulas jau atidarytas paspaudimu, hover kitų nebeatidaro:
+     kitaip vedžiojant pelę per gretimus ženklus šalia atviro burbulo mirgėtų
+     antras. Atviras ženklas iš taisyklės išimtas (`:not(.is-open)`). */
+  :global(body:has(.risk-chip.is-open)) .risk-chip:not(.is-open):hover .risk-chip-tooltip {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(var(--nuokrypis, 0px), 2px);
   }
 
   .risk-chip-tooltip p {
@@ -175,6 +190,10 @@ const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
     font-style: italic;
   }
 
+  .risk-chip-context {
+    font-weight: 600;
+  }
+
   .risk-chip-meta {
     margin-top: 8px;
     opacity: 0.6;
@@ -197,6 +216,49 @@ const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
     const details = chip.querySelector<HTMLElement>('.risk-chip-details');
     if (details) details.hidden = true;
   }
+
+  // The tooltip is anchored to the chip's left edge, so a chip sitting near the
+  // right side of the page would push it past the viewport. Measure it once it
+  // is about to be shown and slide it back inside with a horizontal offset.
+  function positionRiskChip(chip: HTMLElement) {
+    const tooltip = chip.querySelector<HTMLElement>('.risk-chip-tooltip');
+    if (!tooltip) return;
+    // Matuojam per `offsetWidth` ir ženklo poziciją, o ne per burbulo
+    // `getBoundingClientRect` — pastarasis grąžintų dar animuojamo `transform`
+    // vietą ir poslinkis skaičiuotųsi nuo savęs paties.
+    const marge = 8;
+    // clientWidth, o ne innerWidth — pastarasis įskaito slinkties juostą ir
+    // burbulas atsidurtų po ja.
+    const ekranas = document.documentElement.clientWidth;
+    const kaire = chip.getBoundingClientRect().left;
+    const plotis = tooltip.offsetWidth;
+    let dx = 0;
+    if (kaire + plotis > ekranas - marge) dx = ekranas - marge - kaire - plotis;
+    if (kaire + dx < marge) dx = marge - kaire;
+    tooltip.style.setProperty('--nuokrypis', `${Math.round(dx)}px`);
+  }
+
+  // mouseenter doesn't bubble, so hover is picked up through delegated mouseover.
+  document.addEventListener('mouseover', (event) => {
+    const chip = (event.target as HTMLElement).closest<HTMLElement>('.risk-chip');
+    if (chip) positionRiskChip(chip);
+  });
+
+  // Paslėptas burbulas iš layout'o neišnyksta (`visibility: hidden`), tad prie
+  // dešinio krašto esantis ženklas praplėsdavo puslapį ir telefone atsirasdavo
+  // horizontali slinktis. Todėl visus išdėliojam iš karto, o ne tik užvedus.
+  function positionAllRiskChips() {
+    document.querySelectorAll<HTMLElement>('.risk-chip').forEach(positionRiskChip);
+  }
+
+  const whenIdle = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1));
+  whenIdle(() => positionAllRiskChips());
+
+  let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(positionAllRiskChips, 100);
+  });
 
   // Hiding the tooltip (visibility/pointer-events) while the mouse sits on
   // top of it doesn't reliably fire mouseleave (the element silently drops
@@ -246,7 +308,14 @@ const dataAsOfStr = String(signal.dataAsOf).slice(0, 10);
       if (chip.classList.contains('is-open')) {
         closeRiskChip(chip);
       } else {
+        // Vienu metu atviras tik vienas burbulas — kitaip prie kelių greta
+        // esančių ženklų jie persidengia. Kitiems `force-hidden` nekliūva:
+        // pelė ne virš jų, tad pirmas `mousemove` jį nuima.
+        document.querySelectorAll<HTMLElement>('.risk-chip.is-open').forEach((kitas) => {
+          if (kitas !== chip) closeRiskChip(kitas);
+        });
         chip.classList.remove('force-hidden');
+        positionRiskChip(chip);
         chip.classList.add('is-open');
         trigger.setAttribute('aria-expanded', 'true');
       }

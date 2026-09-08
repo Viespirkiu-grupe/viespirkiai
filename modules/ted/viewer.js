@@ -782,6 +782,17 @@ function ltRegCode(reg, countryValue) {
     return value
 }
 
+/**
+ * Skelbimo antraštės duomenys (tipas, potipis, data) neišskleidžiant viso
+ * turinio. `buildTedNoticeViewModel` kiekvienam iš ~2000 laukų vykdo atskirą
+ * XPath užklausą — dideliame skelbime tai užtrunka kelias sekundes, o pirkimo
+ * puslapiui iš viso to reikia tik pavadinimo nuorodai.
+ */
+export function buildTedNoticeSummary(xmlString) {
+    const { doc } = parseXml(xmlString)
+    return detectNotice(doc)
+}
+
 export function buildTedNoticeViewModel(xmlString) {
     const { doc } = parseXml(xmlString)
     const notice = detectNotice(doc)

@@ -19,6 +19,7 @@ import FailasPasalintas from '../../components/failai/FailasPasalintas.astro';
 import FailoAntraste from '../../components/failai/FailoAntraste.astro';
 import PpaAtaskaita from '../../components/failai/PpaAtaskaita.astro';
 import { loadPpaByFailasId } from '../../lib/ppa.js';
+import config from '../../lib/config.ts';
 import { convertUnit } from '@/utils/units.js';
 
 const { id: rawId } = Astro.params;
@@ -50,10 +51,18 @@ if (format === 'json') {
 }
 
 let ppa = null;
+// Rizikos signalai ataskaitoje rodomi tie patys, kaip pirkimo puslapyje: PPA
+// ataskaitos `pirkimoNumeris` yra tas pats raktas, pagal kurį jie susieti su
+// `viesiejiPirkimai.pirkimoId` (žr. src/lib/ppa.ts `loadPpaForPirkimas`).
+let riskView = null;
 if (!isPasalintas) {
   failas = await enrichFailas(failas);
   if (failas.specialTypes?.includes('PPA') || failas.tipas === 'PPA') {
     ppa = await loadPpaByFailasId(failas.id);
+  }
+  if (ppa?.ataskaita?.pirkimoNumeris && config.riskEnableIndicatorsChips) {
+    const { loadProcurementRiskView } = await import('@/modules/risk/procurementDecisionsReader.ts');
+    riskView = await loadProcurementRiskView('cvpis', String(ppa.ataskaita.pirkimoNumeris));
   }
 }
 
@@ -262,7 +271,7 @@ const perziurosHref = failoPerziurosKelias(failas.id, { search, puslapis: page }
               <button type="button" class="failas-tab" role="tab" aria-selected="false" aria-controls="panel-failas" data-tab="failas">Failas</button>
             </div>
             <div id="panel-ataskaita" role="tabpanel">
-              <PpaAtaskaita ppa={ppa} />
+              <PpaAtaskaita ppa={ppa} riskView={riskView} />
             </div>
             <div id="panel-failas" role="tabpanel" hidden>
               <FailasPreview failas={failas} search={search} page={page} />
