@@ -159,6 +159,7 @@ export async function searchDokumentai(
     contentStateFilter: parts.contentStates,
     institutionNumberFilter: parts.institutionNumbers,
     registrationNumberFilter: parts.registrationNumbers,
+    processNumberFilter: parts.processNumbers,
     dateFrom: parts.dateFrom,
     dateTo: parts.dateTo,
     bbox: parts.bbox,

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { gautiNuosprendiPagalUuid } from "../../liteko/nuosprendisPagalUuid.js";
+import {
+    gautiNuosprendiPagalUuid,
+    gautiSusijusiusSprendimus,
+} from "../../liteko/nuosprendisPagalUuid.js";
 import { sliceDocumentText } from "./getDokumentasTekstas.js";
 
 const DEFAULT_CHARS = 12_000;
@@ -12,6 +15,10 @@ export const description =
     "Identifikatorių turi viespirkiai.org/teismoNuosprendis/<uuid> ir LITEKO adresai — galima paduoti ir visą tokį adresą. " +
     "Tinka ir senojo LITEKO UUID (df247241-d5d5-409c-b085-754cec5ac3f1), ir LITEKO2 id (09002711829c4977). " +
     "Kitai teksto daliai perduok atsakyme pateiktą sekantiPozicija. " +
+    "Grąžina ir kitus tos pačios bylos sprendimus (susijeSprendimai) — teisminio proceso nr. " +
+    "byloje nekinta, tad aukštesnės instancijos sprendimas, galėjęs šitą pakeisti ar panaikinti, " +
+    "randamas pagal jį; yraVelesniuSprendimu=true reiškia, kad byloje yra vėlesnių sprendimų " +
+    "ir šio negalima pateikti kaip galutinio nepatikrinus jų. " +
     "Pagal bylos numerį ar turinį sprendimų ieškok su search_dokumentai (type=teismoNuosprendis).";
 
 export const schema = {
@@ -61,6 +68,11 @@ export async function handler({ uuid, pozicija = 0, kiekis = DEFAULT_CHARS }) {
     if (!sprendimas) return error(`Teismo sprendimas su LITEKO ID ${id} nerastas.`);
 
     const { n, saltinis, dalyviai, kategorijos, teisejai, vieta, tekstas } = sprendimas;
+    const susijeSprendimai = await gautiSusijusiusSprendimus(n.teisminisProcesoNr, n.litekoId);
+    // Vėlesnis tos pačios bylos sprendimas šitą galėjo pakeisti ar panaikinti.
+    const yraVelesniu = susijeSprendimai.some(
+        (s) => isoData(s.data) && isoData(n.data) && isoData(s.data) > isoData(n.data),
+    );
     const fullText = tekstas ?? "";
     if (pozicija > fullText.length) {
         return error(
@@ -97,6 +109,20 @@ export async function handler({ uuid, pozicija = 0, kiekis = DEFAULT_CHARS }) {
             vaidmuo: d.bylojeKaip || null,
             // 9 skaitmenų kodas — JAR kodas, tinkantis get_juridinis įrankiui.
             jarKodas: d.isJar ? d.kodas : null,
+        })),
+        // Byloje gali būti vėlesnių (t. y. galimai šitą pakeitusių) sprendimų.
+        yraVelesniuSprendimu: yraVelesniu,
+        susijeSprendimai: susijeSprendimai.map((s) => ({
+            litekoId: s.litekoId,
+            saltinis: s.saltinis,
+            bylosNumeris: s.bylosNumeris ?? null,
+            teismas: s.teismas ?? null,
+            teismoRumai: s.teismoRumai ?? null,
+            instancija: s.instancija ?? null,
+            sprendimoTipas: s.sprendimoTipas ?? null,
+            data: isoData(s.data),
+            velesnisUzSi: !!(isoData(s.data) && isoData(n.data) && isoData(s.data) > isoData(n.data)),
+            viespirkiaiUrl: `https://viespirkiai.org/teismoNuosprendis/${encodeURIComponent(s.litekoId)}`,
         })),
         litekoUrl: sprendimas.litekoUrl,
         viespirkiaiUrl: `https://viespirkiai.org/teismoNuosprendis/${encodeURIComponent(n.litekoId)}`,

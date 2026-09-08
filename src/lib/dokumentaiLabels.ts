@@ -79,6 +79,7 @@ export const DOKUMENTAI_PARAM_LABELS: Record<string, string> = {
   metai: 'Metai',
   istaigosNr: 'Įstaigos numeris',
   regNr: 'Registracijos numeris',
+  teisminisProcesas: 'Teisminio proceso nr.',
   nuo: 'Data nuo',
   iki: 'Data iki',
   mode: 'Paieškos režimas',

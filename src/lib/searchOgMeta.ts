@@ -259,6 +259,7 @@ const ROUTES: Record<SearchRoute, RouteSpec> = {
       metai: { multi: true },
       istaigosNr: { multi: true },
       regNr: { multi: true },
+      teisminisProcesas: { multi: true },
       nuo: { format: isoDate },
       iki: { format: isoDate },
       sort: { format: dokumentaiSortLabel },

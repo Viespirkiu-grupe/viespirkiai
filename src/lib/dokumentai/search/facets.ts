@@ -46,6 +46,7 @@ const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   'metadata.turinioBusena': 'excludeContentState',
   'metadata.istaigosNr': 'excludeInstitutionNumber',
   'metadata.registracijosNr': 'excludeRegistrationNumber',
+  'metadata.teisminisProcesoNr': 'excludeProcessNumber',
 };
 
 export async function dokumentaiFacetOptions(

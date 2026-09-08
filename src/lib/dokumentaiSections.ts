@@ -32,6 +32,7 @@ export interface FiltersData {
   contentState: DokFacet;
   institutionNumber: string | null;
   registrationNumber: string | null;
+  processNumber: string | null;
   dateFrom: string | null;
   dateTo: string | null;
   source: DokFacet;

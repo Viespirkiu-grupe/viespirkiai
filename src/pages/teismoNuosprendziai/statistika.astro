@@ -1,0 +1,224 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import DetailsSection from '@design-system/components/DetailsSection.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import BarList from '@design-system/components/BarList.astro';
+import Alert from '@design-system/components/Alert.astro';
+import { gautiNuosprendziuStatistika } from '../../lib/teismoNuosprendziaiStatistika.ts';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+import config from '../../lib/config.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+let stat: Awaited<ReturnType<typeof gautiNuosprendziuStatistika>> | null = null;
+let klaida: string | null = null;
+try {
+  stat = await gautiNuosprendziuStatistika();
+} catch (cause: any) {
+  klaida = cause?.message ?? String(cause);
+}
+
+const sk = (value: number) => Number(value || 0).toLocaleString('lt-LT');
+const dal = (value: number, skaitmenys = 2) =>
+  Number(value || 0).toLocaleString('lt-LT', { maximumFractionDigits: skaitmenys });
+const proc = (value: number) => `${dal(value, 1)} %`;
+
+// Paieška, parodanti visus vieno teisminio proceso sprendimus.
+const procesoUrl = (nr: string) =>
+  `/dokumentai?klase=teise&teisminisProcesas=${encodeURIComponent(nr)}`;
+
+// Tiksliai suskaičiuoti procesai — visi, išskyrus išvestinę apatinę eilutę.
+const tiksluProcesu = stat
+  ? stat.skirstinys.filter((e) => !e.apytiksliai).reduce((suma, e) => suma + e.procesai, 0)
+  : 0;
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=300');
+---
+
+<Layout
+  pageTitle="Teismo sprendimų statistika"
+  pageDescription="Kiek sprendimų priimama viename teisminiame procese, kaip bylos keliauja per instancijas"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext">Teismo nuosprendžiai</Fragment>
+      Sprendimų statistika
+    </PageHeader>
+
+    {klaida && (
+      <Alert variant="danger" icon="✕" title="Statistikos suskaičiuoti nepavyko">
+        {klaida}
+      </Alert>
+    )}
+
+    {stat && (
+      <>
+        <p class="tns-ivadas">
+          Viskas skaičiuojama pagal <strong>teisminio proceso numerį</strong>: bylai keliaujant
+          per instancijas jis nekinta, tad juo visi vienos bylos sprendimai suvedami į vieną
+          teisminį procesą. Skaičiuoja Quickwit agregacijos ant paieškos indekso — čia jau suvesti
+          abu šaltiniai (senasis LITEKO ir LITEKO2).
+        </p>
+
+        <MetricCardGrid className="mb-7" minWidth="200px">
+          <MetricCard label="Sprendimų" value={sk(stat.sprendimai)} />
+          <MetricCard
+            label="Teisminių procesų"
+            value={sk(stat.procesai)}
+            meta="apytiksliai (HyperLogLog++)"
+          />
+          <MetricCard
+            label="Sprendimų viename procese"
+            value={dal(stat.sprendimuProcese)}
+            meta="vidurkis"
+          />
+          <MetricCard
+            label={`Procesų su ${stat.skirstinioRiba}+ sprendimais`}
+            value={sk(tiksluProcesu)}
+            meta={proc((tiksluProcesu / (stat.procesai || 1)) * 100)}
+          />
+        </MetricCardGrid>
+
+        <DetailsSection title="Kiek sprendimų turi vienas procesas" className="mb-7">
+          <p class="text-muted tns-info">
+            Nuo {stat.skirstinioRiba} sprendimų skaičiai tikslūs — tiek procesų suskaičiuota
+            po vieną. Žemesnė eilutė išvesta iš bendro procesų skaičiaus, tad apytikslė.
+          </p>
+          <BarList
+            className="tns-bars"
+            items={stat.skirstinys.map((e) => ({
+              label: `${e.etikete} sprend.${e.apytiksliai ? ' ≈' : ''}`,
+              value: e.procesai,
+              title: `${sk(e.procesai)} procesų`,
+            }))}
+            formatValue={sk}
+          />
+        </DetailsSection>
+
+        <DetailsSection title="Daugiausiai sprendimų turintys procesai" className="mb-7">
+          <DataTable
+            wrapperClassName="tns-wrap"
+            columns={[
+              { label: 'Teisminio proceso nr.' },
+              { label: 'Sprendimų', className: 'cell-right' },
+            ]}
+          >
+            {stat.daugiausiaiSprendimu.map((e) => (
+              <tr>
+                <td class="cell-mono cell-nowrap">
+                  <a href={procesoUrl(e.procesoNr)}>{e.procesoNr}</a>
+                </td>
+                <td class="cell-right cell-mono">{sk(e.sprendimai)}</td>
+              </tr>
+            ))}
+          </DataTable>
+        </DetailsSection>
+
+        <DetailsSection title="Instancijos" className="mb-7">
+          <p class="text-muted tns-info">
+            Eilučių sumuoti negalima: tas pats procesas patenka į kelias instancijas.
+            Dalis skaičiuojama nuo visų {sk(stat.procesai)} procesų. „Pirmosios/apeliacinės
+            instancijos“ — LITEKO žymė teismams, sprendžiantiems abiem vaidmenimis, tad
+            apeliacijų dalis iš tikrųjų didesnė, nei rodo atskira apeliacinės eilutė.
+          </p>
+          <DataTable
+            wrapperClassName="tns-wrap"
+            columns={[
+              { label: 'Instancija' },
+              { label: 'Sprendimų', className: 'cell-right' },
+              { label: 'Procesų', className: 'cell-right' },
+              { label: 'Visų procesų dalis', className: 'cell-right' },
+              { label: 'Sprendimų procese', className: 'cell-right' },
+            ]}
+          >
+            {stat.instancijos.map((e) => (
+              <tr>
+                <td>{e.instancija}</td>
+                <td class="cell-right cell-mono">{sk(e.sprendimai)}</td>
+                <td class="cell-right cell-mono">{sk(e.procesai)}</td>
+                <td class="cell-right cell-mono">{proc(e.daliesProcentai)}</td>
+                <td class="cell-right cell-mono">{dal(e.sprendimuProcese)}</td>
+              </tr>
+            ))}
+          </DataTable>
+        </DetailsSection>
+
+        <DetailsSection title="Sprendimai per metus" className="mb-7">
+          <BarList
+            className="tns-bars"
+            items={stat.metai.map((m) => ({ label: m.reiksme, value: m.kiekis }))}
+            formatValue={sk}
+          />
+        </DetailsSection>
+
+        <div class="tns-stulpeliai">
+          <DetailsSection title="Teismai" className="mb-7">
+            <BarList
+              className="tns-bars"
+              items={stat.teismai.map((t) => ({ label: t.reiksme, value: t.kiekis }))}
+              formatValue={sk}
+            />
+          </DetailsSection>
+
+          <DetailsSection title="Bylų rūšys" className="mb-7">
+            <BarList
+              className="tns-bars"
+              items={stat.bylosRusys.map((r) => ({ label: r.reiksme, value: r.kiekis }))}
+              formatValue={sk}
+            />
+          </DetailsSection>
+        </div>
+
+        <DetailsSection
+          title="Šaltiniai"
+          className="mb-7"
+          items={[
+            ...stat.saltiniai.map((s) => ({
+              label: s.reiksme === 'liteko2' ? 'LITEKO2 (viešasis API)' : 'Senasis LITEKO',
+              value: sk(s.kiekis),
+            })),
+            { label: 'Skaičiavimo trukmė', value: `${sk(stat.trukmeMs)} ms` },
+          ]}
+        />
+      </>
+    )}
+  </main>
+</Layout>
+
+<style>
+  .tns-ivadas {
+    max-width: 70ch;
+    margin: 0 0 24px;
+    line-height: 1.7;
+  }
+
+  .tns-info {
+    max-width: 70ch;
+    margin: 0 0 12px;
+    font-size: var(--text-sm);
+  }
+
+  :global(.table-wrapper.tns-wrap) {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .tns-bars {
+    max-width: 720px;
+  }
+
+  @media (min-width: 900px) {
+    .tns-stulpeliai {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 36px;
+    }
+  }
+</style>

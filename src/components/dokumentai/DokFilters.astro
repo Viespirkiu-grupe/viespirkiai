@@ -24,7 +24,28 @@ const otherCount = p.author.filter.length + p.creator.filter.length + p.producer
 
   <div class="dok-filters-body" id="dokFiltersBody">
     {s.top.map((x) => <DokFacetSection {...x} />)}
-    {p.showVerdictFacets && s.verdict.map((x) => <DokFacetSection {...x} />)}
+    {p.showVerdictFacets && (
+      <>
+        {s.verdict.map((x) => <DokFacetSection {...x} />)}
+        {/* Teisminio proceso nr. – ne fasetė: reikšmių ~1.2 mln., sąrašo nebūtų
+            prasmės rodyti. Įvedus surenkami visi vienos bylos sprendimai per
+            visas instancijas. */}
+        <section class="dok-filter-section">
+          <span class="dok-filter-section-label">Teisminio proceso nr.</span>
+          <form class="dok-input-form" data-dok-text-filter="teisminisProcesas" autocomplete="off">
+            <input
+              type="text"
+              class="dok-input"
+              name="teisminisProcesas"
+              value={p.processNumber ?? ''}
+              placeholder="pvz. 2-55-3-00930-2013-3"
+              aria-label="Teisminio proceso nr."
+            />
+            <button type="submit" class="dok-input-btn" aria-label="Taikyti">→</button>
+          </form>
+        </section>
+      </>
+    )}
     {p.showTeisekuraFacets && (
       <>
         {s.teisekura.map((x) => <DokFacetSection {...x} />)}

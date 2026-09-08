@@ -67,6 +67,10 @@ const FACETS = [
   { key: 'contentStates', param: 'turinys', field: 'metadata.turinioBusena', exclude: 'excludeContentState', kind: 'term', quote: true, parse: 'array' },
   { key: 'institutionNumbers', param: 'istaigosNr', field: 'metadata.istaigosNr', exclude: 'excludeInstitutionNumber', kind: 'term', quote: true, parse: 'array' },
   { key: 'registrationNumbers', param: 'regNr', field: 'metadata.registracijosNr', exclude: 'excludeRegistrationNumber', kind: 'term', quote: true, parse: 'array' },
+  // Teisminio proceso nr. byloje nekinta, tad juo surenkami visi vienos bylos
+  // sprendimai per visas instancijas. Reikšmių ~1.2 mln., tad šoninio fasečių
+  // sąrašo neturi — tik filtras iš nuorodos (kaip istaigosNr / regNr).
+  { key: 'processNumbers', param: 'teisminisProcesas', field: 'metadata.teisminisProcesoNr', exclude: 'excludeProcessNumber', kind: 'term', quote: true, parse: 'array' },
   { key: 'hosts', param: 'host', field: 'host', exclude: 'excludeHost', kind: 'term', quote: true, parse: 'split', inline: 'hosts' },
   { key: 'jars', param: 'jar', field: 'jarKodai', exclude: 'excludeJar', kind: 'jar', quote: false, parse: 'split', inline: 'jars' },
   { key: 'istaigos', param: 'istaiga', field: 'istaigaJar', exclude: 'excludeIstaiga', kind: 'term', quote: true, parse: 'split' },

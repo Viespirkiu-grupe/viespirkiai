@@ -61,6 +61,7 @@ export async function loadDokumentaiPage(url: URL) {
   const rawContentStateFilter = params.getAll('turinys').filter(Boolean);
   const rawInstitutionNumberFilter = params.getAll('istaigosNr').filter(Boolean);
   const rawRegistrationNumberFilter = params.getAll('regNr').filter(Boolean);
+  const rawProcessNumberFilter = params.getAll('teisminisProcesas').filter(Boolean);
   const rawDateFrom = params.get('nuo') ?? undefined;
   const rawDateTo = params.get('iki') ?? undefined;
 
@@ -108,6 +109,7 @@ export async function loadDokumentaiPage(url: URL) {
       rawContentStateFilter.forEach((value) => sp.append('turinys', value));
       rawInstitutionNumberFilter.forEach((value) => sp.append('istaigosNr', value));
       rawRegistrationNumberFilter.forEach((value) => sp.append('regNr', value));
+      rawProcessNumberFilter.forEach((value) => sp.append('teisminisProcesas', value));
       if (rawDateFrom) sp.set('nuo', rawDateFrom);
       if (rawDateTo) sp.set('iki', rawDateTo);
       sp.set('mode', mode);
@@ -124,6 +126,7 @@ export async function loadDokumentaiPage(url: URL) {
     || rawCourtFilter.length || rawCaseTypeFilter.length || rawCategoryFilter.length || rawJudgeFilter.length
     || rawActTypeFilter.length || rawValidityFilter.length || rawEditionTypeFilter.length || rawProjectStatusFilter.length || rawEurovocFilter.length
     || rawAdoptedByFilter.length || rawContentStateFilter.length || rawInstitutionNumberFilter.length || rawRegistrationNumberFilter.length
+    || rawProcessNumberFilter.length
     || rawDateFrom || rawDateTo
     || hasArea,
   );
@@ -160,6 +163,7 @@ export async function loadDokumentaiPage(url: URL) {
     turinys: rawContentStateFilter,
     istaigosNr: rawInstitutionNumberFilter,
     regNr: rawRegistrationNumberFilter,
+    teisminisProcesas: rawProcessNumberFilter,
     nuo: rawDateFrom,
     iki: rawDateTo,
     minLat: rawArea.minLat,
@@ -261,6 +265,7 @@ export async function loadDokumentaiPage(url: URL) {
   const contentStateFilter = result?.contentStateFilter ?? [];
   const institutionNumberFilter = result?.institutionNumberFilter ?? [];
   const registrationNumberFilter = result?.registrationNumberFilter ?? [];
+  const processNumberFilter = result?.processNumberFilter ?? [];
   const dateFrom = result?.dateFrom ?? null;
   const dateTo = result?.dateTo ?? null;
   const typeCountMap = result?.typeCountMap ?? {};
@@ -299,6 +304,7 @@ export async function loadDokumentaiPage(url: URL) {
     turinys: contentStateFilter,
     istaigosNr: institutionNumberFilter,
     regNr: registrationNumberFilter,
+    teisminisProcesas: processNumberFilter,
     nuo: dateFrom,
     iki: dateTo,
     area: bbox,
@@ -329,7 +335,7 @@ export async function loadDokumentaiPage(url: URL) {
 
   const showVerdictFacets = classFilter.includes('teise')
     || courtFilter.length > 0 || caseTypeFilter.length > 0
-    || categoryFilter.length > 0 || judgeFilter.length > 0;
+    || categoryFilter.length > 0 || judgeFilter.length > 0 || processNumberFilter.length > 0;
   const showTeisekuraFacets = classFilter.includes('teisekura')
     || actTypeFilter.length > 0 || validityFilter.length > 0 || editionTypeFilter.length > 0
     || projectStatusFilter.length > 0 || eurovocFilter.length > 0;
@@ -343,6 +349,7 @@ export async function loadDokumentaiPage(url: URL) {
     + courtFilter.length + caseTypeFilter.length + categoryFilter.length + judgeFilter.length
     + actTypeFilter.length + validityFilter.length + editionTypeFilter.length + projectStatusFilter.length + eurovocFilter.length
     + adoptedByFilter.length + contentStateFilter.length + institutionNumberFilter.length + registrationNumberFilter.length
+    + processNumberFilter.length
     + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
     + (bbox ? 1 : 0);
 
@@ -400,6 +407,7 @@ export async function loadDokumentaiPage(url: URL) {
       contentState: facet('turinys', contentStateFilter, result?.contentStateOptions, 8),
       institutionNumber: institutionNumberFilter[0] ?? null,
       registrationNumber: registrationNumberFilter[0] ?? null,
+      processNumber: processNumberFilter[0] ?? null,
       dateFrom,
       dateTo,
       source: facet('source', sourceFilter, result?.sourceOptions, 8),

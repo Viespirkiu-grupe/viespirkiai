@@ -12,6 +12,9 @@ import { postgres } from "../../postgres/postgres.js";
 import { readDocumentFs } from "../documents/documentsFs.js";
 import { readLiteko2Sidecar } from "../liteko2/sidecar.js";
 
+/** Kiek daugiausiai tos pačios bylos sprendimų rodom. */
+const SUSIJUSIU_RIBA = 50;
+
 /** Nuvalo sprendimo tekstą rodymui: eilučių pradžios tarpai, >1 tuščia eilutė. */
 export function valytiNuosprendzioTeksta(text) {
     if (!text) return null;
@@ -116,6 +119,93 @@ async function gautiKategorijas(saltinis, sprendimoId) {
     return rows.filter((k) => k.pavadinimas);
 }
 
+/** Grąžina reikšmę tik jei ji yra UUID – LITEKO2 id į `uuid` stulpelį nekastinasi. */
+function uuidArba(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value ?? "")
+        ? value
+        : null;
+}
+
+/** `YYYY-MM-DD` iš datos – dublikatų raktui ir palyginimams. */
+function dienaISO(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+/**
+ * Kiti tos pačios bylos sprendimai – pagal teisminio proceso numerį.
+ *
+ * Teisminio proceso nr. byloje nekinta, kai byla keliauja per instancijas, tad
+ * aukštesnės instancijos sprendimas (galėjęs šitą pakeisti ar panaikinti)
+ * randamas būtent pagal jį. Ieškom abiejuose šaltiniuose – byla galėjo prasidėti
+ * senajame LITEKO ir baigtis LITEKO2.
+ *
+ * @param {string|null} teisminisProcesoNr
+ * @param {string} dabartinisId einamojo sprendimo id – jo sąraše nerodom.
+ * @returns {Promise<Array<object>>} naujausi pirmi.
+ */
+export async function gautiSusijusiusSprendimus(teisminisProcesoNr, dabartinisId) {
+    if (!teisminisProcesoNr) return [];
+
+    // Senojo LITEKO pusėje einam į bazinę lentelę, o ne į `nuosprendziaiPilni` –
+    // taip garantuotai suveikia nuosprendziai_teisminisProcesoNr_idx
+    // (migrations/liteko/001_teisminisProcesoNrIndeksas.sql).
+    const [{ rows: litekoRows }, { rows: liteko2Rows }] = await Promise.all([
+        postgres.query(
+            `SELECT n."litekoId", n."bylosNumeris", n.data,
+                    t.teismas, t.rumai AS "teismoRumai", t.instancija,
+                    NULL::text AS "sprendimoTipas"
+               FROM liteko.nuosprendziai n
+               LEFT JOIN liteko.teismai t ON t.id = n."teismasId"
+              WHERE n."teisminisProcesoNr" = $1
+                AND n."litekoId" IS DISTINCT FROM $2::uuid
+              ORDER BY n.data DESC
+              LIMIT $3`,
+            [teisminisProcesoNr, uuidArba(dabartinisId), SUSIJUSIU_RIBA],
+        ),
+        postgres.query(
+            `SELECT s."liteko2Id" AS "litekoId", s."bylosNumeris",
+                    s."sprendimoData" AS data, t.pavadinimas AS teismas,
+                    r.pavadinimas AS "teismoRumai", NULL::text AS instancija,
+                    dt.pavadinimas AS "sprendimoTipas"
+               FROM liteko2."sprendimai" s
+               LEFT JOIN liteko2."teismai" t ON t."liteko2Id" = s."teismoId"
+               LEFT JOIN liteko2."teismai" r ON r."liteko2Id" = s."rumuId"
+               LEFT JOIN liteko2."dokumentuTipai" dt ON dt."liteko2Id" = s."sprendimoTipoId"
+              WHERE s."teisminisProcesoNr" = $1
+                AND s."liteko2Id" <> $2
+                AND s.atsauktas = false
+              ORDER BY s."sprendimoData" DESC
+              LIMIT $3`,
+            [teisminisProcesoNr, dabartinisId, SUSIJUSIU_RIBA],
+        ),
+    ]);
+
+    const visi = [
+        ...litekoRows.map((r) => ({ ...r, saltinis: "liteko" })),
+        ...liteko2Rows.map((r) => ({ ...r, saltinis: "liteko2" })),
+    ];
+
+    // Perėjimo laikotarpiu tas pats sprendimas gali gulėti abiejuose šaltiniuose
+    // skirtingais id. Tas pats teismas toje pačioje byloje tą pačią dieną to
+    // paties numerio sprendimo du kartus nepriima, tad dubliui atpažinti
+    // (bylosNumeris, diena, teismas) pakanka. Paliekam LITEKO2 eilutę – tas
+    // šaltinis tebeatnaujinamas ir turi sprendimo tipą.
+    const pagalRakta = new Map();
+    for (const s of visi) {
+        const raktas = [s.bylosNumeris, dienaISO(s.data), s.teismas].join("|");
+        const esamas = pagalRakta.get(raktas);
+        if (!esamas || (esamas.saltinis === "liteko" && s.saltinis === "liteko2")) {
+            pagalRakta.set(raktas, s);
+        }
+    }
+
+    return [...pagalRakta.values()]
+        .sort((a, b) => new Date(b.data ?? 0) - new Date(a.data ?? 0))
+        .slice(0, SUSIJUSIU_RIBA);
+}
+
 /**
  * Sprendimas pagal LITEKO/LITEKO2 identifikatorių.
  *
@@ -132,6 +222,8 @@ export async function gautiNuosprendiPagalUuid(uuid) {
     if (!rastas) return null;
     const { saltinis, n } = rastas;
 
+    // Susijusių bylos sprendimų čia netraukiam – jų reikia tik MCP atsakymui,
+    // o puslapiui tai būtų dvi užklausos kiekvienam peržiūrėjimui.
     const [dalyviai, kategorijos] = await Promise.all([
         gautiDalyvius(saltinis, n.id),
         gautiKategorijas(saltinis, n.id),

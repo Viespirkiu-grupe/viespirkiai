@@ -41,6 +41,7 @@ export interface DokumentaiSearchInput {
   turinys?: string | string[];
   istaigosNr?: string | string[];
   regNr?: string | string[];
+  teisminisProcesas?: string | string[];
   nuo?: string;
   iki?: string;
   minLat?: string | number;
@@ -169,6 +170,7 @@ export interface DokumentaiSearchResult {
   contentStateFilter: string[];
   institutionNumberFilter: string[];
   registrationNumberFilter: string[];
+  processNumberFilter: string[];
   dateFrom: string | null;
   dateTo: string | null;
   bbox: Bbox | null;

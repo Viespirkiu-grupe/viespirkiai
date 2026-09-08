@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     gautiNuosprendiPagalUuid: vi.fn(),
+    gautiSusijusiusSprendimus: vi.fn(),
 }));
 
 vi.mock("../../modules/liteko/nuosprendisPagalUuid.js", () => ({
     gautiNuosprendiPagalUuid: mocks.gautiNuosprendiPagalUuid,
+    gautiSusijusiusSprendimus: mocks.gautiSusijusiusSprendimus,
 }));
 
 import {
@@ -54,6 +56,7 @@ describe("get_teismo_nuosprendis", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.gautiNuosprendiPagalUuid.mockResolvedValue(sprendimas());
+        mocks.gautiSusijusiusSprendimus.mockResolvedValue([]);
     });
 
     it("grąžina bylos duomenis, dalyvius ir tekstą dalimis", async () => {
@@ -102,6 +105,41 @@ describe("get_teismo_nuosprendis", () => {
     it("grąžina klaidą, kai pozicija už teksto pabaigos", async () => {
         const result = klaida(await handler({ uuid: UUID, pozicija: 9999 }));
         expect(result.isError).toBe(true);
+    });
+
+    it("pažymi tos pačios bylos vėlesnius sprendimus", async () => {
+        mocks.gautiSusijusiusSprendimus.mockResolvedValue([
+            {
+                litekoId: "09002711829c4977",
+                saltinis: "liteko2",
+                bylosNumeris: "e2A-118-1138/2026",
+                teismas: "Lietuvos apeliacinis teismas",
+                teismoRumai: null,
+                instancija: null,
+                sprendimoTipas: "Nutartis",
+                data: new Date("2026-05-20T00:00:00Z"),
+            },
+            {
+                litekoId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                saltinis: "liteko",
+                bylosNumeris: "e2YT-954-1138/2025",
+                teismas: "Šiaulių apylinkės teismas",
+                teismoRumai: null,
+                instancija: "I",
+                sprendimoTipas: null,
+                data: new Date("2025-11-02T00:00:00Z"),
+            },
+        ]);
+
+        const result = payload(await handler({ uuid: UUID }));
+        expect(result.yraVelesniuSprendimu).toBe(true);
+        expect(result.susijeSprendimai).toHaveLength(2);
+        expect(result.susijeSprendimai[0].data).toBe("2026-05-20");
+        expect(result.susijeSprendimai[0].velesnisUzSi).toBe(true);
+        expect(result.susijeSprendimai[0].viespirkiaiUrl).toBe(
+            "https://viespirkiai.org/teismoNuosprendis/09002711829c4977",
+        );
+        expect(result.susijeSprendimai[1].velesnisUzSi).toBe(false);
     });
 
     it("išrenka identifikatorių iš adreso", () => {

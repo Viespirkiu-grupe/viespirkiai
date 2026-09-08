@@ -271,10 +271,12 @@ describe('buildParts characterization (query-string stability)', () => {
   it('produces identical parsed structures and query strings', () => {
     const parsed = buildPartsOpts(RICH);
     const parsedPhrase = buildPartsOpts(PHRASE);
-    const withoutETarFacets = ({ adoptedBy: _a, contentStates: _c, institutionNumbers: _i, registrationNumbers: _r, dateFrom: _f, dateTo: _t, ...rest }: any) => rest;
+    // Vėliau pridėtos fasetės (e-TAR laukai, teisminio proceso nr.) BASELINE
+    // neįeina – jos nemodifikuoja nė vienos užfiksuotos užklausos eilutės.
+    const withoutNewerFacets = ({ adoptedBy: _a, contentStates: _c, institutionNumbers: _i, registrationNumbers: _r, processNumbers: _p, dateFrom: _f, dateTo: _t, ...rest }: any) => rest;
     const out: Record<string, unknown> = {
-      parsed: withoutETarFacets(parsed),
-      parsedPhrase: withoutETarFacets(parsedPhrase),
+      parsed: withoutNewerFacets(parsed),
+      parsedPhrase: withoutNewerFacets(parsedPhrase),
       base: buildPartsExcluding(parsed as any),
       phraseBase: buildPartsExcluding(parsedPhrase as any),
     };
