@@ -1,5 +1,5 @@
 import type { Lentele, Rysys } from './tipai.ts';
-import { lentelesUrl } from './grupes.ts';
+import { lentelesUrl } from './schemos.ts';
 import { rodomasVardas } from './formatavimas.ts';
 import {
   ANTRASTES_AUKSTIS,
@@ -69,7 +69,7 @@ function sutrumpinti(tekstas: string, plotisPx: number, simbolioPlotis: number):
 
 function piestiMazga(mazgas: IsdestytasMazgas): string {
   const { lentele, x, y, plotis, aukstis } = mazgas;
-  const url = lentelesUrl(lentele.grupe.raktas, lentele.schema, lentele.vardas);
+  const url = lentelesUrl(lentele.schema, lentele.vardas);
   const pavadinimas = rodomasVardas(lentele.schema, lentele.vardas);
   const vidus = plotis - VIDINE_PARASTE * 2;
   const antraste = sutrumpinti(rodomaAntraste(lentele), vidus, ANTRASTES_SIMBOLIS);

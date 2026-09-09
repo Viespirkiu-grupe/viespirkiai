@@ -8,14 +8,13 @@ export const GET: APIRoute = async () => {
   const kunas = {
     sudaryta: modelis.sudaryta,
     metrikos: modelis.metrikos,
-    grupes: modelis.grupes,
+    schemos: modelis.schemos,
     rysiai: modelis.rysiai,
     lenteles: modelis.lenteles.map((l) => ({
       raktas: l.raktas,
       schema: l.schema,
       vardas: l.vardas,
       aprasymas: l.aprasymas,
-      grupe: l.grupe.raktas,
       eiluciuIvertis: l.eiluciuIvertis,
       bendrasDydis: l.bendrasDydis,
       meta: l.meta,

@@ -8,8 +8,8 @@ import Badge from '@design-system/components/Badge.astro';
 import Alert from '@design-system/components/Alert.astro';
 import config from '../../../../lib/config.ts';
 import { getColorScheme, getFont } from '../../../../lib/failai.ts';
-import { gautiSchemosModeli, kaimynyste, rasti } from '../../../../lib/dbSchema/modelis.ts';
-import { grupesUrl, lentelesUrl } from '../../../../lib/dbSchema/grupes.ts';
+import { gautiSchemosModeli, kaimynyste } from '../../../../lib/dbSchema/modelis.ts';
+import { lentelesUrlIsRakto, schemosUrl } from '../../../../lib/dbSchema/schemos.ts';
 import { piestiSvg } from '../../../../lib/dbSchema/erDiagrama.ts';
 import {
   dydis, eiluciuKiekis, kodoNuoroda, ribojimoPavadinimas, rodomasVardas, trumpasTipas,
@@ -18,18 +18,14 @@ import {
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-const { lentele: segmentas } = Astro.params;
 const modelis = await gautiSchemosModeli();
 
 // Vardas iš URL niekada nepatenka į SQL – ieškom jau įkeltame modelyje.
-const lentele = rasti(modelis, segmentas ?? '');
+// Schema yra rakto dalis, tad adresas vienareikšmis ir kanonizuoti nėra ko.
+const lentele = modelis.pagalRakta.get(`${Astro.params.schema}.${Astro.params.lentele}`);
 if (!lentele) return Astro.redirect('/duomenys/lenteles');
 
-// Kanonizacija: jei grupė URL'e neteisinga, nukreipiam į teisingą adresą.
-if (Astro.params.grupe !== lentele.grupe.raktas) {
-  return Astro.redirect(lentelesUrl(lentele.grupe.raktas, lentele.schema, lentele.vardas), 301);
-}
-
+const schema = modelis.schemosPagalVarda.get(lentele.schema);
 const pavadinimas = rodomasVardas(lentele.schema, lentele.vardas);
 
 const isEina = modelis.rysiai.filter((r) => r.is === lentele.raktas);
@@ -42,12 +38,14 @@ const diagrama = piestiSvg(aplinka.lenteles, aplinka.rysiai, {
 });
 
 const meta = lentele.meta;
-const saltinis = meta?.saltinis ?? lentele.grupe.saltinis;
-const saltinioUrl = meta?.saltinioUrl ?? lentele.grupe.saltinioUrl;
+const saltinis = meta?.saltinis ?? schema?.saltinis ?? null;
+const saltinioUrl = meta?.saltinioUrl ?? schema?.saltinioUrl ?? null;
 
 const pagrindas: Array<{ label: string; value?: unknown; html?: string }> = [
-  { label: 'Grupė', html: `<a href="${grupesUrl(lentele.grupe.raktas)}">${lentele.grupe.pavadinimas}</a>` },
-  { label: 'Schema', value: lentele.schema },
+  {
+    label: 'Schema',
+    html: `<a href="${schemosUrl(lentele.schema)}">${schema?.pavadinimas ?? lentele.schema}</a>`,
+  },
   {
     label: 'Šaltinis',
     html: saltinis
@@ -75,7 +73,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
   <main>
     <PageHeader>
       <Fragment slot="subtext">
-        <a href="/duomenys/lenteles">Lentelės</a> / <a href={grupesUrl(lentele.grupe.raktas)}>{lentele.grupe.pavadinimas}</a>
+        <a href="/duomenys/lenteles">Lentelės</a> / <a href={schemosUrl(lentele.schema)}>{schema?.pavadinimas ?? lentele.schema}</a>
       </Fragment>
       <span class="cell-mono">{pavadinimas}</span>
     </PageHeader>
@@ -134,11 +132,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
             <td class="cell-nowrap">
               {s.arPirminis && <Badge variant="primary">PK</Badge>}
               {s.isorinisRaktas && (
-                <a href={lentelesUrl(
-                  modelis.pagalRakta.get(s.isorinisRaktas)?.grupe.raktas ?? lentele.grupe.raktas,
-                  s.isorinisRaktas.split('.')[0],
-                  s.isorinisRaktas.split('.').slice(1).join('.'),
-                )}><Badge variant="info">FK</Badge></a>
+                <a href={lentelesUrlIsRakto(s.isorinisRaktas)}><Badge variant="info">FK</Badge></a>
               )}
               {s.arButinas && <Badge variant="muted">NOT NULL</Badge>}
               {s.generuota && <Badge variant="muted">generuota</Badge>}
@@ -160,11 +154,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
               {isEina.map((r) => (
                 <li>
                   <code>{r.stulpeliai.join(', ')}</code> →{' '}
-                  <a href={lentelesUrl(
-                    modelis.pagalRakta.get(r.i)?.grupe.raktas ?? lentele.grupe.raktas,
-                    r.i.split('.')[0],
-                    r.i.split('.').slice(1).join('.'),
-                  )} class="cell-mono">{r.i.replace(/^public\./, '')}</a>
+                  <a href={lentelesUrlIsRakto(r.i)} class="cell-mono">{r.i}</a>
                 </li>
               ))}
             </ul>
@@ -176,11 +166,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
             <ul class="text-sm">
               {iEina.map((r) => (
                 <li>
-                  <a href={lentelesUrl(
-                    modelis.pagalRakta.get(r.is)?.grupe.raktas ?? lentele.grupe.raktas,
-                    r.is.split('.')[0],
-                    r.is.split('.').slice(1).join('.'),
-                  )} class="cell-mono">{r.is.replace(/^public\./, '')}</a>{' '}
+                  <a href={lentelesUrlIsRakto(r.is)} class="cell-mono">{r.is}</a>{' '}
                   <code>{r.stulpeliai.join(', ')}</code>
                 </li>
               ))}

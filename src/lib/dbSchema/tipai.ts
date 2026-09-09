@@ -1,9 +1,8 @@
 /**
  * `/duomenys/lenteles` duomenų modelio tipai.
  *
- * Modelis nuo pat pradžių yra daugiaschemis (`schema` + `lentele` raktas):
- * be `public` bazėje yra dokumentacijos schema `dba`, o PostGIS atsineša
- * `spatial_ref_sys`.
+ * Modelis daugiaschemis (`schema` + `lentele` raktas): schema ir yra rodymo
+ * grupė, o `public` teliko PostGIS `spatial_ref_sys`.
  */
 
 /** Lentelės raktas visame modelyje: `schema.lentele`. */
@@ -44,8 +43,13 @@ export interface Trigeris {
   apibrezimas: string;
 }
 
-export interface Grupe {
-  raktas: string;
+/**
+ * Schema kaip rodymo vienetas. `aprasymas` ateina iš `COMMENT ON SCHEMA`,
+ * likusieji laukai – iš `dba."schemos"`; jos įrašo nesant, `pavadinimas` yra
+ * pats schemos vardas.
+ */
+export interface Schema {
+  vardas: string;
   pavadinimas: string;
   aprasymas: string | null;
   saltinis: string | null;
@@ -81,9 +85,6 @@ export interface Lentele {
   bendrasDydis: number;
   /** ANALYZE įvertis, ne tikslus COUNT(*). */
   eiluciuIvertis: number;
-  grupe: Grupe;
-  /** Ar grupė priskirta rankiniu būdu (ne pagal prefiksą). */
-  grupePriskirtaRankomis: boolean;
   meta: LentelesMeta | null;
 }
 
@@ -103,14 +104,16 @@ export interface Metrikos {
   eiluciuIvertis: number;
   aprasytaLenteliu: number;
   aprasytaStulpeliu: number;
-  nesugrupuotaLenteliu: number;
+  schemu: number;
 }
 
 export interface SchemosModelis {
   lenteles: Lentele[];
   /** Greitas priėjimas pagal `schema.lentele`. */
   pagalRakta: Map<LentelesRaktas, Lentele>;
-  grupes: Grupe[];
+  /** Tik tos schemos, kuriose realiai yra bent viena lentelė; rikiuota `tvarka`. */
+  schemos: Schema[];
+  schemosPagalVarda: Map<string, Schema>;
   rysiai: Rysys[];
   metrikos: Metrikos;
   sudaryta: string;

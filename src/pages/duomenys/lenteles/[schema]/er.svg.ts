@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
-import { gautiSchemosModeli, grupesLenteles } from '@/src/lib/dbSchema/modelis.ts';
+import { gautiSchemosModeli, schemosLenteles } from '@/src/lib/dbSchema/modelis.ts';
 import { KOMPAKTINIO_RIBA, piestiSvg } from '@/src/lib/dbSchema/erDiagrama.ts';
 
 /**
- * Grupės ER diagrama atskiru SVG – naršyklė tokį failą moka zoom'inti pati,
+ * Schemos ER diagrama atskiru SVG – naršyklė tokį failą moka zoom'inti pati,
  * tad tai ir yra „pilno ekrano“ režimas bei dalinimosi nuoroda.
  *
  * Puslapyje spalvos ateina iš dizaino sistemos; atskirai atidarytas SVG jų
@@ -30,11 +30,11 @@ const STILIUS = `
 
 export const GET: APIRoute = async ({ params, url }) => {
   const modelis = await gautiSchemosModeli();
-  const grupe = modelis.grupes.find((g) => g.raktas === params.grupe);
+  const schema = modelis.schemosPagalVarda.get(params.schema ?? '');
 
-  if (!grupe) return new Response('Grupė nerasta', { status: 404 });
+  if (!schema) return new Response('Schema nerasta', { status: 404 });
 
-  const lenteles = grupesLenteles(modelis, grupe.raktas);
+  const lenteles = schemosLenteles(modelis, schema.vardas);
   const savos = new Set(lenteles.map((l) => l.raktas));
   const rysiai = modelis.rysiai.filter((r) => savos.has(r.is) && savos.has(r.i));
 
@@ -43,7 +43,7 @@ export const GET: APIRoute = async ({ params, url }) => {
     || (rezimas !== 'pilnas' && lenteles.length > KOMPAKTINIO_RIBA);
 
   const { svg } = piestiSvg(lenteles, rysiai, { kompaktinis });
-  if (!svg) return new Response('Grupė tuščia', { status: 404 });
+  if (!svg) return new Response('Schema tuščia', { status: 404 });
 
   return new Response(svg.replace('<defs>', `${STILIUS}<defs>`), {
     headers: {

@@ -8,21 +8,28 @@ describe('gautiSchemosModeli', () => {
     const m = await gautiSchemosModeli();
     console.log('krova ms:', Date.now() - t0, '| metaKlaida:', m.metaKlaida);
     console.log('metrikos:', JSON.stringify(m.metrikos));
-    console.log('grupes:', m.grupes.map((g) => `${g.raktas}`).join(', '));
+    console.log('schemos:', m.schemos.map((s) => s.vardas).join(', '));
 
-    expect(m.lenteles.length).toBeGreaterThan(300);
+    expect(m.lenteles.length).toBeGreaterThan(400);
     expect(m.metrikos.isoriniuRaktu).toBeGreaterThan(200);
+    expect(m.metrikos.schemu).toBe(m.schemos.length);
 
-    const vp = rasti(m, 'viesiejiPirkimai')!;
-    console.log('viesiejiPirkimai:', vp.stulpeliai.length, 'stulpeliu,', vp.indeksai.length, 'indeksu, grupe', vp.grupe.raktas);
-    expect(vp.stulpeliai.length).toBeGreaterThan(5);
+    // Grupavimo nebėra: kiekviena lentelė turi savo schemos aprašą, ir „nesugrupuotų“
+    // būti negali iš principo.
+    const beAprasymo = m.lenteles.filter((l) => !m.schemosPagalVarda.has(l.schema));
+    expect(beAprasymo).toEqual([]);
+
+    const eppsSkelbimai = rasti(m, 'eppsViesiejiPirkimai.skelbimai')!;
+    console.log('eppsViesiejiPirkimai.skelbimai:', eppsSkelbimai.stulpeliai.length, 'stulpeliu,',
+      eppsSkelbimai.indeksai.length, 'indeksu, schema', eppsSkelbimai.schema);
+    expect(eppsSkelbimai.stulpeliai.length).toBeGreaterThan(5);
 
     const cv = rasti(m, 'cvppDump.atn1')!;
     console.log('cvppDump.atn1 aprasymas:', cv.aprasymas?.slice(0, 50));
     console.log('cvppDump.atn1 aprasytu stulpeliu:', cv.stulpeliai.filter((s) => s.aprasymas).length);
     expect(cv.aprasymas).toBeTruthy();
 
-    const k = kaimynyste(m, 'public.viesiejiPirkimai', 1);
+    const k = kaimynyste(m, eppsSkelbimai.raktas, 1);
     console.log('kaimynyste:', k.lenteles.length, 'lenteliu,', k.rysiai.length, 'rysiu');
 
     const t1 = Date.now();

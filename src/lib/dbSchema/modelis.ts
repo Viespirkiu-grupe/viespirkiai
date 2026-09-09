@@ -1,15 +1,15 @@
 import * as uzklausos from './uzklausos.ts';
 import { gautiMeta } from './meta.ts';
-import { NESUGRUPUOTA, priskirtiGrupe } from './grupes.ts';
+import { NUMATYTOJI_TVARKA } from './schemos.ts';
 import type {
-  Grupe, Indeksas, Lentele, LentelesRaktas, Metrikos,
-  Ribojimas, Rysys, SchemosModelis, Stulpelis, Trigeris,
+  Indeksas, Lentele, LentelesRaktas, Metrikos, Ribojimas,
+  Rysys, Schema, SchemosModelis, Stulpelis, Trigeris,
 } from './tipai.ts';
 
 /**
  * Visos bazės schemos modelis su TTL kešu.
  *
- * Puslapis viešas, o katalogo užklausos liečia 324 lenteles, tad krova daroma
+ * Puslapis viešas, o katalogo užklausos liečia ~500 lentelių, tad krova daroma
  * kartą ir dalinama visiems: `createTtlPromiseCache` ne tik kešuoja, bet ir
  * sujungia lygiagrečius krovimus – 50 vienu metu užėjusių lankytojų duoda
  * vieną DB krovą, ne 50.
@@ -70,8 +70,9 @@ function pagalLentele<T extends { schema: string; lentele: string }>(rows: T[]):
 }
 
 async function kraunamaSchema(): Promise<SchemosModelis> {
-  const [lentelesRows, stulpeliaiRows, ribojimaiRows, indeksaiRows, trigeriaiRows, dydziaiRows, meta] =
+  const [schemosRows, lentelesRows, stulpeliaiRows, ribojimaiRows, indeksaiRows, trigeriaiRows, dydziaiRows, meta] =
     await Promise.all([
+      uzklausos.schemos(),
       uzklausos.lenteles(),
       uzklausos.stulpeliai(),
       uzklausos.ribojimai(),
@@ -89,19 +90,18 @@ async function kraunamaSchema(): Promise<SchemosModelis> {
   const dydziai = new Map<string, any>();
   for (const row of dydziaiRows) dydziai.set(raktas(row.schemaName, row.tableName), row);
 
-  const grupesPagalRakta = new Map<string, Grupe>(meta.grupes.map((g) => [g.raktas, g]));
+  // `COMMENT ON SCHEMA "x" IS ''` yra tuščias, o ne nesamas aprašymas – rodyti
+  // tokį reikštų tuščią eilutę po antrašte.
+  const schemuAprasymai = new Map<string, string | null>(
+    schemosRows.map((row: any) => [row.vardas, row.aprasymas?.trim() || null]),
+  );
+
   const rysiai: Rysys[] = [];
   const lenteles: Lentele[] = [];
 
   for (const row of lentelesRows) {
     const key = raktas(row.schema, row.vardas);
     const lentelesMeta = meta.lenteles.get(key) ?? null;
-    const { grupe, rankomis } = priskirtiGrupe(
-      row.vardas,
-      lentelesMeta?.grupesRaktas ?? null,
-      meta.taisykles,
-      grupesPagalRakta,
-    );
 
     const ribojimai = (ribojimaiPagal.get(key) ?? []).map((r: any): Ribojimas => ({
       vardas: r.vardas,
@@ -166,49 +166,51 @@ async function kraunamaSchema(): Promise<SchemosModelis> {
       indeksuDydis: Number(dydis?.indexSize ?? 0),
       bendrasDydis: Number(dydis?.totalSize ?? 0),
       eiluciuIvertis: Number(dydis?.approxRowCount ?? Math.max(0, Number(row.eiluciuIvertis) || 0)),
-      grupe,
-      grupePriskirtaRankomis: rankomis,
       meta: lentelesMeta,
     });
   }
 
   const pagalRakta = new Map(lenteles.map((l) => [l.raktas, l]));
 
-  // Rodomos tik tos grupės, kuriose realiai yra lentelių, plius „Nesugrupuota“,
-  // jei tokių lentelių atsirado.
-  const naudojamos = new Set(lenteles.map((l) => l.grupe.raktas));
-  const grupes = [
-    ...meta.grupes.filter((g) => naudojamos.has(g.raktas)),
-    ...(naudojamos.has(NESUGRUPUOTA.raktas)
-      && !meta.grupes.some((g) => g.raktas === NESUGRUPUOTA.raktas)
-      ? [NESUGRUPUOTA]
-      : []),
-  ].sort((a, b) => a.tvarka - b.tvarka || a.pavadinimas.localeCompare(b.pavadinimas, 'lt'));
+  // Rodomos tik tos schemos, kuriose realiai yra lentelių. `dba."schemos"`
+  // įrašas neprivalomas: be jo schema vadinasi savo vardu ir stoja į galą.
+  const schemos = [...new Set(lenteles.map((l) => l.schema))]
+    .map((vardas): Schema => {
+      const schemosMeta = meta.schemos.get(vardas);
+      return {
+        vardas,
+        pavadinimas: schemosMeta?.pavadinimas ?? vardas,
+        aprasymas: schemuAprasymai.get(vardas) ?? null,
+        saltinis: schemosMeta?.saltinis ?? null,
+        saltinioUrl: schemosMeta?.saltinioUrl ?? null,
+        tvarka: schemosMeta?.tvarka ?? NUMATYTOJI_TVARKA,
+      };
+    })
+    .sort((a, b) => a.tvarka - b.tvarka || a.pavadinimas.localeCompare(b.pavadinimas, 'lt'));
 
   return {
     lenteles,
     pagalRakta,
-    grupes,
+    schemos,
+    schemosPagalVarda: new Map(schemos.map((s) => [s.vardas, s])),
     rysiai,
-    metrikos: suskaiciuotiMetrikas(lenteles, rysiai),
+    metrikos: suskaiciuotiMetrikas(lenteles, rysiai, schemos.length),
     sudaryta: new Date().toISOString(),
     metaKlaida: meta.klaida,
   };
 }
 
-function suskaiciuotiMetrikas(lenteles: Lentele[], rysiai: Rysys[]): Metrikos {
+function suskaiciuotiMetrikas(lenteles: Lentele[], rysiai: Rysys[], schemu: number): Metrikos {
   let stulpeliu = 0;
   let aprasytaStulpeliu = 0;
   let aprasytaLenteliu = 0;
   let bendrasDydis = 0;
   let eiluciuIvertis = 0;
-  let nesugrupuota = 0;
 
   for (const lentele of lenteles) {
     stulpeliu += lentele.stulpeliai.length;
     aprasytaStulpeliu += lentele.stulpeliai.filter((s) => s.aprasymas).length;
     if (lentele.aprasymas) aprasytaLenteliu += 1;
-    if (lentele.grupe.raktas === NESUGRUPUOTA.raktas) nesugrupuota += 1;
     bendrasDydis += lentele.bendrasDydis;
     eiluciuIvertis += lentele.eiluciuIvertis;
   }
@@ -221,22 +223,31 @@ function suskaiciuotiMetrikas(lenteles: Lentele[], rysiai: Rysys[]): Metrikos {
     eiluciuIvertis,
     aprasytaLenteliu,
     aprasytaStulpeliu,
-    nesugrupuotaLenteliu: nesugrupuota,
+    schemu,
   };
 }
 
-/** Lentelės iš vienos grupės, didžiausios pirma. */
-export function grupesLenteles(modelis: SchemosModelis, grupesRaktas: string): Lentele[] {
+/** Vienos schemos lentelės, didžiausios pirma. */
+export function schemosLenteles(modelis: SchemosModelis, schema: string): Lentele[] {
   return modelis.lenteles
-    .filter((l) => l.grupe.raktas === grupesRaktas)
+    .filter((l) => l.schema === schema)
     .sort((a, b) => b.bendrasDydis - a.bendrasDydis || a.vardas.localeCompare(b.vardas, 'lt'));
 }
 
-/** Lentelė pagal URL segmentą (`vardas` arba `schema.vardas`). */
+/**
+ * Lentelė pagal `schema.vardas` arba pagal vien vardą.
+ *
+ * Bevardė paieška tinka tik tada, kai vardas visoje bazėje vienintelis: apie 25
+ * vardai kartojasi keliose schemose (`sutartys` yra ir `sabis`, ir
+ * `vpmSutartys`), o spėti už lankytoją būtų blogiau nei nurodyti, kad reikia
+ * pilno vardo. Naudojama tik `/duomenys/lenteles/l/<vardas>` nuorodoms.
+ */
 export function rasti(modelis: SchemosModelis, segmentas: string): Lentele | null {
-  return modelis.pagalRakta.get(segmentas)
-    ?? modelis.pagalRakta.get(`public.${segmentas}`)
-    ?? null;
+  const tikslus = modelis.pagalRakta.get(segmentas);
+  if (tikslus) return tikslus;
+
+  const pagalVarda = modelis.lenteles.filter((l) => l.vardas === segmentas);
+  return pagalVarda.length === 1 ? pagalVarda[0] : null;
 }
 
 /**

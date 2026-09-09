@@ -8,25 +8,24 @@ import ErDiagram from '@design-system/components/ErDiagram.astro';
 import Badge from '@design-system/components/Badge.astro';
 import config from '../../../../lib/config.ts';
 import { getColorScheme, getFont } from '../../../../lib/failai.ts';
-import { gautiSchemosModeli, grupesLenteles } from '../../../../lib/dbSchema/modelis.ts';
-import { grupesUrl, lentelesUrl } from '../../../../lib/dbSchema/grupes.ts';
+import { gautiSchemosModeli, schemosLenteles } from '../../../../lib/dbSchema/modelis.ts';
+import { lentelesUrl, schemosUrl } from '../../../../lib/dbSchema/schemos.ts';
 import { KOMPAKTINIO_RIBA, piestiSvg } from '../../../../lib/dbSchema/erDiagrama.ts';
-import { dalis, dydis, eiluciuKiekis, rodomasVardas } from '../../../../lib/dbSchema/formatavimas.ts';
+import { dalis, dydis, eiluciuKiekis } from '../../../../lib/dbSchema/formatavimas.ts';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-const { grupe: grupesRaktas } = Astro.params;
 const modelis = await gautiSchemosModeli();
-const grupe = modelis.grupes.find((g) => g.raktas === grupesRaktas);
+const schema = modelis.schemosPagalVarda.get(Astro.params.schema ?? '');
 
-if (!grupe) return Astro.redirect('/duomenys/lenteles');
+if (!schema) return Astro.redirect('/duomenys/lenteles');
 
-const lenteles = grupesLenteles(modelis, grupe.raktas);
+const lenteles = schemosLenteles(modelis, schema.vardas);
 const savos = new Set(lenteles.map((l) => l.raktas));
 
-// Ryšiai grupės viduje. Į kitas grupes išeinantys FK rodomi lentelės puslapyje,
-// kad grupės diagrama neišsipūstų iki visos bazės.
+// Ryšiai schemos viduje. Į kitas schemas išeinantys FK rodomi lentelės puslapyje,
+// kad schemos diagrama neišsipūstų iki visos bazės.
 const rysiai = modelis.rysiai.filter((r) => savos.has(r.is) && savos.has(r.i));
 
 const rezimas = Astro.url.searchParams.get('rezimas');
@@ -43,8 +42,8 @@ const suUzduotimis = lenteles.filter((l) => l.meta?.uzduotys?.length || l.meta?.
 Astro.response.headers.set('Cache-Control', 'public, max-age=60');
 ---
 <Layout
-  pageTitle={`${grupe.pavadinimas} — lentelės`}
-  pageDescription={grupe.aprasymas ?? `Grupės ${grupe.pavadinimas} duomenų bazės lentelės`}
+  pageTitle={`${schema.pavadinimas} — lentelės`}
+  pageDescription={schema.aprasymas ?? `Schemos ${schema.vardas} duomenų bazės lentelės`}
   colorScheme={colorScheme}
   font={font}
   customHead={config.customHead}
@@ -52,16 +51,19 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
   <main>
     <PageHeader>
       <Fragment slot="subtext"><a href="/duomenys/lenteles">Duomenų bazės lentelės</a></Fragment>
-      {grupe.pavadinimas}
+      {schema.pavadinimas}
     </PageHeader>
 
-    {grupe.aprasymas && <p class="text-muted mb-4">{grupe.aprasymas}</p>}
-    {grupe.saltinis && (
+    <p class="text-muted mb-4">
+      <code>{schema.vardas}</code>
+      {schema.aprasymas && <> — {schema.aprasymas}</>}
+    </p>
+    {schema.saltinis && (
       <p class="text-sm mb-7">
         Šaltinis:{' '}
-        {grupe.saltinioUrl
-          ? <a href={grupe.saltinioUrl} rel="noopener">{grupe.saltinis}</a>
-          : grupe.saltinis}
+        {schema.saltinioUrl
+          ? <a href={schema.saltinioUrl} rel="noopener">{schema.saltinis}</a>
+          : schema.saltinis}
       </p>
     )}
 
@@ -80,8 +82,8 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
           {diagrama.mazgu} lentelės, {diagrama.briaunu} išorinių raktų. Spustelėkite dėžutę, kad atidarytumėte lentelę.
           {' '}
           {kompaktinis
-            ? <a href={`${grupesUrl(grupe.raktas)}?rezimas=pilnas`}>Rodyti su stulpeliais</a>
-            : <a href={`${grupesUrl(grupe.raktas)}?rezimas=kompaktinis`}>Kompaktinis vaizdas</a>}
+            ? <a href={`${schemosUrl(schema.vardas)}?rezimas=pilnas`}>Rodyti su stulpeliais</a>
+            : <a href={`${schemosUrl(schema.vardas)}?rezimas=kompaktinis`}>Kompaktinis vaizdas</a>}
         </p>
         <ErDiagram
           svgHtml={diagrama.svg}
@@ -103,15 +105,13 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
           { label: 'Dydis', className: 'cell-right', sortable: true, sortType: 'number' },
         ]}
         rows={lenteles}
-        emptyText="Grupėje lentelių nėra."
+        emptyText="Schemoje lentelių nėra."
         size="sm"
       >
         {lenteles.map((l) => (
           <tr>
             <td class="cell-nowrap">
-              <a href={lentelesUrl(l.grupe.raktas, l.schema, l.vardas)} class="cell-mono">
-                {rodomasVardas(l.schema, l.vardas)}
-              </a>
+              <a href={lentelesUrl(l.schema, l.vardas)} class="cell-mono">{l.vardas}</a>
             </td>
             <td class="text-sm">{l.aprasymas ?? <span class="text-muted">—</span>}</td>
             <td class="text-sm cell-nowrap">
@@ -134,7 +134,7 @@ Astro.response.headers.set('Cache-Control', 'public, max-age=60');
         <ul class="text-sm">
           {suUzduotimis.map((l) => (
             <li>
-              <a href={lentelesUrl(l.grupe.raktas, l.schema, l.vardas)} class="cell-mono">{l.vardas}</a>
+              <a href={lentelesUrl(l.schema, l.vardas)} class="cell-mono">{l.vardas}</a>
               {' — '}
               {l.meta?.uzduotys?.length ? l.meta.uzduotys.join(', ') : l.meta?.moduliai?.join(', ')}
               {l.meta?.atnaujinimoDaznis && <span class="text-muted"> ({l.meta.atnaujinimoDaznis})</span>}

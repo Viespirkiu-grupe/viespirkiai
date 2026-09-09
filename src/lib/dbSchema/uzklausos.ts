@@ -5,17 +5,36 @@ import { gautiLenteliuDydzius } from '@/modules/statistika/lenteliuDydziai.js';
  * Katalogo užklausos `/duomenys/lenteles` puslapiui.
  *
  * Principas: viena „visos bazės“ krova, o ne užklausa kiekvienai lentelei.
- * 324 lentelės × ~15 stulpelių ≈ 5000 eilučių – tai pigiau nei 324 atskiros
- * užklausos, ir modelis sulipdomas atmintyje.
+ * ~500 lentelių × ~15 stulpelių ≈ 7500 eilučių – tai pigiau nei ~500 atskirų
+ * užklausų, ir modelis sulipdomas atmintyje.
  *
  * Filtras visur vienodas: ne-sisteminės schemos, t. y. `public`, `dba` ir
- * viskas, kas atsiras ateityje.
+ * viskas, kas atsiras ateityje. Be `pg_toast%` atmetamos ir `pg_temp%` bei
+ * `repack` – lentelių jos neturi, bet į schemų sąrašą (kuris dabar yra ir
+ * grupių sąrašas) išlįstų.
  */
 
 const SCHEMU_FILTRAS = `
-    n.nspname NOT IN ('pg_catalog', 'information_schema')
+    n.nspname NOT IN ('pg_catalog', 'information_schema', 'repack')
     AND n.nspname NOT LIKE 'pg_toast%'
+    AND n.nspname NOT LIKE 'pg_temp%'
 `;
+
+/**
+ * Schemų aprašymai iš katalogo. Grąžinamos visos ne-sisteminės; modelis
+ * pasilieka tik tas, kuriose realiai yra lentelių.
+ */
+export async function schemos() {
+    const { rows } = await postgres.query(`
+        SELECT
+            n.nspname                              AS "vardas",
+            obj_description(n.oid, 'pg_namespace') AS "aprasymas"
+        FROM pg_namespace n
+        WHERE ${SCHEMU_FILTRAS}
+        ORDER BY n.nspname
+    `);
+    return rows;
+}
 
 export async function lenteles() {
     const { rows } = await postgres.query(`

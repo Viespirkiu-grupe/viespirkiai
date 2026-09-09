@@ -2,59 +2,50 @@
 
 Viešas puslapių rinkinys, generuojamas **tiesiai iš gyvo Postgres katalogo**:
 visos lentelės, jų stulpeliai, ryšiai, indeksai, dydžiai ir aprašymai,
-sugrupuoti pagal sritis, su ER diagramomis ir nuoroda į juos rašantį kodą.
+sugrupuoti **pagal schemą**, su ER diagramomis ir nuoroda į juos rašantį kodą.
 
 ## Kur kas gyvena
 
 | Duomuo | Vieta | Kodėl ten |
 |---|---|---|
 | Lentelės / stulpelio **prasmė** | `COMMENT ON` pačioje DB | Matoma `psql \d+`, `pg_dump`, MCP `get_schema` — ne tik šiame puslapyje |
-| Grupė, šaltinis, atnaujinimo būdas, rašantis kodas | schema `dba` | Netelpa į komentarą; atskira schema, kad `public` neaugtų |
+| Schemos **prasmė** | `COMMENT ON SCHEMA` | Ten pat, kur ir lentelių prasmė |
+| **Grupavimas** | pati schema | Lentelė guli schemoje; antro sąrašo, kuris tą pakartotų, nereikia |
+| Schemos pavadinimas ir šaltinis | `dba."schemos"` | Lietuviškas vardas ir nuoroda į šaltinį į komentarą netelpa |
+| Lentelės šaltinis, atnaujinimo būdas, rašantis kodas | `dba."lenteles"` | Netelpa į komentarą; atskira schema, kad `public` neaugtų |
 | Struktūra (stulpeliai, FK, indeksai) | `pg_catalog` | Vienintelis tiesos šaltinis; nieko dubliuoti nereikia |
 | Versijavimas | `dbSchema/*.sql` per `npm run db:schema:dump` | **Dėmesio:** `dbSchema/` yra `.gitignore`'e (54 eil.), tad į git komentarai nepatenka |
 
+## Grupavimas: grupė yra schema
+
+Lentelė rodoma toje grupėje, kurios schemoje ji guli — jokių taisyklių, jokio
+rankinio priskyrimo, jokios „Nesugrupuota“ pseudo-grupės. Adresas:
+`/duomenys/lenteles/<schema>/<lentelė>`.
+
+Taip buvo ne visada. Iki 2026 m. rugsėjo grupė buvo atskira sąvoka:
+`dba."grupiuTaisykles"` laikė ~60 `prefiksas → grupė` taisyklių, nes anksčiau
+beveik viskas gyveno `public` schemoje ir vardo prefiksas buvo vienintelis
+namespace. Perkėlus 400+ lentelių į savas schemas taisyklės liko dubliuoti tai,
+ką bazė ir taip pasako, ir kartu klydo: taisyklė lygina **tik lentelės vardą**,
+tad `adresuRegistras."adresai"` ar `eTar` lentelės jokio prefikso neatitikdavo
+ir **119 lentelių likdavo nesugrupuotos**. Perėjimą atlieka
+`migrations/dba/001_schemos.sql`.
+
 ## Schema `dba`
 
-Sukuriama `dbaSchema.sql`, užpildoma `dbaSchemaSeed.sql` (abu taiko vartotojas).
+Sukuriama `dbaSchema.sql`, grupavimo dalis perdaryta
+`migrations/dba/001_schemos.sql` (visus taiko vartotojas).
 
-- `dba."grupes"` — grupių žodynas; `raktas` yra URL segmentas.
-- `dba."grupiuTaisykles"` — `prefiksas → grupė`. **Tai pagrindinis mechanizmas:**
-  60 taisyklių sugrupuoja visas 324 lenteles be 324 rankinių įrašų.
+- `dba."schemos"` — schemos rodymo kortelė: `pavadinimas`, `saltinis`,
+  `saltinioUrl`, `tvarka`. Raktas yra pats schemos vardas, jis ir URL segmentas.
+  **Įrašas neprivalomas:** be jo schema rodoma savo vardu ir stoja į sąrašo galą
+  (`tvarka = 500`). Aprašymo čia nėra — jis imamas iš `COMMENT ON SCHEMA`.
 - `dba."atnaujinimoBudai"`, `dba."busenos"` — žodynai.
 - `dba."lenteles"` — rankinė kortelė: šaltinis, užduotys, moduliai, komandos.
+  Lentelės `saltinis` nugali schemos šaltinį.
 
-Atšaukimas: `DROP SCHEMA dba CASCADE;` — `public` neliečiamas.
-
-### Grupės priskyrimo tvarka
-
-1. `dba."lenteles".grupeId` (rankinis) — laimi visada.
-2. Ilgiausias sutampantis prefiksas iš `dba."grupiuTaisykles"`.
-3. Lygiaverčiams — didesnis `prioritetas`.
-4. Nieko — pseudo-grupė „Nesugrupuota“, matoma puslapyje kaip TODO.
-
-**camelCase riba** (`grieztaRiba = true`, numatytoji): po prefikso privalo eiti
-didžioji raidė arba skaitmuo. Be jos trumpas prefiksas kaip `jar` gaudytų
-`jarCsv` giminės nesusijusius vardus, o dar trumpesnis — bet kokį žodį, kuris
-atsitiktinai prasideda tomis pačiomis raidėmis. Išimtis — `xlsxPPA`, nes
-`xlsxPPAataskaitos` turi mažąją raidę; tokioms taisyklėms `grieztaRiba = false`.
-
-Logika yra `src/lib/dbSchema/grupes.ts` (ne SQL'e), kad būtų padengta testais —
-žr. `test/dbSchemaGrupes.test.ts`.
-
-### Taisyklių ribos, apie kurias verta žinoti
-
-- **Taisyklė lygina tik lentelės vardą, ne schemą.** Todėl pačios `dba` schemos
-  lentelės (`grupes`, `lenteles`, `busenos`…) jokio prefikso neatitinka ir buvo
-  priskirtos rankiniais įrašais (`dbaSchemaSeed2.sql`). Tas pats galioja
-  `adresuRegistras` ir `eTar` schemoms: kai vardo prefiksą pakeičia schema,
-  prefikso taisyklė nebeturi ko gaudyti, ir grupė nurodoma rankiniais įrašais. Tai
-  numatytas mainas — schema yra tikslesnis namespace nei prefiksas, o grupavimas
-  atsiperka viena eilute lentelei.
-- **Prefiksas nieko nesako apie turinį.** `kotis` iš pradžių pateko į „Sistemos
-  infrastruktūrą“ vien dėl trumpo, nedalykiškai atrodančio vardo — iš tikrųjų tai
-  Konkurencijos tarybos valstybės pagalbos registras (`dbaSchemaSeed3.sql`).
-  Priskiriant naują prefiksą verta atsidaryti `dbSchema/public.<lentelė>.sql`
-  ir pažiūrėti į stulpelius, o ne spręsti iš vardo.
+Atšaukimas: `DROP SCHEMA dba CASCADE;` — `public` neliečiamas, o puslapis
+lieka veikti: schemos tiesiog vadinsis savo vardais.
 
 ## Kodas
 
@@ -63,7 +54,7 @@ Logika yra `src/lib/dbSchema/grupes.ts` (ne SQL'e), kad būtų padengta testais 
 | `src/lib/dbSchema/uzklausos.ts` | 7 katalogo užklausos visai bazei iš karto |
 | `src/lib/dbSchema/meta.ts` | `dba` skaitymas; atsparus tam, kad schemos dar nėra |
 | `src/lib/dbSchema/modelis.ts` | Modelio sulipdymas, TTL kešas, `kaimynyste()`, `rasti()` |
-| `src/lib/dbSchema/grupes.ts` | Grupavimas ir URL formavimas |
+| `src/lib/dbSchema/schemos.ts` | URL formavimas (grupavimo logikos nebėra) |
 | `src/lib/dbSchema/erDiagrama.ts` | Deterministinis SVG išdėstymas |
 | `src/lib/dbSchema/formatavimas.ts` | Dydžiai, tipų trumpiniai, nuorodos į kodą |
 | `modules/statistika/lenteliuDydziai.js` | Dydžių užklausa, bendra su `/statistika` |
@@ -87,7 +78,12 @@ Naudojamas savas įrašas, o ne `utils/ttlPromiseCache.js`, nes pastarojo TTL
 fiksuotas, o čia jis priklauso nuo rezultato.
 
 **Sauga:** lentelės vardas iš URL niekada nepatenka į SQL — jis tik ieškomas jau
-įkeltame modelyje (`rasti()`), nerastas duoda peradresavimą.
+įkeltame modelyje (`pagalRakta`), nerastas duoda peradresavimą.
+
+`/duomenys/lenteles/l/<vardas>` leidžia linkinti žinant tik lentelės vardą, be
+schemos. `rasti()` tokį vardą priima tik jei jis visoje bazėje vienintelis: apie
+25 vardai kartojasi (`sutartys` yra ir `sabis`, ir `vpmSutartys`), ir spėti už
+lankytoją būtų blogiau nei nuvesti į sąrašą.
 
 ## ER diagramos
 
@@ -101,7 +97,7 @@ Trys dalykai, be kurių diagrama buvo neskaitoma (visi turi regresijos testus):
    drobę iki **7230 px**. Dabar pirma DFS'u sudaromas DAG, o ciklą uždarančios
    briaunos į gylį neįskaitomos (bet piešiamos, pažymėtos `er-edge--atgal`).
 2. **Ilgos briaunos.** Briauna, peršokanti kelis sluoksnius, buvo brėžiama
-   tiesiai per viską, kas pakeliui – `etar` grupėje **33 briaunos iš 36 kirto
+   tiesiai per viską, kas pakeliui – `eTar` schemoje **33 briaunos iš 36 kirto
    dėžutes**. Dabar tokioms briaunoms įterpiami tarpiniai (dummy) mazgai.
    Svarbu: tarpinis mazgas rezervuoja **visą sluoksnio juostos plotį**, ne tašką –
    kitaip briauna vis tiek kirstų to sluoksnio dėžutes.
@@ -115,10 +111,10 @@ Papildomai:
   drobę. Po sluoksniavimo kiekvienas mazgas pastumiamas kiek įmanoma į dešinę,
   į sluoksnį prieš arčiausią jį naudojantį. `etar` aukštis nuo 782 iki 626 px.
 - **Izoliuotos lentelės** (be jokių išorinių raktų) į grafą neįtraukiamos – jos
-  dedamos į tinklelį apačioje. Kitaip `adresai` grupės 12 lentelių virsdavo
+  dedamos į tinklelį apačioje. Kitaip `adresuRegistras` schemos 12 lentelių virsdavo
   926 px ilgio vienu stulpeliu.
 
-Rezultatas visoms grupėms: **225 briaunos, 0 kirtimų per dėžutes.**
+Rezultatas visoms schemoms: **225 briaunos, 0 kirtimų per dėžutes.**
 
 Sigma.js (`src/graph-bundle.ts`) sąmoningai nenaudotas: tai force-atlas grafas
 neaiškios struktūros tinklui, kurio išdėstymas kaskart kitoks, tad nuoroda
@@ -126,7 +122,7 @@ nepasidalinama. Mermaid – nauja ~1 MB priklausomybė be išdėstymo kontrolės
 
 Režimai: `?rezimas=kompaktinis` (tik dėžutės) įsijungia automatiškai virš 25
 lentelių; `?rezimas=pilnas` priverstinai rodo stulpelius. Atskiras
-`/duomenys/lenteles/<grupe>/er.svg` turi savo temos stilių – naršyklė tokį failą
+`/duomenys/lenteles/<schema>/er.svg` turi savo temos stilių – naršyklė tokį failą
 zoom'ina pati.
 
 ## Pagalbiniai skriptai
