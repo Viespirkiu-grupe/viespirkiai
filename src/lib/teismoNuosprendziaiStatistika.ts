@@ -12,6 +12,7 @@ per instancijas jis nekinta, tad juo sprendimai suvedami į vieną teisminį pro
 */
 
 import { searchIndexPattern as qwSearch } from '@/quickwit/qwHttp.js';
+import { tinkamasProcesoNr } from '@/modules/liteko/nuosprendisPagalUuid.js';
 import { createTtlPromiseCache } from '@/utils/ttlPromiseCache.js';
 
 /** qwHttp.js grąžina netipizuotą Quickwit atsakymą – laukus skaitom patys. */
@@ -37,12 +38,6 @@ const SKIRSTINIO_RIBOS = [3, 4, 5, 6];
 
 /** Statistika brangi (~4 s), o kinta kartą per parą — laikom procese valandą. */
 const cache = createTtlPromiseCache(60 * 60 * 1000);
-
-/** Tvarkingas teisminio proceso nr.: `2-55-3-00930-2013-3`. */
-const PROCESO_NR = /^\d-\d{2}-\d-\d{5}-\d{4}-\d$/;
-
-/** Formaliai taisyklingas, bet tuščias numeris – LITEKO užpildas. */
-const TUSCIAS_NR = /^[0-]+$/;
 
 export interface Kibiras {
   reiksme: string;
@@ -228,7 +223,7 @@ async function skaiciuoti(): Promise<NuosprendziuStatistika> {
   const daugiausiaiSprendimu: ProcesoEilute[] = skaiciai.kibirai
     // Šaltiniuose pasitaiko sugadintų numerių („1-", „0-00-0-00000-0000-0"),
     // kurie surenka tūkstančius nesusijusių sprendimų – jie ne procesai.
-    .filter((b: any) => PROCESO_NR.test(String(b.key ?? '')) && !TUSCIAS_NR.test(String(b.key)))
+    .filter((b: any) => tinkamasProcesoNr(b.key))
     .slice(0, 15)
     .map((b: any) => ({ procesoNr: String(b.key), sprendimai: Number(b.doc_count ?? 0) }));
 

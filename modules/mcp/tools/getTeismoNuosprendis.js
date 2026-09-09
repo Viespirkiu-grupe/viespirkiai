@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-    gautiNuosprendiPagalUuid,
-    gautiSusijusiusSprendimus,
-} from "../../liteko/nuosprendisPagalUuid.js";
+import { gautiNuosprendiPagalUuid } from "../../liteko/nuosprendisPagalUuid.js";
 import { sliceDocumentText } from "./getDokumentasTekstas.js";
 
 const DEFAULT_CHARS = 12_000;
@@ -68,11 +65,9 @@ export async function handler({ uuid, pozicija = 0, kiekis = DEFAULT_CHARS }) {
     if (!sprendimas) return error(`Teismo sprendimas su LITEKO ID ${id} nerastas.`);
 
     const { n, saltinis, dalyviai, kategorijos, teisejai, vieta, tekstas } = sprendimas;
-    const susijeSprendimai = await gautiSusijusiusSprendimus(n.teisminisProcesoNr, n.litekoId);
+    const susijeSprendimai = sprendimas.susijeSprendimai ?? [];
     // Vėlesnis tos pačios bylos sprendimas šitą galėjo pakeisti ar panaikinti.
-    const yraVelesniu = susijeSprendimai.some(
-        (s) => isoData(s.data) && isoData(n.data) && isoData(s.data) > isoData(n.data),
-    );
+    const velesni = new Set((sprendimas.velesniSprendimai ?? []).map((s) => s.litekoId));
     const fullText = tekstas ?? "";
     if (pozicija > fullText.length) {
         return error(
@@ -111,7 +106,7 @@ export async function handler({ uuid, pozicija = 0, kiekis = DEFAULT_CHARS }) {
             jarKodas: d.isJar ? d.kodas : null,
         })),
         // Byloje gali būti vėlesnių (t. y. galimai šitą pakeitusių) sprendimų.
-        yraVelesniuSprendimu: yraVelesniu,
+        yraVelesniuSprendimu: velesni.size > 0,
         susijeSprendimai: susijeSprendimai.map((s) => ({
             litekoId: s.litekoId,
             saltinis: s.saltinis,
@@ -121,7 +116,7 @@ export async function handler({ uuid, pozicija = 0, kiekis = DEFAULT_CHARS }) {
             instancija: s.instancija ?? null,
             sprendimoTipas: s.sprendimoTipas ?? null,
             data: isoData(s.data),
-            velesnisUzSi: !!(isoData(s.data) && isoData(n.data) && isoData(s.data) > isoData(n.data)),
+            velesnisUzSi: velesni.has(s.litekoId),
             viespirkiaiUrl: `https://viespirkiai.org/teismoNuosprendis/${encodeURIComponent(s.litekoId)}`,
         })),
         litekoUrl: sprendimas.litekoUrl,

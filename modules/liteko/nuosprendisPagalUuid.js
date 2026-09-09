@@ -134,6 +134,21 @@ function dienaISO(value) {
 }
 
 /**
+ * Ar teisminio proceso nr. tikras, t. y. tinkamas bylos sprendimams surišti.
+ *
+ * Senajame LITEKO dalis įrašų turi vietoj numerio užpildą („-", „1-", „1-01-1-",
+ * „0-00-0-00000-0000-0"). Pagal tokį „numerį" susirištų šimtai nesusijusių bylų,
+ * tad jį prilyginam trūkstamam. Tikras numeris yra `2-70-3-15052-2026-5` formos.
+ *
+ * @param {string|null|undefined} nr
+ */
+export function tinkamasProcesoNr(nr) {
+    const value = String(nr ?? "").trim();
+    if (!/^\d-\d{2}-\d-\d{5}-\d{4}-\d$/.test(value)) return false;
+    return /[1-9]/.test(value.replace(/[^\d]/g, ""));
+}
+
+/**
  * Kiti tos pačios bylos sprendimai – pagal teisminio proceso numerį.
  *
  * Teisminio proceso nr. byloje nekinta, kai byla keliauja per instancijas, tad
@@ -146,7 +161,7 @@ function dienaISO(value) {
  * @returns {Promise<Array<object>>} naujausi pirmi.
  */
 export async function gautiSusijusiusSprendimus(teisminisProcesoNr, dabartinisId) {
-    if (!teisminisProcesoNr) return [];
+    if (!tinkamasProcesoNr(teisminisProcesoNr)) return [];
 
     // Senojo LITEKO pusėje einam į bazinę lentelę, o ne į `nuosprendziaiPilni` –
     // taip garantuotai suveikia nuosprendziai_teisminisProcesoNr_idx
@@ -160,7 +175,7 @@ export async function gautiSusijusiusSprendimus(teisminisProcesoNr, dabartinisId
                LEFT JOIN liteko.teismai t ON t.id = n."teismasId"
               WHERE n."teisminisProcesoNr" = $1
                 AND n."litekoId" IS DISTINCT FROM $2::uuid
-              ORDER BY n.data DESC
+              ORDER BY n.data DESC NULLS LAST
               LIMIT $3`,
             [teisminisProcesoNr, uuidArba(dabartinisId), SUSIJUSIU_RIBA],
         ),
@@ -176,7 +191,7 @@ export async function gautiSusijusiusSprendimus(teisminisProcesoNr, dabartinisId
               WHERE s."teisminisProcesoNr" = $1
                 AND s."liteko2Id" <> $2
                 AND s.atsauktas = false
-              ORDER BY s."sprendimoData" DESC
+              ORDER BY s."sprendimoData" DESC NULLS LAST
               LIMIT $3`,
             [teisminisProcesoNr, dabartinisId, SUSIJUSIU_RIBA],
         ),
@@ -207,11 +222,30 @@ export async function gautiSusijusiusSprendimus(teisminisProcesoNr, dabartinisId
 }
 
 /**
+ * Iš susijusių bylos sprendimų atrenka vėlesnius už duotą datą – būtent jie
+ * galėjo šitą sprendimą pakeisti ar panaikinti. Lyginam dienom: sprendimų
+ * laikas nefiksuojamas, o tos pačios dienos sprendimas nėra „vėlesnis".
+ *
+ * @param {Array<{data?: any}>} susije
+ * @param {any} data einamojo sprendimo data.
+ * @returns {Array<object>} naujausi pirmi (tvarka paveldima iš `susije`).
+ */
+export function atrinktiVelesnius(susije, data) {
+    const diena = dienaISO(data);
+    if (!diena) return [];
+    return susije.filter((s) => {
+        const kito = dienaISO(s.data);
+        return kito !== null && kito > diena;
+    });
+}
+
+/**
  * Sprendimas pagal LITEKO/LITEKO2 identifikatorių.
  *
  * @param {string} uuid
  * @returns {Promise<null|{
  *   saltinis: 'liteko'|'liteko2', n: any, dalyviai: any[], kategorijos: any[],
+ *   susijeSprendimai: any[], velesniSprendimai: any[],
  *   sidecar: any, tekstas: string|null, teisejai: string[], vieta: string|null,
  *   litekoUrl: string, dokumentoId: number|null,
  * }>} `null`, jei tokio sprendimo nėra.
@@ -222,11 +256,10 @@ export async function gautiNuosprendiPagalUuid(uuid) {
     if (!rastas) return null;
     const { saltinis, n } = rastas;
 
-    // Susijusių bylos sprendimų čia netraukiam – jų reikia tik MCP atsakymui,
-    // o puslapiui tai būtų dvi užklausos kiekvienam peržiūrėjimui.
-    const [dalyviai, kategorijos] = await Promise.all([
+    const [dalyviai, kategorijos, susijeSprendimai] = await Promise.all([
         gautiDalyvius(saltinis, n.id),
         gautiKategorijas(saltinis, n.id),
+        gautiSusijusiusSprendimus(n.teisminisProcesoNr, n.litekoId),
     ]);
 
     // Pilnas tekstas ir papildomi metaduomenys — iš dokumento sidecar JSON (pagal md5).
@@ -254,6 +287,8 @@ export async function gautiNuosprendiPagalUuid(uuid) {
         n,
         dalyviai,
         kategorijos,
+        susijeSprendimai,
+        velesniSprendimai: atrinktiVelesnius(susijeSprendimai, n.data),
         sidecar,
         tekstas: valytiNuosprendzioTeksta(sidecar?.text),
         teisejai: sidecar?.metadata?.teisejai ?? [],

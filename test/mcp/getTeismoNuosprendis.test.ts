@@ -2,12 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     gautiNuosprendiPagalUuid: vi.fn(),
-    gautiSusijusiusSprendimus: vi.fn(),
 }));
 
 vi.mock("../../modules/liteko/nuosprendisPagalUuid.js", () => ({
     gautiNuosprendiPagalUuid: mocks.gautiNuosprendiPagalUuid,
-    gautiSusijusiusSprendimus: mocks.gautiSusijusiusSprendimus,
 }));
 
 import {
@@ -37,6 +35,8 @@ function sprendimas(overrides: Record<string, unknown> = {}) {
         kategorijos: [{ kodas: "2.4.2.8.", pavadinimas: "Daiktinė teisė" }],
         teisejai: ["Vaidas Kazlauskas"],
         vieta: "Šiauliai",
+        susijeSprendimai: [],
+        velesniSprendimai: [],
         tekstas: "Pirmas antras trečias ketvirtas",
         litekoUrl: `https://liteko.teismai.lt/viesasprendimupaieska/tekstas.aspx?id=${UUID}`,
         ...overrides,
@@ -56,7 +56,6 @@ describe("get_teismo_nuosprendis", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.gautiNuosprendiPagalUuid.mockResolvedValue(sprendimas());
-        mocks.gautiSusijusiusSprendimus.mockResolvedValue([]);
     });
 
     it("grąžina bylos duomenis, dalyvius ir tekstą dalimis", async () => {
@@ -108,7 +107,7 @@ describe("get_teismo_nuosprendis", () => {
     });
 
     it("pažymi tos pačios bylos vėlesnius sprendimus", async () => {
-        mocks.gautiSusijusiusSprendimus.mockResolvedValue([
+        const susije = [
             {
                 litekoId: "09002711829c4977",
                 saltinis: "liteko2",
@@ -129,7 +128,10 @@ describe("get_teismo_nuosprendis", () => {
                 sprendimoTipas: null,
                 data: new Date("2025-11-02T00:00:00Z"),
             },
-        ]);
+        ];
+        mocks.gautiNuosprendiPagalUuid.mockResolvedValue(
+            sprendimas({ susijeSprendimai: susije, velesniSprendimai: [susije[0]] }),
+        );
 
         const result = payload(await handler({ uuid: UUID }));
         expect(result.yraVelesniuSprendimu).toBe(true);
@@ -140,6 +142,12 @@ describe("get_teismo_nuosprendis", () => {
             "https://viespirkiai.org/teismoNuosprendis/09002711829c4977",
         );
         expect(result.susijeSprendimai[1].velesnisUzSi).toBe(false);
+    });
+
+    it("nerodo vėlesnių sprendimų žymos, kai byloje jų nėra", async () => {
+        const result = payload(await handler({ uuid: UUID }));
+        expect(result.yraVelesniuSprendimu).toBe(false);
+        expect(result.susijeSprendimai).toEqual([]);
     });
 
     it("išrenka identifikatorių iš adreso", () => {

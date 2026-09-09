@@ -5,7 +5,7 @@ import DetailsSection from '@design-system/components/DetailsSection.astro';
 import DataTable from '@design-system/components/DataTable.astro';
 import Alert from '@design-system/components/Alert.astro';
 import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
-import { gautiNuosprendiPagalUuid } from '@/modules/liteko/nuosprendisPagalUuid.js';
+import { gautiNuosprendiPagalUuid, tinkamasProcesoNr } from '@/modules/liteko/nuosprendisPagalUuid.js';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
 import config from '../../lib/config.ts';
 
@@ -18,13 +18,14 @@ if (!uuid) return Astro.redirect('/404');
 const sprendimas = await gautiNuosprendiPagalUuid(uuid);
 if (!sprendimas) return Astro.redirect('/404');
 
-const { n, dalyviai, kategorijos, tekstas, teisejai, vieta, litekoUrl, saltinis } = sprendimas;
+const { n, dalyviai, kategorijos, tekstas, teisejai, vieta, litekoUrl, saltinis, susijeSprendimai, velesniSprendimai } = sprendimas;
 
 const dataStr = n.data ? new Date(n.data).toLocaleDateString('lt-LT') : null;
 const busena = n.busena === 'decs_published' ? 'Paskelbtas' : n.busena;
 const dokumentaiUrl = `/dokumentai?mode=phrase&type=teismoNuosprendis&q=${encodeURIComponent(n.bylosNumeris)}`;
 // Visi bylos sprendimai per visas instancijas – filtras pagal proceso numerį.
-const procesoUrl = n.teisminisProcesoNr
+// Užpildo (pvz. „1-01-1-") nelinkuojam – pagal jį rastųsi nesusijusios bylos.
+const procesoUrl = tinkamasProcesoNr(n.teisminisProcesoNr)
   ? `/dokumentai?klase=teise&teisminisProcesas=${encodeURIComponent(n.teisminisProcesoNr)}`
   : null;
 
@@ -75,12 +76,17 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=60');
       </Fragment>
     </PageHeader>
 
-    {procesoUrl && (
+    {velesniSprendimai.length > 0 ? (
       <Alert variant="info" icon="ℹ">
-        Byloje gali būti ir vėlesnių teismo nuosprendžių.
+        Byloje yra vėlesnių teismo sprendimų – šis galėjo būti pakeistas ar panaikintas.
         Žr. teisminio proceso nr. <a href={procesoUrl}>{n.teisminisProcesoNr}</a>.
       </Alert>
-    )}
+    ) : susijeSprendimai.length > 0 ? (
+      <Alert variant="info" icon="ℹ">
+        Byloje yra ir kitų (ankstesnių) teismo sprendimų.
+        Žr. teisminio proceso nr. <a href={procesoUrl}>{n.teisminisProcesoNr}</a>.
+      </Alert>
+    ) : null}
 
     {/* Dešinioji kolona (desktop float): kategorijos + dalyviai. Dalyviai prasideda
         ties kategorijų pabaiga, o „Byla" ir tekstas teka kairėje. */}
