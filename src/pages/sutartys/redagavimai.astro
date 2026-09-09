@@ -4,7 +4,16 @@ import PageHeader from '@design-system/components/PageHeader.astro';
 import Pagination from '@design-system/components/Pagination.astro';
 import EmptyState from '@design-system/components/EmptyState.astro';
 import SutartisRedagavimuKortele from '../../components/sutartis/SutartisRedagavimuKortele.astro';
-import { loadRedagavimuSarasas } from '../../lib/sutartisPakeitimai.ts';
+import RedagavimaiFilters from '../../components/content/RedagavimaiFilters.astro';
+import {
+  arFiltruota,
+  filtroNuoroda,
+  filtroParams,
+  loadRedagavimuSarasas,
+  parseRedagavimuFiltra,
+  parseRikiavima,
+  RIKIAVIMO_PAVADINIMAI,
+} from '../../lib/sutartisPakeitimai.ts';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
 import config from '../../lib/config.ts';
 
@@ -15,15 +24,66 @@ const PAGE_SIZE = 20;
 const currentPage = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1') || 1);
 const skip = (currentPage - 1) * PAGE_SIZE;
 
-const { items, visoSutarciu, visoRedagavimu } = await loadRedagavimuSarasas({
+const filtras = parseRedagavimuFiltra(Astro.url.searchParams);
+const rikiavimas = parseRikiavima(Astro.url.searchParams);
+const filtruota = arFiltruota(filtras);
+
+const { items, rasta, viso, facetai } = await loadRedagavimuSarasas({
   limit: PAGE_SIZE,
   skip,
+  filtras,
+  rikiavimas,
 });
-const pageCount = Math.max(1, Math.ceil(visoSutarciu / PAGE_SIZE));
+const pageCount = Math.max(1, Math.ceil(rasta.sutarciu / PAGE_SIZE));
+
+// Pagination prie savo `?page=N` prikabina likusius parametrus.
+const filtroEilute = filtroParams(filtras, rikiavimas).toString();
+const queryParams = filtroEilute ? `&${filtroEilute}` : '';
+
+// Aktyvių filtrų žymos virš sąrašo – kiekviena su nuoroda, kuri ją nuima.
+const aktyvus: { label: string; href: string }[] = [];
+for (const laukas of filtras.laukai) {
+  aktyvus.push({
+    label: facetai.laukai.find((o) => o.reiksme === laukas)?.label ?? laukas,
+    href: filtroNuoroda(filtras, rikiavimas, { laukai: filtras.laukai.filter((l) => l !== laukas) }),
+  });
+}
+if (filtras.busena) {
+  aktyvus.push({
+    label: filtras.busena === 'istrinta' ? 'Ištrintos' : 'Atkurtos',
+    href: filtroNuoroda(filtras, rikiavimas, { busena: null }),
+  });
+}
+if (filtras.verte) {
+  aktyvus.push({
+    label: filtras.verte === 'padidejo' ? 'Vertė padidėjo' : 'Vertė sumažėjo',
+    href: filtroNuoroda(filtras, rikiavimas, { verte: null }),
+  });
+}
+if (filtras.verteMin) {
+  aktyvus.push({
+    label: `Pokytis ≥ ${filtras.verteMin.toLocaleString('lt-LT')} €`,
+    href: filtroNuoroda(filtras, rikiavimas, { verteMin: null }),
+  });
+}
+if (filtras.nuo || filtras.iki) {
+  aktyvus.push({
+    label: `${filtras.nuo ?? '…'} – ${filtras.iki ?? '…'}`,
+    href: filtroNuoroda(filtras, rikiavimas, { nuo: null, iki: null }),
+  });
+}
+if (filtras.visi) {
+  aktyvus.push({
+    label: 'Su techniniais',
+    href: filtroNuoroda(filtras, rikiavimas, { visi: false }),
+  });
+}
+
+const sk = (n: number) => n.toLocaleString('lt-LT');
 
 if (Astro.url.searchParams.has('json')) {
   return new Response(
-    JSON.stringify({ data: items, currentPage, pageCount, visoSutarciu, visoRedagavimu }, null, 2),
+    JSON.stringify({ data: items, currentPage, pageCount, filtras, rikiavimas, rasta, viso }, null, 2),
     { headers: { 'Content-Type': 'application/json' } },
   );
 }
@@ -39,23 +99,23 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
   customHead={config.customHead}
 >
   <main class="sidebar-main">
-    <div class="redagavimai-shell">
-      <aside class="redagavimai-rail" aria-label="Apie redagavimus">
-        <div class="rail-card">
-          <h2 class="rail-card__title">Sutarčių redagavimai</h2>
-          <p class="rail-card__text">
-            Kai perkančioji organizacija pataiso jau paskelbtą sutartį, mes užfiksuojame
-            pokytį. Čia – naujausiai redaguotos sutartys su paskutiniais pakeitimais.
-          </p>
-
+    <div class="redagavimai-shell dok-shell">
+      <RedagavimaiFilters
+        filtras={filtras}
+        rikiavimas={rikiavimas}
+        facetai={facetai}
+        filtruota={filtruota}
+      >
+        <section class="dok-filter-section rail-apie">
+          <span class="dok-filter-section-label">Apie šiuos duomenis</span>
           <dl class="rail-stats">
             <div>
               <dt>Redaguota sutarčių</dt>
-              <dd>{visoSutarciu.toLocaleString('lt-LT')}</dd>
+              <dd>{sk(viso.sutarciu)}</dd>
             </div>
             <div>
               <dt>Iš viso redagavimų</dt>
-              <dd>{visoRedagavimu.toLocaleString('lt-LT')}</dd>
+              <dd>{sk(viso.pakeitimu)}</dd>
             </div>
           </dl>
 
@@ -76,24 +136,70 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
             Nurodomas redagavimo pastebėjimo laikas. Daugelį redagavimų pastebime
             per 5 minutes.
           </p>
-        </div>
-      </aside>
+        </section>
+      </RedagavimaiFilters>
+
 
       <div class="redagavimai-content">
         <PageHeader>
           Sutarčių redagavimai
         </PageHeader>
 
+        <div class="redagavimai-suvestine">
+          <div class="suvestine-juosta">
+            <p class="suvestine-tekstas">
+              {filtruota
+                ? <>Rasta <strong>{sk(rasta.pakeitimu)}</strong> redagavimų <strong>{sk(rasta.sutarciu)}</strong> sutartyse</>
+                : <><strong>{sk(rasta.sutarciu)}</strong> redaguotos sutartys, <strong>{sk(rasta.pakeitimu)}</strong> redagavimai</>}
+              {!filtras.visi && facetai.nereiksmingi > 0 && (
+                <>
+                  {' · '}
+                  <a href={filtroNuoroda(filtras, rikiavimas, { visi: true })}>
+                    paslėpta {sk(facetai.nereiksmingi)} techninių
+                  </a>
+                </>
+              )}
+            </p>
+
+            {/* Rikiavimas – prie rezultatų, kaip /sutartys paieškoje: GET forma
+                su paslėptais dabartinio filtro laukais, tad veikia ir be JS. */}
+            <form class="suvestine-rikiavimas" method="get" action="/sutartys/redagavimai">
+              {[...filtroParams(filtras).entries()].map(([name, value]) => (
+                <input type="hidden" name={name} value={value} />
+              ))}
+              <label class="sr-only" for="redagavimuRikiavimas">Rikiuoti pagal</label>
+              <select id="redagavimuRikiavimas" name="rikiavimas" data-autosubmit>
+                {Object.entries(RIKIAVIMO_PAVADINIMAI).map(([reiksme, label]) => (
+                  <option value={reiksme} selected={rikiavimas === reiksme}>{label}</option>
+                ))}
+              </select>
+              <noscript><button type="submit">Rikiuoti</button></noscript>
+            </form>
+          </div>
+
+          {aktyvus.length > 0 && (
+            <ul class="filtru-zymos">
+              {aktyvus.map((zyma) => (
+                <li>
+                  <a href={zyma.href}>{zyma.label}<span aria-hidden="true">✕</span></a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {items.length === 0 ? (
-          <EmptyState message="Redagavimų nerasta." />
+          <EmptyState message={filtruota
+            ? 'Pagal pasirinktus filtrus redagavimų nerasta.'
+            : 'Redagavimų nerasta.'} />
         ) : (
           <>
             <div class="redagavimai-sarasas">
               {items.map((redagavimai) => (
-                <SutartisRedagavimuKortele redagavimai={redagavimai} />
+                <SutartisRedagavimuKortele redagavimai={redagavimai} filtruota={filtruota} />
               ))}
             </div>
-            <Pagination currentPage={currentPage} pageCount={pageCount} queryParams="" />
+            <Pagination currentPage={currentPage} pageCount={pageCount} queryParams={queryParams} />
           </>
         )}
       </div>
@@ -102,57 +208,124 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 </Layout>
 
 <script>
-  // Juosta telpa ekrane – užtenka paprasto sticky, prilipdyto po sticky navbar
-  // su tarpu. (Bendras initStickyRail prilipdo flush, be tarpo.)
-  const nav = document.querySelector<HTMLElement>('.site-header-shell .navbar');
-  const rail = document.querySelector<HTMLElement>('.redagavimai-rail');
-  const setTop = () => {
-    if (rail) rail.style.top = `${(nav?.offsetHeight ?? 0) + 16}px`;
-  };
-  setTop();
-  window.addEventListener('resize', setTop);
+  // Rikiavimo pasirinkimas pritaikomas iškart – kaip SearchResults juostoje.
+  document.querySelectorAll<HTMLSelectElement>('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => select.form?.requestSubmit());
+  });
 </script>
 
+
 <style>
+  /* Toks pat kairėn prigludęs tinklelis kaip /dokumentai (.dok-shell): 240px
+     filtrų juosta, po jos – rezultatai. Skiriamąją liniją per visą puslapio
+     aukštį piešia main.sidebar-main:has(> .dok-shell)::before (forms.css). */
   .redagavimai-shell {
     display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 32px;
-    align-items: start;
-    /* sidebar-main nuima numatytą main paraštę – atkuriame ją čia. */
-    padding-inline: 56px;
-    padding-top: 28px;
+    grid-template-columns: 240px minmax(0, 900px);
+    grid-template-areas: "sidebar content";
+    column-gap: 32px;
+    justify-content: start;
+    align-items: stretch;
+    padding-inline: 16px;
   }
 
-  @media (max-width: 1200px) {
-    .redagavimai-shell {
-      padding-inline: 28px;
+  .redagavimai-content {
+    grid-area: content;
+    min-width: 0;
+    padding-top: 24px;
+  }
+
+  /* Juostoje – ne kortelė, o tokia pat tyli sekcija kaip facetai; rodoma
+     visada, nes tai kontekstas, be kurio skaičiai klaidina. Atskiriama nuo
+     filtrų didesniu tarpu – tai jau ne filtras, o paaiškinimas. */
+  .rail-apie {
+    padding-top: 44px;
+  }
+
+  /* Po antrašte – ne facetų eilutės, o tekstas, tad reikia daugiau oro
+     nei įprastoje facetų sekcijoje. */
+  .rail-apie :global(.dok-filter-section-label) {
+    padding-bottom: 18px;
+  }
+
+  .redagavimai-suvestine {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .suvestine-juosta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  /* Tas pats dropdown'as kaip paieškos rezultatų juostoje (SearchResultsShell). */
+  .suvestine-rikiavimas select {
+    min-width: 170px;
+    padding: 7px 10px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .suvestine-rikiavimas select:focus-visible {
+    outline: var(--border-focus);
+  }
+
+  @media (max-width: 720px) {
+    .suvestine-juosta {
+      flex-wrap: wrap;
     }
   }
 
-  .redagavimai-rail {
-    position: sticky;
-    top: 24px;
-    align-self: start;
-  }
-
-  .rail-card {
-    padding: 20px;
-    border: var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--white);
-  }
-
-  .rail-card__title {
-    margin: 0 0 8px;
-    font-size: var(--text-md);
-  }
-
-  .rail-card__text {
-    margin: 0 0 16px;
+  .suvestine-tekstas {
+    margin: 0;
     font-size: var(--text-sm);
     color: var(--gray);
-    line-height: 1.5;
+  }
+
+  .suvestine-tekstas strong {
+    color: var(--black);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Aktyvūs filtrai – žymos, kurių paspaudimas filtrą nuima. */
+  .filtru-zymos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .filtru-zymos a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 10px;
+    border: var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--white);
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+    text-decoration: none;
+  }
+
+  .filtru-zymos a:hover {
+    color: var(--black);
+    border-color: var(--black);
+  }
+
+  .filtru-zymos span {
+    color: var(--color-muted);
   }
 
   .rail-stats {
@@ -160,8 +333,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
     flex-direction: column;
     gap: 12px;
     margin: 0 0 16px;
-    padding: 16px 0;
-    border-top: var(--border);
+    padding: 0 0 16px;
     border-bottom: var(--border);
   }
 
@@ -239,17 +411,17 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
   }
 
   @media (max-width: 900px) {
+    /* Vienas stulpelis; juosta susitraukia į atidaromą „Filtrai" antraštę
+       (žr. RedagavimaiFilters), tad rezultatai lieka viršuje. */
     .redagavimai-shell {
       grid-template-columns: minmax(0, 1fr);
-    }
-
-    .redagavimai-rail {
-      position: static;
-      order: 2;
+      grid-template-areas:
+        "sidebar"
+        "content";
     }
 
     .redagavimai-content {
-      order: 1;
+      padding-top: 16px;
     }
   }
 </style>

@@ -1,7 +1,8 @@
 import {
   fetchRecentChanges,
+  fetchChangesByIds,
   fetchChangedContractsPage,
-  countChangedContracts,
+  fetchChangesFacets,
   countChanges,
   countContractChanges,
   diffContractDocuments,
@@ -51,6 +52,10 @@ export type PakeitimoEilute = {
   kryptis: 'pridėta' | 'pašalinta' | 'pakeista';
   /** Ryškus būsenos pokytis, rodomas kaip atskira žyma (pvz. sutarties ištrynimas). */
   busena?: 'istrinta' | 'atkurta';
+  /** Sujungtos „Vertės" eilutės pokytis, pvz. „+2 323,20 € (+200 %)". */
+  delta?: string;
+  /** Paaiškinimas prie eilutės, pvz. „patikslinta faktine". */
+  pastaba?: string;
 };
 
 export type SutartiesPakeitimas = {
@@ -109,10 +114,54 @@ function formatValue(field: string, value: unknown): string | null {
   return String(value);
 }
 
+/** „+2 323,20 € (+200 %)" – sujungtos vertės eilutės pokytis. */
+function deltosTekstas(pries: number | null, po: number | null): string | undefined {
+  if (pries === null || po === null) return undefined;
+  const skirtumas = po - pries;
+  if (skirtumas === 0) return undefined;
+  const zenklas = skirtumas > 0 ? '+' : '−';
+  const suma = `${zenklas}${fmtEur(Math.abs(skirtumas))}\u00a0€`;
+  if (pries === 0) return suma;
+  const proc = Math.round((skirtumas / Math.abs(pries)) * 100);
+  return `${suma} (${zenklas}${Math.abs(proc).toLocaleString('lt-LT')}\u00a0%)`;
+}
+
+const PAGRINDO_PASTABOS: Record<string, string> = {
+  'numatoma→faktine': 'patikslinta faktine verte',
+  'faktine→numatoma': 'faktinės vertės nebeliko',
+};
+
+/**
+ * Sujungta „Vertės" eilutė iš `skirtumai._verte`: numatoma ir faktinė vertė nėra
+ * du nepriklausomi skaičiai, tad rodome vieną aktualios vertės judesį
+ * (COALESCE(faktinė, numatoma)) su delta ir pagrindo pasikeitimu.
+ */
+function verteseEilute(verte: any): { eilute: PakeitimoEilute; pries: number | null; po: number | null } | null {
+  if (!verte) return null;
+  const pries = verte.pries ?? null;
+  const po = verte.po ?? null;
+  const nuo = verte.pagrindas?.pries ?? null;
+  const iki = verte.pagrindas?.po ?? null;
+  return {
+    pries,
+    po,
+    eilute: {
+      laukas: 'Vertė',
+      before: pries === null ? null : `${fmtEur(pries)}\u00a0€`,
+      after: po === null ? null : `${fmtEur(po)}\u00a0€`,
+      kryptis: pries === null ? 'pridėta' : po === null ? 'pašalinta' : 'pakeista',
+      delta: deltosTekstas(pries, po),
+      pastaba: nuo && iki && nuo !== iki ? PAGRINDO_PASTABOS[`${nuo}→${iki}`] : undefined,
+    },
+  };
+}
+
 /** Vieną `vpmSutartys."changes"` eilutę paverčia matomų skirtumų sąrašu (arba null). */
 function rowToPakeitimas(row: any): SutartiesPakeitimas | null {
   if (!row.after) return null;
   const diffs = diffContractDocuments(row.before, row.after);
+  const verte = verteseEilute(row.skirtumai?._verte);
+  let verteIdeta = false;
   const eilutes: PakeitimoEilute[] = [];
   for (const diff of diffs) {
     // Ištrynimą/atkūrimą rodome kaip ryškią būsenos žymą, ne kaip Ne→Taip eilutę.
@@ -125,6 +174,17 @@ function rowToPakeitimas(row: any): SutartiesPakeitimas | null {
         busena: diff.after === true ? 'istrinta' : 'atkurta',
       });
       continue;
+    }
+    if (verte && MONEY_FIELDS.has(diff.field)) {
+      // Sujungta eilutė stoja pirmojo vertės lauko vieton (kanoninė tvarka).
+      if (!verteIdeta) {
+        eilutes.push(verte.eilute);
+        verteIdeta = true;
+      }
+      // Žalią lauką praleidžiame tik tada, kai jis nieko naujo nepasako –
+      // t. y. juda lygiai taip pat kaip aktuali vertė.
+      const sutampa = (diff.before ?? null) === verte.pries && (diff.after ?? null) === verte.po;
+      if (sutampa) continue;
     }
     const before = formatValue(diff.field, diff.before);
     const after = formatValue(diff.field, diff.after);
@@ -190,39 +250,215 @@ export type SutartiesRedagavimai = {
   pakeitimai: SutartiesPakeitimas[];
 };
 
+/** Redagavimų sąrašo filtras – tiesiogiai atitinka URL parametrus. */
+export type RedagavimuFiltras = {
+  /** Rodyti ir pakeitimus, kuriuose pasikeitė vien `redagavimoData`. */
+  visi: boolean;
+  /** Kanoninių laukų raktai + išvestinis `_verte`. */
+  laukai: string[];
+  busena: 'istrinta' | 'atkurta' | null;
+  nuo: string | null;
+  iki: string | null;
+  verte: 'padidejo' | 'sumazejo' | null;
+  verteMin: number | null;
+};
+
+export type Rikiavimas = 'naujausi' | 'verte' | 'daugiausia';
+
+export const RIKIAVIMO_PAVADINIMAI: Record<Rikiavimas, string> = {
+  naujausi: 'Naujausi',
+  verte: 'Didžiausias vertės pokytis',
+  daugiausia: 'Daugiausia redagavimų',
+};
+
+/** Facetų eilutė šoninėje juostoje. */
+export type FacetoParinktis = { reiksme: string; label: string; kiek: number };
+
+export type RedagavimuFacetai = {
+  laukai: FacetoParinktis[];
+  busenos: FacetoParinktis[];
+  vertesKryptis: FacetoParinktis[];
+  /** Kiek pakeitimų šiuo metu paslėpta kaip techniniai (tik `redagavimoData`). */
+  nereiksmingi: number;
+};
+
+export const TUSCIAS_FILTRAS: RedagavimuFiltras = {
+  visi: false,
+  laukai: [],
+  busena: null,
+  nuo: null,
+  iki: null,
+  verte: null,
+  verteMin: null,
+};
+
+const teigiamas = (value: string | null): number | null => {
+  if (!value) return null;
+  const skaicius = Number(value.replace(/[^\d.-]/g, ''));
+  return Number.isFinite(skaicius) && skaicius > 0 ? skaicius : null;
+};
+
+const data = (value: string | null): string | null =>
+  value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+
+/** URL parametrai → filtras. Netinkamos reikšmės tyliai ignoruojamos. */
+export function parseRedagavimuFiltra(params: URLSearchParams): RedagavimuFiltras {
+  const busena = params.get('busena');
+  const verte = params.get('verte');
+  return {
+    visi: ['1', 'true'].includes(params.get('visi') ?? ''),
+    laukai: params.getAll('laukas').filter(Boolean),
+    busena: busena === 'istrinta' || busena === 'atkurta' ? busena : null,
+    nuo: data(params.get('nuo')),
+    iki: data(params.get('iki')),
+    verte: verte === 'padidejo' || verte === 'sumazejo' ? verte : null,
+    verteMin: teigiamas(params.get('verteMin')),
+  };
+}
+
+export function parseRikiavima(params: URLSearchParams): Rikiavimas {
+  const reiksme = params.get('rikiavimas');
+  return reiksme === 'verte' || reiksme === 'daugiausia' ? reiksme : 'naujausi';
+}
+
+/** Filtras → URLSearchParams (be `page` – puslapiavimas jį prideda pats). */
+export function filtroParams(filtras: RedagavimuFiltras, rikiavimas: Rikiavimas = 'naujausi'): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filtras.visi) params.set('visi', '1');
+  for (const laukas of filtras.laukai) params.append('laukas', laukas);
+  if (filtras.busena) params.set('busena', filtras.busena);
+  if (filtras.nuo) params.set('nuo', filtras.nuo);
+  if (filtras.iki) params.set('iki', filtras.iki);
+  if (filtras.verte) params.set('verte', filtras.verte);
+  if (filtras.verteMin) params.set('verteMin', String(filtras.verteMin));
+  if (rikiavimas !== 'naujausi') params.set('rikiavimas', rikiavimas);
+  return params;
+}
+
+/** Nuoroda su pakeista viena filtro reikšme (puslapiavimas atstatomas į 1). */
+export function filtroNuoroda(
+  filtras: RedagavimuFiltras,
+  rikiavimas: Rikiavimas,
+  pakeitimai: Partial<RedagavimuFiltras> & { rikiavimas?: Rikiavimas },
+): string {
+  const { rikiavimas: naujasRikiavimas, ...filtroPakeitimai } = pakeitimai;
+  const params = filtroParams(
+    { ...filtras, ...filtroPakeitimai },
+    naujasRikiavimas ?? rikiavimas,
+  );
+  const eilute = params.toString();
+  return eilute ? `?${eilute}` : '/sutartys/redagavimai';
+}
+
+/** Perjungia vieną „kas pasikeitė" lauką (pažymėtą – nuima). */
+export function laukoNuoroda(filtras: RedagavimuFiltras, rikiavimas: Rikiavimas, laukas: string): string {
+  const laukai = filtras.laukai.includes(laukas)
+    ? filtras.laukai.filter((l) => l !== laukas)
+    : [...filtras.laukai, laukas];
+  return filtroNuoroda(filtras, rikiavimas, { laukai });
+}
+
+export function arFiltruota(filtras: RedagavimuFiltras): boolean {
+  return JSON.stringify(filtras) !== JSON.stringify(TUSCIAS_FILTRAS);
+}
+
+const VERTES_LAUKAS = '_verte';
+
+/**
+ * Facetų tvarka. Sujungta „Vertė" viršuje; žali `numatomaVerte`/`faktineVerte`
+ * nustumiami žemiau – jie beveik visada kartoja tą patį pokytį, tad matomose
+ * aštuoniose eilutėse užimtų vietą skirtingiems laukams. Techninė redagavimo
+ * data – paskutinė.
+ */
+function facetoSvoris(laukas: string): number {
+  if (laukas === VERTES_LAUKAS) return 0;
+  if (laukas === 'redagavimoData') return 3;
+  if (MONEY_FIELDS.has(laukas)) return 2;
+  return 1;
+}
+
+function facetoLabel(laukas: string): string {
+  if (laukas === VERTES_LAUKAS) return 'Vertė (faktinė/numatoma)';
+  if (laukas === 'redagavimoData') return 'Redagavimo data (techninė)';
+  if (laukas === 'istrinta') return 'Ištrynimas / atkūrimas';
+  return FIELD_LABELS[laukas] ?? laukas;
+}
+
 /**
  * Užkrauna redaguotų sutarčių puslapį (naujausiai redaguotos viršuje).
- * Kiekviena sutartis atskirai su keliais naujausiais pakeitimais; likusieji
- * suskaičiuojami į `praleista` ir pasiekiami sutarties puslapyje.
+ * Filtras taikomas pakeitimų eilutėms: sutartys grupuojamos tik iš tų, kurie
+ * jį atitinka, o kortelėje rodomi keli naujausi atitinkantys pakeitimai.
  */
 export async function loadRedagavimuSarasas(
-  { limit = 20, skip = 0, perSutarti = 3 }: { limit?: number; skip?: number; perSutarti?: number } = {},
-): Promise<{ items: SutartiesRedagavimai[]; visoSutarciu: number; visoRedagavimu: number }> {
-  const [grupes, visoSutarciu, visoRedagavimu] = await Promise.all([
-    fetchChangedContractsPage({ limit, skip }),
-    countChangedContracts(),
-    countChanges(),
+  {
+    limit = 20,
+    skip = 0,
+    perSutarti = 3,
+    filtras = TUSCIAS_FILTRAS,
+    rikiavimas = 'naujausi' as Rikiavimas,
+  }: {
+    limit?: number;
+    skip?: number;
+    perSutarti?: number;
+    filtras?: RedagavimuFiltras;
+    rikiavimas?: Rikiavimas;
+  } = {},
+): Promise<{
+  items: SutartiesRedagavimai[];
+  rasta: { sutarciu: number; pakeitimu: number };
+  viso: { sutarciu: number; pakeitimu: number };
+  facetai: RedagavimuFacetai;
+}> {
+  const [grupes, rasta, viso, zali] = await Promise.all([
+    // Paimame kelis atsargai – dalis pakeitimų gali neturėti matomų skirtumų.
+    fetchChangedContractsPage({ limit, skip, perSutarti: perSutarti + 4, filtras, rikiavimas }),
+    countChanges(filtras),
+    countChanges(TUSCIAS_FILTRAS),
+    fetchChangesFacets(filtras),
   ]);
 
-  const items = await Promise.all(
-    grupes.map(async (g: any): Promise<SutartiesRedagavimai> => {
-      // Paimame kelis atsargai – dalis pakeitimų gali neturėti matomų skirtumų.
-      const rows = await fetchRecentChanges({ id: g.unikalusId, limit: perSutarti + 4 } as any);
-      const visi: SutartiesPakeitimas[] = rows
-        .map((row: any): SutartiesPakeitimas | null => rowToPakeitimas(row))
-        .filter((p: SutartiesPakeitimas | null): p is SutartiesPakeitimas => p !== null);
-      const pakeitimai = visi.slice(0, perSutarti);
-      return {
-        unikalusId: g.unikalusId,
-        pavadinimas: visi[0]?.pavadinimas ?? null,
-        perkancioKodas: visi[0]?.perkancioKodas ?? null,
-        perkancioPavadinimas: visi[0]?.perkancioPavadinimas ?? null,
-        viso: g.viso,
-        praleista: Math.max(0, g.viso - pakeitimai.length),
-        pakeitimai,
-      };
-    }),
-  );
+  // Visų puslapio sutarčių pakeitimai – viena užklausa (anksčiau būdavo po
+  // vieną kiekvienai sutarčiai).
+  const ids = grupes.flatMap((g: any) => g.pakeitimuIds ?? []);
+  const eilutes = await fetchChangesByIds(ids);
+  const pagalSutarti = new Map<string, SutartiesPakeitimas[]>();
+  for (const eilute of eilutes) {
+    const pakeitimas = rowToPakeitimas(eilute);
+    if (!pakeitimas) continue;
+    const raktas = String(eilute.unikalusId);
+    pagalSutarti.set(raktas, [...(pagalSutarti.get(raktas) ?? []), pakeitimas]);
+  }
 
-  return { items, visoSutarciu, visoRedagavimu };
+  const items = grupes.map((g: any): SutartiesRedagavimai => {
+    const visiPakeitimai = pagalSutarti.get(String(g.unikalusId)) ?? [];
+    const pakeitimai = visiPakeitimai.slice(0, perSutarti);
+    return {
+      unikalusId: Number(g.unikalusId),
+      pavadinimas: visiPakeitimai[0]?.pavadinimas ?? null,
+      perkancioKodas: visiPakeitimai[0]?.perkancioKodas ?? null,
+      perkancioPavadinimas: visiPakeitimai[0]?.perkancioPavadinimas ?? null,
+      viso: g.viso,
+      praleista: Math.max(0, g.viso - pakeitimai.length),
+      pakeitimai,
+    };
+  });
+
+  const laukuKiekiai: Record<string, number> = zali.laukai ?? {};
+  const facetai: RedagavimuFacetai = {
+    laukai: Object.entries(laukuKiekiai)
+      .map(([reiksme, kiek]) => ({ reiksme, label: facetoLabel(reiksme), kiek }))
+      .sort((a, b) =>
+        facetoSvoris(a.reiksme) - facetoSvoris(b.reiksme) || b.kiek - a.kiek),
+    busenos: [
+      { reiksme: 'istrinta', label: 'Ištrintos', kiek: zali.istrinta },
+      { reiksme: 'atkurta', label: 'Atkurtos', kiek: zali.atkurta },
+    ].filter((o) => o.kiek > 0),
+    vertesKryptis: [
+      { reiksme: 'padidejo', label: 'Vertė padidėjo', kiek: zali.padidejo },
+      { reiksme: 'sumazejo', label: 'Vertė sumažėjo', kiek: zali.sumazejo },
+    ].filter((o) => o.kiek > 0),
+    nereiksmingi: zali.nereiksmingi,
+  };
+
+  return { items, rasta, viso, facetai };
 }

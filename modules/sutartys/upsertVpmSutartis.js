@@ -143,10 +143,15 @@ old_document AS MATERIALIZED (
 ),
 history AS (
     INSERT INTO "vpmSutartys"."changes" (
-        "unikalusId", sutartis, "sutartisHash", "pakeitimoData"
+        "unikalusId", sutartis, "sutartisHash", "pakeitimoData", "skirtumai"
     )
+    -- "skirtumai" skaičiuojami čia, nes tik šioje vietoje po ranka yra abu
+    -- pilni dokumentai: senasis (old.doc) ir ateinantis (i.doc). Vėliau
+    -- išvestinę „aktualią vertę" (_verte) atkurti nebeįmanoma – jai reikia ir
+    -- NEpakitusio vertės lauko reikšmės, kurios santraukoje nebelieka.
     SELECT (i.doc->>'unikalusId')::bigint, old.doc, old.hash,
-        (now() AT TIME ZONE 'Europe/Vilnius')
+        (now() AT TIME ZONE 'Europe/Vilnius'),
+        "vpmSutartys"."diffJsonb"(old.doc, i.doc)
     FROM incoming i
     JOIN old_document old ON old.hash IS DISTINCT FROM i.hash
     RETURNING id

@@ -72,6 +72,7 @@
         "sutartys:changes": "node modules/sutartys/rodytiPakeitimus.js",
         "teisekura:palyginti": "node modules/teisekura/palygintiRedakcijas.js",
         "sutartys:dropEmptyChanges": "node modules/sutartys/trintiNuliniusPakeitimus.js",
+        "sutartys:rebuildDiffs": "node modules/sutartys/perskaiciuotiSkirtumus.js",
         "sutartys:canonical-json": "node modules/sutartys/scrapeCanonical.js",
         "sutartys:rescrape-recent": "node modules/sutartys/rescrapeRecent.js",
         "push:sutartys": "node modules/sutartys/pushToSpinta.js",

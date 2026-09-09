@@ -5,13 +5,17 @@ import { linksniuoti } from '@/utils/linksniai.js';
 
 interface Props {
   redagavimai: SutartiesRedagavimai;
+  /** Su įjungtais filtrais skaičiuojami tik juos atitinkantys redagavimai. */
+  filtruota?: boolean;
 }
 
-const { redagavimai } = Astro.props;
+const { redagavimai, filtruota = false } = Astro.props;
 const { unikalusId, pavadinimas, perkancioKodas, perkancioPavadinimas, praleista, pakeitimai } = redagavimai;
 
 const antraste = pavadinimas && pavadinimas.length > 0 ? pavadinimas : `Sutartis #${unikalusId}`;
-const praleistaTekstas = linksniuoti(praleista, ['ankstesnis redagavimas', 'ankstesni redagavimai', 'ankstesnių redagavimų', 'ankstesnio redagavimo']);
+const praleistaTekstas = filtruota
+  ? linksniuoti(praleista, ['atitinkantis redagavimas', 'atitinkantys redagavimai', 'atitinkančių redagavimų', 'atitinkančio redagavimo'])
+  : linksniuoti(praleista, ['ankstesnis redagavimas', 'ankstesni redagavimai', 'ankstesnių redagavimų', 'ankstesnio redagavimo']);
 ---
 
 <article class="redagavimu-kortele">

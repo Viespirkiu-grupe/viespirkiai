@@ -34,6 +34,7 @@ SELECT
     recent.id,
     recent."unikalusId",
     recent."pakeitimoData",
+    recent."skirtumai",
     recent.sutartis AS before,
     recent."sutartisHash" AS "beforeHash",
     COALESCE(next_change.sutartis, current_contract.doc) AS after,
@@ -128,32 +129,166 @@ WITH recent_changes AS MATERIALIZED (
 )
 ${CHANGES_PROJECTION}`;
 
+// Pakeitimai pagal id sąrašą – redagavimų sąrašas viena užklausa paima visų
+// puslapio sutarčių pakeitimus (anksčiau ėjo po užklausą kiekvienai sutarčiai).
+export const CHANGES_BY_IDS_SQL = `
+WITH recent_changes AS MATERIALIZED (
+    SELECT change.*
+    FROM "vpmSutartys"."changes" change
+    WHERE change.id = ANY($1::integer[])
+)
+${CHANGES_PROJECTION}`;
+
+/**
+ * @param {number[]} ids
+ * @param {{query: (...args: any[]) => Promise<any>}} [db]
+ */
+export async function fetchChangesByIds(ids, db = postgres) {
+    if (!ids || ids.length === 0) return [];
+    const result = await db.query(CHANGES_BY_IDS_SQL, [ids]);
+    return result.rows;
+}
+
+/**
+ * Redagavimų sąrašo filtras → SQL sąlygos. Alias: `c` – vpmSutartys."changes".
+ *
+ * Beveik viskas remiasi 002 migracijos stulpeliais: `reiksmingas` (numatytai
+ * slepia pakeitimus, kuriuose pasikeitė vien `redagavimoData`), `skirtumai`
+ * (GIN indeksas, todėl laukų filtras yra `?|` operatorius, o ne
+ * jsonb_exists_any – funkcijos forma indekso nenaudotų), `busena`, `verteDelta`.
+ *
+ * @param {Filtras} [filtras]
+ * @param {any[]} [params] - parametrų masyvas, pildomas vietoje
+ */
+export function changesFilterSql(filtras = {}, params = []) {
+    const salygos = [];
+    const p = (value) => `$${params.push(value)}`;
+
+    if (!filtras.visi) salygos.push('c."reiksmingas"');
+    if (filtras.laukai?.length) {
+        salygos.push(`c."skirtumai" ?| ${p(filtras.laukai)}::text[]`);
+    }
+    if (filtras.busena) salygos.push(`c."busena" = ${p(filtras.busena)}`);
+    if (filtras.nuo) salygos.push(`c."pakeitimoData" >= ${p(filtras.nuo)}::date`);
+    // `iki` imtinai – lyginam su kitos dienos pradžia.
+    if (filtras.iki) salygos.push(`c."pakeitimoData" < ${p(filtras.iki)}::date + 1`);
+    if (filtras.verte === "padidejo") salygos.push('c."verteDelta" > 0');
+    if (filtras.verte === "sumazejo") salygos.push('c."verteDelta" < 0');
+    if (filtras.verteMin != null) {
+        salygos.push(`abs(c."verteDelta") >= ${p(filtras.verteMin)}`);
+    }
+    return {
+        where: salygos.length > 0 ? `WHERE ${salygos.join("\n      AND ")}` : "",
+        params,
+    };
+}
+
+export const RIKIAVIMAI = {
+    naujausi: '"maxId" DESC',
+    verte: '"didziausiaDelta" DESC NULLS LAST, "maxId" DESC',
+    daugiausia: 'viso DESC, "maxId" DESC',
+};
+
 // Redaguotos sutartys, naujausiai redaguotos viršuje, su puslapiavimu.
 // Grąžina po vieną eilutę kiekvienai sutarčiai su bendru jos pakeitimų skaičiumi.
-export async function fetchChangedContractsPage({ limit = 20, skip = 0 } = {}, db = postgres) {
+export async function fetchChangedContractsPage(
+    { limit = 20, skip = 0, perSutarti = 3, filtras = {}, rikiavimas = "naujausi" } = {},
+    db = postgres,
+) {
+    const params = [];
+    const f = changesFilterSql(filtras, params);
+    const tvarka = RIKIAVIMAI[rikiavimas] ?? RIKIAVIMAI.naujausi;
+    const p = (value) => `$${params.push(value)}`;
+    // Grupuojama tik iš atrinktų pakeitimų: `viso` reiškia „kiek šios sutarties
+    // pakeitimų atitinka filtrą", o `pakeitimuIds` – kelis naujausius iš jų.
     const result = await db.query(
-        `SELECT "unikalusId", COUNT(*)::int AS viso, MAX(id) AS "maxId"
-         FROM "vpmSutartys"."changes"
-         GROUP BY "unikalusId"
-         ORDER BY "maxId" DESC
-         LIMIT $1 OFFSET $2`,
-        [limit, skip],
+        `WITH atrinkti AS MATERIALIZED (
+            SELECT c.id, c."unikalusId", c."verteDelta"
+            FROM "vpmSutartys"."changes" c
+            ${f.where}
+        ),
+        grupes AS (
+            SELECT "unikalusId",
+                COUNT(*)::int AS viso,
+                MAX(id) AS "maxId",
+                MAX(abs("verteDelta")) AS "didziausiaDelta"
+            FROM atrinkti
+            GROUP BY "unikalusId"
+        )
+        SELECT g."unikalusId", g.viso, g."maxId",
+            (SELECT array_agg(naujausi.id ORDER BY naujausi.id DESC)
+             FROM (
+                SELECT a.id FROM atrinkti a
+                WHERE a."unikalusId" = g."unikalusId"
+                ORDER BY a.id DESC
+                LIMIT ${p(perSutarti)}
+             ) naujausi) AS "pakeitimuIds"
+        FROM grupes g
+        ORDER BY ${tvarka}
+        LIMIT ${p(limit)} OFFSET ${p(skip)}`,
+        params,
     );
     return result.rows;
 }
 
-export async function countChangedContracts(db = postgres) {
+/** Atitinkančių sutarčių ir pakeitimų skaičius (be filtro – bendros sumos). */
+export async function countChanges(filtras = {}, db = postgres) {
+    const params = [];
+    const f = changesFilterSql(filtras, params);
     const result = await db.query(
-        `SELECT COUNT(DISTINCT "unikalusId")::bigint AS count FROM "vpmSutartys"."changes"`,
+        `SELECT COUNT(DISTINCT c."unikalusId")::bigint AS sutarciu,
+                COUNT(*)::bigint AS pakeitimu
+         FROM "vpmSutartys"."changes" c
+         ${f.where}`,
+        params,
     );
-    return Number(result.rows[0].count);
+    return {
+        sutarciu: Number(result.rows[0].sutarciu),
+        pakeitimu: Number(result.rows[0].pakeitimu),
+    };
 }
 
-export async function countChanges(db = postgres) {
-    const result = await db.query(
-        `SELECT COUNT(*)::bigint AS count FROM "vpmSutartys"."changes"`,
+/**
+ * Facetų skaičiai šoninei juostai. Kiekviena grupė skaičiuojama be savo pačios
+ * filtro (kitaip pasirinkus „Ištrintos" likusios parinktys visada rodytų 0),
+ * bet su visais kitais – laikotarpiu ir šalimis.
+ *
+ * `nereiksmingi` sąmoningai skaičiuojamas ir tada, kai triukšmas paslėptas –
+ * iš jo sąraše rodoma „Paslėpta N techninių redagavimų“.
+ */
+export async function fetchChangesFacets(filtras = {}, db = postgres) {
+    const params = [];
+    const f = changesFilterSql(
+        { ...filtras, visi: true, laukai: [], busena: null, verte: null, verteMin: null },
+        params,
     );
-    return Number(result.rows[0].count);
+    // Reikšmingumas taikomas ne CTE viduje, o skaičiuojant – kad ta pati bazė
+    // duotų ir matomų pakeitimų facetus, ir paslėpto triukšmo kiekį.
+    const reiksmingumas = filtras.visi ? "TRUE" : '"reiksmingas"';
+    const result = await db.query(
+        `WITH baze AS MATERIALIZED (
+            SELECT c."skirtumai", c."busena", c."verteDelta", c."reiksmingas"
+            FROM "vpmSutartys"."changes" c
+            ${f.where}
+        )
+        SELECT
+            (SELECT COALESCE(jsonb_object_agg(l.laukas, l.kiek), '{}'::jsonb)
+             FROM (
+                SELECT laukas, COUNT(*)::int AS kiek
+                FROM baze, LATERAL jsonb_object_keys("skirtumai") AS laukas
+                WHERE ${reiksmingumas}
+                GROUP BY laukas
+             ) l) AS laukai,
+            COUNT(*) FILTER (WHERE "busena" = 'istrinta' AND ${reiksmingumas})::int AS istrinta,
+            COUNT(*) FILTER (WHERE "busena" = 'atkurta' AND ${reiksmingumas})::int AS atkurta,
+            COUNT(*) FILTER (WHERE "verteDelta" > 0 AND ${reiksmingumas})::int AS padidejo,
+            COUNT(*) FILTER (WHERE "verteDelta" < 0 AND ${reiksmingumas})::int AS sumazejo,
+            COUNT(*) FILTER (WHERE NOT "reiksmingas")::int AS nereiksmingi,
+            COUNT(*) FILTER (WHERE ${reiksmingumas})::int AS viso
+        FROM baze`,
+        params,
+    );
+    return result.rows[0];
 }
 
 /**
