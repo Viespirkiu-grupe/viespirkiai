@@ -10,7 +10,11 @@ import { loadCpvaProjektai } from "../../cpva/loadProjektai.js";
 
 export const name = "get_sutartis";
 export const description =
-    "Grąžina išsamią informaciją apie vieną viešojo pirkimo sutartį pagal jos unikalų ID. Apima pirkėjo, tiekėjo, vertės, terminų, BVPŽ kodų, dokumentų, SABIS sutarčių ir ES projektų duomenis. Sumos - eurais.";
+    "Grąžina išsamią informaciją apie vieną viešojo pirkimo sutartį pagal jos unikalų ID. Apima pirkėjo, tiekėjo, vertės, terminų, BVPŽ kodų, dokumentų, SABIS sutarčių ir ES projektų duomenis. Sumos - eurais. " +
+    "DĖMESIO: jei tipas = 'SP' (tipoPavadinimas 'Sutarties pakeitimas'), tai ne savarankiška sutartis, o anksčiau sudarytos sutarties pakeitimas " +
+    "(pratęsimas, apimties ar kainos keitimas). Tokios eilutės verte / faktineIvykdimoVerte yra paties pakeitimo suma (gali būti ir neigiama, kai sutartis mažinama), " +
+    "o ne visa sutarties vertė, todėl jos negalima sudėti su bazinės sutarties verte kaip atskiro sandorio. " +
+    "Bazinės sutarties ir kitų to paties pirkimo pakeitimų ieškok per search_sutartys pagal tą patį pirkimoNumeris arba sutartiesNumeris.";
 export const schema = {
     id: z.number().int().positive().describe("Sutarties unikalus ID"),
 };

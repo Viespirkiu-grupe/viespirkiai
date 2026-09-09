@@ -20,7 +20,13 @@ export const description =
     "kuriuos dalijasi visi tokio tipo tiekėjai (801 – pilietis, 802 – ūkininkas, 803 – užsienio įmonė, 804 – LR ambasada, 807 – kitas asmuo, " +
     "808 – Europos Komisijos atstovybė Lietuvoje, 809 – fizinis asmuo). Todėl tiekejoKodas=8xx negrupuoja vieno tiekėjo sutarčių, o sumaišo šimtus nesusijusių: " +
     "sutarciuKiekis ir bendraVerte tokiu atveju nerodo vieno tiekėjo apyvartos. Konkretaus tokio tiekėjo sutarčių ieškok pagal search=\"Vardas Pavardė\" (arba įmonės pavadinimą), " +
-    "prireikus kartu su perkanciosiosOrganizacijosKodas. Filtruoti vien pagal tiekejoKodas=8xx be kitų filtrų neleidžiama.";
+    "prireikus kartu su perkanciosiosOrganizacijosKodas. Filtruoti vien pagal tiekejoKodas=8xx be kitų filtrų neleidžiama. " +
+    "DĖMESIO dėl 'SP' tipo eilučių: SP (sutarties pakeitimas) nėra atskira sutartis, o jau sudarytos sutarties pakeitimas " +
+    "(pratęsimas, apimties ar kainos keitimas), susietas su bazine sutartimi per tą patį pirkimoNumeris / sutartiesNumeris. " +
+    "Jo vertė yra pakeitimo suma (gali būti ir neigiama, kai sutartis mažinama), o ne visa sutarties vertė. " +
+    "Grąžinama bendraVerte sumuoja VISAS rastas eilutes, įskaitant SP, todėl ji nelygi realiai sutarčių apimčiai — " +
+    "skaičiuodamas pirkėjo ar tiekėjo apyvartą naudok ignoruotiSp=true (arba execute_query su WHERE tipas <> 'SP'), " +
+    "kitaip pakeitimai bus suskaičiuoti dar kartą.";
 
 export const schema = {
     search: z.string().optional().describe("Pilno teksto paieškos užklausa"),
@@ -40,7 +46,9 @@ export const schema = {
         .describe(
             "Sutarties tipas. Galimos reikšmės: TSP (tarptautinis arba supaprastintas pirkimas), MVP (mažos vertės pirkimas), " +
                 "ŽS (žodinė sutartis), MVPŽ (mažos vertės pirkimas, žodinė sutartis), SPŽ (supaprastintas pirkimas, žodinė sutartis), " +
-                "PPS (pagrindinė pirkimo sutartis), VS (vidaus sandoris), SP (sutarties pakeitimas), PSĮ (pirkimas iš susijusios įmonės), " +
+                "PPS (pagrindinė pirkimo sutartis), VS (vidaus sandoris), " +
+                "SP (sutarties pakeitimas – ne nauja sutartis, o anksčiau sudarytos sutarties pakeitimas; žr. įrankio aprašymą), " +
+                "PSĮ (pirkimas iš susijusios įmonės), " +
                 "'ILGALAIKĖ MVPŽ' (ilgalaikis mažos vertės pirkimas, žodinė sutartis)",
         ),
     sudarymoDataNuo: z
@@ -57,7 +65,14 @@ export const schema = {
         .string()
         .optional()
         .describe("BVPZ kodo prefiksas, pvz. '45' (statybos darbai)"),
-    ignoruotiSp: z.boolean().optional().describe("Nerodyti 'SP' tipo sutarčių"),
+    ignoruotiSp: z
+        .boolean()
+        .optional()
+        .describe(
+            "Nerodyti 'SP' (sutarties pakeitimas) tipo eilučių. Naudok, kai skaičiuoji sutarčių kiekį ar bendrą vertę: " +
+                "pakeitimai yra jau sudarytų sutarčių papildymai, tad be šio filtro jie į sutarciuKiekis ir bendraVerte " +
+                "įskaičiuojami kaip atskiros sutartys.",
+        ),
     tikSuDokumentais: z
         .boolean()
         .optional()

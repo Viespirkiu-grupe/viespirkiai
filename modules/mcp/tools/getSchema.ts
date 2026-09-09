@@ -120,7 +120,16 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         ],
         primaryKeys: ["sutartiesUnikalusId"],
         example:
-            'SELECT "sutartiesUnikalusId", pirkejas, tiekejas, verte, "bvpzPavadinimas", "sudarymoData" FROM v_sutartys WHERE "sudarymoData" >= CURRENT_DATE - INTERVAL \'1 year\'',
+            'SELECT "sutartiesUnikalusId", pirkejas, tiekejas, verte, "bvpzPavadinimas", "sudarymoData" FROM v_sutartys WHERE tipas <> \'SP\' AND "sudarymoData" >= CURRENT_DATE - INTERVAL \'1 year\'',
+        notes:
+            "tipas = 'SP' ('Sutarties pakeitimas') eilutės nėra atskiros sutartys, o anksčiau sudarytų sutarčių pakeitimai " +
+            "(pratęsimai, apimties ar kainos keitimai), susieti su bazine sutartimi per tą patį pirkimoNumeris / sutartiesNumeris. " +
+            "Jų verte / suma / faktineIvykdimoVerte yra pakeitimo suma (gali būti ir neigiama, kai sutartis mažinama), o ne visa sutarties vertė.\n" +
+            "Todėl skaičiuojant sutarčių kiekius, sumas, rinkos dalis ar pirkėjo/tiekėjo apyvartą pridėk WHERE tipas <> 'SP' — " +
+            "kitaip pakeitimai skaičiuojami kaip papildomos sutartys ir suma išpučiama. SP eilutes imk tik tada, kai " +
+            "sąmoningai analizuoji pačius pakeitimus (pvz. kiek ir kaip dažnai sutartys brangsta).\n" +
+            "verte = numatoma (sudarant) vertė, faktineIvykdimoVerte = faktinė įvykdymo vertė (dažnai NULL), " +
+            "suma = COALESCE(faktinė, numatoma) — vienoje užklausoje rinkis vieną bazę.",
     },
     v_pirkimas: {
         tags: ["procedures", "criteria", "lot-count", "single-bidder", "cvpp-archive"],
