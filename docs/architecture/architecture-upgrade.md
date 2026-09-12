@@ -1,6 +1,6 @@
 # Viešpirkiai — Target Architecture (Upgrade)
 
-> **Status:** Phase 3, step 1: functional decomposition from the use-case perspective.
+> **Status:** Phase 3. Step 1: functional decomposition from the use-case perspective (§1–5). Step 2: monorepo structure with npm workspaces (§6).
 > **Inputs:** [`architecture-current.md`](architecture-current.md) (as-is) and [`architecture-review.md`](architecture-review.md) (pain points).
 > **Scope of this step:** *what* the system does, grouped into functional components with clear data ownership. *How* each component is deployed (processes, containers, hosts) is decided in a later step. A functional component is a unit of responsibility, not necessarily a separate service.
 
@@ -400,11 +400,403 @@ These rules decide where new functionality belongs, so that agentic development 
 
 ---
 
-## 6. Next steps (later phases)
+## 6. Monorepo structure (npm workspaces)
 
-1. **Decompose Data Ingestion:** connector contract, shared pipeline stages, canonical model, versioning and provenance model.
-2. **Define the Query Service contract:** query catalogue, result types, analytical read views, caching.
-3. **Logical architecture:** interfaces and events between all components, and allowed dependencies.
-4. **Module structure:** map components to a repository layout with enforced import boundaries.
-5. **Deployment architecture:** process, container and host placement (review P4, P12).
+The repository stays a single GitHub monorepo, organised with **npm workspaces**. Each workspace is one functional component from §1–3. Its build, test and run commands, its dependencies and its configuration belong to that workspace alone.
+
+### 6.1 Design principles
+
+1. **Workspace = functional component.** Every core and supporting component maps to exactly one workspace, named after the component.
+2. **Two kinds of workspaces.**
+   - `apps/*` are **deployable**: they have an entrypoint, a config schema, a Dockerfile and runtime dependencies.
+   - `packages/*` are **libraries**: no process, no environment reading, no `process.exit`.
+3. **Dependencies point inward only.** Apps depend on packages. Packages never import apps. Apps never import other apps; they communicate through database contracts, events or HTTP.
+4. **Imports go through declared dependencies and each package's `exports` entry.** Deep imports (`@viespirkiai/query/src/…`) are forbidden.
+5. **Plain npm workspaces, no extra monorepo tool.**
+   - Node 24 runs TypeScript directly (built-in type stripping); `tsc -b` only type-checks.
+   - Only the Astro app has a real build step.
+   - Add Turborepo later only if CI time becomes a problem.
+6. **Configuration per app.** Each app declares its own zod schema and `.env.example`. Packages receive settings as parameters. There is no global `CONFIG`.
+7. **Strict TypeScript everywhere.** New code is TypeScript; existing JavaScript is converted when its module moves into a workspace.
+8. **Create a package only when it is shared.** Code used by one workspace stays inside it; for example, the design system stays in `apps/web`. A package exists only for a functional component or for code used by two or more workspaces.
+9. **Versioned agent instructions.** A root `AGENTS.md`, plus a short `AGENTS.md` per workspace stating its responsibility, allowed dependencies and commands (review P8).
+
+### 6.2 Repository tree
+
+```text
+viespirkiai/
+├── package.json                    # private root: workspaces ["apps/*", "packages/*"], orchestration scripts only
+├── package-lock.json               # one lockfile for the whole repository
+├── tsconfig.base.json              # strict · module "nodenext" · erasableSyntaxOnly · verbatimModuleSyntax
+├── tsconfig.json                   # project references to every workspace (tsc -b)
+├── eslint.config.js                # flat config: import hygiene, no process.env outside config.ts
+├── .dependency-cruiser.cjs         # architecture rules from §6.4, enforced in CI
+├── .node-version                   # 24
+├── .editorconfig
+├── AGENTS.md                       # repository-wide agent instructions (versioned)
+├── README.md
+│
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                  # install → lint → typecheck → boundaries → test → build
+│   │   └── images.yml              # build & push one image per deployable app
+│   ├── dependabot.yml
+│   └── CODEOWNERS                  # owners per workspace and per migration folder
+│
+├── apps/                           # ── deployable functional components ──
+│   │
+│   ├── web/                        # «core» Frontend · @viespirkiai/web (Astro SSR)
+│   │   ├── package.json
+│   │   ├── AGENTS.md
+│   │   ├── Dockerfile
+│   │   ├── .env.example
+│   │   ├── astro.config.ts
+│   │   ├── public/
+│   │   ├── src/
+│   │   │   ├── config.ts           # web-only config schema
+│   │   │   ├── middleware.ts
+│   │   │   ├── pages/              # routes: use @viespirkiai/query only, never SQL
+│   │   │   ├── components/
+│   │   │   ├── design-system/
+│   │   │   └── client/             # browser bundles (relationship graph)
+│   │   └── test/
+│   │
+│   ├── mcp/                        # «core» MCP · @viespirkiai/mcp
+│   │   ├── package.json
+│   │   ├── AGENTS.md
+│   │   ├── Dockerfile
+│   │   ├── .env.example
+│   │   ├── src/
+│   │   │   ├── main.ts             # HTTP entrypoint (Streamable HTTP transport)
+│   │   │   ├── config.ts
+│   │   │   ├── server.ts
+│   │   │   └── tools/              # one file per tool, built on @viespirkiai/query
+│   │   └── test/
+│   │
+│   ├── ingestion/                  # «core» Data Ingestion · @viespirkiai/ingestion
+│   │   ├── package.json
+│   │   ├── AGENTS.md
+│   │   ├── Dockerfile
+│   │   ├── .env.example
+│   │   ├── src/
+│   │   │   ├── worker.ts           # entrypoint: pipeline workers and schedules
+│   │   │   ├── api.ts              # entrypoint: work distribution (OCR, extractors), file lookup, commands
+│   │   │   ├── config.ts
+│   │   │   ├── pipeline/           # shared stages: fetch · retain raw · link · persist · notify (I5, I8)
+│   │   │   ├── connectors/         # I1 · one folder per source
+│   │   │   │   ├── cvp-is/
+│   │   │   │   ├── ted/
+│   │   │   │   ├── jar/
+│   │   │   │   ├── liteko/
+│   │   │   │   ├── e-tar/
+│   │   │   │   └── …
+│   │   │   ├── gateway/            # I2 Source Gateway: proxies, Tor, rate limits, request log
+│   │   │   ├── raw-store/          # I3 raw payload retention
+│   │   │   ├── documents/          # I4 download, storage boxes, extraction, OCR distribution
+│   │   │   ├── reference-data/     # I6
+│   │   │   ├── entity-resolution/  # I7
+│   │   │   └── control/            # I9 schedules, backfills, freshness status
+│   │   └── test/
+│   │
+│   ├── risk/                       # «core» Procurement Risk Service · @viespirkiai/risk
+│   │   ├── package.json
+│   │   ├── AGENTS.md
+│   │   ├── Dockerfile
+│   │   ├── .env.example
+│   │   ├── src/
+│   │   │   ├── main.ts             # scheduled or event-triggered evaluation run
+│   │   │   ├── config.ts
+│   │   │   ├── engine/             # run orchestration, decision writer
+│   │   │   └── indicators/         # one folder per indicator (LT-COM-01 …) with fixtures and tests
+│   │   └── test/
+│   │
+│   ├── indexer/                    # «supporting» S2 Search Indexing · @viespirkiai/indexer
+│   ├── enrichment/                 # «supporting» S3 AI Enrichment · @viespirkiai/enrichment
+│   ├── open-data/                  # «supporting» S4 Open Data Publishing · @viespirkiai/open-data
+│   └── ops/                        # «supporting» S9 Operations Console · @viespirkiai/ops
+│       ├── package.json            # "bin": { "vp": "./src/cli.ts" }
+│       └── src/
+│           ├── cli.ts              # vp ingestion run|backfill|requeue · vp db migrate · vp backup verify
+│           └── commands/
+│
+├── packages/                       # ── libraries: no entrypoints, no env reading, no process.exit ──
+│   │
+│   ├── query/                      # «core» Query Service · @viespirkiai/query
+│   │   ├── package.json            # "exports": { ".": "./src/index.ts" }
+│   │   ├── AGENTS.md
+│   │   ├── src/
+│   │   │   ├── index.ts            # the published query contract
+│   │   │   ├── entities/           # procurement, contract, organisation, person, document, legal act, court case
+│   │   │   ├── search/             # search and facets (projections + PostgreSQL fallback)
+│   │   │   ├── relationships/
+│   │   │   ├── documents/          # extracted text, OCR results, file references
+│   │   │   ├── risk/               # risk results
+│   │   │   ├── analytics/          # set-based, streamed reads for Risk and Open Data
+│   │   │   └── analyst-sql/        # bounded ad-hoc SQL
+│   │   └── test/
+│   │
+│   ├── domain/                     # canonical model: entity types, identifiers, Money, dates
+│   ├── database/                   # «supporting» S7 Schema & Data Governance
+│   │   ├── src/                    # role-scoped pools: readOnly · factsWriter · riskWriter · control
+│   │   ├── migrations/
+│   │   │   ├── facts/              # owned by apps/ingestion
+│   │   │   ├── risk/               # owned by apps/risk
+│   │   │   ├── control/            # infra · auth · jobs
+│   │   │   └── views/              # read views owned by packages/query
+│   │   └── schema/                 # generated schema documentation (committed)
+│   ├── jobs/                       # «supporting» S1 Job Orchestration: queues, schedules, retries
+│   ├── events/                     # "facts changed" event contracts + transport (NATS)
+│   ├── search/                     # Quickwit and Typesense clients, index definitions
+│   ├── storage/                    # file store, document content, raw payload stores
+│   ├── auth/                       # «supporting» S5 Identity & Access: API keys, rate limiting
+│   ├── config/                     # «supporting» S10 typed env loader (zod) used by every app's config.ts
+│   ├── observability/              # «supporting» S6 structured logging, metrics, health checks
+│   └── testing/                    # fixtures, test database (Testcontainers), fakes
+│
+├── infra/                          # ── how it runs; no application code, not a workspace ──
+│   ├── compose/
+│   │   ├── compose.yaml            # production topology (versioned; secrets injected via env)
+│   │   └── compose.dev.yaml        # local PostgreSQL, PgBouncer, Quickwit, Typesense, NATS
+│   ├── postgres/                   # image (PostGIS, pg_repack) and configuration
+│   ├── pgbouncer/
+│   ├── quickwit/
+│   ├── typesense/
+│   └── backup/                     # «supporting» S8 Backup & Recovery: scripts and restore runbook
+│
+└── docs/
+    ├── architecture/
+    ├── adr/                        # architecture decision records
+    └── runbooks/
+```
+
+### 6.3 Workspace to functional component map
+
+| Workspace | Package | Functional component | Runs as | Moves from (today) |
+|---|---|---|---|---|
+| `apps/web` | `@viespirkiai/web` | «core» Frontend | `astro build` → Node server | `src/`, `start-server.mjs`, `astro.config.mjs` |
+| `apps/mcp` | `@viespirkiai/mcp` | «core» MCP | `node src/main.ts` | `modules/mcp/`, `src/pages/mcp.astro`, `src/lib/mcp.ts` |
+| `apps/ingestion` | `@viespirkiai/ingestion` | «core» Data Ingestion | `node src/worker.ts`, `node src/api.ts` | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints |
+| `apps/risk` | `@viespirkiai/risk` | «core» Procurement Risk Service | `node src/main.ts` (scheduled) | `modules/risk/`, `services/procurement-risk/` |
+| `apps/indexer` | `@viespirkiai/indexer` | S2 Search Indexing | `node src/main.ts` | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*` |
+| `apps/enrichment` | `@viespirkiai/enrichment` | S3 AI Enrichment | `node src/main.ts` | `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js` |
+| `apps/open-data` | `@viespirkiai/open-data` | S4 Open Data Publishing | `node src/main.ts` | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket |
+| `apps/ops` | `@viespirkiai/ops` | S9 Operations Console | `vp <command>` | about 80 `npm run` scripts, `scripts/` |
+| `packages/query` | `@viespirkiai/query` | «core» Query Service | library | `src/lib/*`, SQL in pages, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/analyst/` |
+| `packages/domain` | `@viespirkiai/domain` | Canonical model (I5) | library | new |
+| `packages/database` | `@viespirkiai/database` | S7 Schema & Data Governance | library + migrations | `postgres/`, `migrations/`, `dbSchema/` |
+| `packages/jobs` | `@viespirkiai/jobs` | S1 Job Orchestration | library | `runner/`, per-module queues |
+| `packages/events` | `@viespirkiai/events` | "Facts changed" contract | library | `utils/natsHub.js`, `utils/taskSignals.js` |
+| `packages/search` | `@viespirkiai/search` | Search clients (used by query and indexer) | library | `quickwit/quickwit.js`, `typesense/` |
+| `packages/storage` | `@viespirkiai/storage` | Document and raw payload stores | library | `utils/sidecar*.js`, `modules/failai/failaiFs.js`, `modules/ocr/rezultataiFs.js` |
+| `packages/auth` | `@viespirkiai/auth` | S5 Identity & Access | library | `modules/failai/auth.js`, `src/lib/botChallenge.ts` |
+| `packages/config` | `@viespirkiai/config` | S10 Configuration & Secrets | library | `utils/config*.js` |
+| `packages/observability` | `@viespirkiai/observability` | S6 Observability | library | `utils/log.js`, SQL and scrape log ingest, metrics |
+| `packages/testing` | `@viespirkiai/testing` | Test support | dev library | `test/mocks/` |
+| `infra/backup` | — | S8 Backup & Recovery | scripts, runbook | `modules/s3backup/` + new database backups |
+
+### 6.4 Workspace dependency rules
+
+```mermaid
+flowchart TB
+  classDef app fill:#dbe9fb,stroke:#1f5fa8,stroke-width:2px,color:#0b2545
+  classDef supapp fill:#f5f9ff,stroke:#1f5fa8,stroke-dasharray:3 2,color:#0b2545
+  classDef pkg fill:#eef7ee,stroke:#2e7d32,color:#123d14
+  classDef xcut fill:#fafafa,stroke:#888,stroke-dasharray:3 2,color:#333
+
+  subgraph APPS["apps/* (deployable)"]
+    web["web"]:::app
+    mcp["mcp"]:::app
+    risk["risk"]:::app
+    ingestion["ingestion"]:::app
+    opendata["open-data"]:::supapp
+    enrichment["enrichment"]:::supapp
+    indexer["indexer"]:::supapp
+    ops["ops"]:::supapp
+  end
+
+  subgraph PKGS["packages/* (libraries)"]
+    query["query"]:::pkg
+    domain["domain"]:::pkg
+    database["database"]:::pkg
+    search["search"]:::pkg
+    storage["storage"]:::pkg
+    jobs["jobs"]:::pkg
+    events["events"]:::pkg
+    auth["auth"]:::pkg
+  end
+
+  xc["config · observability · testing<br/>(allowed everywhere)"]:::xcut
+
+  web --> query
+  web --> auth
+  mcp --> query
+  mcp --> auth
+  risk --> query
+  risk --> database
+  risk --> jobs
+  risk --> events
+  opendata --> query
+  opendata --> jobs
+  enrichment --> query
+  enrichment --> jobs
+  ingestion --> domain
+  ingestion --> database
+  ingestion --> storage
+  ingestion --> jobs
+  ingestion --> events
+  ingestion --> auth
+  indexer --> database
+  indexer --> search
+  indexer --> jobs
+  indexer --> events
+  ops --> database
+  ops --> jobs
+
+  query --> domain
+  query --> database
+  query --> search
+  query --> storage
+  jobs --> database
+```
+
+Solid arrows are allowed dependencies. Any dependency not drawn is forbidden. `config`, `observability` and `testing` are cross-cutting and may be used by every workspace.
+
+| Rule | Enforced by |
+|---|---|
+| `apps/*` import only `packages/*`; never another app | dependency-cruiser in CI |
+| `packages/*` never import `apps/*` | dependency-cruiser in CI |
+| `web`, `mcp`, `open-data`, `enrichment` read data **only through `query`**: no `database` dependency | dependency-cruiser + `package.json` review (CODEOWNERS) |
+| Only `ingestion` imports `@viespirkiai/database/facts-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
+| No deep imports; only paths listed in `exports` | Node `exports` resolution + ESLint |
+| Every import is a declared dependency (npm hoisting would otherwise hide mistakes) | ESLint `import/no-extraneous-dependencies` or `knip` |
+| No `process.env` outside an app's `src/config.ts`; no `process.exit` or top-level side effects in packages | ESLint (`n/no-process-env`, custom rule) |
+
+### 6.5 Commands
+
+**Root `package.json`**, which orchestrates only:
+
+```json
+{
+  "name": "viespirkiai",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:web": "npm run dev -w @viespirkiai/web",
+    "dev:mcp": "npm run dev -w @viespirkiai/mcp",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "boundaries": "depcruise apps packages",
+    "test": "npm run test --workspaces --if-present",
+    "check": "npm run lint && npm run typecheck && npm run boundaries && npm test"
+  }
+}
+```
+
+**A workspace `package.json`** (`apps/mcp`):
+
+```json
+{
+  "name": "@viespirkiai/mcp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file=.env src/main.ts",
+    "start": "node src/main.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@viespirkiai/query": "*",
+    "@viespirkiai/auth": "*",
+    "@viespirkiai/config": "*",
+    "@viespirkiai/observability": "*",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@viespirkiai/testing": "*"
+  }
+}
+```
+
+**A library `package.json`** (`packages/query`):
+
+```json
+{
+  "name": "@viespirkiai/query",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run" },
+  "dependencies": {
+    "@viespirkiai/domain": "*",
+    "@viespirkiai/database": "*",
+    "@viespirkiai/search": "*",
+    "@viespirkiai/storage": "*"
+  }
+}
+```
+
+Typical workflows:
+
+| Task | Command |
+|---|---|
+| Run the website locally | `npm run dev:web` |
+| Test only the Query Service | `npm test -w @viespirkiai/query` |
+| Add a dependency to MCP only | `npm install <pkg> -w @viespirkiai/mcp` |
+| Build the MCP image with only its dependencies | `npm ci -w @viespirkiai/mcp` inside `apps/mcp/Dockerfile` |
+| Run a backfill | `npx vp ingestion backfill --source cvp-is --from 2024-01-01` |
+| Apply migrations | `npx vp db migrate` |
+| Full local gate (same as CI) | `npm run check` |
+
+### 6.6 Configuration separation
+
+| Level | Where | Contains |
+|---|---|---|
+| App schema | `apps/<app>/src/config.ts` | zod schema of **only** the variables that app needs; the only place `process.env` is read |
+| App template | `apps/<app>/.env.example` | documented defaults for local development; replaces the shared `ENV.md` and `config.sample.js` |
+| Packages | constructor or function parameters | no environment access; the app passes typed settings in |
+| Runtime | `infra/compose/compose.yaml` | environment per service; secrets injected by the runtime, never committed |
+
+Database access is split by **role-specific connection strings**, so each app can only receive the credentials it is allowed to use:
+
+| App | Database connection variables |
+|---|---|
+| `web`, `open-data`, `enrichment` | `DATABASE_URL_READONLY` |
+| `mcp` | `DATABASE_URL_READONLY`, `DATABASE_URL_ANALYST` |
+| `risk` | `DATABASE_URL_READONLY`, `DATABASE_URL_RISK_WRITER` |
+| `ingestion` | `DATABASE_URL_FACTS_WRITER` |
+| `indexer` | `DATABASE_URL_READONLY` |
+| `ops` | `DATABASE_URL_MIGRATOR` |
+
+### 6.7 Migration path from the current layout
+
+The move is incremental (strangler pattern); the system keeps running at every step.
+
+| Step | Change | Result |
+|---|---|---|
+| 1 | Add root workspaces. Move the current app **unchanged** into `apps/web`, and move `modules/`, `utils/`, `postgres/`, `quickwit/`, `runner/`, `tasks/` into a temporary `packages/legacy` | Same behaviour, workspace skeleton in place |
+| 2 | Add `ci.yml`: lint, typecheck, tests, boundaries (warn-only at first) | Automated safety net (review P2) |
+| 3 | Extract `config`, `observability`, `database` (with a migration runner) | Configuration separation; reproducible schema (P1, P11) |
+| 4 | Create `packages/query`; move SQL out of pages and MCP tools one entity at a time | Single read path (P5) |
+| 5 | Move `apps/mcp` and `apps/risk` onto `query` | First independently built and deployed apps |
+| 6 | Move ingestion connectors into `apps/ingestion` source by source, onto the shared pipeline | Ingestion contract (§2) |
+| 7 | Split out `indexer`, `enrichment`, `open-data`, `ops`; delete `packages/legacy`; switch boundaries to error mode | Target structure reached |
+
+Validate these in a short spike before step 1:
+- Node 24 type stripping across workspace symlinks, including the `erasableSyntaxOnly` limits (no `enum`, no `namespace`);
+- Astro/Vite resolving TypeScript-source packages;
+- per-workspace `npm ci` inside Docker, including the `tokenizers` lockfile workaround.
+
+---
+
+## 7. Next steps (later phases)
+
+1. **Spike the monorepo skeleton** (§6.7, step 1): prove type stripping, Astro resolution, per-app Docker builds and dependency-cruiser rules.
+2. **Decompose Data Ingestion:** connector contract, shared pipeline stages, canonical model, versioning and provenance model.
+3. **Define the Query Service contract:** query catalogue, result types, analytical read views, caching.
+4. **Logical architecture:** interfaces and events between all components.
+5. **Deployment architecture:** process, container and host placement per app (review P4, P12).
 6. **Migration roadmap:** ordered by risk. S8 Backup & Recovery and S7 migrations come first.
