@@ -449,8 +449,8 @@ viespirkiai/
 │
 ├── .github/
 │   ├── workflows/                  # see §7.4
-│   │   ├── ci.yml                  # PR gate: install → lint → typecheck → boundaries → test → build
-│   │   └── delivery.yml            # main: ci → publish images sha-<commit> → move pointer tag main
+│   │   ├── ci.yml                  # PR gate: install → lint → typecheck → boundaries → unit tests → build
+│   │   └── delivery.yml            # main: ci → build changed images → tag all images sha-<commit> → move pointer main
 │   ├── dependabot.yml
 │   └── CODEOWNERS                  # owners per workspace and per migration folder
 │
@@ -565,6 +565,9 @@ viespirkiai/
 │   └── testing/                    # fixtures, test database (Testcontainers), fakes
 │
 ├── infra/                          # ── how it runs; no application code, not a workspace ──
+│   ├── ci/
+│   │   ├── images.json             # image name → Dockerfile, target, workspace (§7.4)
+│   │   └── affected-images.ts      # changed paths + workspace graph → images to build
 │   ├── compose/                    # see §7.6
 │   │   ├── viespirkiai-business-compose.yaml  # web · mcp · ingestion · migrate; images by digest; alpha and production
 │   │   ├── viespirkiai-data-compose.yaml      # PostgreSQL · PgBouncer · Quickwit · Typesense · NATS; alpha and production
@@ -838,12 +841,12 @@ same image* can mean anything, the image must be self-contained (C3) and the tas
 
 ### 7.2 Design principles
 
-1. **Build once, promote the same digest.** CI builds an image once per commit. Integration tests, alpha and production
-   run that same digest.
-2. **Deploy by digest.** Compose files reference `image@sha256:…`. CI moves one pointer tag, `main`, for discovery only.
-   CI does not publish `latest`.
+1. **Build once, promote the same digest.** CI builds an image only for a commit that changes the inputs of that image.
+   Integration tests, alpha and production run that same digest.
+2. **Deploy by digest.** Compose files reference `image@sha256:…`. Every commit on `main` has the tag `sha-<commit>` on
+   every image. CI moves one pointer tag, `main`, for discovery only. CI does not publish `latest`.
 3. **GitHub Actions verifies and publishes.** Lint, type-check, unit tests and build pass before an image reaches
-   `ghcr.io`.
+   `ghcr.io`. Unit tests use mocks only: no network, no database.
 4. **lempa pulls. Nothing pushes into lempa.** lempa needs no inbound port, no GitHub runner and no GitHub write
    credentials.
 5. **Integration tests are read-only and run on the real database** of the target environment, with a read-only role.
@@ -860,7 +863,8 @@ same image* can mean anything, the image must be self-contained (C3) and the tas
 
 ### 7.3 Pipeline overview
 
-GitHub Actions builds and publishes. The `vp-deploy` agent on lempa does integration tests and deployments.
+GitHub Actions runs unit tests, builds and publishes. The `vp-deploy` agent on lempa pulls images, runs integration tests
+and deploys.
 
 ```mermaid
 flowchart LR
@@ -868,8 +872,8 @@ flowchart LR
     Operator(["Operator"])
 
     subgraph gha["GitHub Actions"]
-        ci["ci.yml: verify"]
-        delivery["delivery.yml: verify, publish"]
+        ci["ci.yml: lint, type-check, unit tests, build"]
+        delivery["delivery.yml: ci.yml, build changed images, tag all images"]
     end
 
     ghcr[("ghcr.io")]
@@ -877,9 +881,18 @@ flowchart LR
     subgraph lempa["lempa"]
         timer["vp-deploy-watch.timer"]
         watch["vp-deploy watch"]
-        alpha["vp-deploy alpha: alpha.viespirkiai.org"]
-        prodcmd["vp-deploy prod"]
-        prod["viespirkiai.org"]
+        subgraph alphaenv["alpha environment"]
+            alphadeploy["vp-deploy alpha"]
+            alphait["it image: integration tests"]
+            alphadb[("alpha database")]
+            alphaapps["alpha.viespirkiai.org"]
+        end
+        subgraph prodenv["production environment"]
+            proddeploy["vp-deploy prod"]
+            prodit["it image: integration tests"]
+            proddb[("production database")]
+            prodapps["viespirkiai.org"]
+        end
     end
 
     Contributor -->|pull request| ci
@@ -887,22 +900,30 @@ flowchart LR
     delivery -.->|" images sha-#lt;commit#gt;, pointer main "| ghcr
     timer -->|every 2 min| watch
     watch -->|reads pointer main| ghcr
-    watch -->|new commit| alpha
-    Operator -->|ssh lempa| prodcmd
-    prodcmd -->|release that passed alpha| prod
-    ghcr -.->|pull by digest| alpha
-    ghcr -.->|pull by digest| prod
+    watch -->|new commit| alphadeploy
+    ghcr -.->|images by digest| alphadeploy
+    alphadeploy -->|runs before rollout| alphait
+    alphait -->|reads with read-only role| alphadb
+    alphadeploy -->|compose up after tests pass| alphaapps
+    Operator -->|ssh lempa, release with status alpha-passed| proddeploy
+    ghcr -.->|images by digest| proddeploy
+    proddeploy -->|runs before rollout| prodit
+    prodit -->|reads with read-only role| proddb
+    proddeploy -->|compose up after tests pass| prodapps
 ```
 
-| # | Stage             | Runs on                                    | Trigger                                      | Result                                        |
-|---|-------------------|--------------------------------------------|----------------------------------------------|-----------------------------------------------|
-| 1 | Verify            | GitHub Actions `ci.yml`                    | every pull request; reused by `delivery.yml` | required status check on `main`               |
-| 2 | Publish           | GitHub Actions `delivery.yml`              | push to `main`, after stage 1                | images `sha-<commit>`; pointer tag `main`     |
-| 3 | Detect            | lempa `vp-deploy watch`                    | systemd timer, every 2 minutes               | release directory for the new commit          |
-| 4 | Deploy alpha      | lempa, compose project `vp-alpha-business` | new commit detected, **automatic**           | release status `alpha-passed` or `failed`     |
-| 5 | Deploy production | lempa, compose project `vp-prod-business`  | `vp-deploy prod`, **manual**                 | release status `prod-deployed` or `failed`    |
+| # | Stage             | Runs on                                    | Trigger                                      | Result                                                          |
+|---|-------------------|--------------------------------------------|----------------------------------------------|-----------------------------------------------------------------|
+| 1 | Verify            | GitHub Actions `ci.yml`                    | every pull request; reused by `delivery.yml` | lint, type-check, boundaries, unit tests and build pass         |
+| 2 | Publish           | GitHub Actions `delivery.yml`              | push to `main`, after stage 1                | changed images built; all images tagged `sha-<commit>`; pointer `main` |
+| 3 | Detect            | lempa `vp-deploy watch`                    | systemd timer, every 2 minutes               | release directory for the new commit                            |
+| 4 | Deploy alpha      | lempa, compose project `vp-alpha-business` | new commit detected, **automatic**           | release status `alpha-passed` or `failed`                       |
+| 5 | Deploy production | lempa, compose project `vp-prod-business`  | `vp-deploy prod`, **manual**                 | release status `prod-deployed` or `failed`                      |
 
-Integration tests are a step of stages 4 and 5 (§7.5).
+| Test kind         | Runs in                                 | Reads                                        | Side effects                                   |
+|-------------------|-----------------------------------------|----------------------------------------------|------------------------------------------------|
+| Unit tests        | GitHub Actions, stage 1                 | mocks and fixtures only                      | none; no network, no database                  |
+| Integration tests | lempa, `it` image, stages 4 and 5 (§7.5) | real database and search of the environment | none; read-only role, search-only keys         |
 
 A release moves through these states:
 
@@ -933,17 +954,56 @@ stateDiagram-v2
 
 **Stage 2 — Publish** (`delivery.yml`, push to `main` only):
 
-1. Run `ci.yml` as a reusable workflow.
-2. Build and push every image with the tag `sha-<full commit>`. The images are the deployable apps (§6.3), `ops` and
-   `it`.
-3. Generate an SBOM and a provenance attestation for each image.
-4. Scan each image with Trivy. `CRITICAL` findings block the publish.
-5. **Move the pointer tag `main`** on every image to the new digests. This step runs last, so lempa never sees a partial
+1. Run `ci.yml` as a reusable workflow. The unit tests run again on the merged commit.
+2. Detect the changed images with `infra/ci/affected-images.ts`.
+3. Build and push each changed image with the tag `sha-<full commit>`.
+4. Generate an SBOM and a provenance attestation for each built image.
+5. Scan each built image with Trivy. `CRITICAL` findings block the publish.
+6. Tag each unchanged image: add `sha-<full commit>` to the digest of `sha-<base commit>`. This is a registry operation
+   (`docker buildx imagetools create`), without a build.
+7. **Move the pointer tag `main`** on every image to the new digests. This step runs last, so lempa never sees a partial
    release.
+
+The images are the deployable apps (§6.3), `ops` and `it`.
+
+#### `delivery.yml` builds only the changed images
+
+`delivery.yml` selects the images to build from the paths changed since the last successful publish:
+
+```mermaid
+flowchart TD
+    run["gh run list: last successful delivery.yml run on main"] -->|run list| found{"run found?"}
+    found -->|no| all["select all images"]
+    found -->|"yes: base commit"| diff["git diff --name-only base..HEAD"]
+    diff -->|changed paths| match["affected-images.ts: match paths to image inputs"]
+    match -->|changed images| build["build, attest, scan, push sha-#lt;commit#gt;"]
+    match -->|unchanged images| retag["imagetools create: sha-#lt;base#gt; digest as sha-#lt;commit#gt;"]
+    all -->|all images| build
+    build -->|digests| pointer["move pointer main on every image"]
+    retag -->|digests| pointer
+```
+
+`infra/ci/images.json` declares each image. `affected-images.ts` resolves the image inputs from the workspace graph:
+
+| Image                                         | Inputs                                                                                                        |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| `web`, `mcp`, `ingestion`, `risk`, supporting apps | `apps/<app>/**` and every workspace in its transitive `@viespirkiai/*` `dependencies` (§6.4)             |
+| `ops`                                         | `apps/ops/**` and its transitive workspace dependencies, which include `packages/database/migrations/**`      |
+| `it`                                          | `apps/**`, `packages/**`                                                                                      |
+| All images                                    | `package.json`, `package-lock.json`, `tsconfig.base.json`, `.node-version`, `infra/ci/**`                     |
+
+| Rule                                                                                                   | Effect                                                                                     |
+|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
+| The base commit is the last **successful** run, not `HEAD^`                                            | Changes from cancelled or failed runs are included in the next build                       |
+| Every image gets `sha-<commit>` on every commit                                                        | `vp-deploy` resolves a complete `manifest.env` for any commit, without knowing what changed |
+| An unchanged image keeps its digest                                                                    | `compose up` does not recreate its containers                                              |
+| A change in `infra/compose/**` or `infra/deploy/**` builds no image, but still creates a release       | Compose and deploy changes deploy through alpha like code changes                          |
+| `push` has `paths-ignore: ['docs/**', '**/*.md']`                                                      | Documentation changes create no release                                                    |
+| `workflow_dispatch` input `all-images: true` selects all images                                        | An operator rebuilds everything, for example to pick up a patched base image              |
 
 Workflow settings:
 
-- `concurrency: { group: delivery, cancel-in-progress: true }`. A newer push cancels an older publish before step 5.
+- `concurrency: { group: delivery, cancel-in-progress: true }`. A newer push cancels an older publish before step 7.
 - Minimal `permissions:` per job. `GITHUB_TOKEN` is the only credential.
 - Actions are pinned by commit SHA. Dependabot updates them.
 
@@ -1191,7 +1251,7 @@ and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md)
 
 The front page reads the Quickwit contract index built from `ods`. A source schema is never the data source of a page.
 
-### 8.2 Layer model
+### 8.2 Data Layer model
 
 The diagram shows the writer of each data layer and the read path of every consumer.
 
