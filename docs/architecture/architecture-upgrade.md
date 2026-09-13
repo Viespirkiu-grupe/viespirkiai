@@ -567,9 +567,8 @@ viespirkiai/
 │
 ├── infra/                          # ── how it runs; no application code, not a workspace ──
 │   ├── compose/                    # see §7.6
-│   │   ├── app.yaml                # web · mcp · ingestion · migrate; images by digest; alpha and production
-│   │   ├── data.yaml               # PostgreSQL · PgBouncer · Quickwit · Typesense · NATS; alpha and production
-│   │   ├── it.yaml                 # integration test stack on tmpfs (lempa)
+│   │   ├── viespirkiai-business-compose.yaml  # web · mcp · ingestion · migrate; images by digest; alpha and production
+│   │   ├── viespirkiai-data-compose.yaml      # PostgreSQL · PgBouncer · Quickwit · Typesense · NATS; alpha and production
 │   │   ├── dev.yaml                # local development services
 │   │   └── env/
 │   │       ├── alpha.env           # non-secret alpha values
@@ -869,7 +868,8 @@ same image* can mean anything, the image must be self-contained (C3) and the tas
    `ghcr.io`.
 4. **lempa pulls. Nothing pushes into lempa.** lempa needs no inbound port, no GitHub runner and no GitHub write
    credentials.
-5. **Integration tests run on lempa**, against the published images, before every alpha deployment.
+5. **Integration tests are read-only and run on the real database** of the target environment, with a read-only role.
+   They run before every rollout and on demand at any time.
 6. **Alpha deploys automatically. Production deploys only by an operator command on lempa**, and only a release that
    passed alpha.
 7. **Alpha and production use the same compose files.** They differ only in their env files.
@@ -897,10 +897,9 @@ flowchart LR
     subgraph lempa["lempa"]
         timer["vp-deploy-watch.timer"]
         watch["vp-deploy watch"]
-        it["vp-it: integration tests"]
-        alpha["vp-alpha: alpha.viespirkiai.org"]
+        alpha["vp-deploy alpha: alpha.viespirkiai.org"]
         prodcmd["vp-deploy prod"]
-        prod["vp-prod: viespirkiai.org"]
+        prod["viespirkiai.org"]
     end
 
     Contributor -->|pull request| ci
@@ -908,34 +907,31 @@ flowchart LR
     delivery -.->|" images sha-#lt;commit#gt;, pointer main "| ghcr
     timer -->|every 2 min| watch
     watch -->|reads pointer main| ghcr
-    watch -->|new commit| it
-    it -->|passed| alpha
+    watch -->|new commit| alpha
     Operator -->|ssh lempa| prodcmd
     prodcmd -->|release that passed alpha| prod
-    ghcr -.->|pull by digest| it
     ghcr -.->|pull by digest| alpha
     ghcr -.->|pull by digest| prod
 ```
 
-| # | Stage             | Runs on                               | Trigger                                      | Result                                    |
-|---|-------------------|---------------------------------------|----------------------------------------------|-------------------------------------------|
-| 1 | Verify            | GitHub Actions `ci.yml`               | every pull request; reused by `delivery.yml` | required status check on `main`           |
-| 2 | Publish           | GitHub Actions `delivery.yml`         | push to `main`, after stage 1                | images `sha-<commit>`; pointer tag `main` |
-| 3 | Detect            | lempa `vp-deploy watch`               | systemd timer, every 2 minutes               | release directory for the new commit      |
-| 4 | Integration tests | lempa, compose project `vp-it`        | new commit detected                          | release status `it-passed` or `failed`    |
-| 5 | Deploy alpha      | lempa, compose project `vp-alpha-app` | status `it-passed`, **automatic**            | release status `alpha-passed` or `failed` |
-| 6 | Deploy production | lempa, compose project `vp-prod-app`  | `vp-deploy prod`, **manual**                 | release status `prod-deployed`            |
+| # | Stage             | Runs on                                    | Trigger                                      | Result                                        |
+|---|-------------------|--------------------------------------------|----------------------------------------------|-----------------------------------------------|
+| 1 | Verify            | GitHub Actions `ci.yml`                    | every pull request; reused by `delivery.yml` | required status check on `main`               |
+| 2 | Publish           | GitHub Actions `delivery.yml`              | push to `main`, after stage 1                | images `sha-<commit>`; pointer tag `main`     |
+| 3 | Detect            | lempa `vp-deploy watch`                    | systemd timer, every 2 minutes               | release directory for the new commit          |
+| 4 | Deploy alpha      | lempa, compose project `vp-alpha-business` | new commit detected, **automatic**           | release status `alpha-passed` or `failed`     |
+| 5 | Deploy production | lempa, compose project `vp-prod-business`  | `vp-deploy prod`, **manual**                 | release status `prod-deployed` or `failed`    |
+
+Integration tests are a step of stages 4 and 5 (§7.5).
 
 A release moves through these states:
 
 ```mermaid
 stateDiagram-v2
     [*] --> published: delivery.yml moves pointer main
-    published --> it_passed: integration tests pass
-    published --> failed: integration tests fail
-    it_passed --> alpha_passed: alpha smoke tests pass
-    it_passed --> failed: alpha smoke tests fail, alpha rolled back
-    alpha_passed --> prod_deployed: operator runs vp-deploy prod
+    published --> alpha_passed: migrations, integration tests and smoke tests pass on alpha
+    published --> failed: a deployment step fails on alpha
+    alpha_passed --> prod_deployed: operator runs vp-deploy prod and all steps pass
     prod_deployed --> [*]
     failed --> [*]
 ```
@@ -996,7 +992,7 @@ suites, so lempa runs tests without a checkout.
 │   └── <commit>/
 │       ├── infra/                 # compose files, env files and scripts at <commit>
 │       ├── manifest.env           # WEB_IMAGE=ghcr.io/racionalas/viespirkiai-web@sha256:… (one line per image)
-│       ├── status                 # published · it-passed · alpha-passed · prod-deployed · failed
+│       ├── status                 # published · alpha-passed · prod-deployed · failed
 │       └── logs/
 ├── alpha/
 │   ├── current -> ../releases/<commit>
@@ -1009,6 +1005,38 @@ suites, so lempa runs tests without a checkout.
 `vp-deploy` uses only Docker, git and `curl`. The images and the repository are public, so lempa needs no GitHub or GHCR
 credentials.
 
+#### `vp-deploy` deploys a release to an environment
+
+`vp-deploy alpha <commit>` and `vp-deploy prod <commit>` run the same steps against their own environment.
+`vp-deploy prod` first requires status `alpha-passed`, a typed short commit and a fresh database backup.
+
+```mermaid
+flowchart TD
+    fetch["extract infra/ at commit, resolve image digests"] -->|manifest.env| pull["docker pull images by digest"]
+    pull -->|images| migrate["run ops image: vp db migrate"]
+    migrate -->|migrated schema| it{"run it image: npm run test:integration with read-only role"}
+    it -->|fail| stop["status failed, notify; running apps unchanged"]
+    it -->|pass| rollout["point current to release, compose up -d --wait"]
+    rollout -->|unhealthy| rollback["point current to previous, compose up -d --wait, notify"]
+    rollout -->|healthy| smoke{"smoke tests"}
+    smoke -->|fail| rollback
+    smoke -->|pass| record["status alpha-passed or prod-deployed, append deployments.log"]
+```
+
+The integration tests run before rollout, so they test the new code against the migrated schema. The running apps keep
+serving during the test run, because migrations are expand/contract.
+
+#### Integration tests read the real database
+
+| Rule                                                                     | Enforcement                                                                                     |
+|--------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| Tests only read: queries, views, search requests                         | PostgreSQL role from `DATABASE_URL_READONLY`: `SELECT` grants only, `default_transaction_read_only = on` |
+| Tests use the data of the target environment                             | The `it` container joins network `vp-<env>-data`                                                |
+| Search tests use read access only                                        | Typesense search-only API key; Quickwit search endpoints only                                   |
+| Tests assert on structure and invariants, not on exact row counts or values | Code review of `*.it.ts`                                                                     |
+| Tests run any number of times with the same effect                       | `vp-deploy it <env>` runs the suite against the running environment, without a deployment      |
+| A test run has a time limit                                              | 15 minutes                                                                                      |
+
 ### 7.6 Compose files
 
 The compose files are in the monorepo, in `infra/compose/`. lempa runs the copy in `releases/<commit>/infra/`, never a
@@ -1016,9 +1044,8 @@ live checkout. A compose change therefore deploys and rolls back with its releas
 
 | File                                 | Contains                                                                              | Compose projects                | Applied by                                                     |
 |--------------------------------------|---------------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------|
-| `app.yaml`                           | `web`, `mcp`, `ingestion`, `migrate` (profile `migrate`)                              | `vp-alpha-app`, `vp-prod-app`   | `vp-deploy alpha` / `vp-deploy prod`, every release            |
-| `data.yaml`                          | `postgres`, `pgbouncer`, `quickwit`, `typesense`, `nats`, network `vp-<env>-data`     | `vp-alpha-data`, `vp-prod-data` | Operator, `vp-deploy data <env>`, only on data-service changes |
-| `it.yaml`                            | Data services on `tmpfs`, `it` test runner                                            | `vp-it`                         | `vp-deploy it`, every release                                  |
+| `viespirkiai-business-compose.yaml`  | `web`, `mcp`, `ingestion`, `migrate` (profile `migrate`)                              | `vp-alpha-business`, `vp-prod-business` | `vp-deploy alpha` / `vp-deploy prod`, every release    |
+| `viespirkiai-data-compose.yaml`      | `postgres`, `pgbouncer`, `quickwit`, `typesense`, `nats`, network `vp-<env>-data`     | `vp-alpha-data`, `vp-prod-data` | Operator, `vp-deploy data <env>`, only on data-service changes |
 | `env/alpha.env`, `env/prod.env`      | Non-secret values per environment: ports, memory limits, data paths, feature switches | —                               | Committed                                                      |
 | `/srv/viespirkiai/<env>/secrets.env` | Passwords, API keys                                                                   | —                               | On lempa only                                                  |
 | `releases/<commit>/manifest.env`     | Image digests                                                                         | —                               | Generated by `vp-deploy`                                       |
@@ -1027,22 +1054,23 @@ live checkout. A compose change therefore deploys and rolls back with its releas
 stops testing what production runs. Structural differences go into env values; an override file is added only for a
 difference that env values can't express.
 
-**Data and apps are separate compose projects.** An app deployment never recreates PostgreSQL or the search engines.
+**Data and business services are separate compose projects.** A business deployment never recreates PostgreSQL or the
+search engines.
 
-`vp-deploy` starts the apps with:
+`vp-deploy` starts the business services with:
 
 ```bash
-docker compose -p vp-alpha-app \
-  -f releases/<commit>/infra/compose/app.yaml \
+docker compose -p vp-alpha-business \
+  -f releases/<commit>/infra/compose/viespirkiai-business-compose.yaml \
   --env-file releases/<commit>/infra/compose/env/alpha.env \
   --env-file releases/<commit>/manifest.env \
   up -d --wait --remove-orphans
 ```
 
-`infra/compose/app.yaml`:
+`infra/compose/viespirkiai-business-compose.yaml`:
 
 ```yaml
-name: vp-${VP_ENV}-app
+name: vp-${VP_ENV}-business
 
 x-app: &app
   restart: unless-stopped
@@ -1100,7 +1128,7 @@ services:
 networks:
   data:
     external: true
-    name: vp-${VP_ENV}-data          # created by data.yaml
+    name: vp-${VP_ENV}-data          # created by viespirkiai-data-compose.yaml
 ```
 
 `infra/compose/env/alpha.env`:
@@ -1130,7 +1158,7 @@ S3_BACKUP_ENABLED=false
 
 | Aspect                                | alpha                                                                                             | production                                                             |
 |---------------------------------------|---------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| Compose projects                      | `vp-alpha-data`, `vp-alpha-app`                                                                   | `vp-prod-data`, `vp-prod-app`                                          |
+| Compose projects                      | `vp-alpha-data`, `vp-alpha-business`                                                              | `vp-prod-data`, `vp-prod-business`                                     |
 | Docker network                        | `vp-alpha-data` (bridge)                                                                          | `vp-prod-data` (bridge)                                                |
 | Public hostname (cloudflared ingress) | `alpha.viespirkiai.org` → `127.0.0.1:9029`                                                        | `viespirkiai.org` → `127.0.0.1:9019`                                   |
 | Data root                             | `/flashas/viespirkiai-alpha`                                                                      | `/flashas/viespirkiai`                                                 |
@@ -1153,9 +1181,9 @@ The pipeline works before the monorepo migration. The current image then acts as
 |----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|-----------|
 | R1 | Bake `modules/` and `public/` into the image; keep only data volumes mounted                                                                                       | C3              | 1         |
 | R2 | Run the taskRunner as the `ingestion` compose service from the same image; remove `startTaskRunner.sh`                                                             | C4              | 1         |
-| R3 | Create `infra/compose/` (`app.yaml`, `data.yaml`, env files); move the production stack to the `vp-prod-*` projects on bridge networks, with the same data paths   | C2, C6          | 1         |
+| R3 | Create `infra/compose/` (`viespirkiai-business-compose.yaml`, `viespirkiai-data-compose.yaml`, env files); move the production stack to the `vp-prod-*` projects on bridge networks, with the same data paths | C2, C6          | 1         |
 | R4 | Add `ci.yml` and `delivery.yml`; make `ci.yml` a required status check with branch protection on `main`; pin actions by SHA; enable Dependabot and secret scanning | C1, C5, C9, C10 | 2         |
-| R5 | Add the `it` `Dockerfile` target and `it.yaml`; configure integration tests by env vars; seed fixtures instead of reading a live database                          | C7              | 2         |
+| R5 | Add the `it` `Dockerfile` target; configure integration tests by env vars; make every `*.it.ts` suite read-only (`analystPool.it.ts` and `getSchema.it.ts` call `ensureAnalystViews()`, which moves into migrations); create the read-only role with `default_transaction_read_only = on` | C7              | 2         |
 | R6 | Add the migration runner `vp db migrate`; remove runtime table creation                                                                                            | C8              | 3         |
 | R7 | Add `/health` endpoints that check the database connection                                                                                                         | C6              | 2         |
 | R8 | On lempa: `deploy` user, `/srv/viespirkiai/`, `vp-deploy`, systemd timer, alpha data stack, cloudflared hostname `alpha.viespirkiai.org`, notification webhook     | C6              | 2         |
