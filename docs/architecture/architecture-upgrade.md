@@ -1207,14 +1207,124 @@ The pipeline works before the monorepo migration. The current image then acts as
 
 ---
 
-## 8. Next steps (later phases)
+## 8. Domain baseline: canonical layer and read models
+
+Input: [`architecture-review.md` P13](architecture-review.md#p13--no-canonical-domain-model-pages-and-tools-read-the-source-shaped-warehouse-)
+and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md). This section refines guarantee G2
+(canonical model) from §2.3 and the Query Service from §1.3.
+
+### 8.1 Principal theses
+
+| #  | Thesis                                                                                                                                                                                  | Resolves (P13) |
+|----|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------|
+| T1 | **The database has three layers, each with one owner:** raw (source-shaped), canonical (domain entities) and read models (consumer-shaped).                                              | D1, D8         |
+| T2 | **Frontend, MCP and the Risk Service MUST NOT read raw schemas.** They read canonical entities or read models through the Query Service.                                                 | D6, D8, D9     |
+| T3 | **`domain-model.md` is the system's canonical model, not an MCP artifact.** Its entities, keys and grain are the contract for every consumer, the Frontend included.                    | D10            |
+| T4 | **Canonical entities are tables written by Data Ingestion,** with typed keys, provenance and version. Plain views over raw tables are a transition step only.                            | D2, D13        |
+| T5 | **Entity resolution runs once, in ingestion, and its result is stored** as link rows with `confidence` and `method`. Pages read links; pages never compute them.                        | D4, D5         |
+| T6 | **Each identifier has one canonical type and format:** `jarKodas` is 9-digit `text`; procurement identity is `(saltinis, pirkimoNumeris)`. Casts happen once, at the raw → canonical step. | D3             |
+| T7 | **Read models are derived and rebuildable.** Each page and each search index has a named read model, built from canonical entities on "facts changed".                                   | D9, D12, D13   |
+| T8 | **One concept has one definition.** An aggregate that ingestion already maintains becomes the read model; no view recomputes it.                                                         | D12            |
+| T9 | **Schema objects are created by migrations and verified in CI.** A registered view or read model that does not compile against the migrated schema fails the build.                     | D10, D11       |
+
+Thesis T7 answers the question "can the front page be built on the warehouse". The front page can be built on data
+from the warehouse only through read models. A page that joins raw tables repeats P13.
+
+### 8.2 Data layers
+
+The diagram shows which component writes each layer and which consumers read it.
+
+```mermaid
+flowchart LR
+    subgraph ingestion["Data Ingestion"]
+        Connectors["Source Connectors (I1)"]
+        Resolution["Normalisation and Entity Resolution (I5, I7)"]
+        Projector["Read-model builders (S2)"]
+    end
+    subgraph db["PostgreSQL"]
+        Raw[("Raw schemas: vpmSutartys, eppsViesiejiPirkimai, cvpp, ppa, rcJar, sabis")]
+        Canonical[("Canonical schema: pirkimas, pirkimo_dalis, dalyvis, sutartis, organizacija, links")]
+        ReadModels[("Read models: page and relationship projections")]
+    end
+    Search[("Quickwit and Typesense documents")]
+    QueryService["Query Service"]
+    Consumers["Frontend, MCP, Risk Service"]
+    Connectors -.->|source rows| Raw
+    Raw -.->|typed facts| Resolution
+    Resolution -.->|entities and scored links| Canonical
+    Canonical -.->|facts changed| Projector
+    Projector -.->|projections| ReadModels
+    Projector -.->|documents| Search
+    QueryService -->|reads| Canonical
+    QueryService -->|reads| ReadModels
+    QueryService -->|searches| Search
+    Consumers -->|calls queries| QueryService
+```
+
+| Layer       | Owner                                    | Shape                                                    | Readers                                          | Rebuildable from      |
+|-------------|------------------------------------------|----------------------------------------------------------|--------------------------------------------------|-----------------------|
+| Raw         | Source Connectors (I1)                   | Source shape; one schema per source                      | Normalisation (I5) and S7 governance tooling only | Re-scrape, raw store (I3) |
+| Canonical   | Normalisation, Entity Resolution (I5, I7) | `domain-model.md` entities; typed keys; provenance       | Query Service, read-model builders               | Raw layer             |
+| Read models | Read-model builders (S2)                 | One table or document per page, search index or tool    | Query Service                                    | Canonical layer       |
+
+### 8.3 Canonical entities and link tables
+
+The canonical layer implements the subject and evidence entities of `domain-model.md` §1 as tables. It adds link tables
+for every relationship that the sources do not key.
+
+| Link table                      | Joins                                              | Replaces request-time logic                                     | Columns beyond the keys                        |
+|---------------------------------|----------------------------------------------------|-----------------------------------------------------------------|------------------------------------------------|
+| `sutarties_pirkimas`            | `sutartis` → `pirkimas`                            | `src/lib/sutartisPirkimai.ts` (`loadPirkimoAtitikmenys()`)      | `confidence`, `method`, `pozymiai`             |
+| `ataskaitos_sutartis`           | `ppa."ataskaituSutartys"` row → `sutartis`         | `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts`              | `confidence`, `method`                         |
+| `pirkimo_numerio_atitikmuo`     | raw `pirkimoNumeris` value → `pirkimas`            | `domain-model.md` §7.1 structural mitigation                    | `confidence`, `method`; one row per reference  |
+| `organizacijos_identifikatorius` | source party code or name → `organizacija`        | Casts of `jarKodas` in pages; `spetiPavadinimaIsSutarciu()`     | `saltinis`, `confidence`, `method`             |
+
+- A link row with low `confidence` stays in the table. The consumer decides which confidence it accepts.
+- `organizacija` has a surrogate key. Foreign suppliers and natural persons without a `jarKodas` are organisations too.
+- Buyer and supplier stay roles of `organizacija`, as `domain-model.md` §1.1 defines.
+
+### 8.4 Read models for the Frontend
+
+| Page or consumer                      | Reads today                                                                            | Target read model                                   |
+|---------------------------------------|----------------------------------------------------------------------------------------|-----------------------------------------------------|
+| `/` contract search                   | Quickwit hits, then `VPM_SUTARTIS_ROW_SQL` (1 table, 9 joins) per page                  | `sutarties_kortele` document, built from `sutartis` |
+| `/sutartis/[id]`                      | About 15 queries over 6 schemas, plus request-time procurement matching               | `sutartis` entity plus `sutarties_pirkimas` links   |
+| `/pirkimas/[key]` (new)               | Redirects to a contract; `/viesiejiPirkimai/[id]` covers `cvpis` only                   | `pirkimo_suvestine`: procurement, lots, bids, contracts |
+| `/organizacija/[jarKodas]` buyer and supplier roles (new) | Redirects to a filtered contract search                              | `organizacijos_profilis`, `pirkejo_tiekejo_rysys`   |
+| `/asmuo/[jarKodas]`                   | 22 source loaders per view                                                             | `organizacijos_profilis` plus per-section queries   |
+| Buyer–supplier relationship (MCP, graph) | `"vpmSutartys"."sumosPirkejasTiekejas"` and `v_pirkejo_tiekejo_rysys`, two definitions | `pirkejo_tiekejo_rysys`, one definition             |
+
+### 8.5 Migration steps
+
+The steps extend §6.7 step 4 and keep the system running after each step.
+
+| Step | Change                                                                                                                                               | Result                                                   |
+|------|------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|
+| 1    | Move the `v_*` view DDL from `ensureAnalystViews()` into migrations. Add an integration test that selects `LIMIT 0` from every registered view.       | Views exist in every environment; drift fails CI (T9)    |
+| 2    | Update `domain-model.md` §4 to the current schemas. Register or delete the `*_v2.sql` files.                                                          | One current domain contract (T3)                         |
+| 3    | Build `sutarties_pirkimas` and `ataskaitos_sutartis` in ingestion from the page logic. Switch `/sutartis/[id]` and the PPA page to read them.          | Links computed once and measurable over the corpus (T5)  |
+| 4    | Create the canonical schema: `organizacija` with typed `jarKodas`, `pirkimas` over `cvpis` and `cvpp`, `sutartis`. Point the `v_*` views at it.        | Canonical layer in place; MCP and risk unchanged (T4, T6) |
+| 5    | Build `pirkejo_tiekejo_rysys` from `sumosPirkejasTiekejas`; delete the recomputing view body.                                                        | One definition per concept (T8)                          |
+| 6    | Add `/pirkimas/[key]` and `/organizacija/[jarKodas]` on read models. Build Quickwit contract documents from `sutartis`.                                 | Domain pages on the front end (T7)                       |
+| 7    | Add a CI rule: no file under `src/` references a raw schema name.                                                                                    | Boundary enforced (T2)                                   |
+
+### 8.6 Open Questions
+
+1. Canonical tables need storage on `lempa` next to 6 M contract rows. Does the disk budget hold a second copy of
+   contract facts, or does `sutartis` stay a typed view over `"vpmSutartys".sutartys` until P4 is resolved?
+2. The `confidence` threshold for a link shown on a public page is a product decision. Who owns it?
+
+---
+
+## 9. Next steps (later phases)
 
 1. **Spike the monorepo skeleton** (§6.7, step 1): prove type stripping, Astro resolution, per-app Docker builds and
    dependency-cruiser rules.
 2. **Implement CI/CD prerequisites R1–R8** (§7.7), starting with the self-contained image and the `ci.yml` gate.
 3. **Decompose Data Ingestion:** connector contract, shared pipeline stages, canonical model, versioning and provenance
    model.
-4. **Define the Query Service contract:** query catalogue, result types, analytical read views, caching.
+4. **Define the Query Service contract:** query catalogue, result types, analytical read views, caching. Build it on
+   the canonical layer and read models of §8.
 5. **Logical architecture:** interfaces and events between all components.
 6. **Deployment architecture:** process, container and host placement per app, including the alpha host (review P4,
    P12).
