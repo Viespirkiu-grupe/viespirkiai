@@ -80,15 +80,14 @@ flowchart LR
 | Component                    | Key use cases                                                                                                                                                                                                                                                      | Depends on                                                            | Writes (owns)                                          | Current code                                                                                                                           |
 |------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | **Data Ingestion**           | Discover new records · import and refresh incrementally · backfill history · acquire and process documents (download, extract, OCR) · link entities and reference data · detect and version changes (contract edits, legislation editions, court decision updates) | Upstream sources, S1 Job Orchestration                                | **Fact schemas**, including document content (see §2)  | `tasks/*`, `modules/<source>/*`, `modules/failai/`, `modules/documents/`, `runner/`                                                    |
-| **Query Service**            | Look up an entity by identifier · search and facet (contracts, procurements, organisations, documents) · traverse relationships · read document content · read risk results · provide bulk analytical reads · run bounded ad-hoc SQL for analysts                  | Database (read-only role), S2 search projections, S3 enrichment store | **Nothing.** Read-only by definition.                  | Scattered: SQL in 21 `src/pages`, `src/lib/*`, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/tools/`, `modules/mcp/analyst/` |
+| **Query Service**            | Look up an entity by identifier · search and facet (contracts, procurements, organisations, documents) · traverse relationships · read document content · read risk results · provide bulk analytical reads · run bounded ad-hoc SQL for analysts                  | Database (read-only role), S2 search indexes, S3 enrichment store | **Nothing.** Read-only by definition.                  | Scattered: SQL in 21 `src/pages`, `src/lib/*`, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/tools/`, `modules/mcp/analyst/` |
 | **Procurement Risk Service** | Run evaluation for all procurements or a subset · evaluate each deployed indicator · record explainable decisions · re-evaluate after "facts changed"                                                                                                              | **Query Service** (analytical reads), S1                              | **`risk` schema** only                                 | `services/procurement-risk/`, `modules/risk/`                                                                                          |
 | **Frontend**                 | Search · entity pages (buyer, supplier, person, contract, procurement, legal act, court decision) · relationship graph · statistics · shareable pages (OpenGraph)                                                                                                  | **Query Service**                                                     | **Nothing.**                                           | `src/`                                                                                                                                 |
 | **MCP**                      | List tools · search and fetch entities · read contract changes · describe schema · run analyst SQL (optional)                                                                                                                                                      | **Query Service**                                                     | **Nothing.** Tool-call audit goes to S6 Observability. | `modules/mcp/`, `src/pages/mcp.astro`, `src/lib/mcp.ts`                                                                                |
 
 **Ownership rules (target)**
 
-1. **One writer per schema.** Data Ingestion owns the source schemas and `ods`; S2 owns `mart`; the Risk Service owns
-   `risk` (§8).
+1. **One writer per schema.** Data Ingestion owns the source schemas and `ods`; the Risk Service owns `risk` (§8).
 2. **One read path.** Frontend, MCP and the Risk Service never query the database directly. They go through the Query
    Service. This is the boundary that removes SQL from pages and tools (review P5).
 3. Today both rules are broken:
@@ -105,15 +104,15 @@ typed results, never on table layouts. A schema change then touches one componen
 | Query family                                                                                                       | Consumers                  | Notes                                                                        |
 |--------------------------------------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------------------------------|
 | **Entity queries**: get procurement, contract, organisation, person, document, legal act, court case by identifier | Frontend, MCP              | Includes change history of the entity                                        |
-| **Search & facets**: full-text and filtered search, suggestions, facet counts                                      | Frontend, MCP              | Uses S2 search projections; PostgreSQL fallback lives here, not in consumers |
+| **Search & facets**: full-text and filtered search, suggestions, facet counts                                      | Frontend, MCP              | Uses S2 search indexes; PostgreSQL fallback lives here, not in consumers |
 | **Relationship queries**: organisation–person–contract graph traversal                                             | Frontend, MCP, Risk        | Graph *building* belongs to Data Ingestion; graph *reading* belongs here     |
 | **Document content**: extracted text, OCR result, file reference                                                   | Frontend, MCP              | Replaces direct sidecar reads and the sidecar HTTP API                       |
 | **Risk results**: indicator results and decisions per procurement or organisation                                  | Frontend, MCP              | Reads the `risk` schema                                                      |
 | **Analytical reads**: set-based, streamed reads over large fact sets                                               | Risk Service, S4 Open Data | Versioned read views, not per-row API calls, so batch jobs stay efficient    |
-| **Ad-hoc SQL** (bounded): read-only, time-limited, restricted to `ods` and `mart`                                     | MCP                        | Enforcement by database role grants, not only by SQL parsing (review P3)  |
+| **Ad-hoc SQL** (bounded): read-only, time-limited, restricted to `ods`                                     | MCP                        | Enforcement by database role grants, not only by SQL parsing (review P3)  |
 
 A functional component is not necessarily a network service. The Query Service is an in-process library with a
-read-only connection pool over `ods`, `mart` and `risk`. Its value is the contract and the boundary, not the deployment.
+read-only connection pool over `ods` and `risk`. Its value is the contract and the boundary, not the deployment.
 
 ---
 
@@ -252,7 +251,7 @@ Resolution) are listed in §2.4.
 | #       | Component                      | Responsibility                                                                                                                                            | Serves                                  | Exists today?     | Current code / gap                                                                                                  |
 |---------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------|
 | **S1**  | **Job Orchestration**          | Scheduling (cron and continuous), durable work queues, retries and back-off, reservation expiry, concurrency limits, wake-up signals                      | Data Ingestion, Risk, S2, S3, S4        | ✅ Home-grown     | `runner/`, `tasks/`, per-domain `SKIP LOCKED` queues, NATS                                                          |
-| **S2**  | **Search Indexing**            | Build the `mart` schema and search projections (Quickwit full-text, Typesense suggestions and organisations) from `ods` on "facts changed"; rebuild and drift detection | Query Service                           | ✅ Partial        | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
+| **S2**  | **Search Indexing**            | Build search indexes (Quickwit full-text, Typesense suggestions and organisations) from `ods` on "facts changed"; rebuild and drift detection | Query Service                           | ✅ Partial        | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
 | **S3**  | **AI Enrichment**              | LLM-generated descriptions, embeddings; owns its own enrichment store (does **not** write facts); cost, rate, prompt and model versioning                 | Query Service                           | ✅ Experimental   | `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js`                                                    |
 | **S4**  | **Open Data Publishing**       | Publish curated datasets to the open-data API (Spinta / viesStalcius) and bulk exports; reads through the Query Service                                   | Open-data consumers                     | ✅ Scattered      | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket                                |
 | **S5**  | **Identity & Access**          | API keys for machine clients, worker registry, MCP client identification, rate limiting and abuse protection, analyst role policy                         | Frontend, MCP, Data Ingestion (workers) | ⚠️ Partial        | `auth.raktai`, `modules/failai/auth.js`, `src/lib/botChallenge.ts`; **no rate limiting, no key rotation**           |
@@ -296,7 +295,7 @@ flowchart TB
     subgraph L4["«database» Viešpirkiai data"]
         facts[("Fact schemas<br/>+ document content")]:::store
         riskdb[("risk schema")]:::store
-        search[("Search projections<br/>Quickwit · Typesense")]:::store
+        search[("Search indexes<br/>Quickwit · Typesense")]:::store
         enrich[("Enrichment store<br/>descriptions · embeddings")]:::store
         ctrl[("Control schemas<br/>infra · auth · jobs")]:::store
     end
@@ -346,7 +345,7 @@ flowchart TB
     ing -.->|" writes facts "| facts
     ing -.->|" facts changed "| s2
     risk -.->|" writes decisions "| riskdb
-    s2 -.->|" projections "| search
+    s2 -.->|" documents "| search
     s3 -.->|" descriptions · embeddings "| enrich
     s1 -.->|" job state "| ctrl
 %% ── Platform ──
@@ -369,7 +368,7 @@ P8).
 1. **Does it bring data from outside into the database** (including files, OCR, reference data, entity linking)? →
    **Data Ingestion.** It is the only component that writes facts.
 2. **Does it read Viešpirkiai data for someone else?** → it is a query in the **Query Service**. No other component
-   issues read SQL against fact or `risk` schemas. The only exceptions are S2 projection builders and S7 governance
+   issues read SQL against source, `ods` or `risk` schemas. The only exceptions are S2 index builders and S7 governance
    tooling.
 3. **Does it show data to humans?** → **Frontend**, using only the Query Service.
 4. **Does it expose data to AI agents?** → **MCP**, using only the Query Service.
@@ -539,7 +538,7 @@ viespirkiai/
 │   │   ├── src/
 │   │   │   ├── index.ts            # the published query contract
 │   │   │   ├── entities/           # procurement, contract, organisation, person, document, legal act, court case
-│   │   │   ├── search/             # search and facets (projections + PostgreSQL fallback)
+│   │   │   ├── search/             # search and facets (search indexes + PostgreSQL fallback)
 │   │   │   ├── relationships/
 │   │   │   ├── documents/          # extracted text, OCR results, file references
 │   │   │   ├── risk/               # risk results
@@ -553,7 +552,6 @@ viespirkiai/
 │   │   ├── migrations/
 │   │   │   ├── source/             # source schemas, owned by apps/ingestion
 │   │   │   ├── ods/                # Operational Data Store, owned by apps/ingestion
-│   │   │   ├── mart/               # data marts, owned by apps/indexer
 │   │   │   ├── risk/               # owned by apps/risk
 │   │   │   └── control/            # infra · auth · jobs
 │   │   └── schema/                 # generated schema documentation (committed)
@@ -684,7 +682,7 @@ cross-cutting and may be used by every workspace.
 | `apps/*` import only `packages/*`; never another app                                                                   | dependency-cruiser in CI                                                                        |
 | `packages/*` never import `apps/*`                                                                                     | dependency-cruiser in CI                                                                        |
 | `web`, `mcp`, `open-data`, `enrichment` read data **only through `query`**: no `database` dependency                   | dependency-cruiser + `package.json` review (CODEOWNERS)                                         |
-| Only `ingestion` imports `@viespirkiai/database/facts-writer`; only `indexer` imports `@viespirkiai/database/mart-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
+| Only `ingestion` imports `@viespirkiai/database/facts-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
 | No deep imports; only paths listed in `exports`                                                                        | Node `exports` resolution + ESLint                                                              |
 | Every import is a declared dependency (npm hoisting would otherwise hide mistakes)                                     | ESLint `import/no-extraneous-dependencies` or `knip`                                            |
 | No `process.env` outside an app's `src/config.ts`; no `process.exit` or top-level side effects in packages             | ESLint (`n/no-process-env`, custom rule)                                                        |
@@ -796,7 +794,7 @@ allowed to use:
 | `mcp`                            | `DATABASE_URL_READONLY`, `DATABASE_URL_ANALYST`     |
 | `risk`                           | `DATABASE_URL_READONLY`, `DATABASE_URL_RISK_WRITER` |
 | `ingestion`                      | `DATABASE_URL_FACTS_WRITER`                         |
-| `indexer`                        | `DATABASE_URL_READONLY`, `DATABASE_URL_MART_WRITER` |
+| `indexer`                        | `DATABASE_URL_READONLY`                             |
 | `ops`                            | `DATABASE_URL_MIGRATOR`                             |
 
 ---
@@ -1168,7 +1166,7 @@ S3_BACKUP_ENABLED=false
 
 ---
 
-## 8. Data layers: source schemas, Operational Data Store and data marts
+## 8. Data layers: source schemas and the Operational Data Store
 
 Input: [`architecture-review.md` P13](architecture-review.md#p13--no-operational-data-store-pages-and-tools-read-source-schemas-directly-)
 and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md). This section defines guarantee G2
@@ -1176,80 +1174,78 @@ and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md)
 
 ### 8.1 Principal theses
 
-| #   | Thesis                                                                                                                                                                        | Resolves (P13)     |
-|-----|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
-| T1  | **PostgreSQL holds three data layers, each with one writer:** the source schemas, the Operational Data Store `ods` and the data mart `mart`.                                  | D1, D8             |
-| T2  | **Frontend, MCP and the Risk Service MUST NOT read source schemas.** They read `ods`, `mart` and `risk` through the Query Service.                                             | D6, D8, D9         |
-| T3  | **`domain-model.md` defines the `ods` schema.** Its entities, keys and grain are the contract for every consumer, the Frontend included.                                       | D10, D11           |
-| T4  | **`ods` entities are tables written by Data Ingestion,** with typed keys, enforced foreign keys, provenance and version.                                                     | D2, D13            |
-| T5  | **Entity resolution runs once, in Data Ingestion.** `ods` stores each result as a link row with `patikimumas` and `metodas`.                                                  | D4, D5             |
-| T6  | **Each identifier has one type and one format in `ods`.** `jarKodas` is 9-digit `text`. Type conversion happens only between a source schema and `ods`.                     | D3, D16            |
-| T7  | **`mart` tables are derived from `ods` and rebuildable at any time.** Each list page, search index and aggregate reads one `mart` table.                                     | D9, D13, D14, D18  |
-| T8  | **One concept has one definition.** Each aggregate exists once, as a `mart` table. No view and no page recomputes it.                                                       | D12, D17           |
-| T9  | **Migrations create every `ods` and `mart` object.** CI verifies each object against the migrated schema.                                                                  | D10, D11           |
-| T10 | **Page reads are bounded.** A page section reads one `ods` point lookup or one `mart` row set. No page runs entity resolution or aggregation.                                | D5, D14, D15, D19  |
+| #   | Thesis                                                                                                                                                             | Resolves (P13)     |
+|-----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
+| T1  | **PostgreSQL holds two data layers, each with one writer:** the source schemas and the Operational Data Store `ods`. The `risk` schema holds risk decisions.       | D1, D8             |
+| T2  | **Frontend, MCP and the Risk Service MUST NOT read source schemas.** They read `ods` and `risk` through the Query Service.                                         | D6, D8, D9         |
+| T3  | **`domain-model.md` defines the entities of `ods`.** Their keys and grain are the contract for every consumer, the Frontend included.                             | D10, D11           |
+| T4  | **`ods` entities are tables written by Data Ingestion,** with typed keys, enforced foreign keys, provenance and version.                                          | D2, D13            |
+| T5  | **`ods` carries the enrichment that Frontend and MCP serve.** Display attributes are `ods` columns or `ods` tables keyed by an entity.                             | D8, D14, D18       |
+| T6  | **Entity resolution runs once, in Data Ingestion.** `ods` stores each result as a link row with `patikimumas` and `metodas`.                                       | D4, D5             |
+| T7  | **Each identifier has one type and one format in `ods`.** `jarKodas` is 9-digit `text`. Type conversion happens only between a source schema and `ods`.          | D3, D16            |
+| T8  | **An `ods` object is a view only when its read cost is small** (§8.7). Otherwise Data Ingestion maintains it as a derived table.                                  | D13, D17           |
+| T9  | **One concept has one definition.** Each aggregate exists once in `ods`. No page and no second view recomputes it.                                               | D12, D17           |
+| T10 | **Migrations create every `ods` object.** CI verifies each object against the migrated schema.                                                                  | D10, D11           |
+| T11 | **Page reads are bounded.** A page section reads `ods` by key or reads one derived table. No page runs entity resolution.                                        | D5, D14, D15, D19  |
+| T12 | **Search indexes are the only denormalised copies.** Quickwit and Typesense documents are built from `ods`.                                                     | D18                |
 
-The front page reads `mart` and the search indexes built from it. A source schema is never the data source of a page.
+The front page reads the Quickwit contract index built from `ods`. A source schema is never the data source of a page.
 
 ### 8.2 Layer model
 
-The diagram shows the writer of each layer and the read path of every consumer.
+The diagram shows the writer of each data layer and the read path of every consumer.
 
 ```mermaid
 flowchart LR
     subgraph ingestion["Data Ingestion"]
         Connectors["Source Connectors (I1)"]
-        Integration["Normalisation and Entity Resolution (I5, I7)"]
+        Integration["Normalisation, Entity Resolution, Fact Persistence (I5, I7, I8)"]
     end
     subgraph pg["PostgreSQL"]
         Source[("Source schemas: vpmSutartys, eppsViesiejiPirkimai, cvpp, ppa, rcJar, sabis")]
-        Ods[("ods: entities and link tables")]
-        Mart[("mart: denormalised projections and aggregates")]
+        Ods[("ods: entities, enrichment, links, derived tables, views")]
         Risk[("risk: indicator decisions")]
     end
-    MartBuilders["Mart builders (S2)"]
+    Indexer["Search Indexing (S2)"]
     Search[("Quickwit and Typesense indexes")]
     RiskService["Procurement Risk Service"]
     QueryService["Query Service"]
     Consumers["Frontend and MCP"]
     Connectors -.->|source rows| Source
     Source -.->|typed facts| Integration
-    Integration -.->|entities and scored links| Ods
-    Ods -.->|facts changed| MartBuilders
-    MartBuilders -.->|projections| Mart
-    MartBuilders -.->|documents built from mart| Search
+    Integration -.->|entities, links, derived rows| Ods
+    Ods -.->|facts changed| Indexer
+    Indexer -.->|documents| Search
     RiskService -.->|decisions| Risk
-    RiskService -->|reads ods and mart| QueryService
+    RiskService -->|reads ods| QueryService
     Consumers -->|calls queries| QueryService
-    QueryService -->|point lookups| Ods
-    QueryService -->|lists and aggregates| Mart
+    QueryService -->|reads| Ods
     QueryService -->|full-text search| Search
     QueryService -->|risk results| Risk
 ```
 
-| Layer          | Schema names                                                                                          | ETL term                           | Grain                                  | Writer                                          | Readers                                   | Rebuilt from                        |
-|----------------|-------------------------------------------------------------------------------------------------------|------------------------------------|----------------------------------------|-------------------------------------------------|-------------------------------------------|-------------------------------------|
-| Source         | One schema per upstream source: `vpmSutartys`, `eppsViesiejiPirkimai`, `cvpp`, `ppa`, `rcJar`, `sabis` | Persistent staging area (bronze)   | One row per source record              | Source Connectors (I1)                          | Normalisation (I5), S7 governance tooling | Raw Payload Store (I3), re-scrape   |
-| ODS            | `ods`                                                                                                 | Operational Data Store (silver)    | One row per business entity or link    | Normalisation, Entity Resolution (I5, I7, I8)   | Query Service, mart builders              | Source schemas                      |
-| Data mart      | `mart`                                                                                                | Data mart (gold)                   | One row per consumer question          | Mart builders (S2)                              | Query Service, search indexers            | `ods`                               |
-| Risk decisions | `risk`                                                                                                | Analytical output                  | One row per indicator decision         | Procurement Risk Service                        | Query Service                             | `ods`, `mart` and indicator code    |
+| Layer          | Schema names                                                                                          | ETL term                         | Grain                                   | Writer                                        | Readers                                   | Rebuilt from                      |
+|----------------|-------------------------------------------------------------------------------------------------------|----------------------------------|-----------------------------------------|-----------------------------------------------|-------------------------------------------|-----------------------------------|
+| Source         | One schema per upstream source: `vpmSutartys`, `eppsViesiejiPirkimai`, `cvpp`, `ppa`, `rcJar`, `sabis` | Persistent staging area          | One row per source record               | Source Connectors (I1)                        | Data Ingestion (I5), S7 governance tooling | Raw Payload Store (I3), re-scrape |
+| ODS            | `ods`                                                                                                 | Operational Data Store           | One row per entity, link or aggregate   | Data Ingestion (I5, I6, I7, I8); migrations for views | Query Service, Search Indexing (S2)   | Source schemas                    |
+| Risk decisions | `risk`                                                                                                | Analytical output                | One row per indicator decision          | Procurement Risk Service                      | Query Service                             | `ods` and indicator code          |
 
-### 8.3 `ods` records facts; `mart` answers consumer questions
+### 8.3 `ods` object kinds
 
-| Property         | `ods`                                                                                  | `mart`                                                                 |
-|------------------|----------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| Content          | Facts that a source records, and identities and links that Data Ingestion resolves    | Values computed from `ods` by joins and aggregation                    |
-| Grain            | Business entity: procurement, lot, bid, contract, organisation                         | Consumer question: search card, organisation profile, buyer–supplier pair |
-| Normalisation    | Normalised (3NF): one fact in one place                                                | Denormalised: one row holds all values of one page section             |
-| Keys             | Stable business or surrogate keys; enforced foreign keys inside `ods`                  | Keys of the projected `ods` entities, or deterministic composite keys  |
-| Change trigger   | A source fact changes                                                                  | An `ods` fact changes, or a consumer needs a new shape                 |
-| Business logic   | Type conversion, normalisation, entity resolution                                      | Joins and aggregation only                                             |
-| Loss of a table  | Data Ingestion re-integrates it from the source schemas                                | Mart builders rebuild it from `ods`                                    |
-| Typical read     | Point lookup by key                                                                    | List, filter, sort, aggregate                                          |
+| Kind              | Content                                                                                      | Physical form                                           | Writer                              | Example                                   |
+|-------------------|----------------------------------------------------------------------------------------------|---------------------------------------------------------|-------------------------------------|-------------------------------------------|
+| Entity table      | One entity of `domain-model.md` §1                                                            | Table                                                   | Normalisation (I5)                  | `ods."sutartys"`                          |
+| Enrichment        | Attributes that Frontend or MCP show: names, classifier titles, registry flags, payroll, finance | Entity table column (1:1) or table keyed by the entity (1:N) | Normalisation (I5), Reference Data (I6) | `ods."organizacijos"."darbuotojai"`, `ods."organizacijuFinansai"` |
+| Link table        | A relationship that the sources do not key, with its match score                              | Table                                                   | Entity Resolution (I7)              | `ods."sutarciuPirkimai"`                  |
+| Derived table     | An aggregate over many entity rows whose view cost is not small                               | Table, updated on "facts changed"                      | Fact Persistence (I8)               | `ods."pirkejuTiekejuRysiai"`              |
+| View              | A join or aggregate whose read cost is small                                                 | View                                                    | Migration                           | `ods."rinkos"`                            |
 
-### 8.4 `ods` schema
+- An attribute with one value per entity is a column of the entity table.
+- A 1:N attribute, or an attribute set with its own refresh cycle, is a table keyed by the entity.
 
-Every `ods` table has these provenance columns:
+### 8.4 Entity tables and enrichment
+
+Every entity, enrichment and link table has these provenance columns:
 
 | Column            | Type          | Meaning                                                    |
 |-------------------|---------------|------------------------------------------------------------|
@@ -1259,78 +1255,83 @@ Every `ods` table has these provenance columns:
 | `ikeltaAt`        | `timestamptz` | Commit time of that ingestion run                          |
 | `versija`         | `integer`     | Version of the fact; increments on each change             |
 
-The entity tables implement the entities of `domain-model.md` §1. The table shows the core entities.
+The table shows the core entities. The remaining entities of `domain-model.md` §1.3 follow the same pattern.
 
-| Table                       | Domain entity         | Key                                                        | Foreign keys                                                      |
-|-----------------------------|-----------------------|------------------------------------------------------------|-------------------------------------------------------------------|
-| `ods."organizacijos"`       | Įmonė                 | `organizacijosId` (surrogate); `jarKodas` unique if known  | —                                                                 |
-| `ods."pirkimoPlanai"`       | Pirkimo planas        | `planoRaktas`                                              | `pirkejoId` → `organizacijos`                                     |
-| `ods."pirkimai"`            | Pirkimas              | `pirkimoRaktas` (`saltinis` + `pirkimoNumeris`)            | `pirkejoId` → `organizacijos`                                     |
-| `ods."skelbimai"`           | Skelbimas             | `skelbimoRaktas`                                           | `pirkimoRaktas` → `pirkimai`                                      |
-| `ods."pirkimoDalys"`        | Pirkimo dalis         | `daliesRaktas`                                             | `pirkimoRaktas` → `pirkimai`                                      |
-| `ods."dalyviai"`            | Dalyvis               | `dalyvioRaktas`                                            | `daliesRaktas` → `pirkimoDalys`; `tiekejoId` → `organizacijos`    |
-| `ods."sutartys"`            | Sutartis              | `sutartiesUnikalusId`                                      | `pirkejoId`, `tiekejoId` → `organizacijos`                        |
-| `ods."sutarciuPakeitimai"`  | Sutarties pakeitimas  | `pakeitimoRaktas`                                          | `sutartiesUnikalusId` → `sutartys`                                |
-| `ods."dokumentai"`          | Dokumentas            | `dokumentoRaktas`                                          | `pirkimoRaktas` → `pirkimai` or `sutartiesUnikalusId` → `sutartys` |
-| `ods."bylos"`               | Byla                  | `bylosId`                                                  | `organizacijosId` → `organizacijos`                               |
-| `ods."asmenuRysiai"`        | Asmens ryšys          | `rysioId`                                                  | `organizacijosId` → `organizacijos`                               |
-| `ods."valdymas"`            | Valdymas              | `valdymoRaktas`                                            | `organizacijosId`, `valdytojoId` → `organizacijos`                |
+| Table                       | Domain entity         | Key                                                        | Foreign keys                                                       | Enrichment for Frontend and MCP                                                                 |
+|-----------------------------|-----------------------|------------------------------------------------------------|--------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| `ods."organizacijos"`       | Įmonė                 | `organizacijosId` (surrogate); `jarKodas` unique if known  | —                                                                  | `pavadinimas`, `teisineForma`, `statusas`, `adresas`, `koordinates`, `darbuotojai`, `vidutinisAtlyginimas`, blacklist validity intervals |
+| `ods."pirkimoPlanai"`       | Pirkimo planas        | `planoRaktas`                                              | `pirkejoId` → `organizacijos`                                      | `pavadinimas`, `numatomaVerte`, `bvpzKodai`, `bvpzPavadinimai`                                  |
+| `ods."pirkimai"`            | Pirkimas              | `pirkimoRaktas` (`saltinis` + `pirkimoNumeris`)            | `pirkejoId` → `organizacijos`                                      | `pavadinimas`, `pirkimoBudas`, `statusas`, `numatomaVerteEur`, `bvpzKodai`, `bvpzPavadinimai`   |
+| `ods."skelbimai"`           | Skelbimas             | `skelbimoRaktas`                                           | `pirkimoRaktas` → `pirkimai`                                       | `skelbimoRusis`, `skelbimoTipas`, `paskelbimoData`                                              |
+| `ods."pirkimoDalys"`        | Pirkimo dalis         | `daliesRaktas`                                             | `pirkimoRaktas` → `pirkimai`                                       | `daliesPavadinimas`, `dalyviuSkaicius`, `atmestuSkaicius`                                       |
+| `ods."dalyviai"`            | Dalyvis               | `dalyvioRaktas`                                            | `daliesRaktas` → `pirkimoDalys`; `tiekejoId` → `organizacijos`     | `eileNumeris`, `pasiulymoKaina`, `atmetimoPriezastis`                                           |
+| `ods."sutartys"`            | Sutartis              | `sutartiesUnikalusId`                                      | `pirkejoId`, `tiekejoId` → `organizacijos`                         | `pavadinimas`, `tipoPavadinimas`, `kategorija`, `verte`, `faktineVerte`, `bvpzPavadinimas`, `dokumentuSkaicius` |
+| `ods."sutarciuPakeitimai"`  | Sutarties pakeitimas  | `pakeitimoRaktas`                                          | `sutartiesUnikalusId` → `sutartys`                                 | Changed fields with previous and new values                                                     |
+| `ods."dokumentai"`          | Dokumentas            | `dokumentoRaktas`                                          | `pirkimoRaktas` → `pirkimai` or `sutartiesUnikalusId` → `sutartys` | `pavadinimas`, `pletinys`, `parsiustas`, `nuskaitytas`, `failoNuoroda`                          |
+| `ods."mokejimai"`           | Mokėjimas             | `mokejimoRaktas`                                           | `sutartiesUnikalusId` → `sutartys`                                 | `israsymoData`, `suma`, `busena`                                                                |
+| `ods."bylos"`               | Byla                  | `bylosId`                                                  | `organizacijosId` → `organizacijos`                                | `bylosNumeris`, `bylosRusis`, `bylojeKaip`                                                      |
+| `ods."asmenuRysiai"`        | Asmens ryšys          | `rysioId`                                                  | `organizacijosId` → `organizacijos`                                | `vardas`, `pavarde`, `pareigos`                                                                 |
+| `ods."valdymas"`            | Valdymas              | `valdymoRaktas`                                            | `organizacijosId`, `valdytojoId` → `organizacijos`                 | `valdymoTipas`, `dalis`                                                                         |
+| `ods."organizacijuFinansai"` | Įmonės finansai (enrichment) | `finansuRaktas`                                     | `organizacijosId` → `organizacijos`                                | `laikotarpis`, balance sheet and profit-and-loss lines                                          |
 
-The remaining entities of `domain-model.md` §1.3 follow the same pattern. Link tables hold every relationship that the
-sources do not key:
+### 8.5 Link tables
 
-| Table                                | Links                                        | Match evidence                                                  | Columns beyond the keys                  |
-|--------------------------------------|----------------------------------------------|-----------------------------------------------------------------|------------------------------------------|
-| `ods."sutarciuPirkimai"`             | `sutartys` → `pirkimai`                      | Procurement number, buyer, title similarity, publication and signing dates | `patikimumas`, `metodas`, `pozymiai` |
-| `ods."daliuSutartys"`                | `pirkimoDalys` → `sutartys`                  | Procurement number, buyer, supplier, value, signing date        | `patikimumas`, `metodas`                 |
-| `ods."pirkimoNumeriuAtitikmenys"`    | Source `pirkimoNumeris` value → `pirkimai`   | Normalised number; one row per reference in a multi-reference value | `patikimumas`, `metodas`             |
-| `ods."organizacijuIdentifikatoriai"` | Source party code or name → `organizacijos`  | Registry code, name, country                                    | `saltinis`, `patikimumas`, `metodas`     |
+| Table                                | Links                                        | Match evidence                                                              | Columns beyond the keys                  |
+|--------------------------------------|----------------------------------------------|-----------------------------------------------------------------------------|------------------------------------------|
+| `ods."sutarciuPirkimai"`             | `sutartys` → `pirkimai`                      | Procurement number, buyer, title similarity, publication and signing dates  | `patikimumas`, `metodas`, `pozymiai`     |
+| `ods."daliuSutartys"`                | `pirkimoDalys` → `sutartys`                  | Procurement number, buyer, supplier, value, signing date                    | `patikimumas`, `metodas`                 |
+| `ods."pirkimoNumeriuAtitikmenys"`    | Source `pirkimoNumeris` value → `pirkimai`   | Normalised number; one row per reference in a multi-reference value         | `patikimumas`, `metodas`                 |
+| `ods."organizacijuIdentifikatoriai"` | Source party code or name → `organizacijos`  | Registry code, name, country                                                | `saltinis`, `patikimumas`, `metodas`     |
 
 - A link row keeps its `patikimumas`. Each consumer states the minimum `patikimumas` it accepts.
 - `organizacijos` includes foreign suppliers and natural persons without a `jarKodas`.
 - Buyer and supplier are roles of `organizacijos`, as `domain-model.md` §1.1 defines.
 - A relationship that the sources do not key is a link table row, never a nullable foreign key filled by a guess.
 
-### 8.5 `mart` schema
+### 8.6 Derived tables and views
 
-| Table                          | Grain                                  | Built from (`ods`)                                              | Consumers                                                     |
-|--------------------------------|----------------------------------------|-----------------------------------------------------------------|---------------------------------------------------------------|
-| `mart."sutarciuKorteles"`      | One row per contract                   | `sutartys`, `organizacijos`, `sutarciuPirkimai`                 | Contract search, Quickwit contract index, exports             |
-| `mart."pirkimuSuvestines"`     | One row per procurement                | `pirkimai`, `pirkimoDalys`, `dalyviai`, `sutarciuPirkimai`      | Procurement page and search index                             |
-| `mart."organizacijuProfiliai"` | One row per organisation               | `organizacijos`, `sutartys`, `dalyviai`, `bylos`, `asmenuRysiai` | Organisation page, Typesense organisation index               |
-| `mart."pirkejuTiekejuRysiai"`  | One row per buyer–supplier pair        | `sutartys`                                                      | Organisation page, relationship graph, MCP, Risk Service      |
-| `mart."organizacijuMetai"`     | One row per organisation and year      | `sutartys`                                                      | Organisation activity charts                                  |
-| `mart."dalyviuPoros"`          | One row per unordered pair of bidders  | `dalyviai`                                                      | Risk Service, MCP                                             |
-| `mart."rinkos"`                | One row per BVPŽ division              | `pirkimai`, `sutartys`                                          | Market statistics, Risk Service                               |
+| Object                        | Form          | Grain                                  | Built from (`ods`)          | Consumers                                                | Evidence for the form                                   |
+|-------------------------------|---------------|----------------------------------------|-----------------------------|----------------------------------------------------------|---------------------------------------------------------|
+| `ods."pirkejuTiekejuRysiai"`  | Derived table | One row per buyer–supplier pair        | `sutartys`                  | Organisation page, relationship graph, MCP, Risk Service | Recompute 8,933 ms; stored table 5.4 ms (review D17)    |
+| `ods."organizacijuMetai"`     | Derived table | One row per organisation and year      | `sutartys`                  | Organisation activity charts                             | 161 ms per view for a buyer with 14,052 contracts       |
+| `ods."dalyviuPoros"`          | View          | One row per unordered pair of bidders  | `dalyviai`                  | Risk Service, MCP                                        | Input is about 37 k bid rows                            |
+| `ods."rinkos"`                | View          | One row per BVPŽ division              | `pirkimai`                  | Market statistics, Risk Service                          | 45 rows over about 51 k procurements                   |
 
-- A `mart` table contains only the columns that its consumers read.
-- Mart builders update the affected rows on "facts changed". They rebuild a whole table on an ingestion command.
-- Quickwit and Typesense take their documents from `mart` only. A search hit carries every field its result card shows.
-- The MCP analyst role has `SELECT` on `ods` and `mart`. No separate analyst view layer exists.
+- A derived table has `perskaiciuotaAt` instead of the provenance columns.
+- Fact Persistence (I8) updates the affected derived rows in the transaction that writes the entity rows.
 
-### 8.6 Frontend pages read `ods` and `mart`
+### 8.7 Read cost budget for views
 
-| Page                                  | Reads                                                                           |
-|---------------------------------------|---------------------------------------------------------------------------------|
-| `/` contract search                   | Quickwit contract index                                                         |
-| `/sutartis/[sutartiesUnikalusId]`     | `ods."sutartys"`, `ods."sutarciuPirkimai"`, `ods."dokumentai"`                  |
-| `/pirkimas/[pirkimoRaktas]`           | `mart."pirkimuSuvestines"`                                                      |
-| `/organizacija/[jarKodas]`            | `mart."organizacijuProfiliai"`, `mart."pirkejuTiekejuRysiai"`, `mart."organizacijuMetai"` |
-| Procurement and organisation search   | Quickwit and Typesense indexes built from `mart`                                |
+- A view is small when its consumer query takes at most 50 ms at p95 on production data volume.
+- Each `ods` view has an `EXPLAIN ANALYZE` result at production volume, recorded next to its migration.
+- A view that exceeds the budget MUST be a derived table.
 
-### 8.7 Placement rules
+### 8.8 Consumers read `ods`
 
-1. A fact that a source records, or an identity that Data Ingestion resolves, goes to `ods`.
-2. A value computed by joining or aggregating `ods` rows goes to `mart`.
-3. A derived subject that a risk decision attaches to goes to `mart`, with a deterministic key.
+| Consumer                              | Reads                                                                                                     |
+|---------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `/` contract search                   | Quickwit contract index built from `ods."sutartys"`                                                       |
+| `/sutartis/[sutartiesUnikalusId]`     | `ods."sutartys"`, `ods."sutarciuPirkimai"`, `ods."dokumentai"`, `ods."mokejimai"`                         |
+| `/pirkimas/[pirkimoRaktas]`           | `ods."pirkimai"`, `ods."pirkimoDalys"`, `ods."dalyviai"`, `ods."sutarciuPirkimai"`                        |
+| `/organizacija/[jarKodas]`            | `ods."organizacijos"`, `ods."pirkejuTiekejuRysiai"`, `ods."organizacijuMetai"`, enrichment tables         |
+| Procurement and organisation search   | Quickwit and Typesense indexes built from `ods`                                                           |
+| MCP tools                             | `ods` through the Query Service                                                                           |
+| MCP analyst SQL                       | `ods` with `SELECT` grants; no separate analyst view layer                                                |
+| Procurement Risk Service              | `ods` through the Query Service                                                                           |
+
+### 8.9 Placement rules
+
+1. A fact that a source records, or an identity that Data Ingestion resolves, goes to an `ods` entity or link table.
+2. An attribute that Frontend or MCP shows goes to `ods` as an enrichment column or enrichment table.
+3. An aggregate over many entity rows goes to an `ods` view within the budget, or else to a derived table.
 4. A judgement about a subject goes to `risk`.
 5. A source-shaped record goes to its source schema. A raw payload goes to the Raw Payload Store (I3).
 
-### 8.8 Clarifications
+### 8.10 Clarifications
 
 - The source schemas are a persistent staging area. They are not integrated and not subject-oriented, so they are not a
   data warehouse.
-- The architecture has no dimensional enterprise data warehouse. Source schemas keep source history (G5, G6), and `ods`
+- The architecture has no data warehouse and no data mart layer. Source schemas keep source history (G5, G6), and `ods`
   keeps entity versions.
+- `ods` also holds aggregates. One schema gives Frontend, MCP and risk one read contract.
 - The `public` schema is not a data layer. It holds PostGIS catalog objects only.
-- The layer names map to the medallion model: source schemas are bronze, `ods` is silver, `mart` is gold.
