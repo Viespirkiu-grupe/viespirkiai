@@ -17,7 +17,7 @@ JavaScript, TypeScript and Astro. That is written in 14 months (1,195 commits, w
 product works and delivers real public value.
 
 The architecture has, however, grown by **accretion rather than design**. It has reached the point where the cost of
-each change, and the risk of each deployment, is rising faster than the team's capacity to absorb it. The five most
+each change, and the risk of each deployment, is rising faster than the team's capacity to absorb it. The six most
 serious problems:
 
 1. **Data can't be reliably recovered.** No PostgreSQL backup procedure is defined in the repository. The only copy of
@@ -35,6 +35,8 @@ serious problems:
 5. **Module boundaries don't exist in practice.** SQL is written directly in pages. Library modules double as CLI
    scripts and call `process.exit`. The same code is deployed through two different lifecycles (a Docker image and a
    bare git checkout).
+6. **No data layer sits between the sources and the pages.** Pages and tools join source-shaped schemas on every
+   request. One organisation page takes about 1 s of server time, and recomputed aggregates take seconds.
 
 The common root cause: **agentic development optimises locally** (make this feature work) **but nothing optimises
 globally** (keep the system coherent). Without tests in CI, enforced conventions and explicit boundaries, each
@@ -75,7 +77,7 @@ A fair review starts here. These are foundations to *keep*.
 | P10 | Dependency and toolchain fragility                                             | Security, build reliability           | 🟡 Medium   | Medium                      |
 | P11 | Configuration spread across seven files                                        | Operations, onboarding                | 🟡 Medium   | High                        |
 | P12 | The public web process is also an internal control plane                       | Security, reliability                 | 🟡 Medium   | Medium                      |
-| P13 | No canonical domain model: pages and tools read the source-shaped warehouse    | Correctness, maintainability, product | 🟠 High     | Certain (already happening) |
+| P13 | No Operational Data Store: pages and tools read source schemas directly        | Correctness, performance, product     | 🔴 Critical | Certain (already happening) |
 
 Every finding below follows the same format: what was observed, the evidence, why it matters, and how agentic
 development contributed.
@@ -389,14 +391,14 @@ It also holds write credentials for PostgreSQL and the sidecar stores.
 
 ---
 
-### P13 — No canonical domain model: pages and tools read the source-shaped warehouse 🟠
+### P13 — No Operational Data Store: pages and tools read source schemas directly 🔴
 
 > **Evidence base.** Repository at `c543c493`. Live measurements on `viespirkiai` at `10.1.10.2:9118` (the `config.js`
 > target), 2026-09-13.
 
 **Observation**
 
-The database is a warehouse of source-shaped tables. No layer turns it into domain entities that the Frontend reads.
+The database holds source-shaped schemas only. No layer integrates them into domain entities for the Frontend.
 
 | #   | Finding                                                                                                                                                                                                                                                                         | Evidence                                                                                                                                                             |
 |-----|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -414,12 +416,27 @@ The database is a warehouse of source-shaped tables. No layer turns it into doma
 | D12 | **One concept has two definitions.** Ingestion maintains `"vpmSutartys"."sumosPirkejasTiekejas"` (1.1 M rows) incrementally in `upsertVpmSutartis.js`. `v_pirkejo_tiekejo_rysys` recomputes the same buyer–supplier aggregate from 6 M contracts per query.                     | The two can disagree, and no check compares them.                                                                                                                    |
 | D13 | **Domain views are not materialized.** `v_sutartys`, `v_company` and `v_pirkejo_tiekejo_rysys` compute joins or aggregates over millions of rows on each read.                                                                                                                  | View SQL in `modules/mcp/analyst/views/`. The views are usable for batch risk runs, not for page requests.                                                           |
 
+**Performance impact (measured)**
+
+| #   | Finding                                                                                                                                                                                                         | Evidence                                                                                                                  |
+|-----|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
+| D14 | **An organisation page runs 22 source loaders per uncached view.** `getJuridinisInfo('188710061')` took 1,051 ms of server time. The slowest loaders were `teismoNuosprendziai` (942 ms) and `sutartys` (541 ms). | The loader's own `Timings`. The page renders only after its slowest loader returns.                                        |
+| D15 | **One page view exhausts database connections.** In the same run, loaders failed with `too many connections for role`.                                                                                          | Developer role on port 9118. Each view requests about 22 connections at once; PgBouncer queues them in production.        |
+| D16 | **Identifier type mismatch turns lookups into scans.** `"rcJar".asmenys` by `"jarKodas"::text` takes 55 ms (parallel sequential scan). The typed lookup takes 0.34 ms (index-only scan).                        | `EXPLAIN ANALYZE`. The cast is 164 times slower. Every `text` party code from contracts meets it.                          |
+| D17 | **Recomputed aggregates cost seconds.** The top 20 buyer–supplier pairs take 8,933 ms from `"vpmSutartys".sutartys` and 5.4 ms from `"sumosPirkejasTiekejas"`.                                                  | `EXPLAIN ANALYZE`. `v_pirkejo_tiekejo_rysys` uses the recomputing form.                                                   |
+| D18 | **Contract search reads two stores per result page.** Quickwit returns ids. PostgreSQL then rebuilds each row with `VPM_SUTARTIS_ROW_SQL` (9 joins).                                                            | `loadSearchRowsFromPostgres()` in `modules/sutartys/search/search.js`.                                                    |
+| D19 | **Request-time joins compete with ingestion on one host.** Page queries share `lempa` and the PgBouncer pool with 18 concurrent ingestion jobs.                                                                  | P4.                                                                                                                       |
+
+Severity is critical. The missing layer costs page latency and database capacity, in addition to correctness.
+
 **Why it matters**
 
+- **Pages are slow by construction.** Page latency grows with the number of source schemas behind one entity (D14–D19).
+  Short in-process caches hide the cost, but they do not remove it.
 - **Each consumer answers "what is a procurement" differently.** The contract page, MCP, the Risk Service and Quickwit
   each join raw tables in their own way. A published fact can differ between the web page and the MCP answer.
 - **The product cannot show its main domain objects.** A buyer profile, a supplier profile and a procurement with its
-  lots, bids and contracts need linked entities. The warehouse only supplies them through request-time matching.
+  lots, bids and contracts need linked entities. The source schemas supply them only through request-time matching.
 - **Schema moves break consumers silently.** The August–September schema moves left 10 of 12 registered views absent
   and the domain document stale. No test detected it.
 - **Match logic in page code is unverifiable at scale.** A heuristic that runs per page view is never measured over

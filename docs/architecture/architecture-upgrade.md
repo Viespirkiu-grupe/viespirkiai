@@ -1,12 +1,11 @@
 # Viešpirkiai — Target Architecture (Upgrade)
 
-> **Status:** Phase 3. Step 1: functional decomposition from the use-case perspective (§1–5). Step 2: monorepo structure
-> with npm workspaces (§6). Step 3: CI/CD pipeline (§7).
+> **Status:** Phase 3, target architecture: functional decomposition (§1–5), monorepo structure (§6), CI/CD pipeline
+> (§7) and data layers (§8). The document defines the target state only. It contains no migration plan.
 > **Inputs:** [`architecture-current.md`](architecture-current.md) (as-is) and [
 `architecture-review.md`](architecture-review.md) (pain points).
-> **Scope of this step:** *what* the system does, grouped into functional components with clear data ownership. *How*
-> each component is deployed (processes, containers, hosts) is decided in a later step. A functional component is a unit
-> of responsibility, not necessarily a separate service.
+> **Scope:** *what* the system does, grouped into functional components with clear data ownership. A functional
+> component is a unit of responsibility, not necessarily a separate service.
 
 Notation is the same as in `architecture-current.md`:
 
@@ -88,7 +87,8 @@ flowchart LR
 
 **Ownership rules (target)**
 
-1. **One writer per schema.** Data Ingestion owns the facts; the Risk Service owns `risk`.
+1. **One writer per schema.** Data Ingestion owns the source schemas and `ods`; S2 owns `mart`; the Risk Service owns
+   `risk` (§8).
 2. **One read path.** Frontend, MCP and the Risk Service never query the database directly. They go through the Query
    Service. This is the boundary that removes SQL from pages and tools (review P5).
 3. Today both rules are broken:
@@ -110,10 +110,10 @@ typed results, never on table layouts. A schema change then touches one componen
 | **Document content**: extracted text, OCR result, file reference                                                   | Frontend, MCP              | Replaces direct sidecar reads and the sidecar HTTP API                       |
 | **Risk results**: indicator results and decisions per procurement or organisation                                  | Frontend, MCP              | Reads the `risk` schema                                                      |
 | **Analytical reads**: set-based, streamed reads over large fact sets                                               | Risk Service, S4 Open Data | Versioned read views, not per-row API calls, so batch jobs stay efficient    |
-| **Ad-hoc SQL** (bounded): read-only, time-limited, restricted to analyst views                                     | MCP                        | Enforcement by database role and views, not only by SQL parsing (review P3)  |
+| **Ad-hoc SQL** (bounded): read-only, time-limited, restricted to `ods` and `mart`                                     | MCP                        | Enforcement by database role grants, not only by SQL parsing (review P3)  |
 
-A functional component is not necessarily a network service. The Query Service may start as an in-process library with a
-read-only connection pool and versioned SQL views. Its value is the contract and the boundary, not the deployment.
+A functional component is not necessarily a network service. The Query Service is an in-process library with a
+read-only connection pool over `ods`, `mart` and `risk`. Its value is the contract and the boundary, not the deployment.
 
 ---
 
@@ -195,7 +195,7 @@ These invariants are what "writes facts" *means*. Every internal design decision
 | G7 | **Commit, then notify**: events and notifications are sent only after facts are committed                                                                     | No consumer reads uncommitted state                                         | ✅ documented NATS rule                 |
 | G8 | **Observable freshness**: every source reports sync status and lag                                                                                            | Operators and users know how current the data is                            | ⚠️ partial                              |
 
-### 2.4 Internal view (to be decomposed in a later step)
+### 2.4 Internal view
 
 Every source goes through the same stages. Only the source-specific stages are implemented per source; the rest are
 shared.
@@ -252,7 +252,7 @@ Resolution) are listed in §2.4.
 | #       | Component                      | Responsibility                                                                                                                                            | Serves                                  | Exists today?     | Current code / gap                                                                                                  |
 |---------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------|
 | **S1**  | **Job Orchestration**          | Scheduling (cron and continuous), durable work queues, retries and back-off, reservation expiry, concurrency limits, wake-up signals                      | Data Ingestion, Risk, S2, S3, S4        | ✅ Home-grown     | `runner/`, `tasks/`, per-domain `SKIP LOCKED` queues, NATS                                                          |
-| **S2**  | **Search Indexing**            | Build derived search projections (Quickwit full-text, Typesense suggestions and organisations) from facts on "facts changed"; rebuild and drift detection | Query Service                           | ✅ Partial        | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
+| **S2**  | **Search Indexing**            | Build the `mart` schema and search projections (Quickwit full-text, Typesense suggestions and organisations) from `ods` on "facts changed"; rebuild and drift detection | Query Service                           | ✅ Partial        | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
 | **S3**  | **AI Enrichment**              | LLM-generated descriptions, embeddings; owns its own enrichment store (does **not** write facts); cost, rate, prompt and model versioning                 | Query Service                           | ✅ Experimental   | `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js`                                                    |
 | **S4**  | **Open Data Publishing**       | Publish curated datasets to the open-data API (Spinta / viesStalcius) and bulk exports; reads through the Query Service                                   | Open-data consumers                     | ✅ Scattered      | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket                                |
 | **S5**  | **Identity & Access**          | API keys for machine clients, worker registry, MCP client identification, rate limiting and abuse protection, analyst role policy                         | Frontend, MCP, Data Ingestion (workers) | ⚠️ Partial        | `auth.raktai`, `modules/failai/auth.js`, `src/lib/botChallenge.ts`; **no rate limiting, no key rotation**           |
@@ -551,10 +551,11 @@ viespirkiai/
 │   ├── database/                   # «supporting» S7 Schema & Data Governance
 │   │   ├── src/                    # role-scoped pools: readOnly · factsWriter · riskWriter · control
 │   │   ├── migrations/
-│   │   │   ├── facts/              # owned by apps/ingestion
+│   │   │   ├── source/             # source schemas, owned by apps/ingestion
+│   │   │   ├── ods/                # Operational Data Store, owned by apps/ingestion
+│   │   │   ├── mart/               # data marts, owned by apps/indexer
 │   │   │   ├── risk/               # owned by apps/risk
-│   │   │   ├── control/            # infra · auth · jobs
-│   │   │   └── views/              # read views owned by packages/query
+│   │   │   └── control/            # infra · auth · jobs
 │   │   └── schema/                 # generated schema documentation (committed)
 │   ├── jobs/                       # «supporting» S1 Job Orchestration: queues, schedules, retries
 │   ├── events/                     # "facts changed" event contracts + transport (NATS)
@@ -683,7 +684,7 @@ cross-cutting and may be used by every workspace.
 | `apps/*` import only `packages/*`; never another app                                                                   | dependency-cruiser in CI                                                                        |
 | `packages/*` never import `apps/*`                                                                                     | dependency-cruiser in CI                                                                        |
 | `web`, `mcp`, `open-data`, `enrichment` read data **only through `query`**: no `database` dependency                   | dependency-cruiser + `package.json` review (CODEOWNERS)                                         |
-| Only `ingestion` imports `@viespirkiai/database/facts-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
+| Only `ingestion` imports `@viespirkiai/database/facts-writer`; only `indexer` imports `@viespirkiai/database/mart-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
 | No deep imports; only paths listed in `exports`                                                                        | Node `exports` resolution + ESLint                                                              |
 | Every import is a declared dependency (npm hoisting would otherwise hide mistakes)                                     | ESLint `import/no-extraneous-dependencies` or `knip`                                            |
 | No `process.env` outside an app's `src/config.ts`; no `process.exit` or top-level side effects in packages             | ESLint (`n/no-process-env`, custom rule)                                                        |
@@ -795,29 +796,8 @@ allowed to use:
 | `mcp`                            | `DATABASE_URL_READONLY`, `DATABASE_URL_ANALYST`     |
 | `risk`                           | `DATABASE_URL_READONLY`, `DATABASE_URL_RISK_WRITER` |
 | `ingestion`                      | `DATABASE_URL_FACTS_WRITER`                         |
-| `indexer`                        | `DATABASE_URL_READONLY`                             |
+| `indexer`                        | `DATABASE_URL_READONLY`, `DATABASE_URL_MART_WRITER` |
 | `ops`                            | `DATABASE_URL_MIGRATOR`                             |
-
-### 6.7 Migration path from the current layout
-
-The move is incremental (strangler pattern); the system keeps running at every step.
-
-| Step | Change                                                                                                                                                                                      | Result                                                       |
-|------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|
-| 1    | Add root workspaces. Move the current app **unchanged** into `apps/web`, and move `modules/`, `utils/`, `postgres/`, `quickwit/`, `runner/`, `tasks/` into a temporary `packages/legacy`    | Same behaviour, workspace skeleton in place                  |
-| 2    | Add the CI/CD pipeline (§7): `ci.yml` gate (boundaries warn-only at first), image publishing, `vp-deploy` on lempa with integration tests, automatic alpha deploy, manual production deploy | Automated safety net and reproducible deployment (review P2) |
-| 3    | Extract `config`, `observability`, `database` (with a migration runner)                                                                                                                     | Configuration separation; reproducible schema (P1, P11)      |
-| 4    | Create `packages/query`; move SQL out of pages and MCP tools one entity at a time                                                                                                           | Single read path (P5)                                        |
-| 5    | Move `apps/mcp` and `apps/risk` onto `query`                                                                                                                                                | First independently built and deployed apps                  |
-| 6    | Move ingestion connectors into `apps/ingestion` source by source, onto the shared pipeline                                                                                                  | Ingestion contract (§2)                                      |
-| 7    | Split out `indexer`, `enrichment`, `open-data`, `ops`; delete `packages/legacy`; switch boundaries to error mode                                                                            | Target structure reached                                     |
-
-Validate these in a short spike before step 1:
-
-- Node 24 type stripping across workspace symlinks, including the `erasableSyntaxOnly` limits (no `enum`, no
-  `namespace`);
-- Astro/Vite resolving TypeScript-source packages;
-- per-workspace `npm ci` inside Docker, including the `tokenizers` lockfile workaround.
 
 ---
 
@@ -877,6 +857,8 @@ same image* can mean anything, the image must be self-contained (C3) and the tas
    database rollback.
 9. **No self-hosted GitHub Actions runner.** The repository is public, so a pull request from a fork can run code on a
    self-hosted runner.
+10. **lempa verifies provenance.** `vp-deploy` verifies the image provenance attestation with `cosign` before it pulls
+    an image.
 
 ### 7.3 Pipeline overview
 
@@ -945,10 +927,10 @@ stateDiagram-v2
 | Install          | `npm ci`                                            | yes                                    |
 | Lint             | `npm run lint`                                      | yes                                    |
 | Type-check       | `npm run typecheck` (`tsc -b`, `astro check`)       | yes                                    |
-| Boundaries       | `npm run boundaries`                                | no, until §6.7 step 7                  |
+| Boundaries       | `npm run boundaries`                                | yes                                    |
 | Unit tests       | `npm test` (no network, no database)                | yes                                    |
 | Build            | `npm run build`; `docker buildx build` without push | yes                                    |
-| Dependency audit | `npm audit --omit=dev --audit-level=high`           | no, until review P3 findings are fixed |
+| Dependency audit | `npm audit --omit=dev --audit-level=high`           | yes                                    |
 | Dockerfile lint  | `hadolint`                                          | yes                                    |
 
 **Stage 2 — Publish** (`delivery.yml`, push to `main` only):
@@ -1172,28 +1154,7 @@ S3_BACKUP_ENABLED=false
 - The cloudflared configuration is versioned in `infra/cloudflared/config.yml`.
 - The weekly alpha database restore also serves as the tested restore that S8 Backup & Recovery requires.
 
-### 7.7 Prerequisites in the current codebase
-
-The pipeline works before the monorepo migration. The current image then acts as `web`, `ingestion` (command
-`node tasks/index.js`) and `ops`.
-
-| #  | Change                                                                                                                                                             | Fixes           | §6.7 step |
-|----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|-----------|
-| R1 | Bake `modules/` and `public/` into the image; keep only data volumes mounted                                                                                       | C3              | 1         |
-| R2 | Run the taskRunner as the `ingestion` compose service from the same image; remove `startTaskRunner.sh`                                                             | C4              | 1         |
-| R3 | Create `infra/compose/` (`viespirkiai-business-compose.yaml`, `viespirkiai-data-compose.yaml`, env files); move the production stack to the `vp-prod-*` projects on bridge networks, with the same data paths | C2, C6          | 1         |
-| R4 | Add `ci.yml` and `delivery.yml`; make `ci.yml` a required status check with branch protection on `main`; pin actions by SHA; enable Dependabot and secret scanning | C1, C5, C9, C10 | 2         |
-| R5 | Add the `it` `Dockerfile` target; configure integration tests by env vars; make every `*.it.ts` suite read-only (`analystPool.it.ts` and `getSchema.it.ts` call `ensureAnalystViews()`, which moves into migrations); create the read-only role with `default_transaction_read_only = on` | C7              | 2         |
-| R6 | Add the migration runner `vp db migrate`; remove runtime table creation                                                                                            | C8              | 3         |
-| R7 | Add `/health` endpoints that check the database connection                                                                                                         | C6              | 2         |
-| R8 | On lempa: `deploy` user, `/srv/viespirkiai/`, `vp-deploy`, systemd timer, alpha data stack, cloudflared hostname `alpha.viespirkiai.org`, notification webhook     | C6              | 2         |
-
-### 7.8 Future improvements
-
-- `vp-deploy` verifies image provenance attestations with `cosign` before it pulls an image.
-- `vp-deploy prod` creates a git tag and a GitHub Release. This needs a GitHub token with `contents: write` on lempa.
-
-### 7.9 Open questions
+### 7.7 Open questions
 
 1. **lempa capacity for alpha**: alpha adds a second PostgreSQL, Quickwit and Typesense to lempa (§7.6). The production
    stack has about 21.3 GB of memory limits (`architecture-current.md` §5.1).
@@ -1207,125 +1168,169 @@ The pipeline works before the monorepo migration. The current image then acts as
 
 ---
 
-## 8. Domain baseline: canonical layer and read models
+## 8. Data layers: source schemas, Operational Data Store and data marts
 
-Input: [`architecture-review.md` P13](architecture-review.md#p13--no-canonical-domain-model-pages-and-tools-read-the-source-shaped-warehouse-)
-and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md). This section refines guarantee G2
-(canonical model) from §2.3 and the Query Service from §1.3.
+Input: [`architecture-review.md` P13](architecture-review.md#p13--no-operational-data-store-pages-and-tools-read-source-schemas-directly-)
+and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md). This section defines guarantee G2
+(canonical model) from §2.3 and the data that the Query Service (§1.3) reads.
 
 ### 8.1 Principal theses
 
-| #  | Thesis                                                                                                                                                                                  | Resolves (P13) |
-|----|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------|
-| T1 | **The database has three layers, each with one owner:** raw (source-shaped), canonical (domain entities) and read models (consumer-shaped).                                              | D1, D8         |
-| T2 | **Frontend, MCP and the Risk Service MUST NOT read raw schemas.** They read canonical entities or read models through the Query Service.                                                 | D6, D8, D9     |
-| T3 | **`domain-model.md` is the system's canonical model, not an MCP artifact.** Its entities, keys and grain are the contract for every consumer, the Frontend included.                    | D10            |
-| T4 | **Canonical entities are tables written by Data Ingestion,** with typed keys, provenance and version. Plain views over raw tables are a transition step only.                            | D2, D13        |
-| T5 | **Entity resolution runs once, in ingestion, and its result is stored** as link rows with `confidence` and `method`. Pages read links; pages never compute them.                        | D4, D5         |
-| T6 | **Each identifier has one canonical type and format:** `jarKodas` is 9-digit `text`; procurement identity is `(saltinis, pirkimoNumeris)`. Casts happen once, at the raw → canonical step. | D3             |
-| T7 | **Read models are derived and rebuildable.** Each page and each search index has a named read model, built from canonical entities on "facts changed".                                   | D9, D12, D13   |
-| T8 | **One concept has one definition.** An aggregate that ingestion already maintains becomes the read model; no view recomputes it.                                                         | D12            |
-| T9 | **Schema objects are created by migrations and verified in CI.** A registered view or read model that does not compile against the migrated schema fails the build.                     | D10, D11       |
+| #   | Thesis                                                                                                                                                                        | Resolves (P13)     |
+|-----|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
+| T1  | **PostgreSQL holds three data layers, each with one writer:** the source schemas, the Operational Data Store `ods` and the data mart `mart`.                                  | D1, D8             |
+| T2  | **Frontend, MCP and the Risk Service MUST NOT read source schemas.** They read `ods`, `mart` and `risk` through the Query Service.                                             | D6, D8, D9         |
+| T3  | **`domain-model.md` defines the `ods` schema.** Its entities, keys and grain are the contract for every consumer, the Frontend included.                                       | D10, D11           |
+| T4  | **`ods` entities are tables written by Data Ingestion,** with typed keys, enforced foreign keys, provenance and version.                                                     | D2, D13            |
+| T5  | **Entity resolution runs once, in Data Ingestion.** `ods` stores each result as a link row with `patikimumas` and `metodas`.                                                  | D4, D5             |
+| T6  | **Each identifier has one type and one format in `ods`.** `jarKodas` is 9-digit `text`. Type conversion happens only between a source schema and `ods`.                     | D3, D16            |
+| T7  | **`mart` tables are derived from `ods` and rebuildable at any time.** Each list page, search index and aggregate reads one `mart` table.                                     | D9, D13, D14, D18  |
+| T8  | **One concept has one definition.** Each aggregate exists once, as a `mart` table. No view and no page recomputes it.                                                       | D12, D17           |
+| T9  | **Migrations create every `ods` and `mart` object.** CI verifies each object against the migrated schema.                                                                  | D10, D11           |
+| T10 | **Page reads are bounded.** A page section reads one `ods` point lookup or one `mart` row set. No page runs entity resolution or aggregation.                                | D5, D14, D15, D19  |
 
-Thesis T7 answers the question "can the front page be built on the warehouse". The front page can be built on data
-from the warehouse only through read models. A page that joins raw tables repeats P13.
+The front page reads `mart` and the search indexes built from it. A source schema is never the data source of a page.
 
-### 8.2 Data layers
+### 8.2 Layer model
 
-The diagram shows which component writes each layer and which consumers read it.
+The diagram shows the writer of each layer and the read path of every consumer.
 
 ```mermaid
 flowchart LR
     subgraph ingestion["Data Ingestion"]
         Connectors["Source Connectors (I1)"]
-        Resolution["Normalisation and Entity Resolution (I5, I7)"]
-        Projector["Read-model builders (S2)"]
+        Integration["Normalisation and Entity Resolution (I5, I7)"]
     end
-    subgraph db["PostgreSQL"]
-        Raw[("Raw schemas: vpmSutartys, eppsViesiejiPirkimai, cvpp, ppa, rcJar, sabis")]
-        Canonical[("Canonical schema: pirkimas, pirkimo_dalis, dalyvis, sutartis, organizacija, links")]
-        ReadModels[("Read models: page and relationship projections")]
+    subgraph pg["PostgreSQL"]
+        Source[("Source schemas: vpmSutartys, eppsViesiejiPirkimai, cvpp, ppa, rcJar, sabis")]
+        Ods[("ods: entities and link tables")]
+        Mart[("mart: denormalised projections and aggregates")]
+        Risk[("risk: indicator decisions")]
     end
-    Search[("Quickwit and Typesense documents")]
+    MartBuilders["Mart builders (S2)"]
+    Search[("Quickwit and Typesense indexes")]
+    RiskService["Procurement Risk Service"]
     QueryService["Query Service"]
-    Consumers["Frontend, MCP, Risk Service"]
-    Connectors -.->|source rows| Raw
-    Raw -.->|typed facts| Resolution
-    Resolution -.->|entities and scored links| Canonical
-    Canonical -.->|facts changed| Projector
-    Projector -.->|projections| ReadModels
-    Projector -.->|documents| Search
-    QueryService -->|reads| Canonical
-    QueryService -->|reads| ReadModels
-    QueryService -->|searches| Search
+    Consumers["Frontend and MCP"]
+    Connectors -.->|source rows| Source
+    Source -.->|typed facts| Integration
+    Integration -.->|entities and scored links| Ods
+    Ods -.->|facts changed| MartBuilders
+    MartBuilders -.->|projections| Mart
+    MartBuilders -.->|documents built from mart| Search
+    RiskService -.->|decisions| Risk
+    RiskService -->|reads ods and mart| QueryService
     Consumers -->|calls queries| QueryService
+    QueryService -->|point lookups| Ods
+    QueryService -->|lists and aggregates| Mart
+    QueryService -->|full-text search| Search
+    QueryService -->|risk results| Risk
 ```
 
-| Layer       | Owner                                    | Shape                                                    | Readers                                          | Rebuildable from      |
-|-------------|------------------------------------------|----------------------------------------------------------|--------------------------------------------------|-----------------------|
-| Raw         | Source Connectors (I1)                   | Source shape; one schema per source                      | Normalisation (I5) and S7 governance tooling only | Re-scrape, raw store (I3) |
-| Canonical   | Normalisation, Entity Resolution (I5, I7) | `domain-model.md` entities; typed keys; provenance       | Query Service, read-model builders               | Raw layer             |
-| Read models | Read-model builders (S2)                 | One table or document per page, search index or tool    | Query Service                                    | Canonical layer       |
+| Layer          | Schema names                                                                                          | ETL term                           | Grain                                  | Writer                                          | Readers                                   | Rebuilt from                        |
+|----------------|-------------------------------------------------------------------------------------------------------|------------------------------------|----------------------------------------|-------------------------------------------------|-------------------------------------------|-------------------------------------|
+| Source         | One schema per upstream source: `vpmSutartys`, `eppsViesiejiPirkimai`, `cvpp`, `ppa`, `rcJar`, `sabis` | Persistent staging area (bronze)   | One row per source record              | Source Connectors (I1)                          | Normalisation (I5), S7 governance tooling | Raw Payload Store (I3), re-scrape   |
+| ODS            | `ods`                                                                                                 | Operational Data Store (silver)    | One row per business entity or link    | Normalisation, Entity Resolution (I5, I7, I8)   | Query Service, mart builders              | Source schemas                      |
+| Data mart      | `mart`                                                                                                | Data mart (gold)                   | One row per consumer question          | Mart builders (S2)                              | Query Service, search indexers            | `ods`                               |
+| Risk decisions | `risk`                                                                                                | Analytical output                  | One row per indicator decision         | Procurement Risk Service                        | Query Service                             | `ods`, `mart` and indicator code    |
 
-### 8.3 Canonical entities and link tables
+### 8.3 `ods` records facts; `mart` answers consumer questions
 
-The canonical layer implements the subject and evidence entities of `domain-model.md` §1 as tables. It adds link tables
-for every relationship that the sources do not key.
+| Property         | `ods`                                                                                  | `mart`                                                                 |
+|------------------|----------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| Content          | Facts that a source records, and identities and links that Data Ingestion resolves    | Values computed from `ods` by joins and aggregation                    |
+| Grain            | Business entity: procurement, lot, bid, contract, organisation                         | Consumer question: search card, organisation profile, buyer–supplier pair |
+| Normalisation    | Normalised (3NF): one fact in one place                                                | Denormalised: one row holds all values of one page section             |
+| Keys             | Stable business or surrogate keys; enforced foreign keys inside `ods`                  | Keys of the projected `ods` entities, or deterministic composite keys  |
+| Change trigger   | A source fact changes                                                                  | An `ods` fact changes, or a consumer needs a new shape                 |
+| Business logic   | Type conversion, normalisation, entity resolution                                      | Joins and aggregation only                                             |
+| Loss of a table  | Data Ingestion re-integrates it from the source schemas                                | Mart builders rebuild it from `ods`                                    |
+| Typical read     | Point lookup by key                                                                    | List, filter, sort, aggregate                                          |
 
-| Link table                      | Joins                                              | Replaces request-time logic                                     | Columns beyond the keys                        |
-|---------------------------------|----------------------------------------------------|-----------------------------------------------------------------|------------------------------------------------|
-| `sutarties_pirkimas`            | `sutartis` → `pirkimas`                            | `src/lib/sutartisPirkimai.ts` (`loadPirkimoAtitikmenys()`)      | `confidence`, `method`, `pozymiai`             |
-| `ataskaitos_sutartis`           | `ppa."ataskaituSutartys"` row → `sutartis`         | `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts`              | `confidence`, `method`                         |
-| `pirkimo_numerio_atitikmuo`     | raw `pirkimoNumeris` value → `pirkimas`            | `domain-model.md` §7.1 structural mitigation                    | `confidence`, `method`; one row per reference  |
-| `organizacijos_identifikatorius` | source party code or name → `organizacija`        | Casts of `jarKodas` in pages; `spetiPavadinimaIsSutarciu()`     | `saltinis`, `confidence`, `method`             |
+### 8.4 `ods` schema
 
-- A link row with low `confidence` stays in the table. The consumer decides which confidence it accepts.
-- `organizacija` has a surrogate key. Foreign suppliers and natural persons without a `jarKodas` are organisations too.
-- Buyer and supplier stay roles of `organizacija`, as `domain-model.md` §1.1 defines.
+Every `ods` table has these provenance columns:
 
-### 8.4 Read models for the Frontend
+| Column            | Type          | Meaning                                                    |
+|-------------------|---------------|------------------------------------------------------------|
+| `saltinis`        | `text`        | Code of the source schema that supplied the fact           |
+| `saltinioIrasoId` | `text`        | Key of the record in the source schema                     |
+| `ikelimoId`       | `bigint`      | Id of the ingestion run that wrote the row                 |
+| `ikeltaAt`        | `timestamptz` | Commit time of that ingestion run                          |
+| `versija`         | `integer`     | Version of the fact; increments on each change             |
 
-| Page or consumer                      | Reads today                                                                            | Target read model                                   |
-|---------------------------------------|----------------------------------------------------------------------------------------|-----------------------------------------------------|
-| `/` contract search                   | Quickwit hits, then `VPM_SUTARTIS_ROW_SQL` (1 table, 9 joins) per page                  | `sutarties_kortele` document, built from `sutartis` |
-| `/sutartis/[id]`                      | About 15 queries over 6 schemas, plus request-time procurement matching               | `sutartis` entity plus `sutarties_pirkimas` links   |
-| `/pirkimas/[key]` (new)               | Redirects to a contract; `/viesiejiPirkimai/[id]` covers `cvpis` only                   | `pirkimo_suvestine`: procurement, lots, bids, contracts |
-| `/organizacija/[jarKodas]` buyer and supplier roles (new) | Redirects to a filtered contract search                              | `organizacijos_profilis`, `pirkejo_tiekejo_rysys`   |
-| `/asmuo/[jarKodas]`                   | 22 source loaders per view                                                             | `organizacijos_profilis` plus per-section queries   |
-| Buyer–supplier relationship (MCP, graph) | `"vpmSutartys"."sumosPirkejasTiekejas"` and `v_pirkejo_tiekejo_rysys`, two definitions | `pirkejo_tiekejo_rysys`, one definition             |
+The entity tables implement the entities of `domain-model.md` §1. The table shows the core entities.
 
-### 8.5 Migration steps
+| Table                       | Domain entity         | Key                                                        | Foreign keys                                                      |
+|-----------------------------|-----------------------|------------------------------------------------------------|-------------------------------------------------------------------|
+| `ods."organizacijos"`       | Įmonė                 | `organizacijosId` (surrogate); `jarKodas` unique if known  | —                                                                 |
+| `ods."pirkimoPlanai"`       | Pirkimo planas        | `planoRaktas`                                              | `pirkejoId` → `organizacijos`                                     |
+| `ods."pirkimai"`            | Pirkimas              | `pirkimoRaktas` (`saltinis` + `pirkimoNumeris`)            | `pirkejoId` → `organizacijos`                                     |
+| `ods."skelbimai"`           | Skelbimas             | `skelbimoRaktas`                                           | `pirkimoRaktas` → `pirkimai`                                      |
+| `ods."pirkimoDalys"`        | Pirkimo dalis         | `daliesRaktas`                                             | `pirkimoRaktas` → `pirkimai`                                      |
+| `ods."dalyviai"`            | Dalyvis               | `dalyvioRaktas`                                            | `daliesRaktas` → `pirkimoDalys`; `tiekejoId` → `organizacijos`    |
+| `ods."sutartys"`            | Sutartis              | `sutartiesUnikalusId`                                      | `pirkejoId`, `tiekejoId` → `organizacijos`                        |
+| `ods."sutarciuPakeitimai"`  | Sutarties pakeitimas  | `pakeitimoRaktas`                                          | `sutartiesUnikalusId` → `sutartys`                                |
+| `ods."dokumentai"`          | Dokumentas            | `dokumentoRaktas`                                          | `pirkimoRaktas` → `pirkimai` or `sutartiesUnikalusId` → `sutartys` |
+| `ods."bylos"`               | Byla                  | `bylosId`                                                  | `organizacijosId` → `organizacijos`                               |
+| `ods."asmenuRysiai"`        | Asmens ryšys          | `rysioId`                                                  | `organizacijosId` → `organizacijos`                               |
+| `ods."valdymas"`            | Valdymas              | `valdymoRaktas`                                            | `organizacijosId`, `valdytojoId` → `organizacijos`                |
 
-The steps extend §6.7 step 4 and keep the system running after each step.
+The remaining entities of `domain-model.md` §1.3 follow the same pattern. Link tables hold every relationship that the
+sources do not key:
 
-| Step | Change                                                                                                                                               | Result                                                   |
-|------|------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|
-| 1    | Move the `v_*` view DDL from `ensureAnalystViews()` into migrations. Add an integration test that selects `LIMIT 0` from every registered view.       | Views exist in every environment; drift fails CI (T9)    |
-| 2    | Update `domain-model.md` §4 to the current schemas. Register or delete the `*_v2.sql` files.                                                          | One current domain contract (T3)                         |
-| 3    | Build `sutarties_pirkimas` and `ataskaitos_sutartis` in ingestion from the page logic. Switch `/sutartis/[id]` and the PPA page to read them.          | Links computed once and measurable over the corpus (T5)  |
-| 4    | Create the canonical schema: `organizacija` with typed `jarKodas`, `pirkimas` over `cvpis` and `cvpp`, `sutartis`. Point the `v_*` views at it.        | Canonical layer in place; MCP and risk unchanged (T4, T6) |
-| 5    | Build `pirkejo_tiekejo_rysys` from `sumosPirkejasTiekejas`; delete the recomputing view body.                                                        | One definition per concept (T8)                          |
-| 6    | Add `/pirkimas/[key]` and `/organizacija/[jarKodas]` on read models. Build Quickwit contract documents from `sutartis`.                                 | Domain pages on the front end (T7)                       |
-| 7    | Add a CI rule: no file under `src/` references a raw schema name.                                                                                    | Boundary enforced (T2)                                   |
+| Table                                | Links                                        | Match evidence                                                  | Columns beyond the keys                  |
+|--------------------------------------|----------------------------------------------|-----------------------------------------------------------------|------------------------------------------|
+| `ods."sutarciuPirkimai"`             | `sutartys` → `pirkimai`                      | Procurement number, buyer, title similarity, publication and signing dates | `patikimumas`, `metodas`, `pozymiai` |
+| `ods."daliuSutartys"`                | `pirkimoDalys` → `sutartys`                  | Procurement number, buyer, supplier, value, signing date        | `patikimumas`, `metodas`                 |
+| `ods."pirkimoNumeriuAtitikmenys"`    | Source `pirkimoNumeris` value → `pirkimai`   | Normalised number; one row per reference in a multi-reference value | `patikimumas`, `metodas`             |
+| `ods."organizacijuIdentifikatoriai"` | Source party code or name → `organizacijos`  | Registry code, name, country                                    | `saltinis`, `patikimumas`, `metodas`     |
 
-### 8.6 Open Questions
+- A link row keeps its `patikimumas`. Each consumer states the minimum `patikimumas` it accepts.
+- `organizacijos` includes foreign suppliers and natural persons without a `jarKodas`.
+- Buyer and supplier are roles of `organizacijos`, as `domain-model.md` §1.1 defines.
+- A relationship that the sources do not key is a link table row, never a nullable foreign key filled by a guess.
 
-1. Canonical tables need storage on `lempa` next to 6 M contract rows. Does the disk budget hold a second copy of
-   contract facts, or does `sutartis` stay a typed view over `"vpmSutartys".sutartys` until P4 is resolved?
-2. The `confidence` threshold for a link shown on a public page is a product decision. Who owns it?
+### 8.5 `mart` schema
 
----
+| Table                          | Grain                                  | Built from (`ods`)                                              | Consumers                                                     |
+|--------------------------------|----------------------------------------|-----------------------------------------------------------------|---------------------------------------------------------------|
+| `mart."sutarciuKorteles"`      | One row per contract                   | `sutartys`, `organizacijos`, `sutarciuPirkimai`                 | Contract search, Quickwit contract index, exports             |
+| `mart."pirkimuSuvestines"`     | One row per procurement                | `pirkimai`, `pirkimoDalys`, `dalyviai`, `sutarciuPirkimai`      | Procurement page and search index                             |
+| `mart."organizacijuProfiliai"` | One row per organisation               | `organizacijos`, `sutartys`, `dalyviai`, `bylos`, `asmenuRysiai` | Organisation page, Typesense organisation index               |
+| `mart."pirkejuTiekejuRysiai"`  | One row per buyer–supplier pair        | `sutartys`                                                      | Organisation page, relationship graph, MCP, Risk Service      |
+| `mart."organizacijuMetai"`     | One row per organisation and year      | `sutartys`                                                      | Organisation activity charts                                  |
+| `mart."dalyviuPoros"`          | One row per unordered pair of bidders  | `dalyviai`                                                      | Risk Service, MCP                                             |
+| `mart."rinkos"`                | One row per BVPŽ division              | `pirkimai`, `sutartys`                                          | Market statistics, Risk Service                               |
 
-## 9. Next steps (later phases)
+- A `mart` table contains only the columns that its consumers read.
+- Mart builders update the affected rows on "facts changed". They rebuild a whole table on an ingestion command.
+- Quickwit and Typesense take their documents from `mart` only. A search hit carries every field its result card shows.
+- The MCP analyst role has `SELECT` on `ods` and `mart`. No separate analyst view layer exists.
 
-1. **Spike the monorepo skeleton** (§6.7, step 1): prove type stripping, Astro resolution, per-app Docker builds and
-   dependency-cruiser rules.
-2. **Implement CI/CD prerequisites R1–R8** (§7.7), starting with the self-contained image and the `ci.yml` gate.
-3. **Decompose Data Ingestion:** connector contract, shared pipeline stages, canonical model, versioning and provenance
-   model.
-4. **Define the Query Service contract:** query catalogue, result types, analytical read views, caching. Build it on
-   the canonical layer and read models of §8.
-5. **Logical architecture:** interfaces and events between all components.
-6. **Deployment architecture:** process, container and host placement per app, including the alpha host (review P4,
-   P12).
-7. **Migration roadmap:** ordered by risk. S8 Backup & Recovery and S7 migrations come first.
+### 8.6 Frontend pages read `ods` and `mart`
+
+| Page                                  | Reads                                                                           |
+|---------------------------------------|---------------------------------------------------------------------------------|
+| `/` contract search                   | Quickwit contract index                                                         |
+| `/sutartis/[sutartiesUnikalusId]`     | `ods."sutartys"`, `ods."sutarciuPirkimai"`, `ods."dokumentai"`                  |
+| `/pirkimas/[pirkimoRaktas]`           | `mart."pirkimuSuvestines"`                                                      |
+| `/organizacija/[jarKodas]`            | `mart."organizacijuProfiliai"`, `mart."pirkejuTiekejuRysiai"`, `mart."organizacijuMetai"` |
+| Procurement and organisation search   | Quickwit and Typesense indexes built from `mart`                                |
+
+### 8.7 Placement rules
+
+1. A fact that a source records, or an identity that Data Ingestion resolves, goes to `ods`.
+2. A value computed by joining or aggregating `ods` rows goes to `mart`.
+3. A derived subject that a risk decision attaches to goes to `mart`, with a deterministic key.
+4. A judgement about a subject goes to `risk`.
+5. A source-shaped record goes to its source schema. A raw payload goes to the Raw Payload Store (I3).
+
+### 8.8 Clarifications
+
+- The source schemas are a persistent staging area. They are not integrated and not subject-oriented, so they are not a
+  data warehouse.
+- The architecture has no dimensional enterprise data warehouse. Source schemas keep source history (G5, G6), and `ods`
+  keeps entity versions.
+- The `public` schema is not a data layer. It holds PostGIS catalog objects only.
+- The layer names map to the medallion model: source schemas are bronze, `ods` is silver, `mart` is gold.
