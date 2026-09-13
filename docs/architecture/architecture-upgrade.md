@@ -884,15 +884,14 @@ flowchart LR
         subgraph alphaenv["alpha environment"]
             alphadeploy["vp-deploy alpha"]
             alphait["it image: integration tests"]
-            alphadb[("alpha database")]
             alphaapps["alpha.viespirkiai.org"]
         end
         subgraph prodenv["production environment"]
             proddeploy["vp-deploy prod"]
             prodit["it image: integration tests"]
-            proddb[("production database")]
             prodapps["viespirkiai.org"]
         end
+        ods[("PostgreSQL ods (§8.2), one instance")]
     end
 
     Contributor -->|pull request| ci
@@ -903,12 +902,12 @@ flowchart LR
     watch -->|new commit| alphadeploy
     ghcr -.->|images by digest| alphadeploy
     alphadeploy -->|runs before rollout| alphait
-    alphait -->|reads with read-only role| alphadb
+    alphait -->|reads with read-only role| ods
     alphadeploy -->|compose up after tests pass| alphaapps
     Operator -->|ssh lempa, release with status alpha-passed| proddeploy
     ghcr -.->|images by digest| proddeploy
     proddeploy -->|runs before rollout| prodit
-    prodit -->|reads with read-only role| proddb
+    prodit -->|reads with read-only role| ods
     proddeploy -->|compose up after tests pass| prodapps
 ```
 
@@ -923,7 +922,7 @@ flowchart LR
 | Test kind         | Runs in                                 | Reads                                        | Side effects                                   |
 |-------------------|-----------------------------------------|----------------------------------------------|------------------------------------------------|
 | Unit tests        | GitHub Actions, stage 1                 | mocks and fixtures only                      | none; no network, no database                  |
-| Integration tests | lempa, `it` image, stages 4 and 5 (§7.5) | real database and search of the environment | none; read-only role, search-only keys         |
+| Integration tests | lempa, `it` image, stages 4 and 5 (§7.5) | the one `ods` instance and search indexes    | none; read-only role, search-only keys         |
 
 A release moves through these states:
 
