@@ -15,6 +15,9 @@ Notation follows `architecture-current.md`, with stereotypes for the target comp
 | `«schemas»`      | Group of PostgreSQL schemas of one kind (green cylinder, bold names)  |
 | `«actor»`        | Person or external system that starts an interaction                  |
 | `«external»`     | System outside this repository (dashed grey)                          |
+| `«host»`         | Physical or virtual server (deployment diagram)                       |
+| `«image»`        | Docker image; it wraps the components it contains (deployment diagram) |
+| `«container»`    | Compose service that runs an image with one entrypoint (deployment diagram) |
 
 ## Terminology
 
@@ -38,7 +41,9 @@ The document uses these terms with one meaning each:
 | Staging layer             | Source schemas, raw payloads and files. Extract writes it; only Normalize & Link and S7 read it               | §8.2                                                   |
 | Integration & Serving layer | `ods`, document content, `risk`, search indexes and the AI enrichment store. The Query Service reads only this layer | §8.2                                          |
 | Control layer             | The control schemas. It holds no domain data                                                                  | §8.2, §8.10                                            |
-| Deliver stage             | S2 Search Indexing and S3 AI Enrichment: pipeline work that runs after Data Ingestion commits facts           | §3, §3.1                                               |
+| Data Pipeline             | Core component that holds the ETL components: the Data Ingestion stage and the Deliver stage. Workspace `apps/pipeline` | §1, §3.1, §6.2, §7.7                          |
+| Data Ingestion            | First stage of Data Pipeline: Extract and Normalize & Link. The only writer of the fact schemas              | §2                                                     |
+| Deliver stage             | Second stage of Data Pipeline: S2 Search Indexing and S3 AI Enrichment. It runs after Data Ingestion commits facts | §3, §3.1                                         |
 | Facts changed event       | Hint that Normalize & Link committed changes to `ods` entities in one ingestion run                           | `packages/events`, §2.2                                |
 | Ingestion run             | One execution of an ingestion job. `ods` rows store its id in `ikelimoId`                                     | §8.4                                                   |
 | Job                       | Unit of scheduled or queued work that S1 manages. The current code calls it a *task*                          | `packages/jobs`; `tasks/*.js`, `runner/`               |
@@ -59,8 +64,11 @@ The system has **five core functional components** around **one shared database*
 
 | # | Component                    | Purpose (one sentence)                                                                                                                     | Primary actors                                                    |
 |---|------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
-| 1 | **Data Ingestion**           | Brings public data from upstream sources into the Viešpirkiai database as normalised, linked and versioned facts.                          | Upstream registries & portals, OCR workers, text extractors, operator |
-| 2 | **Query Service**            | The single read path to Viešpirkiai data: entity lookups, search, relationships, documents and risk results behind stable query contracts. | Frontend, MCP, Procurement Risk Service, S3, S4                   |
+| 1 | **Data Pipeline**            | Brings public data from upstream sources into the Viešpirkiai database as normalised, linked and versioned facts, and delivers search indexes and AI enrichment built from them. | Upstream registries & portals, OCR workers, text extractors, LLM providers, operator |
+| 2 | **Query Service**            | The single read path to Viešpirkiai data: entity lookups, search, relationships, documents and risk results behind stable query contracts. | Frontend, MCP, Procurement Risk Service, Data Pipeline (S3), S4   |
+
+Data Pipeline has two stages: **Data Ingestion** (Extract, Normalize & Link; §2) writes the fact schemas, and the
+**Deliver stage** (S2 Search Indexing, S3 AI Enrichment; §3) writes the derived stores.
 | 3 | **Procurement Risk Service** | Evaluates procurements against risk indicators and records explainable risk decisions.                                                     | Analysts (through Frontend and MCP), operator                     |
 | 4 | **Frontend**                 | Publishes the data as a searchable public website.                                                                                         | Citizens, journalists, researchers, NGOs                          |
 | 5 | **MCP**                      | Gives LLM agents structured, read-only access to the data through tools.                                                                   | AI agents / MCP clients                                           |
@@ -77,7 +85,7 @@ flowchart LR
     op(["«actor»<br/>Operator"]):::actor
     citizen(["«actor»<br/>Citizen / journalist /<br/>researcher"]):::actor
     agent(["«actor»<br/>AI agent<br/>(MCP client)"]):::actor
-    ing["«core»<br/><b>Data Ingestion</b><br/>Extract · Normalize & Link"]:::core
+    ing["«core»<br/><b>Data Pipeline</b><br/>Data Ingestion · Deliver"]:::core
 
     subgraph STG["Staging layer"]
         srcdb[("«schemas»<br/><b>Source schemas</b><br/>one per upstream source")]:::store
@@ -96,7 +104,7 @@ flowchart LR
     op --> risk
     citizen --> fe
     agent --> mcp
-%% ── Ingestion ──
+%% ── Data Pipeline ──
     ing --> src
     src -.->|" raw records & documents "| ing
     ing -.->|" source rows "| srcdb
@@ -114,7 +122,7 @@ flowchart LR
 
 | Component                    | Key use cases                                                                                                                                                                                                                                                      | Depends on                                                            | Writes (owns)                                          | Current code                                                                                                                           |
 |------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| **Data Ingestion**           | Discover new records · import and refresh incrementally · backfill history · acquire and process documents (download, extract, OCR) · link entities and reference data · detect and version changes (contract edits, legislation editions, court decision updates) | Upstream sources, S1 Job Orchestration                                | **Fact schemas**: Extract writes the source schemas and document content; Normalize & Link writes `ods` (§2, §8) | `tasks/*`, `modules/<source>/*`, `modules/failai/`, `modules/documents/`, `runner/`                                                    |
+| **Data Pipeline**            | Discover new records · import and refresh incrementally · backfill history · acquire and process documents (download, extract, OCR) · link entities and reference data · detect and version changes (contract edits, legislation editions, court decision updates) · build and rebuild search indexes · generate AI descriptions and embeddings | Upstream sources, LLM providers, S1 Job Orchestration, **Query Service** (S3 only) | **Fact schemas** (Data Ingestion: Extract writes the source schemas and document content; Normalize & Link writes `ods`) and **derived stores** (Deliver: S2 writes the search indexes; S3 writes the AI enrichment store) (§2, §3, §8) | `tasks/*`, `modules/<source>/*`, `modules/failai/`, `modules/documents/`, `runner/`, `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/openrouter/`, `modules/vector/` |
 | **Query Service**            | Look up an entity by identifier · search and facet (contracts, procurements, organisations, documents) · traverse relationships · read document content · read risk results · provide bulk analytical reads · run bounded ad-hoc SQL for analysts                  | `ods` and `risk` (read-only role), S2 search indexes, document content store, S3 AI enrichment store | **Nothing.** Read-only by definition.                  | Scattered: SQL in 21 pages under `src/pages`, `src/lib/*`, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/tools/`, `modules/mcp/analyst/` |
 | **Procurement Risk Service** | Run evaluation for all procurements or a subset · evaluate each deployed indicator · record explainable procurement risk decisions and risk signals · re-evaluate after "facts changed"                                                                                                              | **Query Service** (analytical reads), S1                              | **`risk` schema** only                                 | `services/procurement-risk/`, `modules/risk/`                                                                                          |
 | **Frontend**                 | Search · entity pages (buyer, supplier, person, contract, procurement, legal act, court decision) · relationship graph · statistics · shareable pages (OpenGraph)                                                                                                  | **Query Service**                                                     | **Nothing.**                                           | `src/`                                                                                                                                 |
@@ -122,9 +130,10 @@ flowchart LR
 
 **Ownership rules (target)**
 
-1. **One writer per schema.** Data Ingestion owns the source schemas and `ods`: its Extract component writes the source
-   schemas, and its Normalize & Link component writes `ods`. The Risk Service owns `risk` (§8). S3
-   owns the AI enrichment store. The writers of the control schemas are open (§9 Q6).
+1. **One writer per schema.** Data Pipeline owns the source schemas, `ods` and the derived stores. In its Data Ingestion
+   stage, Extract writes the source schemas and Normalize & Link writes `ods`. In its Deliver stage, S2 writes the
+   search indexes and S3 writes the AI enrichment store. The Risk Service owns `risk` (§8). The writers of the control
+   schemas are open (§9 Q6).
 2. **One read path.** Frontend, MCP and the Risk Service never query the database directly. They go through the Query
    Service. This is the boundary that removes SQL from pages and tools (review P5).
 3. Today both rules are broken:
@@ -157,7 +166,7 @@ boundary, not the deployment.
 
 ## 2. Data Ingestion — the abstraction
 
-### 2.1 Data Ingestion is one core component with two supporting components
+### 2.1 Data Ingestion is one stage of Data Pipeline with two supporting components
 
 The current code implements ingestion as **30+ source modules**. Each module re-implements its own discovery, fetching,
 parsing, queues, reservation cleanup and persistence (review P5, P6).
@@ -202,7 +211,7 @@ flowchart LR
     iFile(("File<br/>lookup")):::iface
     iStatus(("Ingestion<br/>status")):::iface
     iEvt(("Facts changed<br/>events")):::iface
-    ing["«core»<br/><b>Data Ingestion</b><br/>(black box)"]:::core
+    ing["«core» Data Pipeline<br/><b>Data Ingestion stage</b><br/>(black box)"]:::core
     srcdb[("«schemas»<br/><b>Source schemas</b>")]:::store
     ods[("«schema»<br/><b>ods</b>")]:::store
     docs[("Document content store")]:::store
@@ -326,17 +335,18 @@ Data Ingestion owns two further supporting components, Extract and Normalize & L
 document processing belong to Extract (I2, I4). Reference data and entity resolution belong to Normalize & Link (I6,
 I7).
 
-S2 Search Indexing and S3 AI Enrichment form the **Deliver stage** of the data pipeline. They run after Data Ingestion
+S2 Search Indexing and S3 AI Enrichment form the **Deliver stage** of the core component Data Pipeline. They run after Data Ingestion
 commits facts and write derived stores in the Integration & Serving layer. They are not part of Data Ingestion: their
 outputs are not facts, S3 output is not deterministic, and their failures must not delay fact writes (G1, G4, G9).
+The workspace `apps/pipeline` holds Data Ingestion and the Deliver stage; each runs in its own container (§6.2, §7.7).
 
 | #       | Component                      | Responsibility                                                                                                                                            | Serves                                  | Exists today?     | Current code / gap                                                                                                  |
 |---------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------|
-| **S1**  | **Job Orchestration**          | Scheduling (cron and continuous), durable work queues, retries and back-off, reservation expiry, concurrency limits, wake-up signals                      | Data Ingestion, Risk, S2, S3, S4        | ✅ Home-grown     | `runner/`, `tasks/`, per-domain `SKIP LOCKED` queues, NATS                                                          |
+| **S1**  | **Job Orchestration**          | Scheduling (cron and continuous), durable work queues, retries and back-off, reservation expiry, concurrency limits, wake-up signals                      | Data Pipeline, Risk, S4                 | ✅ Home-grown     | `runner/`, `tasks/`, per-domain `SKIP LOCKED` queues, NATS                                                          |
 | **S2**  | **Search Indexing**            | Build search indexes (Quickwit full-text, Typesense suggestions and organisations) from `ods` on "facts changed"; rebuild and drift detection | Query Service                           | ✅ Partial        | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
 | **S3**  | **AI Enrichment**              | LLM-generated descriptions, embeddings; owns the AI enrichment store (does **not** write facts, §9 Q7); cost, rate, prompt and model versioning           | Query Service                           | ✅ Experimental   | `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js`; descriptions in `eppsViesiejiPirkimai."aprasymai"` |
 | **S4**  | **Open Data Publishing**       | Publish curated datasets to the open-data API (Spinta / viesStalcius) and bulk exports; reads through the Query Service                                   | Open-data consumers                     | ✅ Scattered      | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket                                |
-| **S5**  | **Identity & Access**          | API keys for machine clients, worker registry, MCP client identification, rate limiting and abuse protection, analyst role policy                         | Frontend, MCP, Data Ingestion (workers) | ⚠️ Partial        | `auth.raktai`, `modules/failai/auth.js`, `src/lib/botChallenge.ts`; **no rate limiting, no key rotation**           |
+| **S5**  | **Identity & Access**          | API keys for machine clients, worker registry, MCP client identification, rate limiting and abuse protection, analyst role policy                         | Frontend, MCP, Data Pipeline (workers)  | ⚠️ Partial        | `auth.raktai`, `modules/failai/auth.js`, `src/lib/botChallenge.ts`; **no rate limiting, no key rotation**           |
 | **S6**  | **Observability & Statistics** | Metrics, logs (SQL, scrape, MCP tool calls), ingestion status, job health, alerting, public statistics                                                    | Operator, Frontend (`/statistika`)      | ⚠️ Partial        | `modules/statistika/`, `/metrics`, SQL and scrape log ingest; **no taskRunner health, no alerting**                 |
 | **S7**  | **Schema & Data Governance**   | Versioned migrations, schema documentation, table ownership map, data-quality checks, reconciliation of derived stores                                    | All core components                     | ⚠️ Fragmented     | `migrations/` (incomplete), `postgres/dumpSchema.js`, schema scripts; **no migration runner**                       |
 | **S8**  | **Backup & Recovery**          | PostgreSQL backups with point-in-time recovery, raw payload and document-store backups, file archive backup, **tested restore**                           | Whole system                            | ❌ Mostly missing | Only `modules/s3backup/` (file archive to S3 object storage)                                                                                |
@@ -387,8 +397,8 @@ flowchart TB
         end
     end
 
-    subgraph PIPE["Data pipeline"]
-        subgraph ing["«core» <b>Data Ingestion</b>"]
+    subgraph PIPE["«core» <b>Data Pipeline</b>"]
+        subgraph ing["Data Ingestion stage"]
             extract["«supporting»<br/>Extract"]:::sup
             nl["«supporting»<br/>Normalize & Link"]:::sup
         end
@@ -396,11 +406,11 @@ flowchart TB
             s2["«supporting» S2<br/>Search Indexing"]:::sup
             s3["«supporting» S3<br/>AI Enrichment"]:::sup
         end
-        s1["«supporting» S1<br/>Job Orchestration"]:::sup
     end
-    class ing core
+    class PIPE core
 
     subgraph L6["Platform & operations (cross-cutting)"]
+        s1["«supporting» S1<br/>Job Orchestration"]:::sup
         s9["«missing» S9<br/>Operations Console"]:::missing
         s5["«supporting» S5<br/>Identity & Access"]:::sup
         s6["«supporting» S6<br/>Observability & Statistics"]:::sup
@@ -424,7 +434,7 @@ flowchart TB
     risk --> qs
     s4 --> qs
     qs -->|" reads "| ISL
-%% ── Data pipeline: Deliver stage ──
+%% ── Data Pipeline: Deliver stage ──
    s2 -->|" reads "| ods
    s2 -->|" reads "| docs
    s2 -->|" reads descriptions "| enrich
@@ -432,7 +442,7 @@ flowchart TB
    s3 --> llm
    DLV --> s1
    risk --> s1
-%% ── Data pipeline: Data Ingestion ──
+%% ── Data Pipeline: Data Ingestion stage ──
     extract --> src
     nl -->|" reads source rows "| srcdb
     ing --> s1
@@ -465,7 +475,7 @@ These rules decide where new functionality belongs, so that agentic development 
 P8).
 
 1. **Does it bring data from outside into the database** (including files, OCR, reference data, entity linking)? →
-   **Data Ingestion.** It is the only component that writes facts. Collecting from a source and staging source rows go
+   **Data Pipeline**, stage **Data Ingestion**. It is the only stage that writes facts. Collecting from a source and staging source rows go
    to **Extract**. Mapping, enrichment and linking into `ods` go to **Normalize & Link**.
 2. **Does it read Viešpirkiai data for someone else?** → it is a query in the **Query Service**. No other component
    issues read SQL against source, `ods` or `risk` schemas. The exceptions: a writer reads its own schemas, S2 index
@@ -513,9 +523,10 @@ alone.
 
 ### 6.1 Design principles
 
-1. **Workspace = functional component.** Each core component and each supporting component of §3 has one primary
-   workspace (§6.3). A supporting component that a core component owns is a top-level folder in the workspace of that
-   core component, for example `apps/ingestion/src/extract/`. Shared
+1. **Workspace = functional component.** Each core component, and each supporting component that no core component
+   owns, has one primary workspace (§6.3). A supporting component that a core component owns is a folder in the
+   workspace of that core component: `apps/pipeline` (Data Pipeline) holds Extract and Normalize & Link under
+   `src/ingestion/`, and S2 and S3 under `src/deliver/`. Shared
    technical packages (`domain`, `events`, `search`, `storage`, `testing`) serve several components. S8 lives in
    `infra/backup/`, which is not a workspace.
 2. **Two kinds of workspaces.**
@@ -591,32 +602,38 @@ viespirkiai/
 │   │   │   └── tools/              # one file per tool, built on @viespirkiai/query
 │   │   └── test/
 │   │
-│   ├── ingestion/                  # «core» Data Ingestion · @viespirkiai/ingestion
+│   ├── pipeline/                   # «core» Data Pipeline · @viespirkiai/pipeline: Data Ingestion + Deliver stages
 │   │   ├── package.json
 │   │   ├── AGENTS.md
-│   │   ├── Dockerfile
+│   │   ├── Dockerfile              # one image; compose runs one container per entrypoint (§7.7)
 │   │   ├── .env.example
 │   │   ├── src/
-│   │   │   ├── worker.ts           # entrypoint: Extract and Normalize & Link workers, schedules
-│   │   │   ├── api.ts              # entrypoint: OCR work distribution and file lookup (HTTP)
-│   │   │   ├── config.ts
-│   │   │   ├── control/            # I9 schedules, backfills, freshness status
-│   │   │   ├── extract/            # «supporting» Extract: upstream sources → source schemas, document content
-│   │   │   │   ├── connectors/     # I1 · one folder per source
-│   │   │   │   │   ├── cvp-is/
-│   │   │   │   │   ├── ted/
-│   │   │   │   │   ├── jar/
-│   │   │   │   │   ├── liteko/
-│   │   │   │   │   ├── e-tar/
-│   │   │   │   │   └── …
-│   │   │   │   ├── gateway/        # I2 Source Gateway: proxies, Tor, rate limits, request log
-│   │   │   │   ├── raw-store/      # I3 raw payload retention
-│   │   │   │   └── documents/      # I4 download, storage boxes, extraction, OCR distribution, file lookup
-│   │   │   └── normalize-link/     # «supporting» Normalize & Link: source schemas → ods
-│   │   │       ├── mappers/        # I5 · one source-to-canonical mapper per source
-│   │   │       ├── reference-data/ # I6
-│   │   │       ├── entity-resolution/ # I7
-│   │   │       └── persistence/    # I8 idempotent upserts, versions, derived tables, facts changed
+│   │   │   ├── ingestion.ts        # entrypoint: Extract and Normalize & Link workers, schedules
+│   │   │   ├── ingestion-api.ts    # entrypoint: OCR work distribution and file lookup (HTTP)
+│   │   │   ├── indexer.ts          # entrypoint: S2 Search Indexing workers
+│   │   │   ├── enrichment.ts       # entrypoint: S3 AI Enrichment workers
+│   │   │   ├── config.ts           # one zod schema per entrypoint
+│   │   │   ├── ingestion/          # Data Ingestion stage
+│   │   │   │   ├── control/        # I9 schedules, backfills, freshness status
+│   │   │   │   ├── extract/        # «supporting» Extract: upstream sources → Staging layer, document content
+│   │   │   │   │   ├── connectors/ # I1 · one folder per source
+│   │   │   │   │   │   ├── cvp-is/
+│   │   │   │   │   │   ├── ted/
+│   │   │   │   │   │   ├── jar/
+│   │   │   │   │   │   ├── liteko/
+│   │   │   │   │   │   ├── e-tar/
+│   │   │   │   │   │   └── …
+│   │   │   │   │   ├── gateway/    # I2 Source Gateway: proxies, Tor, rate limits, request log
+│   │   │   │   │   ├── raw-store/  # I3 raw payload retention
+│   │   │   │   │   └── documents/  # I4 download, storage boxes, extraction, OCR distribution, file lookup
+│   │   │   │   └── normalize-link/ # «supporting» Normalize & Link: source schemas → ods
+│   │   │   │       ├── mappers/    # I5 · one source-to-canonical mapper per source
+│   │   │   │       ├── reference-data/    # I6
+│   │   │   │       ├── entity-resolution/ # I7
+│   │   │   │       └── persistence/       # I8 idempotent upserts, versions, derived tables, facts changed
+│   │   │   └── deliver/            # Deliver stage
+│   │   │       ├── indexing/       # «supporting» S2 Search Indexing: ods · document content → Quickwit, Typesense
+│   │   │       └── enrichment/     # «supporting» S3 AI Enrichment: LLM descriptions, embeddings
 │   │   └── test/
 │   │
 │   ├── risk/                       # «core» Procurement Risk Service · @viespirkiai/risk
@@ -631,8 +648,6 @@ viespirkiai/
 │   │   │   └── indicators/         # one folder per indicator (LT-COM-01 …) with fixtures and tests
 │   │   └── test/
 │   │
-│   ├── indexer/                    # «supporting» S2 Search Indexing · @viespirkiai/indexer
-│   ├── enrichment/                 # «supporting» S3 AI Enrichment · @viespirkiai/enrichment
 │   ├── open-data/                  # «supporting» S4 Open Data Publishing · @viespirkiai/open-data
 │   └── ops/                        # «supporting» S9 Operations Console · @viespirkiai/ops
 │       ├── package.json            # "bin": { "vp": "./src/cli.ts" }
@@ -660,8 +675,8 @@ viespirkiai/
 │   ├── database/                   # «supporting» S7 Schema & Data Governance
 │   │   ├── src/                    # role-scoped pools: readOnly · analyst · factsWriter · riskWriter · migrator (§6.6)
 │   │   ├── migrations/
-│   │   │   ├── source/             # source schemas, owned by apps/ingestion
-│   │   │   ├── ods/                # Operational Data Store, owned by apps/ingestion
+│   │   │   ├── source/             # source schemas, owned by apps/pipeline (Extract)
+│   │   │   ├── ods/                # Operational Data Store, owned by apps/pipeline (Normalize & Link)
 │   │   │   ├── risk/               # owned by apps/risk
 │   │   │   └── control/            # infra · auth · jobs
 │   │   └── schema/                 # generated schema documentation (committed)
@@ -706,10 +721,8 @@ viespirkiai/
 |--------------------------|------------------------------|--------------------------------------------|-----------------------------------------|----------------------------------------------------------------------------------------------|
 | `apps/web`               | `@viespirkiai/web`           | «core» Frontend                            | `astro build` → Node server             | `src/`, `start-server.mjs`, `astro.config.mjs`                                               |
 | `apps/mcp`               | `@viespirkiai/mcp`           | «core» MCP                                 | `node src/main.ts`                      | `modules/mcp/`, `src/pages/mcp.astro`, `src/lib/mcp.ts`                                      |
-| `apps/ingestion`         | `@viespirkiai/ingestion`     | «core» Data Ingestion: Extract, Normalize & Link | `node src/worker.ts`, `node src/api.ts` | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints, matching logic in `src/lib/sutartisPirkimai.ts` and `src/lib/ppa.ts`        |
+| `apps/pipeline`          | `@viespirkiai/pipeline`      | «core» Data Pipeline: Data Ingestion (Extract, Normalize & Link), S2 Search Indexing, S3 AI Enrichment | `node src/ingestion.ts`, `node src/ingestion-api.ts`, `node src/indexer.ts`, `node src/enrichment.ts` | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints, matching logic in `src/lib/sutartisPirkimai.ts` and `src/lib/ppa.ts`; `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/`; `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js` |
 | `apps/risk`              | `@viespirkiai/risk`          | «core» Procurement Risk Service            | `node src/main.ts` (scheduled)          | `modules/risk/`, `services/procurement-risk/`                                                |
-| `apps/indexer`           | `@viespirkiai/indexer`       | S2 Search Indexing                         | `node src/main.ts`                      | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
-| `apps/enrichment`        | `@viespirkiai/enrichment`    | S3 AI Enrichment                           | `node src/main.ts`                      | `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js`                             |
 | `apps/open-data`         | `@viespirkiai/open-data`     | S4 Open Data Publishing                    | `node src/main.ts`                      | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket         |
 | `apps/ops`               | `@viespirkiai/ops`           | S9 Operations Console                      | `vp <command>`                          | about 80 `npm run` scripts, `scripts/`                                                       |
 | `packages/query`         | `@viespirkiai/query`         | «core» Query Service                       | library                                 | `src/lib/*`, SQL in pages, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/analyst/` |
@@ -717,7 +730,7 @@ viespirkiai/
 | `packages/database`      | `@viespirkiai/database`      | S7 Schema & Data Governance                | library + migrations                    | `postgres/`, `migrations/`, `dbSchema/`                                                      |
 | `packages/jobs`          | `@viespirkiai/jobs`          | S1 Job Orchestration                       | library                                 | `runner/`, per-module queues                                                                 |
 | `packages/events`        | `@viespirkiai/events`        | "Facts changed" contract                   | library                                 | `utils/natsHub.js`, `utils/taskSignals.js`                                                   |
-| `packages/search`        | `@viespirkiai/search`        | Search clients (used by query and indexer) | library                                 | `quickwit/quickwit.js`, `typesense/`                                                         |
+| `packages/search`        | `@viespirkiai/search`        | Search clients (used by query and pipeline) | library                                 | `quickwit/quickwit.js`, `typesense/`                                                         |
 | `packages/storage`       | `@viespirkiai/storage`       | Document and raw payload stores            | library                                 | `utils/sidecar*.js`, `modules/failai/failaiFs.js`, `modules/ocr/rezultataiFs.js`             |
 | `packages/auth`          | `@viespirkiai/auth`          | S5 Identity & Access                       | library                                 | `modules/failai/auth.js`, `src/lib/botChallenge.ts`                                          |
 | `packages/config`        | `@viespirkiai/config`        | S10 Configuration & Secrets                | library                                 | `utils/config*.js`                                                                           |
@@ -738,10 +751,8 @@ flowchart TB
         web["web"]:::app
         mcp["mcp"]:::app
         risk["risk"]:::app
-        ingestion["ingestion"]:::app
+        pipeline["pipeline"]:::app
         opendata["open-data"]:::supapp
-        enrichment["enrichment"]:::supapp
-        indexer["indexer"]:::supapp
         ops["ops"]:::supapp
     end
 
@@ -767,19 +778,14 @@ flowchart TB
     risk --> events
     opendata --> query
     opendata --> jobs
-    enrichment --> query
-    enrichment --> jobs
-    ingestion --> domain
-    ingestion --> database
-    ingestion --> storage
-    ingestion --> jobs
-    ingestion --> events
-    ingestion --> auth
-    indexer --> database
-    indexer --> search
-    indexer --> storage
-    indexer --> jobs
-    indexer --> events
+    pipeline --> query
+    pipeline --> domain
+    pipeline --> database
+    pipeline --> search
+    pipeline --> storage
+    pipeline --> jobs
+    pipeline --> events
+    pipeline --> auth
     ops --> database
     ops --> jobs
     query --> domain
@@ -796,9 +802,10 @@ cross-cutting and may be used by every workspace.
 |------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
 | `apps/*` import only `packages/*`; never another app                                                                   | dependency-cruiser in CI                                                                        |
 | `packages/*` never import `apps/*`                                                                                     | dependency-cruiser in CI                                                                        |
-| `web`, `mcp`, `open-data`, `enrichment` read data **only through `query`**: no `database` dependency                   | dependency-cruiser + `package.json` review (CODEOWNERS)                                         |
-| Only `ingestion` imports `@viespirkiai/database/facts-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
-| Inside `ingestion`, `src/extract/**` and `src/normalize-link/**` never import each other; they meet only at the source schemas | dependency-cruiser in CI                                                                        |
+| `web`, `mcp`, `open-data` and `pipeline/src/deliver/enrichment/**` read data **only through `query`**; the three apps have no `database` dependency | dependency-cruiser + `package.json` review (CODEOWNERS)                                         |
+| Only `pipeline/src/ingestion/**` imports `@viespirkiai/database/facts-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
+| Inside `pipeline`, `src/ingestion/extract/**` and `src/ingestion/normalize-link/**` never import each other; they meet only at the source schemas | dependency-cruiser in CI                                                          |
+| Inside `pipeline`, `src/deliver/**` never imports `src/ingestion/**`; it reads the Integration & Serving layer and receives facts changed events | dependency-cruiser in CI                                                          |
 | No deep imports; only paths listed in `exports`                                                                        | Node `exports` resolution + ESLint                                                              |
 | Every import is a declared dependency (npm hoisting would otherwise hide mistakes)                                     | ESLint `import/no-extraneous-dependencies` or `knip`                                            |
 | No `process.env` outside an app's `src/config.ts`; no `process.exit` or top-level side effects in packages             | ESLint (`n/no-process-env`, custom rule)                                                        |
@@ -904,17 +911,17 @@ Typical workflows:
 | Packages     | constructor or function parameters | no environment access; the app passes typed settings in                                        |
 | Runtime      | `infra/compose/*-compose.yaml`, `env/<env>.env`       | environment per service; secrets from `/srv/viespirkiai/<env>/secrets/<app>.env` on `lempa`, never committed                      |
 
-Database access is split by **role-specific connection strings**, so each app can only receive the credentials it is
-allowed to use:
+Database access is split by **role-specific connection strings**, so each container can only receive the credentials
+it is allowed to use. The `pipeline` containers share one image but receive different secrets files (§7.6):
 
-| App                              | Database connection variables                       |
-|----------------------------------|-----------------------------------------------------|
-| `web`, `open-data`, `enrichment` | `DATABASE_URL_READONLY`                             |
-| `mcp`                            | `DATABASE_URL_READONLY`, `DATABASE_URL_ANALYST`     |
-| `risk`                           | `DATABASE_URL_READONLY`, `DATABASE_URL_RISK_WRITER` |
-| `ingestion`                      | `DATABASE_URL_FACTS_WRITER`                         |
-| `indexer`                        | `DATABASE_URL_READONLY`                             |
-| `ops`                            | `DATABASE_URL_MIGRATOR`                             |
+| Container (image)                                  | Database connection variables                       |
+|----------------------------------------------------|-----------------------------------------------------|
+| `web`, `open-data`                                 | `DATABASE_URL_READONLY`                             |
+| `mcp`                                              | `DATABASE_URL_READONLY`, `DATABASE_URL_ANALYST`     |
+| `risk`                                             | `DATABASE_URL_READONLY`, `DATABASE_URL_RISK_WRITER` |
+| `ingestion`, `ingestion-api` (`pipeline`)          | `DATABASE_URL_FACTS_WRITER`                         |
+| `indexer`, `enrichment` (`pipeline`)               | `DATABASE_URL_READONLY`                             |
+| `migrate` (`ops`)                                  | `DATABASE_URL_MIGRATOR`                             |
 | `it` image (§7.5)                | `DATABASE_URL_READONLY`                             |
 
 The roles that write job state and control schemas are open (§9 Q6).
@@ -1083,7 +1090,7 @@ stateDiagram-v2
 7. **Move the pointer tag `main`** on every image to the new digests. This step runs last, so lempa never sees a partial
    release.
 
-The images are the eight apps of §6.3 (`ops` included) and the `it` test image.
+The images are the six apps of §6.3 (`ops` included) and the `it` test image.
 
 #### `delivery.yml` builds only the changed images
 
@@ -1106,7 +1113,7 @@ flowchart TD
 
 | Image                                         | Inputs                                                                                                        |
 |-----------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| `web`, `mcp`, `ingestion`, `risk`, supporting apps | `apps/<app>/**` and every workspace in its transitive `@viespirkiai/*` `dependencies` (§6.4)             |
+| `web`, `mcp`, `pipeline`, `risk`, `open-data` | `apps/<app>/**` and every workspace in its transitive `@viespirkiai/*` `dependencies` (§6.4)             |
 | `ops`                                         | `apps/ops/**` and its transitive workspace dependencies, which include `packages/database/migrations/**`      |
 | `it`                                          | `apps/**`, `packages/**`                                                                                      |
 | All images                                    | `package.json`, `package-lock.json`, `tsconfig.base.json`, `.node-version`, `infra/ci/**`                     |
@@ -1221,7 +1228,7 @@ live checkout. A compose change therefore deploys and rolls back with its releas
 
 | File                                 | Contains                                                                              | Compose projects                | Applied by                                                     |
 |--------------------------------------|---------------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------|
-| `viespirkiai-business-compose.yaml`  | `web`, `mcp`, `ingestion`, `ingestion-api`, `risk`, `indexer`, `enrichment`, `open-data`; `migrate` (profile `migrate`, `ops` image)                              | `vp-alpha-business`, `vp-prod-business` | `vp-deploy alpha` / `vp-deploy prod`, every release    |
+| `viespirkiai-business-compose.yaml`  | `web`, `mcp`, `risk`, `open-data`; `ingestion`, `ingestion-api`, `indexer`, `enrichment` (`pipeline` image); `migrate` (profile `migrate`, `ops` image) | `vp-alpha-business`, `vp-prod-business` | `vp-deploy alpha` / `vp-deploy prod`, every release    |
 | `viespirkiai-data-compose.yaml`      | `postgres`, `pgbouncer`, `quickwit`, `typesense`, `nats`, network `vp-<env>-data`     | `vp-alpha-data`, `vp-prod-data` | Operator, `vp-deploy data <env>`, only on data-service changes |
 | `env/alpha.env`, `env/prod.env`      | Non-secret values per environment: ports, memory limits, data paths, feature switches | —                               | Committed                                                      |
 | `/srv/viespirkiai/<env>/secrets/<app>.env` | Passwords, API keys and `DATABASE_URL_*` values of one app (§6.6)                                                                   | —                               | On lempa only                                                  |
@@ -1244,9 +1251,10 @@ docker compose -p vp-alpha-business \
   up -d --wait --remove-orphans
 ```
 
-`infra/compose/viespirkiai-business-compose.yaml` gives each app its own secrets file, so an app receives only the
-credentials of §6.6. The listing shows `migrate`, `web`, `mcp` and `ingestion`. `ingestion-api`, `risk`, `indexer`,
-`enrichment` and `open-data` follow the same pattern; the public routes of `ingestion-api` are open (§9 Q13).
+`infra/compose/viespirkiai-business-compose.yaml` gives each container its own secrets file, so a container receives
+only the credentials of §6.6. The listing shows `migrate`, `web`, `mcp` and `ingestion`. `ingestion-api`, `indexer` and
+`enrichment` run the `pipeline` image with their own `command` and secrets file. `risk` and `open-data` follow the
+same pattern as `mcp`; the public routes of `ingestion-api` are open (§9 Q13).
 
 ```yaml
 name: vp-${VP_ENV}-business
@@ -1297,9 +1305,9 @@ services:
 
   ingestion:
     <<: *app
-    image: ${INGESTION_IMAGE}
+    image: ${PIPELINE_IMAGE}
     env_file: [ ./env/${VP_ENV}.env, /srv/viespirkiai/${VP_ENV}/secrets/ingestion.env ]
-    command: [ "node", "src/worker.ts" ]
+    command: [ "node", "src/ingestion.ts" ]
     volumes: [ "${DATA_ROOT}:/data" ]
     stop_grace_period: 120s          # lets running jobs release their reservations
     deploy:
@@ -1350,6 +1358,150 @@ S3_BACKUP_ENABLED=false
   `DATABASE_URL_*` values in `secrets/<app>.env` point at `pgbouncer:6432`.
 - The cloudflared configuration is versioned in `infra/cloudflared/config.yml`.
 - The weekly alpha database restore also serves as the tested restore that S8 Backup & Recovery requires.
+
+### 7.7 Deployment diagram
+
+The diagram shows one environment on `lempa`: the components inside each Docker image, the containers that run each
+image, and the protocols between them. Alpha and production have the same layout (§7.6).
+
+```mermaid
+flowchart LR
+    classDef actor fill: #ffffff, stroke: #222, stroke-width: 1.5px, color: #111
+    classDef core fill: #dbe9fb, stroke: #1f5fa8, stroke-width: 2px, color: #0b2545
+    classDef sup fill: #f5f9ff, stroke: #1f5fa8, stroke-dasharray: 3 2, color: #0b2545
+    classDef missing fill: #fff4f4, stroke: #c62828, stroke-dasharray: 3 2, color: #5a1010
+    classDef store fill: #eaf6ea, stroke: #2e7d32, color: #123d14
+    classDef ext fill: #f4f4f4, stroke: #777, stroke-dasharray: 4 3, color: #333
+
+    browser(["«actor»<br/>Browser"]):::actor
+    agent(["«actor»<br/>AI agent"]):::actor
+    workers(["«actor»<br/>OCR workers ·<br/>goViesdezeProxyRewrite"]):::actor
+    op(["«actor»<br/>Operator"]):::actor
+    cf["«external»<br/>Cloudflare edge"]:::ext
+    src["«external»<br/>Public registries & portals"]:::ext
+    extr["«external»<br/>Text extractors"]:::ext
+    llm["«external»<br/>LLM & embedding providers"]:::ext
+    spinta["«external»<br/>Spinta open-data API"]:::ext
+
+    subgraph lempa["«host» lempa"]
+        tunnel["cloudflared"]
+        vol[("DATA_ROOT volume<br/>sidecar SQLite · files")]:::store
+
+        subgraph business["compose project vp-#lt;env#gt;-business"]
+            subgraph imgWeb["«image» web"]
+                fe["«core»<br/><b>Frontend</b>"]:::core
+                qsWeb["«core»<br/><b>Query Service</b>"]:::core
+            end
+            subgraph imgMcp["«image» mcp"]
+                mcp["«core»<br/><b>MCP</b>"]:::core
+                qsMcp["«core»<br/><b>Query Service</b>"]:::core
+            end
+            subgraph imgPipeline["«image» pipeline"]
+                subgraph cIngestion["«container» ingestion"]
+                    extract["«supporting»<br/>Extract"]:::sup
+                    nl["«supporting»<br/>Normalize & Link"]:::sup
+                end
+                subgraph cIngestionApi["«container» ingestion-api"]
+                    extractApi["«supporting»<br/>Extract<br/>OCR work · file lookup (I4)"]:::sup
+                end
+                subgraph cIndexer["«container» indexer"]
+                    s2["«supporting» S2<br/>Search Indexing"]:::sup
+                end
+                subgraph cEnrichment["«container» enrichment"]
+                    s3["«supporting» S3<br/>AI Enrichment"]:::sup
+                    qsPipeline["«core»<br/><b>Query Service</b>"]:::core
+                end
+            end
+            subgraph imgRisk["«image» risk"]
+                risk["«core»<br/><b>Procurement Risk Service</b>"]:::core
+                qsRisk["«core»<br/><b>Query Service</b>"]:::core
+            end
+            subgraph imgOpenData["«image» open-data"]
+                s4["«supporting» S4<br/>Open Data Publishing"]:::sup
+                qsOpenData["«core»<br/><b>Query Service</b>"]:::core
+            end
+            subgraph imgOps["«image» ops"]
+                s9["«missing» S9<br/>Operations Console"]:::missing
+                s7["«supporting» S7<br/>Schema & Data Governance"]:::sup
+            end
+        end
+
+        subgraph data["compose project vp-#lt;env#gt;-data"]
+            subgraph imgPgbouncer["«image» pgbouncer"]
+                pool["Connection pool"]
+            end
+            subgraph imgPostgres["«image» postgres (PostGIS)"]
+                srcdb[("«schemas»<br/><b>Source schemas</b>")]:::store
+                ods[("«schema»<br/><b>ods</b>")]:::store
+                riskdb[("«schema»<br/><b>risk</b>")]:::store
+                ctrl[("«schemas»<br/><b>Control schemas</b>")]:::store
+            end
+            subgraph imgQuickwit["«image» quickwit"]
+                qw[("Full-text indexes")]:::store
+            end
+            subgraph imgTypesense["«image» typesense"]
+                ts[("Suggestion and organisation indexes")]:::store
+            end
+            subgraph imgNats["«image» nats"]
+                bus["Facts changed events"]
+            end
+        end
+    end
+%% ── Inbound ──
+    browser -->|" HTTPS "| cf
+    agent -->|" HTTPS · MCP Streamable HTTP "| cf
+    workers -->|" HTTPS "| cf
+    cf -->|" Cloudflare Tunnel "| tunnel
+    tunnel -->|" HTTP 127.0.0.1:9019 "| imgWeb
+    tunnel -->|" HTTP 127.0.0.1:9022 "| imgMcp
+    tunnel -->|" HTTP, route open (§9 Q13) "| cIngestionApi
+    op -->|" ssh · docker compose run "| imgOps
+%% ── Database ──
+    imgWeb -->|" PostgreSQL TCP 6432 "| pool
+    imgMcp -->|" PostgreSQL TCP 6432 "| pool
+    imgPipeline -->|" PostgreSQL TCP 6432 "| pool
+    imgRisk -->|" PostgreSQL TCP 6432 "| pool
+    imgOpenData -->|" PostgreSQL TCP 6432 "| pool
+    imgOps -->|" PostgreSQL TCP 6432 "| pool
+    pool -->|" PostgreSQL TCP 5432 "| imgPostgres
+%% ── Search ──
+    imgWeb -->|" HTTP REST search "| imgQuickwit
+    imgWeb -->|" HTTP REST search "| imgTypesense
+    imgMcp -->|" HTTP REST search "| imgQuickwit
+    cIndexer -->|" HTTP REST ingest "| imgQuickwit
+    cIndexer -->|" HTTP REST import "| imgTypesense
+%% ── Events ──
+    cIngestion -.->|" NATS publish TCP 4222 "| imgNats
+    imgNats -.->|" NATS subscribe "| cIndexer
+    imgNats -.->|" NATS subscribe "| cEnrichment
+    imgNats -.->|" NATS subscribe "| imgRisk
+%% ── Files ──
+    cIngestion -->|" bind mount /data "| vol
+    cIngestionApi -->|" bind mount /data "| vol
+    imgWeb -->|" bind mount /data "| vol
+%% ── Outbound ──
+    cIngestion -->|" HTTPS via proxies · Tor "| src
+    cIngestion -->|" HTTP POST /extract "| extr
+    cEnrichment -->|" HTTPS "| llm
+    imgOpenData -->|" HTTPS "| spinta
+```
+
+| Image                                                    | Workspace         | Containers                                            | Components                                                                     | Port                                   |
+|----------------------------------------------------------|-------------------|-------------------------------------------------------|--------------------------------------------------------------------------------|----------------------------------------|
+| `web`                                                    | `apps/web`        | `web`                                                 | Frontend, Query Service, S5                                                    | HTTP `9019`                            |
+| `mcp`                                                    | `apps/mcp`        | `mcp`                                                 | MCP, Query Service, S5                                                         | HTTP `9022`                            |
+| `pipeline`                                               | `apps/pipeline`   | `ingestion`, `ingestion-api`, `indexer`, `enrichment` | Extract, Normalize & Link, S2, S3, Query Service (`enrichment` only), S1, S5   | `ingestion-api`: HTTP (§9 Q13)         |
+| `risk`                                                   | `apps/risk`       | `risk`                                                | Procurement Risk Service, Query Service, S1                                    | —                                      |
+| `open-data`                                              | `apps/open-data`  | `open-data`                                           | S4, Query Service, S1                                                          | —                                      |
+| `ops`                                                    | `apps/ops`        | `migrate`; `docker compose run` for operator commands | S9, S7                                                                         | —                                      |
+| `pgbouncer`, `postgres`, `quickwit`, `typesense`, `nats` | — (`infra/`)      | one each                                              | Connection pool; Staging, Integration & Serving and Control stores; search indexes; event transport | `6432`, `5432`, `7280`, `8108`, `4222` |
+
+- The Query Service is a library, so each image that uses it contains its own copy (§1.3).
+- S6 Observability and S10 Configuration are libraries in every app image and are not drawn.
+- S8 Backup & Recovery runs as host scripts from `infra/backup/`, not as an image.
+- The data service ports are the image defaults. Production Typesense uses host networking (§9 Q14); the diagram shows
+  the bridge network.
+- `mcp` does not mount `DATA_ROOT`, so it cannot read document content yet (§9 Q8).
 
 ---
 
@@ -1604,11 +1756,11 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    Option 2: one shared `DATABASE_URL_JOBS` role for every app that uses `packages/jobs`, plus `DATABASE_URL_*_DIRECT`
    connections that bypass PgBouncer for session features.
 7. **Placement of the AI enrichment store**: §1.2, §3 and §3.1 give S3 its own store, which the Query Service reads. §8
-   knows only source schemas, `ods` and `risk`; T5 puts every shown attribute into `ods`; `apps/enrichment` has no
-   `database` dependency and only a read-only connection (§6.4, §6.6). The current code writes LLM descriptions to
+   knows only source schemas, `ods` and `risk`; T5 puts every shown attribute into `ods`; `pipeline/src/deliver/enrichment/`
+   reads only through `query`, and the `enrichment` container has only a read-only connection (§6.4, §6.6). The current code writes LLM descriptions to
    `eppsViesiejiPirkimai."aprasymai"` and embeddings to SQLite (`modules/vector`).
    Question to address: where does S3 write, and how do its outputs reach Frontend and MCP?
-   Option 1 (recommended): a PostgreSQL schema owned by `apps/enrichment`, for example `ai`, with its own writer role.
+   Option 1 (recommended): a PostgreSQL schema owned by S3 (`enrichment` container), for example `ai`, with its own writer role.
    §8.2 lists it as a layer, the Query Service reads it, and embeddings use pgvector.
    Option 2: S3 outputs are an upstream source of Data Ingestion. Extract stages them in a source schema, and Normalize & Link maps them
    into `ods` enrichment.
