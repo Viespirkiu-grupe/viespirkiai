@@ -16,8 +16,8 @@ Notation follows `architecture-current.md`, with stereotypes for the target comp
 | `«actor»`        | Person or external system that starts an interaction                  |
 | `«external»`     | System outside this repository (dashed grey)                          |
 | `«host»`         | Physical or virtual server (deployment diagram)                       |
-| `«image»`        | Docker image; it wraps the components it contains (deployment diagram) |
-| `«container»`    | Compose service that runs an image with one entrypoint (deployment diagram) |
+| `«container»`    | Running container instance: one isolated process with its own memory limit and credentials; it wraps the component instances it runs (deployment diagram) |
+| `«process»`      | Operating system process outside Docker (deployment diagram)          |
 
 ## Terminology
 
@@ -1361,8 +1361,9 @@ S3_BACKUP_ENABLED=false
 
 ### 7.7 Deployment diagram
 
-The diagram shows one environment on `lempa`: the components inside each Docker image, the containers that run each
-image, and the protocols between them. Alpha and production have the same layout (§7.6).
+The diagram shows the running instances of the production environment: hosts, compose projects, containers and the
+component instances inside each container. Each container is one isolated process. The arrows show the protocols
+between containers.
 
 ```mermaid
 flowchart LR
@@ -1384,67 +1385,80 @@ flowchart LR
     spinta["«external»<br/>Spinta open-data API"]:::ext
 
     subgraph lempa["«host» lempa"]
-        tunnel["cloudflared"]
-        vol[("DATA_ROOT volume<br/>sidecar SQLite · files")]:::store
+        tunnel["«process»<br/>cloudflared"]
+        vol[("/flashas/viespirkiai<br/>sidecar SQLite · files")]:::store
 
-        subgraph business["compose project vp-#lt;env#gt;-business"]
-            subgraph imgWeb["«image» web"]
+        subgraph business["compose project vp-prod-business"]
+            subgraph cWeb["«container» vp-prod-business-web-1"]
                 fe["«core»<br/><b>Frontend</b>"]:::core
                 qsWeb["«core»<br/><b>Query Service</b>"]:::core
             end
-            subgraph imgMcp["«image» mcp"]
+            subgraph cMcp["«container» vp-prod-business-mcp-1"]
                 mcp["«core»<br/><b>MCP</b>"]:::core
                 qsMcp["«core»<br/><b>Query Service</b>"]:::core
             end
-            subgraph imgPipeline["«image» pipeline"]
-                subgraph cIngestion["«container» ingestion"]
-                    extract["«supporting»<br/>Extract"]:::sup
-                    nl["«supporting»<br/>Normalize & Link"]:::sup
-                end
-                subgraph cIngestionApi["«container» ingestion-api"]
-                    extractApi["«supporting»<br/>Extract<br/>OCR work · file lookup (I4)"]:::sup
-                end
-                subgraph cIndexer["«container» indexer"]
-                    s2["«supporting» S2<br/>Search Indexing"]:::sup
-                end
-                subgraph cEnrichment["«container» enrichment"]
-                    s3["«supporting» S3<br/>AI Enrichment"]:::sup
-                    qsPipeline["«core»<br/><b>Query Service</b>"]:::core
-                end
+            subgraph cIngestion["«container» vp-prod-business-ingestion-1"]
+                extract["«supporting»<br/>Extract"]:::sup
+                nl["«supporting»<br/>Normalize & Link"]:::sup
             end
-            subgraph imgRisk["«image» risk"]
+            subgraph cIngestionApi["«container» vp-prod-business-ingestion-api-1"]
+                extractApi["«supporting»<br/>Extract<br/>OCR work · file lookup (I4)"]:::sup
+            end
+            subgraph cIndexer["«container» vp-prod-business-indexer-1"]
+                s2["«supporting» S2<br/>Search Indexing"]:::sup
+            end
+            subgraph cEnrichment["«container» vp-prod-business-enrichment-1"]
+                s3["«supporting» S3<br/>AI Enrichment"]:::sup
+                qsEnrichment["«core»<br/><b>Query Service</b>"]:::core
+            end
+            subgraph cRisk["«container» vp-prod-business-risk-1"]
                 risk["«core»<br/><b>Procurement Risk Service</b>"]:::core
                 qsRisk["«core»<br/><b>Query Service</b>"]:::core
             end
-            subgraph imgOpenData["«image» open-data"]
+            subgraph cOpenData["«container» vp-prod-business-open-data-1"]
                 s4["«supporting» S4<br/>Open Data Publishing"]:::sup
                 qsOpenData["«core»<br/><b>Query Service</b>"]:::core
             end
-            subgraph imgOps["«image» ops"]
+            subgraph cMigrate["«container» vp-prod-business-migrate-1 (one-off)"]
                 s9["«missing» S9<br/>Operations Console"]:::missing
                 s7["«supporting» S7<br/>Schema & Data Governance"]:::sup
             end
         end
 
-        subgraph data["compose project vp-#lt;env#gt;-data"]
-            subgraph imgPgbouncer["«image» pgbouncer"]
+        subgraph data["compose project vp-prod-data"]
+            subgraph cPgbouncer["«container» vp-prod-data-pgbouncer-1"]
                 pool["Connection pool"]
             end
-            subgraph imgPostgres["«image» postgres (PostGIS)"]
+            subgraph cPostgres["«container» vp-prod-data-postgres-1"]
                 srcdb[("«schemas»<br/><b>Source schemas</b>")]:::store
                 ods[("«schema»<br/><b>ods</b>")]:::store
                 riskdb[("«schema»<br/><b>risk</b>")]:::store
                 ctrl[("«schemas»<br/><b>Control schemas</b>")]:::store
             end
-            subgraph imgQuickwit["«image» quickwit"]
+            subgraph cQuickwit["«container» vp-prod-data-quickwit-1"]
                 qw[("Full-text indexes")]:::store
             end
-            subgraph imgTypesense["«image» typesense"]
-                ts[("Suggestion and organisation indexes")]:::store
+            subgraph cTypesense["«container» vp-prod-data-typesense-1"]
+                ts[("Typesense node 1")]:::store
             end
-            subgraph imgNats["«image» nats"]
+            subgraph cNats["«container» vp-prod-data-nats-1"]
                 bus["Facts changed events"]
             end
+        end
+    end
+
+    subgraph lempa2["«host» lempa2"]
+        subgraph cTypesense2["«container» typesense (node 2)"]
+            ts2[("Typesense node 2")]:::store
+        end
+    end
+
+    subgraph offsite["«host» off-site mirror"]
+        subgraph cTypesense3["«container» typesense (node 3)"]
+            ts3[("Typesense node 3")]:::store
+        end
+        subgraph cReplica["«container» postgres (replica)"]
+            replica[("Read-only replica")]:::store
         end
     end
 %% ── Inbound ──
@@ -1452,56 +1466,86 @@ flowchart LR
     agent -->|" HTTPS · MCP Streamable HTTP "| cf
     workers -->|" HTTPS "| cf
     cf -->|" Cloudflare Tunnel "| tunnel
-    tunnel -->|" HTTP 127.0.0.1:9019 "| imgWeb
-    tunnel -->|" HTTP 127.0.0.1:9022 "| imgMcp
+    tunnel -->|" HTTP 127.0.0.1:9019 "| cWeb
+    tunnel -->|" HTTP 127.0.0.1:9022 "| cMcp
     tunnel -->|" HTTP, route open (§9 Q13) "| cIngestionApi
-    op -->|" ssh · docker compose run "| imgOps
+    op -->|" ssh · vp-deploy prod "| cMigrate
 %% ── Database ──
-    imgWeb -->|" PostgreSQL TCP 6432 "| pool
-    imgMcp -->|" PostgreSQL TCP 6432 "| pool
-    imgPipeline -->|" PostgreSQL TCP 6432 "| pool
-    imgRisk -->|" PostgreSQL TCP 6432 "| pool
-    imgOpenData -->|" PostgreSQL TCP 6432 "| pool
-    imgOps -->|" PostgreSQL TCP 6432 "| pool
-    pool -->|" PostgreSQL TCP 5432 "| imgPostgres
+    cWeb -->|" PostgreSQL TCP 6432 "| pool
+    cMcp -->|" PostgreSQL TCP 6432 "| pool
+    cIngestion -->|" PostgreSQL TCP 6432 "| pool
+    cIngestionApi -->|" PostgreSQL TCP 6432 "| pool
+    cIndexer -->|" PostgreSQL TCP 6432 "| pool
+    cEnrichment -->|" PostgreSQL TCP 6432 "| pool
+    cRisk -->|" PostgreSQL TCP 6432 "| pool
+    cOpenData -->|" PostgreSQL TCP 6432 "| pool
+    cMigrate -->|" PostgreSQL TCP 6432 "| pool
+    pool -->|" PostgreSQL TCP 5432 "| cPostgres
+    cPostgres -.->|" streaming replication over WireGuard "| cReplica
 %% ── Search ──
-    imgWeb -->|" HTTP REST search "| imgQuickwit
-    imgWeb -->|" HTTP REST search "| imgTypesense
-    imgMcp -->|" HTTP REST search "| imgQuickwit
-    cIndexer -->|" HTTP REST ingest "| imgQuickwit
-    cIndexer -->|" HTTP REST import "| imgTypesense
+    cWeb -->|" HTTP REST search "| cQuickwit
+    cWeb -->|" HTTP REST search "| cTypesense
+    cMcp -->|" HTTP REST search "| cQuickwit
+    cMcp -->|" HTTP REST search "| cTypesense
+    cIndexer -->|" HTTP REST ingest "| cQuickwit
+    cIndexer -->|" HTTP REST import "| cTypesense
+    cTypesense <-->|" Raft peering TCP 8107 over WireGuard "| cTypesense2
+    cTypesense <-->|" Raft peering TCP 8107 over WireGuard "| cTypesense3
 %% ── Events ──
-    cIngestion -.->|" NATS publish TCP 4222 "| imgNats
-    imgNats -.->|" NATS subscribe "| cIndexer
-    imgNats -.->|" NATS subscribe "| cEnrichment
-    imgNats -.->|" NATS subscribe "| imgRisk
+    cIngestion -.->|" NATS publish TCP 4222 "| cNats
+    cNats -.->|" NATS subscribe "| cIndexer
+    cNats -.->|" NATS subscribe "| cEnrichment
+    cNats -.->|" NATS subscribe "| cRisk
 %% ── Files ──
     cIngestion -->|" bind mount /data "| vol
     cIngestionApi -->|" bind mount /data "| vol
-    imgWeb -->|" bind mount /data "| vol
+    cWeb -->|" bind mount /data "| vol
 %% ── Outbound ──
     cIngestion -->|" HTTPS via proxies · Tor "| src
     cIngestion -->|" HTTP POST /extract "| extr
     cEnrichment -->|" HTTPS "| llm
-    imgOpenData -->|" HTTPS "| spinta
+    cOpenData -->|" HTTPS "| spinta
 ```
 
-| Image                                                    | Workspace         | Containers                                            | Components                                                                     | Port                                   |
-|----------------------------------------------------------|-------------------|-------------------------------------------------------|--------------------------------------------------------------------------------|----------------------------------------|
-| `web`                                                    | `apps/web`        | `web`                                                 | Frontend, Query Service, S5                                                    | HTTP `9019`                            |
-| `mcp`                                                    | `apps/mcp`        | `mcp`                                                 | MCP, Query Service, S5                                                         | HTTP `9022`                            |
-| `pipeline`                                               | `apps/pipeline`   | `ingestion`, `ingestion-api`, `indexer`, `enrichment` | Extract, Normalize & Link, S2, S3, Query Service (`enrichment` only), S1, S5   | `ingestion-api`: HTTP (§9 Q13)         |
-| `risk`                                                   | `apps/risk`       | `risk`                                                | Procurement Risk Service, Query Service, S1                                    | —                                      |
-| `open-data`                                              | `apps/open-data`  | `open-data`                                           | S4, Query Service, S1                                                          | —                                      |
-| `ops`                                                    | `apps/ops`        | `migrate`; `docker compose run` for operator commands | S9, S7                                                                         | —                                      |
-| `pgbouncer`, `postgres`, `quickwit`, `typesense`, `nats` | — (`infra/`)      | one each                                              | Connection pool; Staging, Integration & Serving and Control stores; search indexes; event transport | `6432`, `5432`, `7280`, `8108`, `4222` |
+| Container                          | Image       | Process                     | Component instances                    | Database role                     | Inbound                  |
+|------------------------------------|-------------|-----------------------------|----------------------------------------|-----------------------------------|--------------------------|
+| `vp-prod-business-web-1`           | `web`       | Astro Node server           | Frontend, Query Service                | `READONLY`                        | HTTP `127.0.0.1:9019`    |
+| `vp-prod-business-mcp-1`           | `mcp`       | `node src/main.ts`          | MCP, Query Service                     | `READONLY`, `ANALYST`             | HTTP `127.0.0.1:9022`    |
+| `vp-prod-business-ingestion-1`     | `pipeline`  | `node src/ingestion.ts`     | Extract, Normalize & Link              | `FACTS_WRITER`                    | —                        |
+| `vp-prod-business-ingestion-api-1` | `pipeline`  | `node src/ingestion-api.ts` | Extract (OCR work, file lookup)        | `FACTS_WRITER`                    | HTTP (§9 Q13)            |
+| `vp-prod-business-indexer-1`       | `pipeline`  | `node src/indexer.ts`       | S2 Search Indexing                     | `READONLY`                        | —                        |
+| `vp-prod-business-enrichment-1`    | `pipeline`  | `node src/enrichment.ts`    | S3 AI Enrichment, Query Service        | `READONLY`                        | —                        |
+| `vp-prod-business-risk-1`          | `risk`      | `node src/main.ts`          | Procurement Risk Service, Query Service | `READONLY`, `RISK_WRITER`        | —                        |
+| `vp-prod-business-open-data-1`     | `open-data` | `node src/main.ts`          | S4 Open Data Publishing, Query Service | `READONLY`                        | —                        |
+| `vp-prod-business-migrate-1`       | `ops`       | `vp db migrate`, once per deployment | S9, S7                        | `MIGRATOR`                        | —                        |
+| `vp-prod-data-pgbouncer-1`         | `pgbouncer` | PgBouncer                   | Connection pool                        | —                                 | TCP `6432`               |
+| `vp-prod-data-postgres-1`          | `postgres`  | PostgreSQL                  | Staging, Integration & Serving and Control schemas | —                     | TCP `5432`               |
+| `vp-prod-data-quickwit-1`          | `quickwit`  | Quickwit                    | Full-text indexes                      | —                                 | HTTP `7280`              |
+| `vp-prod-data-typesense-1`         | `typesense` | Typesense, host network     | Suggestion and organisation indexes    | —                                 | HTTP `8108`, Raft `8107` |
+| `vp-prod-data-nats-1`              | `nats`      | NATS server                 | Facts changed event transport          | —                                 | TCP `4222`               |
 
-- The Query Service is a library, so each image that uses it contains its own copy (§1.3).
-- S6 Observability and S10 Configuration are libraries in every app image and are not drawn.
-- S8 Backup & Recovery runs as host scripts from `infra/backup/`, not as an image.
-- The data service ports are the image defaults. Production Typesense uses host networking (§9 Q14); the diagram shows
-  the bridge network.
-- `mcp` does not mount `DATA_ROOT`, so it cannot read document content yet (§9 Q8).
+**Process isolation.** Each container has its own process namespace, memory limit, restart policy and secrets file
+(§6.6, §7.6):
+
+- An out-of-memory kill or a crash stops one container. For example, an S3 failure in `enrichment-1` does not stop
+  fact writes in `ingestion-1`.
+- A container receives only the database role of its row. `indexer-1` and `enrichment-1` cannot write facts, although
+  they run the same image as `ingestion-1`.
+- Each Query Service box is a separate instance with its own connection pool. The PgBouncer pool size counts all five
+  instances (§9 Q6).
+
+**Other instances:**
+
+- Alpha runs the same containers as `vp-alpha-business-*` and `vp-alpha-data-*`, on ports `9029` and `9032`, with
+  single-node Quickwit and Typesense and no replica (§7.6).
+- `vp-deploy` also starts the one-off `it` container before each rollout (§7.5). An operator command runs as a one-off
+  `ops` container (`docker compose run`). Neither is drawn.
+- The off-site mirror hosts are open (§9 Q15). Container names on `lempa2` and the off-site mirror are not in the
+  repository (§10.1).
+- S8 Backup & Recovery runs as host scripts from `infra/backup/`. S6 Observability and S10 Configuration are libraries
+  inside every application container.
+- The data service ports are the image defaults. `web`, `ingestion` and `ingestion-api` mount the data root, as in
+  §7.6. `mcp`, `indexer` and `enrichment` cannot read the document content until §9 Q8 is decided.
 
 ---
 
