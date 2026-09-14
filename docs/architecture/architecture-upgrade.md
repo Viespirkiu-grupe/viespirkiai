@@ -371,16 +371,16 @@ flowchart TB
     qs["«core»<br/><b>Query Service</b>"]:::core
 
     subgraph DATA["Viešpirkiai data"]
+       subgraph ISL["Integration & Serving layer"]
+          ods[("«schema»<br/><b>ods</b>")]:::store
+          docs[("Document content store")]:::store
+          riskdb[("«schema»<br/><b>risk</b>")]:::store
+          search[("Search indexes<br/>Quickwit · Typesense")]:::store
+          enrich[("AI enrichment store<br/>descriptions · embeddings")]:::store
+       end
         subgraph STG["Staging layer"]
             srcdb[("«schemas»<br/><b>Source schemas</b>")]:::store
             raw[("Raw payload & file store")]:::store
-        end
-        subgraph ISL["Integration & Serving layer"]
-            ods[("«schema»<br/><b>ods</b>")]:::store
-            docs[("Document content store")]:::store
-            riskdb[("«schema»<br/><b>risk</b>")]:::store
-            search[("Search indexes<br/>Quickwit · Typesense")]:::store
-            enrich[("AI enrichment store<br/>descriptions · embeddings")]:::store
         end
         subgraph CTL["Control layer"]
             ctrl[("«schemas»<br/><b>Control schemas</b><br/><b>infra</b> · <b>auth</b> · <b>jobs</b>")]:::store
@@ -424,19 +424,19 @@ flowchart TB
     risk --> qs
     s4 --> qs
     qs -->|" reads "| ISL
+%% ── Data pipeline: Deliver stage ──
+   s2 -->|" reads "| ods
+   s2 -->|" reads "| docs
+   s2 -->|" reads descriptions "| enrich
+   s3 --> qs
+   s3 --> llm
+   DLV --> s1
+   risk --> s1
 %% ── Data pipeline: Data Ingestion ──
     extract --> src
     nl -->|" reads source rows "| srcdb
     ing --> s1
     s9 --> ing
-%% ── Data pipeline: Deliver stage ──
-    s2 -->|" reads "| ods
-    s2 -->|" reads "| docs
-    s2 -->|" reads descriptions "| enrich
-    s3 --> qs
-    s3 --> llm
-    DLV --> s1
-    risk --> s1
 %% ── Writes into owned stores (data flows) ──
     extract -.->|" source rows · payloads · files "| STG
     extract -.->|" document content "| docs
