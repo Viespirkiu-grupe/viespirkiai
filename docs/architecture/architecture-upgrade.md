@@ -7,10 +7,12 @@ Notation follows `architecture-current.md`, with stereotypes for the target comp
 | **Solid arrow**  | Dependency (A uses B)                                                 |
 | **Dotted arrow** | Data flow (data moves from A to B)                                    |
 | Circle           | Provided interface (lollipop)                                         |
-| `«core»`         | Main functional component (solid blue)                                |
-| `«supporting»`   | Supporting or secondary functional component (dashed blue)            |
-| `«missing»`      | Supporting functional component that does not exist today (dashed red) |
+| `«core»`         | Core Component: main functional component (solid blue)                |
+| `«supporting»`   | Supporting Component: secondary functional component (dashed blue). A decomposed core component can own supporting components |
+| `«missing»`      | Supporting Component that does not exist today (dashed red)           |
 | `«database»`     | Data store (green cylinder)                                           |
+| `«schema»`       | One PostgreSQL schema inside a database (green cylinder, bold name)   |
+| `«schemas»`      | Group of PostgreSQL schemas of one kind (green cylinder, bold names)  |
 | `«actor»`        | Person or external system that starts an interaction                  |
 | `«external»`     | System outside this repository (dashed grey)                          |
 
@@ -21,15 +23,23 @@ The document uses these terms with one meaning each:
 | Term                      | Meaning                                                                                                       | Code or section                                        |
 |---------------------------|---------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|
 | Functional component      | Unit of responsibility with owned data. It is not necessarily a separate process                             | §1, §3                                                 |
-| `S1`–`S10`, `I1`–`I9`     | Ids of the supporting components (§3) and of the Data Ingestion sub-components (§2.4)                         | —                                                      |
+| Core component            | Functional component that delivers the main value of the system. Diagrams mark it `«core»`                   | §1                                                     |
+| Supporting component      | Functional component that core components need. A core component can own supporting components when it is decomposed. Diagrams mark it `«supporting»` | §2.1, §3                                  |
+| `S1`–`S10`, `I1`–`I9`     | Ids of the supporting components (§3) and of the sub-components of Extract and Normalize & Link (§2.4)        | —                                                      |
 | Source schema             | PostgreSQL schema that mirrors one upstream source: a persistent staging area                                 | `vpmSutartys`, `eppsViesiejiPirkimai`, `rcJar`; §8.2   |
 | `ods`                     | Operational Data Store: canonical entities, enrichment, link tables, derived tables and views                 | §8                                                     |
 | Fact schemas              | The source schemas and `ods` together. Data Ingestion is their only writer                                    | §1.2, §2.3                                             |
+| Extract                   | Supporting component of Data Ingestion. It collects data from upstream sources into the source schemas and document content | §2.1, §2.4                               |
+| Normalize & Link          | Supporting component of Data Ingestion. It reads the source schemas and writes `ods`                         | §2.1, §2.4                                             |
 | Document content          | Extracted text and OCR results of downloaded files                                                            | I4, `packages/storage`                                 |
-| Enrichment                | Attributes from registries and classifiers that Data Ingestion adds to `ods` entities                         | §8.3                                                   |
+| Enrichment                | Attributes from registries and classifiers that Normalize & Link adds to `ods` entities                       | §8.3                                                   |
 | AI enrichment             | LLM descriptions and embeddings that S3 writes to the AI enrichment store                                     | S3                                                     |
-| Control schemas           | `infra`, `auth` and `jobs`: runtime configuration, API keys and job state. They are not data layers           | §3, §8.10                                              |
-| Facts changed event       | Hint that Data Ingestion committed changes to entities in one ingestion run                                   | `packages/events`, §2.2                                |
+| Control schemas           | `infra`, `auth` and `jobs`: runtime configuration, API keys and job state. They form the Control layer        | §3, §8.10                                              |
+| Staging layer             | Source schemas, raw payloads and files. Extract writes it; only Normalize & Link and S7 read it               | §8.2                                                   |
+| Integration & Serving layer | `ods`, document content, `risk`, search indexes and the AI enrichment store. The Query Service reads only this layer | §8.2                                          |
+| Control layer             | The control schemas. It holds no domain data                                                                  | §8.2, §8.10                                            |
+| Deliver stage             | S2 Search Indexing and S3 AI Enrichment: pipeline work that runs after Data Ingestion commits facts           | §3, §3.1                                               |
+| Facts changed event       | Hint that Normalize & Link committed changes to `ods` entities in one ingestion run                           | `packages/events`, §2.2                                |
 | Ingestion run             | One execution of an ingestion job. `ods` rows store its id in `ikelimoId`                                     | §8.4                                                   |
 | Job                       | Unit of scheduled or queued work that S1 manages. The current code calls it a *task*                          | `packages/jobs`; `tasks/*.js`, `runner/`               |
 | Organisation              | Party of a procurement: registered legal entity, foreign company or natural person. Buyer and supplier are roles | `ods."organizacijos"`; §9 Q3, Q11                   |
@@ -67,14 +77,14 @@ flowchart LR
     op(["«actor»<br/>Operator"]):::actor
     citizen(["«actor»<br/>Citizen / journalist /<br/>researcher"]):::actor
     agent(["«actor»<br/>AI agent<br/>(MCP client)"]):::actor
-    ing["«core»<br/><b>Data Ingestion</b><br/>collect · normalise · link · version"]:::core
+    ing["«core»<br/><b>Data Ingestion</b><br/>Extract · Normalize & Link"]:::core
 
-    subgraph DB["«database» Viešpirkiai database (PostgreSQL)"]
-        subgraph FACTS["Fact schemas"]
-            srcdb[("Source schemas<br/>one per upstream source")]:::store
-            ods[("ods<br/>procurements · contracts · organisations ·<br/>persons · documents · legal acts · court cases")]:::store
-        end
-        riskdb[("risk schema<br/>procurement risk decisions · risk signals")]:::store
+    subgraph STG["Staging layer"]
+        srcdb[("«schemas»<br/><b>Source schemas</b><br/>one per upstream source")]:::store
+    end
+    subgraph ISL["Integration & Serving layer"]
+        ods[("«schema»<br/><b>ods</b><br/>procurements · contracts · organisations ·<br/>persons · documents · legal acts · court cases")]:::store
+        riskdb[("«schema»<br/><b>risk</b><br/>procurement risk decisions · risk signals")]:::store
     end
 
     qs["«core»<br/><b>Query Service</b><br/>query contracts over ods & risk"]:::core
@@ -95,10 +105,7 @@ flowchart LR
     fe --> qs
     mcp --> qs
     risk --> qs
-    qs --> ods
-    qs --> riskdb
-    ods -.->|" reads "| qs
-    riskdb -.->|" reads "| qs
+    qs -->|" reads "| ISL
 %% ── Risk writes ──
     risk -.->|" writes decisions "| riskdb
 ```
@@ -107,7 +114,7 @@ flowchart LR
 
 | Component                    | Key use cases                                                                                                                                                                                                                                                      | Depends on                                                            | Writes (owns)                                          | Current code                                                                                                                           |
 |------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| **Data Ingestion**           | Discover new records · import and refresh incrementally · backfill history · acquire and process documents (download, extract, OCR) · link entities and reference data · detect and version changes (contract edits, legislation editions, court decision updates) | Upstream sources, S1 Job Orchestration                                | **Fact schemas** (source schemas, `ods`) and document content (§2, §8) | `tasks/*`, `modules/<source>/*`, `modules/failai/`, `modules/documents/`, `runner/`                                                    |
+| **Data Ingestion**           | Discover new records · import and refresh incrementally · backfill history · acquire and process documents (download, extract, OCR) · link entities and reference data · detect and version changes (contract edits, legislation editions, court decision updates) | Upstream sources, S1 Job Orchestration                                | **Fact schemas**: Extract writes the source schemas and document content; Normalize & Link writes `ods` (§2, §8) | `tasks/*`, `modules/<source>/*`, `modules/failai/`, `modules/documents/`, `runner/`                                                    |
 | **Query Service**            | Look up an entity by identifier · search and facet (contracts, procurements, organisations, documents) · traverse relationships · read document content · read risk results · provide bulk analytical reads · run bounded ad-hoc SQL for analysts                  | `ods` and `risk` (read-only role), S2 search indexes, document content store, S3 AI enrichment store | **Nothing.** Read-only by definition.                  | Scattered: SQL in 21 pages under `src/pages`, `src/lib/*`, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/tools/`, `modules/mcp/analyst/` |
 | **Procurement Risk Service** | Run evaluation for all procurements or a subset · evaluate each deployed indicator · record explainable procurement risk decisions and risk signals · re-evaluate after "facts changed"                                                                                                              | **Query Service** (analytical reads), S1                              | **`risk` schema** only                                 | `services/procurement-risk/`, `modules/risk/`                                                                                          |
 | **Frontend**                 | Search · entity pages (buyer, supplier, person, contract, procurement, legal act, court decision) · relationship graph · statistics · shareable pages (OpenGraph)                                                                                                  | **Query Service**                                                     | **Nothing.**                                           | `src/`                                                                                                                                 |
@@ -115,7 +122,8 @@ flowchart LR
 
 **Ownership rules (target)**
 
-1. **One writer per schema.** Data Ingestion owns the source schemas and `ods`; the Risk Service owns `risk` (§8). S3
+1. **One writer per schema.** Data Ingestion owns the source schemas and `ods`: its Extract component writes the source
+   schemas, and its Normalize & Link component writes `ods`. The Risk Service owns `risk` (§8). S3
    owns the AI enrichment store. The writers of the control schemas are open (§9 Q6).
 2. **One read path.** Frontend, MCP and the Risk Service never query the database directly. They go through the Query
    Service. This is the boundary that removes SQL from pages and tools (review P5).
@@ -134,21 +142,22 @@ typed results, never on table layouts. A schema change then touches one componen
 |--------------------------------------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------------------------------|
 | **Entity queries**: get procurement, contract, organisation, person, document, legal act, court case by identifier | Frontend, MCP              | Includes change history of the entity                                        |
 | **Search & facets**: full-text and filtered search, suggestions, facet counts                                      | Frontend, MCP              | Uses S2 search indexes; PostgreSQL fallback lives here, not in consumers |
-| **Relationship queries**: organisation–person–contract graph traversal                                             | Frontend, MCP, Risk Service | Graph *building* belongs to Data Ingestion; graph *reading* belongs here     |
+| **Relationship queries**: organisation–person–contract graph traversal                                             | Frontend, MCP, Risk Service | Graph *building* belongs to Normalize & Link; graph *reading* belongs here   |
 | **Document content**: extracted text, OCR result, file reference                                                   | Frontend, MCP              | Replaces direct sidecar reads and the sidecar HTTP API                       |
 | **Risk results**: procurement risk decisions and their risk signals                                  | Frontend, MCP              | Reads the `risk` schema                                                      |
 | **Analytical reads**: set-based, streamed reads over large `ods` sets                                              | Risk Service, S4 Open Data | Reads `ods` tables and views (§8.3), not per-row calls, so batch jobs stay efficient |
 | **Ad-hoc SQL** (bounded): read-only, time-limited, restricted to `ods`                                     | MCP                        | Enforcement by database role grants, not only by SQL parsing (review P3)  |
 
-The Query Service is an in-process library, not a network service. It holds a read-only connection pool over `ods` and
-`risk`, plus clients for the search indexes and the document content store. Its value is the contract and the
+The Query Service reads only the Integration & Serving layer (§8.2). It is an in-process library, not a network service.
+It holds a read-only connection pool over `ods` and `risk`, plus clients for the search indexes, the document content
+store and the AI enrichment store. Its value is the contract and the
 boundary, not the deployment.
 
 ---
 
 ## 2. Data Ingestion — the abstraction
 
-### 2.1 Data Ingestion is one component
+### 2.1 Data Ingestion is one core component with two supporting components
 
 The current code implements ingestion as **30+ source modules**. Each module re-implements its own discovery, fetching,
 parsing, queues, reservation cleanup and persistence (review P5, P6).
@@ -161,6 +170,17 @@ decomposable internals, gives:
   notifications, never on how a source is scraped.
 - **New sources** plug into a shared pipeline instead of copying a whole module.
 - **Internal redesign** (queues, scheduler, document processing) doesn't ripple outside.
+
+Data Ingestion owns two supporting components. They do not call each other; the source schemas are the boundary between
+them.
+
+| Component            | Responsibility                                                                            | Reads                                          | Writes                                          | Stages (§2.4) | Sub-components (§2.4) |
+|----------------------|-------------------------------------------------------------------------------------------|------------------------------------------------|-------------------------------------------------|---------------|-----------------------|
+| **Extract**          | Collect data from upstream sources on the internet: discover, fetch, retain, parse, stage | Upstream sources, text extractors, OCR workers | Source schemas, raw payloads, document content  | 1–5           | I1–I4                 |
+| **Normalize & Link** | Populate `ods` from the source schemas: normalise, enrich, resolve entities, persist, notify | Source schemas                              | `ods`, facts changed events                     | 6–9           | I5–I8                 |
+
+Ingestion Control (I9) belongs to Data Ingestion itself and schedules both components through S1. Normalize & Link never
+calls an upstream source, so `ods` can be rebuilt from the source schemas without a new extraction (G9).
 
 ### 2.2 External contract (black-box view)
 
@@ -183,7 +203,9 @@ flowchart LR
     iStatus(("Ingestion<br/>status")):::iface
     iEvt(("Facts changed<br/>events")):::iface
     ing["«core»<br/><b>Data Ingestion</b><br/>(black box)"]:::core
-    facts[("«database»<br/>Fact schemas<br/>+ document content")]:::store
+    srcdb[("«schemas»<br/><b>Source schemas</b>")]:::store
+    ods[("«schema»<br/><b>ods</b>")]:::store
+    docs[("Document content store")]:::store
     s1["«supporting» S1<br/>Job Orchestration"]:::sup
     s6["«supporting» S6<br/>Observability"]:::sup
     s9["«missing» S9<br/>Operations Console"]:::missing
@@ -202,20 +224,22 @@ flowchart LR
     ing -->|" POST /extract "| extr
     ing --> s1
     src -.->|" raw records & files "| ing
-    ing -.->|" writes facts "| facts
+    ing -.->|" source rows "| srcdb
+    ing -.->|" entities · links · derived rows "| ods
+    ing -.->|" document content "| docs
 ```
 
 The operator issues ingestion commands through S9.
 
 | Interface                             | Direction         | Purpose                                                                                                                                                                                                                                    |
 |---------------------------------------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Writes facts**                      | Output → database | The only output that matters to consumers: canonical, linked, versioned facts plus document content                                                                                                                                        |
-| **Facts changed events**              | Provided          | "Entity X of type T changed in ingestion run R", emitted **after commit**. It is a hint: consumers re-read the entities through the Query Service, and S2 reads `ods` directly (§4). Replaces the `*.changed` NATS subjects of `utils/taskSignals.js`. The delivery guarantee is open (§9 Q2). |
+| **Writes facts**                      | Output → database | The only output that matters to consumers. Extract writes source rows and document content; Normalize & Link writes canonical, linked, versioned `ods` facts                                                                             |
+| **Facts changed events**              | Provided          | "Entity X of type T changed in ingestion run R", emitted by Normalize & Link **after commit**. It is a hint: consumers re-read the entities through the Query Service, and S2 reads `ods` directly (§4). Replaces the `*.changed` NATS subjects of `utils/taskSignals.js`. The delivery guarantee is open (§9 Q2). |
 | **Ingestion status**                  | Provided          | Per source: last successful sync, lag, error rate, backlog, record counts. Feeds S6 and `/statistika`.                                                                                                                                     |
 | **Ingestion commands**                | Provided          | Run, backfill, re-process, pause or resume a source; requeue a record. S9 issues each command as an S1 job. Replaces ad-hoc `npm run` scripts.                                                                                             |
-| **OCR work distribution**             | Provided          | Checkout and submit for external OCR workers. Moves out of the Frontend (`src/pages/failas/ocr/*`).                                                                                                                                        |
-| **File lookup**                       | Provided          | Resolves a file to the storage box that holds it, for `goViesdezeProxyRewrite`. Moves out of the Frontend (`downloadProxyInformation`).                                                                                                    |
-| Upstream sources, text extractors, S1 | Required          | Everything the black box needs from outside. Data Ingestion calls text extractors with `POST /extract`.                                                                                                                                    |
+| **OCR work distribution**             | Provided          | Checkout and submit for external OCR workers, provided by Extract (I4). Moves out of the Frontend (`src/pages/failas/ocr/*`).                                                                                                                                        |
+| **File lookup**                       | Provided          | Resolves a file to the storage box that holds it, for `goViesdezeProxyRewrite`; provided by Extract (I4). Moves out of the Frontend (`downloadProxyInformation`).                                                                                                    |
+| Upstream sources, text extractors, S1 | Required          | Everything the black box needs from outside. Extract calls text extractors with `POST /extract`.                                                                                                                                           |
 
 ### 2.3 Contract guarantees
 
@@ -223,7 +247,7 @@ These invariants are what "writes facts" *means*. Every internal design decision
 
 | #  | Guarantee                                                                                                                                                     | Why it matters                                                              | Today                                   |
 |----|---------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|-----------------------------------------|
-| G1 | **Single writer**: only Data Ingestion writes fact schemas                                                                                                    | Clear ownership; safe schema evolution                                      | ❌ multiple writers                     |
+| G1 | **Single writer**: only Data Ingestion writes fact schemas. Extract writes the source schemas; Normalize & Link writes `ods`                                   | Clear ownership; safe schema evolution                                      | ❌ multiple writers                     |
 | G2 | **Canonical model**: `ods` uses normalised entities (procurement, contract, organisation, person, document, legal act, court case). Only source schemas keep source-specific shapes (§8) | Consumers stay stable when a source changes format                          | ⚠️ only `v_*` analyst views (review P13) |
 | G3 | **Provenance**: every `ods` row records its source, source record id and ingestion run (§8.4). The referenced source row records source URL and retrieval time | Transparency, auditability, debugging                                       | ⚠️ inconsistent                         |
 | G4 | **Idempotency**: re-ingesting a source record never duplicates or corrupts facts                                                                              | Safe retries, backfills and re-processing                                   | ⚠️ per module                           |
@@ -231,38 +255,45 @@ These invariants are what "writes facts" *means*. Every internal design decision
 | G6 | **Reprocessability**: raw payloads and files are retained, so parsing and normalisation can be re-run without re-scraping                                     | Sources disappear or block access; parsers improve                          | ⚠️ sidecars have no backup; the file archive has an S3 object storage backup |
 | G7 | **Commit, then notify**: events and notifications are sent only after facts are committed                                                                     | No consumer reads uncommitted state                                         | ✅ documented NATS rule                 |
 | G8 | **Observable freshness**: every source reports sync status and lag                                                                                            | Operators and users know how current the data is                            | ⚠️ partial                              |
+| G9 | **Layered flow**: Normalize & Link reads only the source schemas and never calls an upstream source                                                          | A mapping or linking fix rebuilds `ods` without a new extraction            | ⚠️ per module                           |
 
 ### 2.4 Internal view
 
 Every source goes through the same stages. Only the source-specific stages are implemented per source; the rest are
-shared. Stage 5 writes the source schema and stage 8 writes `ods`, the two data layers of §8.2.
+shared. Extract runs stages 1–5 and writes the source schema. Normalize & Link runs stages 6–9 and writes `ods`. The
+Staging layer (§8.2) is the boundary between the two components.
 
 ```mermaid
 flowchart LR
     classDef specific fill: #dbe9fb, stroke: #1f5fa8, color: #0b2545
     classDef shared fill: #f5f9ff, stroke: #1f5fa8, stroke-dasharray: 3 2, color: #0b2545
-    d["1 · Discover<br/>what is new or changed"]:::specific
-    f["2 · Fetch<br/>via Source Gateway"]:::shared
-    r["3 · Retain raw<br/>payload · file"]:::shared
-    p["4 · Parse & extract<br/>structure · text · OCR"]:::specific
-    s["5 · Stage<br/>upsert source schema rows"]:::specific
-    n["6 · Normalise<br/>source rows to canonical model"]:::specific
-    l["7 · Link & enrich<br/>reference data · entity resolution"]:::shared
-    w["8 · Persist<br/>ods upsert · version · provenance"]:::shared
-    e["9 · Notify<br/>facts changed"]:::shared
+    subgraph extract["«supporting» Extract"]
+        d["1 · Discover<br/>what is new or changed"]:::specific
+        f["2 · Fetch<br/>via Source Gateway"]:::shared
+        r["3 · Retain raw<br/>payload · file"]:::shared
+        p["4 · Parse & extract<br/>structure · text · OCR"]:::specific
+        s["5 · Stage<br/>upsert source schema rows"]:::specific
+    end
+    subgraph normalizeLink["«supporting» Normalize & Link"]
+        n["6 · Normalise<br/>source rows to canonical model"]:::specific
+        l["7 · Link & enrich<br/>reference data · entity resolution"]:::shared
+        w["8 · Persist<br/>ods upsert · version · provenance"]:::shared
+        e["9 · Notify<br/>facts changed"]:::shared
+    end
     d -.->|" record references "| f
     f -.->|" payload · file "| r
     r -.->|" retained payload "| p
     p -.->|" parsed records · text "| s
-    s -.->|" source rows "| n
+    s -.->|" source schema rows "| n
     n -.->|" canonical entities "| l
     l -.->|" linked, enriched entities "| w
     w -.->|" committed changes "| e
 ```
 
-Solid blue: source-specific stage, implemented by each connector. Dashed: shared stage, implemented once.
+Solid blue: source-specific stage, implemented once per source. Dashed: shared stage, implemented once.
 
-**Source connector types.** Grouping sources by *how* they are acquired keeps the number of connector patterns small:
+**Source connector types.** Extract groups sources by *how* they are acquired, which keeps the number of connector
+patterns small:
 
 | Connector type                        | Examples today                                                                  |
 |---------------------------------------|---------------------------------------------------------------------------------|
@@ -274,25 +305,30 @@ Solid blue: source-specific stage, implemented by each connector. Dashed: shared
 
 **Internal sub-components** (candidates for the detailed decomposition):
 
-| #  | Sub-component                       | Responsibility                                                                                                     | Current code                                                                                                                                                                   |
-|----|-------------------------------------|--------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| I1 | **Source Connectors**               | Source-specific discovery, parsing, source schema rows and source-to-canonical mapping, one per source (stages 1, 4–6) | `modules/<source>/*`                                                                                                                                                        |
-| I2 | **Source Gateway**                  | Outbound access: proxies, Tor, per-source rate limits, request logging, adapters (stage 2)                         | `utils/scrapeFetch.js`, `modules/scrapeProxies/`, `modules/proxy/`, eTarSeimasScraper clients                                                                                  |
-| I3 | **Raw Payload Store**               | Retain raw API and HTML payloads for audit and re-processing (stage 3)                                             | sidecar SQLite (`eTar`, `eSeimas`, `liteko2`)                                                                                                                                  |
-| I4 | **File & Document Pipeline**        | Download, content-addressed storage, extraction, OCR work distribution, file lookup, document content              | `modules/failai/`, `modules/documents/`, `tasks/dokNuskaitytojai.js`, goViesdeze, OCR endpoints, sidecar SQLite (`failaiInfo`, `dokumentai`, `ocrRezultatai`)                  |
-| I5 | **Canonical Model & Normalisation** | Shared entity definitions (`packages/domain`) and mapping helpers; produces `ods` entity rows (stage 6)            | `upsert*.js`, per-module mapping code                                                                                                                                          |
-| I6 | **Reference Data**                  | CPV (BVPŽ), legal forms, addresses and geocoding, classifiers; produces enrichment (stage 7)                        | `modules/bvpz/`, `modules/geografija/`, `modules/liteko2/klasifikatoriai.js`                                                                                                   |
-| I7 | **Entity Resolution**               | Match organisations, procurements and contracts across sources; produce link tables and relationship edges (stage 7) | `modules/juridiniai/`, `modules/rysiai/` (building), `modules/2014esinvesticijos/rastiPareiskejuKodus.js`, `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` |
-| I8 | **Fact Persistence & Versioning**   | Idempotent upserts, change detection and diffs, provenance, derived tables, notifications (stages 8, 9)            | `sutartys` change tracking, `modules/sutartys/upsertVpmSutartis.js`, `teisekura` editions, `utils/taskSignals.js`                                                              |
-| I9 | **Ingestion Control**               | Per-source schedules, backfills, commands, status and freshness                                                    | `tasks/*.js` definitions, `npm run` scripts                                                                                                                                    |
+| #  | Component        | Sub-component                       | Responsibility                                                                                                     | Current code                                                                                                                                                                   |
+|----|------------------|-------------------------------------|--------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| I1 | Extract          | **Source Connectors**               | Source-specific discovery, parsing and source schema rows, one per source (stages 1, 4, 5)                         | `modules/<source>/*`                                                                                                                                                           |
+| I2 | Extract          | **Source Gateway**                  | Outbound access: proxies, Tor, per-source rate limits, request logging, adapters (stage 2)                         | `utils/scrapeFetch.js`, `modules/scrapeProxies/`, `modules/proxy/`, eTarSeimasScraper clients                                                                                  |
+| I3 | Extract          | **Raw Payload Store**               | Retain raw API and HTML payloads for audit and re-processing (stage 3)                                             | sidecar SQLite (`eTar`, `eSeimas`, `liteko2`)                                                                                                                                  |
+| I4 | Extract          | **File & Document Pipeline**        | Download, content-addressed storage, extraction, OCR work distribution, file lookup, document content              | `modules/failai/`, `modules/documents/`, `tasks/dokNuskaitytojai.js`, goViesdeze, OCR endpoints, sidecar SQLite (`failaiInfo`, `dokumentai`, `ocrRezultatai`)                  |
+| I5 | Normalize & Link | **Canonical Model & Normalisation** | Shared entity definitions (`packages/domain`) and one source-to-canonical mapper per source; produces `ods` entity rows (stage 6) | `upsert*.js`, per-module mapping code                                                                                                                                          |
+| I6 | Normalize & Link | **Reference Data**                  | CPV (BVPŽ), legal forms, addresses and geocoding, classifiers; produces enrichment (stage 7)                        | `modules/bvpz/`, `modules/geografija/`, `modules/liteko2/klasifikatoriai.js`                                                                                                   |
+| I7 | Normalize & Link | **Entity Resolution**               | Match organisations, procurements and contracts across sources; produce link tables and relationship edges (stage 7) | `modules/juridiniai/`, `modules/rysiai/` (building), `modules/2014esinvesticijos/rastiPareiskejuKodus.js`, `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` |
+| I8 | Normalize & Link | **Fact Persistence & Versioning**   | Idempotent upserts, change detection and diffs, provenance, derived tables, notifications (stages 8, 9)            | `sutartys` change tracking, `modules/sutartys/upsertVpmSutartis.js`, `teisekura` editions, `utils/taskSignals.js`                                                              |
+| I9 | Data Ingestion   | **Ingestion Control**               | Per-source schedules of Extract and Normalize & Link, backfills, commands, status and freshness                    | `tasks/*.js` definitions, `npm run` scripts                                                                                                                                    |
 
 ---
 
 ## 3. Supporting (secondary) functional components
 
 These do not deliver end-user value on their own, but the core components can't function reliably without them.
-Source access, file and document processing, reference data and entity resolution belong to Data Ingestion (I2, I4,
-I6 and I7 in §2.4).
+Data Ingestion owns two further supporting components, Extract and Normalize & Link (§2.1). Source access and file and
+document processing belong to Extract (I2, I4). Reference data and entity resolution belong to Normalize & Link (I6,
+I7).
+
+S2 Search Indexing and S3 AI Enrichment form the **Deliver stage** of the data pipeline. They run after Data Ingestion
+commits facts and write derived stores in the Integration & Serving layer. They are not part of Data Ingestion: their
+outputs are not facts, S3 output is not deterministic, and their failures must not delay fact writes (G1, G4, G9).
 
 | #       | Component                      | Responsibility                                                                                                                                            | Serves                                  | Exists today?     | Current code / gap                                                                                                  |
 |---------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------|
@@ -332,24 +368,37 @@ flowchart TB
         s4["«supporting» S4<br/>Open Data Publishing"]:::sup
     end
 
-    subgraph L3["Read path & derived data"]
-        qs["«core»<br/><b>Query Service</b>"]:::core
-        s2["«supporting» S2<br/>Search Indexing"]:::sup
-        s3["«supporting» S3<br/>AI Enrichment"]:::sup
+    qs["«core»<br/><b>Query Service</b>"]:::core
+
+    subgraph DATA["Viešpirkiai data"]
+        subgraph STG["Staging layer"]
+            srcdb[("«schemas»<br/><b>Source schemas</b>")]:::store
+            raw[("Raw payload & file store")]:::store
+        end
+        subgraph ISL["Integration & Serving layer"]
+            ods[("«schema»<br/><b>ods</b>")]:::store
+            docs[("Document content store")]:::store
+            riskdb[("«schema»<br/><b>risk</b>")]:::store
+            search[("Search indexes<br/>Quickwit · Typesense")]:::store
+            enrich[("AI enrichment store<br/>descriptions · embeddings")]:::store
+        end
+        subgraph CTL["Control layer"]
+            ctrl[("«schemas»<br/><b>Control schemas</b><br/><b>infra</b> · <b>auth</b> · <b>jobs</b>")]:::store
+        end
     end
 
-    subgraph L4["«database» Viešpirkiai data"]
-        facts[("Fact schemas<br/>source schemas · ods ·<br/>document content")]:::store
-        riskdb[("risk schema")]:::store
-        search[("Search indexes<br/>Quickwit · Typesense")]:::store
-        enrich[("AI enrichment store<br/>descriptions · embeddings")]:::store
-        ctrl[("Control schemas<br/>infra · auth · jobs")]:::store
-    end
-
-    subgraph L5["Ingestion"]
-        ing["«core»<br/><b>Data Ingestion</b>"]:::core
+    subgraph PIPE["Data pipeline"]
+        subgraph ing["«core» <b>Data Ingestion</b>"]
+            extract["«supporting»<br/>Extract"]:::sup
+            nl["«supporting»<br/>Normalize & Link"]:::sup
+        end
+        subgraph DLV["Deliver stage"]
+            s2["«supporting» S2<br/>Search Indexing"]:::sup
+            s3["«supporting» S3<br/>AI Enrichment"]:::sup
+        end
         s1["«supporting» S1<br/>Job Orchestration"]:::sup
     end
+    class ing core
 
     subgraph L6["Platform & operations (cross-cutting)"]
         s9["«missing» S9<br/>Operations Console"]:::missing
@@ -368,28 +417,31 @@ flowchart TB
     agent --> mcp
     odc --> s4
     op --> s9
-    workers -->|" OCR checkout · submit "| ing
+    workers -->|" OCR checkout · submit "| extract
 %% ── Read path (dependencies) ──
     fe --> qs
     mcp --> qs
     risk --> qs
     s4 --> qs
-    qs -->|" ods · document content "| facts
-    qs --> riskdb
-    qs --> search
-    qs --> enrich
-%% ── Derived data ──
-    s2 -->|" ods · document content "| facts
+    qs -->|" reads "| ISL
+%% ── Data pipeline: Data Ingestion ──
+    extract --> src
+    nl -->|" reads source rows "| srcdb
+    ing --> s1
+    s9 --> ing
+%% ── Data pipeline: Deliver stage ──
+    s2 -->|" reads "| ods
+    s2 -->|" reads "| docs
+    s2 -->|" reads descriptions "| enrich
     s3 --> qs
     s3 --> llm
-%% ── Ingestion & jobs ──
-    ing --> src
-    ing --> s1
+    DLV --> s1
     risk --> s1
-    s9 --> ing
 %% ── Writes into owned stores (data flows) ──
-    ing -.->|" writes facts "| facts
-    ing -.->|" facts changed "| s2
+    extract -.->|" source rows · payloads · files "| STG
+    extract -.->|" document content "| docs
+    nl -.->|" entities · links · derived rows "| ods
+    nl -.->|" facts changed "| DLV
     risk -.->|" writes decisions "| riskdb
     s2 -.->|" documents "| search
     s3 -.->|" descriptions · embeddings "| enrich
@@ -397,11 +449,12 @@ flowchart TB
 %% ── Platform ──
     s9 --> ctrl
     s5 -.->|" keys · clients "| ctrl
-    s7 -.->|" migrations "| facts
-    s8 -.->|" backups "| L4
+    s7 -.->|" migrations "| DATA
+    s8 -.->|" backups "| DATA
 ```
 
-This diagram shows **dependencies** and **writes into owned stores**. Platform components (S5–S10) are cross-cutting;
+This diagram shows **dependencies** and **writes into owned stores**. The Query Service reads only the Integration &
+Serving layer; the Staging layer is internal to the data pipeline. Platform components (S5–S10) are cross-cutting;
 only their data-store edges are drawn, to keep the diagram readable.
 
 ---
@@ -412,7 +465,8 @@ These rules decide where new functionality belongs, so that agentic development 
 P8).
 
 1. **Does it bring data from outside into the database** (including files, OCR, reference data, entity linking)? →
-   **Data Ingestion.** It is the only component that writes facts.
+   **Data Ingestion.** It is the only component that writes facts. Collecting from a source and staging source rows go
+   to **Extract**. Mapping, enrichment and linking into `ods` go to **Normalize & Link**.
 2. **Does it read Viešpirkiai data for someone else?** → it is a query in the **Query Service**. No other component
    issues read SQL against source, `ods` or `risk` schemas. The exceptions: a writer reads its own schemas, S2 index
    builders read `ods`, and S7 governance tooling reads every schema.
@@ -421,7 +475,7 @@ P8).
 5. **Does it compute a judgement about procurements** (score, flag, indicator)? → **Procurement Risk Service.** It reads
    through the Query Service and writes only to `risk`.
 6. **Does it turn existing data into another shape** (index, embedding, export)? → **S2, S3 or S4**, each writing only
-   to its own store. An aggregate inside `ods` is a derived table or view of Data Ingestion (§8.9).
+   to its own store. An aggregate inside `ods` is a derived table or view of Normalize & Link (§8.9).
 7. **Does it keep the system running, safe or recoverable?** → **Platform, S5–S10.**
 8. **Is it a one-off or operator script?** → an ingestion command issued through S9, or S7 governance tooling. **Never**
    a self-executing file inside a library module.
@@ -434,18 +488,18 @@ P8).
 |------------------------------------------------------------------------------------------|--------------------------------------------------------------|----------------------------------------------------------------------------------|
 | SQL in 21 pages under `src/pages`, query code in `src/lib`, separate queries in MCP tools            | No single read path; the same logic is written several times | **Query Service**                                                                |
 | Risk indicators query `ppa."ataskaitos"` and views directly                              | Risk Service coupled to table layouts                        | **Query Service** (analytical reads)                                             |
-| OCR checkout/submit endpoints inside the Frontend                                        | Public web app writes to the database and sidecars           | **Data Ingestion** (I4, OCR work distribution interface)                             |
-| `downloadProxyInformation` inside the Frontend                                           | Internal file lookup on the public surface                   | **Data Ingestion** (I4, file lookup interface)                                             |
+| OCR checkout/submit endpoints inside the Frontend                                        | Public web app writes to the database and sidecars           | **Extract** of Data Ingestion (I4, OCR work distribution interface)                  |
+| `downloadProxyInformation` inside the Frontend                                           | Internal file lookup on the public surface                   | **Extract** of Data Ingestion (I4, file lookup interface)                                  |
 | Sidecar HTTP read API inside the Frontend                                                | Direct access to raw stores                                  | **Query Service** (document content)                                             |
-| Per-source queues, reservation cleaners and change signals re-implemented in each module | Duplicated ingestion infrastructure                          | **Data Ingestion** shared stages (I8, I9) + S1                                   |
+| Per-source queues, reservation cleaners and change signals re-implemented in each module | Duplicated ingestion infrastructure                          | **Data Ingestion**: Ingestion Control (I9), Normalize & Link persistence (I8), S1 |
 | LLM description generation (`scripts/aprasyti*.js`) writes `eppsViesiejiPirkimai."aprasymai"`                                  | AI enrichment mixed with ingestion; writes a source schema                | **S3 AI Enrichment** (AI enrichment store)                                                 |
 | `export:*`, `push:*` scripts inside source modules                                       | Distribution mixed with ingestion                            | **S4 Open Data Publishing**                                                      |
 | MCP tool-call logging to the database and Quickwit                                       | Consumer writes data                                         | **S6 Observability**                                                             |
 | Info banner table created and edited through the Frontend                                | Runtime DDL, no admin UI                                     | **S9 Operations Console**, S7 migrations                                         |
 | `modules/risk` run manually via `npm run risk:run`                                       | Core component without scheduling                            | **Procurement Risk Service**, scheduled through S1, triggered by "facts changed" |
 | 115 self-executing files and 87 files with `process.exit` in `modules/`                     | CLI entry points inside library code                         | Ingestion commands via **S9** / **S7** tooling                                   |
-| Entity resolution in page services: `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` | Links are computed per request and never stored (review D5)  | **Data Ingestion** (I7), `ods` link tables (§8.5)                                |
-| `VPM_SUTARTIS_ROW_SQL` rebuilds contract rows for pages, Quickwit and exports            | Consumers depend on the shape of a dropped table (review D9) | `ods."sutartys"` (§8.4), written by **Data Ingestion**                           |
+| Entity resolution in page services: `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` | Links are computed per request and never stored (review D5)  | **Normalize & Link** (I7), `ods` link tables (§8.5)                              |
+| `VPM_SUTARTIS_ROW_SQL` rebuilds contract rows for pages, Quickwit and exports            | Consumers depend on the shape of a dropped table (review D9) | `ods."sutartys"` (§8.4), written by **Normalize & Link**                         |
 | `ensureAnalystViews()` creates the `v_*` views at runtime                                | Views drift from the schema; no migration (review D10)       | `ods` views and derived tables (§8.6), **S7** migrations                         |
 | Buyer–supplier aggregate in `"vpmSutartys"."sumosPirkejasTiekejas"` and `v_pirkejo_tiekejo_rysys` | Two definitions of one concept (review D12)          | `ods."pirkejuTiekejuRysiai"` (§8.6)                                              |
 
@@ -459,7 +513,9 @@ alone.
 
 ### 6.1 Design principles
 
-1. **Workspace = functional component.** Each core and supporting component has one primary workspace (§6.3). Shared
+1. **Workspace = functional component.** Each core component and each supporting component of §3 has one primary
+   workspace (§6.3). A supporting component that a core component owns is a top-level folder in the workspace of that
+   core component, for example `apps/ingestion/src/extract/`. Shared
    technical packages (`domain`, `events`, `search`, `storage`, `testing`) serve several components. S8 lives in
    `infra/backup/`, which is not a workspace.
 2. **Two kinds of workspaces.**
@@ -541,23 +597,26 @@ viespirkiai/
 │   │   ├── Dockerfile
 │   │   ├── .env.example
 │   │   ├── src/
-│   │   │   ├── worker.ts           # entrypoint: pipeline workers and schedules
+│   │   │   ├── worker.ts           # entrypoint: Extract and Normalize & Link workers, schedules
 │   │   │   ├── api.ts              # entrypoint: OCR work distribution and file lookup (HTTP)
 │   │   │   ├── config.ts
-│   │   │   ├── pipeline/           # stage orchestration, normalisation (I5), persistence and notification (I8)
-│   │   │   ├── connectors/         # I1 · one folder per source
-│   │   │   │   ├── cvp-is/
-│   │   │   │   ├── ted/
-│   │   │   │   ├── jar/
-│   │   │   │   ├── liteko/
-│   │   │   │   ├── e-tar/
-│   │   │   │   └── …
-│   │   │   ├── gateway/            # I2 Source Gateway: proxies, Tor, rate limits, request log
-│   │   │   ├── raw-store/          # I3 raw payload retention
-│   │   │   ├── documents/          # I4 download, storage boxes, extraction, OCR distribution, file lookup
-│   │   │   ├── reference-data/     # I6
-│   │   │   ├── entity-resolution/  # I7
-│   │   │   └── control/            # I9 schedules, backfills, freshness status
+│   │   │   ├── control/            # I9 schedules, backfills, freshness status
+│   │   │   ├── extract/            # «supporting» Extract: upstream sources → source schemas, document content
+│   │   │   │   ├── connectors/     # I1 · one folder per source
+│   │   │   │   │   ├── cvp-is/
+│   │   │   │   │   ├── ted/
+│   │   │   │   │   ├── jar/
+│   │   │   │   │   ├── liteko/
+│   │   │   │   │   ├── e-tar/
+│   │   │   │   │   └── …
+│   │   │   │   ├── gateway/        # I2 Source Gateway: proxies, Tor, rate limits, request log
+│   │   │   │   ├── raw-store/      # I3 raw payload retention
+│   │   │   │   └── documents/      # I4 download, storage boxes, extraction, OCR distribution, file lookup
+│   │   │   └── normalize-link/     # «supporting» Normalize & Link: source schemas → ods
+│   │   │       ├── mappers/        # I5 · one source-to-canonical mapper per source
+│   │   │       ├── reference-data/ # I6
+│   │   │       ├── entity-resolution/ # I7
+│   │   │       └── persistence/    # I8 idempotent upserts, versions, derived tables, facts changed
 │   │   └── test/
 │   │
 │   ├── risk/                       # «core» Procurement Risk Service · @viespirkiai/risk
@@ -647,7 +706,7 @@ viespirkiai/
 |--------------------------|------------------------------|--------------------------------------------|-----------------------------------------|----------------------------------------------------------------------------------------------|
 | `apps/web`               | `@viespirkiai/web`           | «core» Frontend                            | `astro build` → Node server             | `src/`, `start-server.mjs`, `astro.config.mjs`                                               |
 | `apps/mcp`               | `@viespirkiai/mcp`           | «core» MCP                                 | `node src/main.ts`                      | `modules/mcp/`, `src/pages/mcp.astro`, `src/lib/mcp.ts`                                      |
-| `apps/ingestion`         | `@viespirkiai/ingestion`     | «core» Data Ingestion                      | `node src/worker.ts`, `node src/api.ts` | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints, matching logic in `src/lib/sutartisPirkimai.ts` and `src/lib/ppa.ts`        |
+| `apps/ingestion`         | `@viespirkiai/ingestion`     | «core» Data Ingestion: Extract, Normalize & Link | `node src/worker.ts`, `node src/api.ts` | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints, matching logic in `src/lib/sutartisPirkimai.ts` and `src/lib/ppa.ts`        |
 | `apps/risk`              | `@viespirkiai/risk`          | «core» Procurement Risk Service            | `node src/main.ts` (scheduled)          | `modules/risk/`, `services/procurement-risk/`                                                |
 | `apps/indexer`           | `@viespirkiai/indexer`       | S2 Search Indexing                         | `node src/main.ts`                      | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
 | `apps/enrichment`        | `@viespirkiai/enrichment`    | S3 AI Enrichment                           | `node src/main.ts`                      | `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js`                             |
@@ -739,6 +798,7 @@ cross-cutting and may be used by every workspace.
 | `packages/*` never import `apps/*`                                                                                     | dependency-cruiser in CI                                                                        |
 | `web`, `mcp`, `open-data`, `enrichment` read data **only through `query`**: no `database` dependency                   | dependency-cruiser + `package.json` review (CODEOWNERS)                                         |
 | Only `ingestion` imports `@viespirkiai/database/facts-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
+| Inside `ingestion`, `src/extract/**` and `src/normalize-link/**` never import each other; they meet only at the source schemas | dependency-cruiser in CI                                                                        |
 | No deep imports; only paths listed in `exports`                                                                        | Node `exports` resolution + ESLint                                                              |
 | Every import is a declared dependency (npm hoisting would otherwise hide mistakes)                                     | ESLint `import/no-extraneous-dependencies` or `knip`                                            |
 | No `process.env` outside an app's `src/config.ts`; no `process.exit` or top-level side effects in packages             | ESLint (`n/no-process-env`, custom rule)                                                        |
@@ -1303,14 +1363,14 @@ and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md)
 
 | #   | Thesis                                                                                                                                                             | Resolves (P13)     |
 |-----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
-| T1  | **PostgreSQL holds two data layers, each with one writer:** the source schemas and the Operational Data Store `ods`. The `risk` schema holds risk decisions.       | D1, D8             |
+| T1  | **Data is grouped into three layers:** Staging (source schemas), Integration & Serving (`ods`, `risk` and the derived stores) and Control. Each store has one writer. | D1, D8             |
 | T2  | **Frontend, MCP and the Risk Service MUST NOT read source schemas.** They read `ods` and `risk` through the Query Service.                                         | D6, D8, D9         |
 | T3  | **`domain-model.md` defines the entities of `ods`.** Their keys and grain are the contract for every consumer, the Frontend included. Conflicts with §8.4 are open (§9 Q3).                             | D10, D11           |
-| T4  | **`ods` entities are tables written by Data Ingestion,** with typed keys, enforced foreign keys, provenance and version.                                          | D2, D13            |
+| T4  | **`ods` entities are tables written by Normalize & Link,** with typed keys, enforced foreign keys, provenance and version.                                          | D2, D13            |
 | T5  | **`ods` carries the attributes and enrichment that Frontend and MCP serve.** Each is an `ods` column or an `ods` table keyed by an entity.                             | D8, D14, D18       |
-| T6  | **Entity resolution runs once, in Data Ingestion.** `ods` stores each result as a link row with `patikimumas` and `metodas`.                                       | D4, D5             |
+| T6  | **Entity resolution runs once, in Normalize & Link.** `ods` stores each result as a link row with `patikimumas` and `metodas`.                                       | D4, D5             |
 | T7  | **Each identifier has one type and one format in `ods`.** `jarKodas` is 9-digit `text`. Type conversion happens only between a source schema and `ods`.          | D3, D16            |
-| T8  | **An `ods` object is a view only when its read cost is small** (§8.7). Otherwise Data Ingestion maintains it as a derived table.                                  | D13, D17           |
+| T8  | **An `ods` object is a view only when its read cost is small** (§8.7). Otherwise Normalize & Link maintains it as a derived table.                                  | D13, D17           |
 | T9  | **One concept has one definition.** Each aggregate exists once in `ods`. No page and no second view recomputes it.                                               | D12, D17           |
 | T10 | **Migrations create every `ods` object.** CI verifies each object against the migrated schema.                                                                  | D10, D11           |
 | T11 | **Page reads are bounded.** A page section reads `ods` by key or reads one derived table. No page runs entity resolution.                                        | D5, D14, D15, D19  |
@@ -1325,23 +1385,25 @@ The diagram shows the writer of each data layer and the read path of every consu
 ```mermaid
 flowchart LR
     subgraph ingestion["Data Ingestion"]
-        Connectors["Source Connectors (I1)"]
-        Integration["Normalisation, Entity Resolution, Fact Persistence (I5, I7, I8)"]
+        Extract["Extract (I1–I4)"]
+        NormalizeLink["Normalize & Link (I5–I8)"]
     end
-    subgraph pg["PostgreSQL"]
+    subgraph staging["Staging layer"]
         Source[("Source schemas, for example vpmSutartys, eppsViesiejiPirkimai, cvpp, ppa, rcJar, sabis")]
+    end
+    subgraph serving["Integration & Serving layer"]
         Ods[("ods: entities, enrichment, links, derived tables, views")]
         Risk[("risk: procurement risk decisions, risk signals")]
+        Search[("Quickwit and Typesense indexes")]
     end
     Indexer["Search Indexing (S2)"]
-    Search[("Quickwit and Typesense indexes")]
     RiskService["Procurement Risk Service"]
     QueryService["Query Service"]
     Consumers["Frontend and MCP"]
-    Connectors -.->|source rows| Source
-    Source -.->|typed facts| Integration
-    Integration -.->|entities, links, derived rows| Ods
-    Integration -.->|facts changed| Indexer
+    Extract -.->|source rows| Source
+    Source -.->|typed facts| NormalizeLink
+    NormalizeLink -.->|entities, links, derived rows| Ods
+    NormalizeLink -.->|facts changed| Indexer
     Indexer -->|reads| Ods
     Indexer -.->|documents| Search
     RiskService -.->|decisions, signals| Risk
@@ -1354,9 +1416,14 @@ flowchart LR
 
 | Layer          | Schema names                                                                                          | ETL term                         | Grain                                   | Writer                                        | Readers                                   | Rebuilt from                      |
 |----------------|-------------------------------------------------------------------------------------------------------|----------------------------------|-----------------------------------------|-----------------------------------------------|-------------------------------------------|-----------------------------------|
-| Source         | One schema per upstream source, for example `vpmSutartys`, `eppsViesiejiPirkimai`, `cvpp`, `ppa`, `rcJar`, `sabis` | Persistent staging area          | One row per source record               | Source Connectors (I1)                        | Data Ingestion (I5), S7 governance tooling | Raw Payload Store (I3), re-scrape |
-| ODS            | `ods`                                                                                                 | Operational Data Store           | One row per entity, link or aggregate   | Data Ingestion (I5, I6, I7, I8); migrations for views | Query Service, Search Indexing (S2)   | Source schemas                    |
-| Risk           | `risk`                                                                                                | Analytical output                | One row per procurement risk decision; one row per risk signal          | Procurement Risk Service                      | Query Service                             | `ods` and indicator code          |
+| Staging        | One schema per upstream source, for example `vpmSutartys`, `eppsViesiejiPirkimai`, `cvpp`, `ppa`, `rcJar`, `sabis` | Persistent staging area          | One row per source record               | Extract (I1)                                  | Normalize & Link (I5), S7 governance tooling | Raw Payload Store (I3), re-scrape |
+| Integration & Serving | `ods`                                                                                                 | Operational Data Store           | One row per entity, link or aggregate   | Normalize & Link (I5–I8); migrations for views        | Query Service, Search Indexing (S2)   | Source schemas                    |
+| Integration & Serving | `risk`                                                                                         | Analytical output                | One row per procurement risk decision; one row per risk signal          | Procurement Risk Service                      | Query Service                             | `ods` and indicator code          |
+| Control        | `infra`, `auth`, `jobs`                                                                               | Job control and metadata         | One row per setting, key or job          | S1, S5, S9 (§9 Q6)                            | The writing components                    | Migrations and fixtures           |
+
+- The Integration & Serving layer also holds stores outside PostgreSQL: document content (I4), search indexes (S2) and
+  the AI enrichment store (S3).
+- The Query Service reads only the Integration & Serving layer. Only Normalize & Link and S7 read the Staging layer.
 
 ### 8.3 `ods` object kinds
 
@@ -1370,7 +1437,7 @@ flowchart LR
 
 - An attribute with one value per entity is a column of the entity table.
 - A 1:N attribute, or an attribute set with its own refresh cycle, is a table keyed by the entity.
-- The *Writer* column names the sub-component that produces the rows. Fact Persistence (I8) executes every `ods` write:
+- The *Writer* column names the Normalize & Link sub-component that produces the rows. Fact Persistence (I8) executes every `ods` write:
   idempotent upsert, version and provenance.
 
 ### 8.4 Entity tables and enrichment
@@ -1454,11 +1521,11 @@ convention, the grain of merged entities and the history model are open (§9 Q3�
 
 ### 8.9 Placement rules
 
-1. A fact that a source records, or an identity that Data Ingestion resolves, goes to an `ods` entity or link table.
+1. A fact that a source records, or an identity that Normalize & Link resolves, goes to an `ods` entity or link table.
 2. An attribute that Frontend or MCP shows goes to `ods` as an enrichment column or enrichment table.
 3. An aggregate over many entity rows goes to an `ods` view within the budget, or else to a derived table.
 4. A judgement about a subject goes to `risk`.
-5. A source-shaped record goes to its source schema. A raw payload goes to the Raw Payload Store (I3).
+5. A source-shaped record goes to its source schema, which Extract writes. A raw payload goes to the Raw Payload Store (I3).
 
 ### 8.10 Clarifications
 
@@ -1468,7 +1535,8 @@ convention, the grain of merged entities and the history model are open (§9 Q3�
   Payload Store keeps raw payloads (G6), and `ods` keeps entity versions (§9 Q5).
 - `ods` also holds aggregates. One schema gives Frontend, MCP and risk one read contract.
 - The `public` schema is not a data layer. It holds PostGIS catalog objects only.
-- The control schemas `infra`, `auth` and `jobs` hold configuration, API keys and job state. They are not data layers.
+- The control schemas `infra`, `auth` and `jobs` hold configuration, API keys and job state. They form the Control
+  layer, which holds no domain data and which the Query Service does not read.
 
 ---
 
@@ -1542,7 +1610,7 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    Question to address: where does S3 write, and how do its outputs reach Frontend and MCP?
    Option 1 (recommended): a PostgreSQL schema owned by `apps/enrichment`, for example `ai`, with its own writer role.
    §8.2 lists it as a layer, the Query Service reads it, and embeddings use pgvector.
-   Option 2: S3 outputs are an upstream source of Data Ingestion. Ingestion stages them in a source schema and maps them
+   Option 2: S3 outputs are an upstream source of Data Ingestion. Extract stages them in a source schema, and Normalize & Link maps them
    into `ods` enrichment.
    Option 3: a store outside PostgreSQL behind `packages/storage`, for example object storage. The Query Service then
    combines two stores in one read.
@@ -1671,7 +1739,7 @@ The repository does not record these host facts, and the target design depends o
   `risk` and `control` folders (§6.2).
 - [ ] **Contract migrations:** define how a destructive migration waits until no deployed app version uses the old
   shape, and enforce the rule in CI (§7.2, principle 8).
-- [ ] **Source-to-`ods` mapping:** for each `ods` table, list its source tables, mapping rules and owning connector
+- [ ] **Source-to-`ods` mapping:** for each `ods` table, list its source tables, mapping rules and owning mapper (I5)
   (§8.4, `domain-model.md` §4).
 - [ ] **Match quality:** measure the precision and recall of each link table on a labelled sample, and set the minimum
   `patikimumas` of each consumer (§8.5, review D5).
