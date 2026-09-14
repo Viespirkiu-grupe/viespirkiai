@@ -28,10 +28,11 @@ The document uses these terms with one meaning each:
 | Functional component      | Unit of responsibility with owned data. It is not necessarily a separate process                             | §1, §3                                                 |
 | Core component            | Functional component that delivers the main value of the system. Diagrams mark it `«core»`                   | §1                                                     |
 | Supporting component      | Functional component that core components need. A core component can own supporting components when it is decomposed. Diagrams mark it `«supporting»` | §2, §3                                  |
-| `S1`–`S11`, `I1`–`I9`     | Ids of the supporting components (§3) and of the sub-components of Extract and Normalize & Link (§2.3)        | —                                                      |
+| `S1`–`S11`, `I1`–`I9`     | Ids of the supporting components (§3) and of the sub-components of Data Ingestion (§2.3)                       | —                                                      |
 | Source schema             | PostgreSQL schema that mirrors one upstream source: a persistent staging area                                 | `vpmSutartys`, `eppsViesiejiPirkimai`, `rcJar`; §8.2   |
 | `ods`                     | Operational Data Store: canonical entities, enrichment, link tables, derived tables and views                 | §8                                                     |
 | Fact schemas              | The source schemas and `ods` together. Data Ingestion is their only writer                                    | §1.2, §2.4                                             |
+| Derived stores            | Search indexes (S2) and the AI enrichment store (S3). The Deliver stage writes them                           | §1.2, §3                                               |
 | Extract                   | Supporting component of Data Ingestion. It collects data from upstream sources into the source schemas and document content | §2.1, §2.3                               |
 | Normalize & Link          | Supporting component of Data Ingestion. It reads the source schemas and writes `ods`                         | §2.1, §2.3                                             |
 | Document content          | Extracted text and OCR results of downloaded files                                                            | I4, `@viespirkiai/data/storage`                        |
@@ -46,6 +47,7 @@ The document uses these terms with one meaning each:
 | Deliver stage             | Second stage of Data Pipeline: S2 Search Indexing and S3 AI Enrichment. It runs after Data Ingestion commits facts | §3, §3.1                                         |
 | Facts changed event       | Hint that Normalize & Link committed changes to `ods` entities in one ingestion run                           | `@viespirkiai/platform/events`, §2.2                   |
 | Ingestion run             | One execution of an ingestion job. `ods` rows store its id in `ikelimoId`                                     | §8.4                                                   |
+| Ingestion command         | `vp ingestion …` command that S9 issues as an S1 job                                                          | §6.4                                                   |
 | Job                       | Unit of scheduled or queued work that S1 manages. The current code calls it a *task*                          | `@viespirkiai/platform/jobs`; `tasks/*.js`, `runner/`  |
 | Metabase                  | Analytics dashboard service of S11. It reads `ods` and `risk` with the read-only role `METABASE_READER`      | S11, §7.7                                              |
 | Organisation              | Party of a procurement: registered legal entity, foreign company or natural person. Buyer and supplier are roles | `ods."organizacijos"`; §9 Q3, Q11                   |
@@ -123,10 +125,10 @@ flowchart LR
 
 | Component                    | Key use cases                                                                                                                                                                                                                                                      | Depends on                                                            | Writes (owns)                                          | Current code                                                                                                                           |
 |------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| **Data Pipeline**            | Discover new records · import and refresh incrementally · backfill history · acquire and process documents (download, extract, OCR) · link entities and reference data · detect and version changes (contract edits, legislation editions, court decision updates) · build and rebuild search indexes · generate AI descriptions and embeddings | Upstream sources, LLM providers, S1 Job Orchestration, **Query Service** (S3 only) | **Fact schemas** (Data Ingestion: Extract writes the source schemas and document content; Normalize & Link writes `ods`) and **derived stores** (Deliver: S2 writes the search indexes; S3 writes the AI enrichment store) (§2, §3, §8) | `tasks/*`, `modules/<source>/*`, `modules/failai/`, `modules/documents/`, `runner/`, `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/openrouter/`, `modules/vector/` |
+| **Data Pipeline**            | Discover new records · import and refresh incrementally · backfill history · acquire and process documents (download, extract, OCR) · link entities and reference data · detect and version changes (contract edits, legislation editions, court decision updates) · build and rebuild search indexes · generate AI descriptions and embeddings | Upstream sources, LLM providers, S1 Job Orchestration, **Query Service** (S3 only) | **Fact schemas** (Data Ingestion: Extract writes the source schemas and document content; Normalize & Link writes `ods`) and **derived stores** (Deliver stage: S2 writes the search indexes; S3 writes the AI enrichment store) (§2, §3, §8) | `tasks/*`, `modules/<source>/*`, `modules/failai/`, `modules/documents/`, `runner/`, `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/openrouter/`, `modules/vector/` |
 | **Query Service**            | Look up an entity by identifier · search and facet (contracts, procurements, organisations, documents) · traverse relationships · read document content · read risk results · provide bulk analytical reads · run bounded ad-hoc SQL for analysts                  | `ods` and `risk` (read-only role), S2 search indexes, document content store, S3 AI enrichment store | **Nothing.** Read-only by definition.                  | Scattered: SQL in 21 pages under `src/pages`, `src/lib/*`, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/tools/`, `modules/mcp/analyst/` |
-| **Procurement Risk Service** | Run evaluation for all procurements or a subset · evaluate each deployed indicator · record explainable procurement risk decisions and risk signals · re-evaluate after "facts changed"                                                                                                              | **Query Service** (analytical reads), S1                              | **`risk` schema** only                                 | `services/procurement-risk/`, `modules/risk/`                                                                                          |
-| **Frontend**                 | Search · entity pages (buyer, supplier, person, contract, procurement, legal act, court decision) · relationship graph · statistics · shareable pages (OpenGraph)                                                                                                  | **Query Service**                                                     | **Nothing.**                                           | `src/`                                                                                                                                 |
+| **Procurement Risk Service** | Run evaluation for all procurements or a subset · evaluate each deployed indicator · record explainable procurement risk decisions and risk signals · re-evaluate after a facts changed event                                                                                                        | **Query Service** (analytical reads), S1                              | **`risk` schema** only                                 | `services/procurement-risk/`, `modules/risk/`                                                                                          |
+| **Frontend**                 | Search · entity pages (buyer, supplier, person, contract, procurement, legal act, court case) · relationship graph · statistics · shareable pages (OpenGraph)                                                                                                  | **Query Service**                                                     | **Nothing.**                                           | `src/`                                                                                                                                 |
 | **MCP**                      | List tools · search and fetch entities · read contract changes · read document and legal act text · describe schema · run analyst SQL (optional)                                                                                                                                                      | **Query Service**                                                     | **Nothing.** Tool-call audit goes to S6 Observability. | `modules/mcp/`, `src/pages/mcp.astro`, `src/lib/mcp.ts`                                                                                |
 
 **Ownership rules (target)**
@@ -151,7 +153,7 @@ typed results, never on table layouts. A schema change then touches one componen
 
 | Query family                                                                                                       | Consumers                  | Notes                                                                        |
 |--------------------------------------------------------------------------------------------------------------------|----------------------------|------------------------------------------------------------------------------|
-| **Entity queries**: get procurement, contract, organisation, person, document, legal act, court case by identifier | Frontend, MCP              | Includes change history of the entity                                        |
+| **Entity queries**: get procurement, contract, organisation, person, document, legal act, court case by identifier | Frontend, MCP, S3          | Includes change history of the entity                                        |
 | **Search & facets**: full-text and filtered search, suggestions, facet counts                                      | Frontend, MCP              | Uses S2 search indexes; PostgreSQL fallback lives here, not in consumers |
 | **Relationship queries**: organisation–person–contract graph traversal                                             | Frontend, MCP, Risk Service | Graph *building* belongs to Normalize & Link; graph *reading* belongs here   |
 | **Document content**: extracted text, OCR result, file reference                                                   | Frontend, MCP              | Replaces direct sidecar reads and the sidecar HTTP API                       |
@@ -161,8 +163,7 @@ typed results, never on table layouts. A schema change then touches one componen
 
 The Query Service reads only the Integration & Serving layer (§8.2). It is an in-process library, not a network service.
 It holds a read-only connection pool over `ods` and `risk`, plus clients for the search indexes, the document content
-store and the AI enrichment store. Its value is the contract and the
-boundary, not the deployment.
+store and the AI enrichment store. In `mcp`, it also holds the analyst pool for ad-hoc SQL (§6.5).
 
 ---
 
@@ -171,7 +172,7 @@ boundary, not the deployment.
 Data Pipeline is the only writer of the fact schemas and the derived stores. §8.2 defines the data layers that it
 writes.
 
-### 2.1 Pipeline flow
+### 2.1 Data Pipeline flow
 
 ```mermaid
 flowchart LR
@@ -233,7 +234,7 @@ flowchart LR
     s3 -.->|" descriptions · embeddings "| enrich
 ```
 
-### 2.2 Pipeline process
+### 2.2 Data Pipeline process
 
 1. I9 Ingestion Control schedules the jobs of each source through S1. Operator commands (`vp ingestion …`, §6.4) are
    S1 jobs too.
@@ -246,7 +247,8 @@ flowchart LR
 7. Fact Persistence (I8) upserts the `ods` rows with version and provenance in one transaction. The same transaction
    updates the affected derived rows.
 8. After commit, I8 publishes a facts changed event with the changed entity keys (§9 Q2).
-9. S2 Search Indexing reads the changed `ods` rows and document content, and updates Quickwit and Typesense.
+9. S2 Search Indexing reads the changed `ods` rows, document content and AI descriptions. It updates Quickwit and
+   Typesense.
 10. S3 AI Enrichment reads the changed entities through the Query Service. It writes LLM descriptions and embeddings.
 
 - Extract and Normalize & Link never call each other. The source schemas are the boundary between them.
@@ -286,20 +288,20 @@ flowchart LR
 
 ## 3. Supporting (secondary) functional components
 
-These do not deliver end-user value on their own, but the core components can't function reliably without them.
+These do not deliver end-user value on their own, but the core components cannot function reliably without them.
 Data Ingestion owns two further supporting components, Extract and Normalize & Link (§2.3). Source access and file and
 document processing belong to Extract (I2, I4). Reference data and entity resolution belong to Normalize & Link (I6,
 I7).
 
 S2 Search Indexing and S3 AI Enrichment form the **Deliver stage** of the core component Data Pipeline. They run after Data Ingestion
 commits facts and write derived stores in the Integration & Serving layer. They are not part of Data Ingestion: their
-outputs are not facts, S3 output is not deterministic, and their failures must not delay fact writes (G1, G4, G9).
+outputs are not facts, S3 output is not deterministic, and their failures MUST NOT delay fact writes (G1, G4, G9).
 The workspace `apps/pipeline` holds Data Ingestion and the Deliver stage; one container runs both stages (§6.2, §7.7).
 
 | #       | Component                      | Responsibility                                                                                                                                            | Serves                                  | Exists today?     | Current code / gap                                                                                                  |
 |---------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------|
-| **S1**  | **Job Orchestration**          | Scheduling (cron and continuous), durable work queues, retries and back-off, reservation expiry, concurrency limits, wake-up signals                      | Data Pipeline, Risk, S4                 | ✅ Home-grown     | `runner/`, `tasks/`, per-domain `SKIP LOCKED` queues, NATS                                                          |
-| **S2**  | **Search Indexing**            | Build search indexes (Quickwit full-text, Typesense suggestions and organisations) from `ods` on "facts changed"; rebuild and drift detection | Query Service                           | ✅ Partial        | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
+| **S1**  | **Job Orchestration**          | Scheduling (cron and continuous), durable work queues, retries and back-off, reservation expiry, concurrency limits, wake-up signals                      | Data Pipeline, Risk Service, S4         | ✅ Home-grown     | `runner/`, `tasks/`, per-domain `SKIP LOCKED` queues, NATS                                                          |
+| **S2**  | **Search Indexing**            | Build search indexes (Quickwit full-text, Typesense suggestions and organisations) from `ods` on facts changed events; rebuild and drift detection | Query Service                     | ⚠️ Partial        | `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/` |
 | **S3**  | **AI Enrichment**              | LLM-generated descriptions, embeddings; owns the AI enrichment store (does **not** write facts, §9 Q7); cost, rate, prompt and model versioning           | Query Service                           | ✅ Experimental   | `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js`; descriptions in `eppsViesiejiPirkimai."aprasymai"` |
 | **S4**  | **Open Data Publishing**       | Publish curated datasets to the open-data API (Spinta / viesStalcius) and bulk exports; reads through the Query Service                                   | Open-data consumers                     | ✅ Scattered      | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket                                |
 | **S5**  | **Identity & Access**          | API keys for machine clients, worker registry, MCP client identification, rate limiting and abuse protection, analyst role policy                         | Frontend, MCP, Data Pipeline (workers)  | ⚠️ Partial        | `auth.raktai`, `modules/failai/auth.js`, `src/lib/botChallenge.ts`; **no rate limiting, no key rotation**           |
@@ -408,7 +410,7 @@ flowchart TB
     extract --> src
     nl -->|" reads source rows "| srcdb
     ing --> s1
-    s9 --> ing
+    s9 -->|" commands as jobs "| s1
 %% ── Writes into owned stores (data flows) ──
     extract -.->|" source rows · payloads · files "| STG
     extract -.->|" document content "| docs
@@ -426,9 +428,9 @@ flowchart TB
 ```
 
 This diagram shows **dependencies** and **writes into owned stores**. The Query Service reads only the Integration &
-Serving layer; the Staging layer is internal to the data pipeline. S11 Metabase reads `ods` and `risk` directly.
-Platform components (S5–S10) are cross-cutting;
-only their data-store edges are drawn, to keep the diagram readable.
+Serving layer; the Staging layer is internal to Data Pipeline. S11 Metabase reads `ods` and `risk` directly.
+Platform and operations components (S1, S5–S10) are cross-cutting. The diagram draws only their data-store edges and
+the S9 command edge.
 
 ---
 
@@ -448,8 +450,8 @@ P8).
 5. **Does it compute a judgement about procurements** (score, flag, indicator)? → **Procurement Risk Service.** It reads
    through the Query Service and writes only to `risk`.
 6. **Does it turn existing data into another shape** (index, embedding, export)? → **S2, S3 or S4**, each writing only
-   to its own store. An aggregate inside `ods` is a derived table or view of Normalize & Link (§8.9).
-7. **Does it keep the system running, safe or recoverable?** → **Platform, S5–S10.**
+   to its own store. An aggregate inside `ods` is a derived table of Normalize & Link or a view (§8.3, §8.9).
+7. **Does it keep the system running, safe or recoverable?** → **Platform and operations, S1 and S5–S10.**
 8. **Is it a one-off or operator script?** → an ingestion command issued through S9, or S7 governance tooling. **Never**
    a self-executing file inside a library module.
 
@@ -464,12 +466,12 @@ P8).
 | OCR checkout/submit endpoints inside the Frontend                                        | Public web app writes to the database and sidecars           | **Extract** of Data Ingestion (I4, OCR work distribution interface)                  |
 | `downloadProxyInformation` inside the Frontend                                           | Internal file lookup on the public surface                   | **Extract** of Data Ingestion (I4, file lookup interface)                                  |
 | Sidecar HTTP read API inside the Frontend                                                | Direct access to raw stores                                  | **Query Service** (document content)                                             |
-| Per-source queues, reservation cleaners and change signals re-implemented in each module | Duplicated ingestion infrastructure                          | **Data Ingestion**: Ingestion Control (I9), Normalize & Link persistence (I8), S1 |
+| Per-source queues, reservation cleaners and change signals re-implemented in each module | Duplicated ingestion infrastructure                          | **Data Ingestion**: Ingestion Control (I9), Fact Persistence (I8), S1               |
 | LLM description generation (`scripts/aprasyti*.js`) writes `eppsViesiejiPirkimai."aprasymai"`                                  | AI enrichment mixed with ingestion; writes a source schema                | **S3 AI Enrichment** (AI enrichment store)                                                 |
 | `export:*`, `push:*` scripts inside source modules                                       | Distribution mixed with ingestion                            | **S4 Open Data Publishing**                                                      |
 | MCP tool-call logging to the database and Quickwit                                       | Consumer writes data                                         | **S6 Observability**                                                             |
 | Info banner table created and edited through the Frontend                                | Runtime DDL, no admin UI                                     | **S9 Operations CLI**, S7 migrations                                         |
-| `modules/risk` run manually via `npm run risk:run`                                       | Core component without scheduling                            | **Procurement Risk Service**, scheduled through S1, triggered by "facts changed" |
+| `modules/risk` run manually via `npm run risk:run`                                       | Core component without scheduling                            | **Procurement Risk Service**, scheduled through S1, triggered by facts changed events |
 | 115 self-executing files and 87 files with `process.exit` in `modules/`                     | CLI entry points inside library code                         | Ingestion commands via **S9** / **S7** tooling                                   |
 | Entity resolution in page services: `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` | Links are computed per request and never stored (review D5)  | **Normalize & Link** (I7), `ods` link tables (§8.5)                              |
 | `VPM_SUTARTIS_ROW_SQL` rebuilds contract rows for pages, Quickwit and exports            | Consumers depend on the shape of a dropped table (review D9) | `ods."sutartys"` (§8.4), written by **Normalize & Link**                         |
@@ -486,8 +488,8 @@ alone.
 
 ### 6.1 Design principles
 
-1. **App workspace = functional component.** Each core component, and each supporting component with its own process,
-   has one app workspace (§6.3). A supporting component that a core component owns is a folder in the workspace of that
+1. **App workspace = functional component.** Each core or supporting component with its own process has one app
+   workspace (§6.3). The Query Service is a library and lives in `packages/query`. A supporting component that a core component owns is a folder in the workspace of that
    core component: `apps/pipeline` (Data Pipeline) holds Extract and Normalize & Link under `src/ingestion/`, and S2 and
    S3 under `src/deliver/`.
 2. **Two kinds of workspaces.**
@@ -729,7 +731,7 @@ principle 8):
 | `npm ci`                                                                    | root                                | developer, CI, Dockerfiles                      | Install all workspaces from one lockfile; `-w <workspace>` installs one workspace            | `npm ci`                                                                                                                                                                                                                                                                                                                                                                          |
 | `npm install <pkg> -w <workspace>`                                          | root                                | developer                                       | Add a dependency to one workspace                                                           | `npm install <pkg>`                                                                                                                                                                                                                                                                                                                                                               |
 | `npm run dev -w @viespirkiai/web`                                           | `apps/web`                          | developer                                       | Astro dev server with hot reload                                                            | `npm run dev`                                                                                                                                                                                                                                                                                                                                                                     |
-| `npm run dev -w @viespirkiai/<app>`                                         | `apps/mcp`, `pipeline`, `risk`, `open-data` | developer                               | `node --watch --env-file=.env src/main.ts`                                                  | `node tasks/index.js`, `startTaskRunner.sh`                                                                                                                                                                                                                                                                                                                                       |
+| `npm run dev -w @viespirkiai/<app>`                                         | `apps/mcp`, `apps/pipeline`, `apps/risk`, `apps/open-data` | developer                | `node --watch --env-file=.env src/main.ts`                                                  | `node tasks/index.js`, `startTaskRunner.sh`                                                                                                                                                                                                                                                                                                                                       |
 | `npm start -w @viespirkiai/<app>`                                           | every app                           | app container                                   | Start the app entrypoint                                                                    | `npm start`, `node tasks/index.js`                                                                                                                                                                                                                                                                                                                                                |
 | `npm run build`                                                             | root → `apps/web`                   | developer, CI                                   | `astro build`, public links and build info; other workspaces have no build step             | `npm run build`                                                                                                                                                                                                                                                                                                                                                                   |
 | `npm run typecheck`                                                         | root → every workspace              | developer, CI                                   | `tsc -b`; `astro check` in `apps/web`                                                       | `npm run check`                                                                                                                                                                                                                                                                                                                                                                   |
@@ -783,7 +785,7 @@ principle 8):
 
 ## 7. CI/CD pipeline
 
-### 7.1 Assessment of the current pipeline
+### 7.1 Assessment of the current CI/CD pipeline
 
 Source: [`architecture-current.md` §5.4](architecture-current.md#54-cicd-pipeline) and
 `.github/workflows/build-image.yml`.
@@ -809,14 +811,14 @@ Source: [`architecture-current.md` §5.4](architecture-current.md#54-cicd-pipeli
 | C4  | **Only the frontend is packaged.** The taskRunner runs as bare Node under `startTaskRunner.sh`; CLI jobs run from the checkout.                                                                         | Web and background processes can run different versions of the same modules.                                              | P2, P12 |
 | C5  | **Mutable tags are the only readable tags.** `latest` and `main` are overwritten on every push; no `v*` tag has ever been created.                                                                      | No releases, no rollback target, no answer to "what is in production?"                                                    | P2      |
 | C6  | **No deployment definition.** No deploy job, no environments, no approvals, no health checks, no rollback. The production `compose.yml` is git-ignored.                                                 | Deployment is a manual, unrecorded procedure.                                                                             | P2, P4  |
-| C7  | **Integration tests don't gate anything.** The `*.it.ts` suites read `config.js` and need a live, pre-populated database.                                                                               | They don't run automatically and can't gate a release.                                                                    | P2      |
-| C8  | **No database migration step.** `migrations/` is incomplete and there is no runner; tables are also created at runtime.                                                                                 | Schema changes can't be deployed or rolled back safely.                                                                   | P1, P11 |
+| C7  | **Integration tests do not gate anything.** The `*.it.ts` suites read `config.js` and need a live, pre-populated database.                                                                               | They do not run automatically and cannot gate a release.                                                                  | P2      |
+| C8  | **No database migration step.** `migrations/` is incomplete and there is no runner; tables are also created at runtime.                                                                                 | Schema changes cannot be deployed or rolled back safely.                                                                  | P1, P11 |
 | C9  | **No supply-chain controls.** Actions are pinned to major versions rather than commit SHAs; no image scan, no SBOM, no provenance attestation. `npm audit` shows 1 critical and 5 high vulnerabilities. | Vulnerabilities and tampered dependencies ship unnoticed.                                                                 | P3      |
 | C10 | **`cancel-in-progress: true` for every ref.**                                                                                                                                                           | A new push can cancel a publish halfway, leaving a partial set of images.                                                 | —       |
 
-**Conclusion.** The pipeline stops at *build and push*. The target pipeline keeps the good build practices, but puts a
+**Conclusion.** The current CI/CD pipeline stops at *build and push*. The target CI/CD pipeline keeps the good build practices, but puts a
 gate in front of the push and an integration stage and controlled deployments behind it. Before *build once, promote the
-same image* can mean anything, the image must be self-contained (C3) and the taskRunner must be packaged (C4).
+same image* can mean anything, the image MUST be self-contained (C3) and the taskRunner MUST be packaged (C4).
 
 ### 7.2 Design principles
 
@@ -826,23 +828,23 @@ same image* can mean anything, the image must be self-contained (C3) and the tas
    tag `sha-<commit>` on every image. CI moves one pointer tag, `main`, for discovery only. CI does not publish `latest`.
 3. **GitHub Actions verifies and publishes.** Lint, type-check, unit tests and build pass before an image reaches
    `ghcr.io`. Unit tests use mocks only: no network, no database.
-4. **lempa pulls. Nothing pushes into lempa.** lempa needs no inbound port, no GitHub runner and no GitHub write
+4. **`lempa` pulls. Nothing pushes into `lempa`.** `lempa` needs no inbound port, no GitHub runner and no GitHub write
    credentials.
 5. **Integration tests are read-only and run on the real database** of the target environment, with a read-only role.
    They run before every rollout and on demand at any time.
-6. **Alpha deploys automatically. Production deploys only by an operator command on lempa**, and only a release that
+6. **Alpha deploys automatically. Production deploys only by an operator command on `lempa`**, and only a release that
    passed alpha.
 7. **Alpha and production use the same compose files.** They differ only in their env files.
 8. **Migrations are expand/contract.** The previous app version works on the new schema, so an app rollback needs no
    database rollback.
 9. **No self-hosted GitHub Actions runner.** The repository is public, so a pull request from a fork can run code on a
    self-hosted runner.
-10. **lempa verifies provenance.** `vp-deploy` verifies the image provenance attestation with `cosign` before it pulls
+10. **`lempa` verifies provenance.** `vp-deploy` verifies the image provenance attestation with `cosign` before it pulls
     an image.
 
-### 7.3 Pipeline overview
+### 7.3 CI/CD pipeline overview
 
-GitHub Actions runs unit tests, builds and publishes. The `vp-deploy` agent on lempa pulls images, runs integration tests
+GitHub Actions runs unit tests, builds and publishes. The `vp-deploy` agent on `lempa` pulls images, runs integration tests
 and deploys.
 
 ```mermaid
@@ -894,14 +896,14 @@ flowchart LR
 |---|-------------------|--------------------------------------------|----------------------------------------------|-----------------------------------------------------------------|
 | 1 | Verify            | GitHub Actions `ci.yml`                    | every pull request; reused by `delivery.yml` | lint, type-check, boundaries, unit tests and build pass         |
 | 2 | Publish           | GitHub Actions `delivery.yml`              | push to `main`, after stage 1                | changed images built; all images tagged `sha-<commit>`; pointer `main` |
-| 3 | Detect            | lempa `vp-deploy watch`                    | systemd timer, every 2 minutes               | release directory for the new commit                            |
-| 4 | Deploy alpha      | lempa, compose project `vp-alpha-business` | new commit detected, **automatic**           | release status `alpha-passed` or `failed`                       |
-| 5 | Deploy production | lempa, compose project `vp-prod-business`  | `vp-deploy prod`, **manual**                 | release status `prod-deployed` or `failed`                      |
+| 3 | Detect            | `lempa`, `vp-deploy watch`                 | systemd timer, every 2 minutes               | release directory for the new commit                            |
+| 4 | Deploy alpha      | `lempa`, compose project `vp-alpha-business` | new commit detected, **automatic**           | release status `alpha-passed` or `failed`                       |
+| 5 | Deploy production | `lempa`, compose project `vp-prod-business`  | `vp-deploy prod`, **manual**                 | release status `prod-deployed` or `failed`                      |
 
 | Test kind         | Runs in                                 | Reads                                        | Side effects                                   |
 |-------------------|-----------------------------------------|----------------------------------------------|------------------------------------------------|
 | Unit tests        | GitHub Actions, stage 1                 | mocks and fixtures only                      | none; no network, no database                  |
-| Integration tests | lempa, release directory, stages 4 and 5 (§7.5) | the one `ods` instance and search indexes (§9 Q1)    | none; read-only role, search-only keys         |
+| Integration tests | `lempa`, release directory, stages 4 and 5 (§7.5) | the one `ods` instance and search indexes (§9 Q1)    | none; read-only role, search-only keys         |
 
 A release moves through these states:
 
@@ -953,14 +955,14 @@ stateDiagram-v2
 - `concurrency: { group: delivery, cancel-in-progress: true }`. The next run includes the changes of a cancelled run.
 - Minimal `permissions:` per job. `GITHUB_TOKEN` is the only credential. Actions are pinned by commit SHA.
 
-### 7.5 Deploy agent `vp-deploy` on lempa
+### 7.5 Deploy agent `vp-deploy` on `lempa`
 
 | Element                              | Location                                                        | Responsibility                                                                    |
 |--------------------------------------|-----------------------------------------------------------------|-----------------------------------------------------------------------------------|
 | `vp-deploy`                          | `infra/deploy/vp-deploy` (bash), installed to `/usr/local/bin/` | Commands `watch`, `it`, `alpha`, `prod`, `rollback`, `status`, `data`, `refresh-alpha-db` |
 | `vp` wrapper                         | `infra/deploy/vp` (bash), installed to `/usr/local/bin/`        | Runs `apps/ops/src/cli.ts` from `/srv/viespirkiai/<env>/current` with `secrets/ops.env`. Operators run `sudo -u deploy vp --env <env> …`, never as root |
 | `vp-deploy-watch.timer` + `.service` | `infra/deploy/systemd/`                                         | Runs `vp-deploy watch` every 2 minutes as user `deploy`                           |
-| `deploy` user                        | lempa                                                           | Member of the `docker` group; owns `/srv/viespirkiai/`; the only user that runs `vp` |
+| `deploy` user                        | `lempa`                                                         | Member of the `docker` group; owns `/srv/viespirkiai/`; the only user that runs `vp` |
 | Repository mirror                    | `/srv/viespirkiai/repo.git`                                     | Bare clone of the public repository; `git fetch` only                             |
 | Release directories                  | `/srv/viespirkiai/releases/<commit>/`                           | Source tree at `<commit>`, `node_modules`, `manifest.env`, `status`, test logs; the last 10 are kept |
 | Environment state                    | `/srv/viespirkiai/{alpha,prod}/`                                | `current` and `previous` symlinks, `secrets/<app>.env`, `deployments.log`               |
@@ -987,8 +989,8 @@ stateDiagram-v2
 └── prod/                          # same layout as alpha/
 ```
 
-`vp-deploy` and `vp` use only Docker, git, Node 24 with npm, `curl`, `cosign` and `flock`. The images and the repository are public, so lempa needs no GitHub or GHCR
-credentials.
+`vp-deploy` and `vp` use only Docker, git, Node 24 with npm, `curl`, `cosign` and `flock`.
+The images and the repository are public, so `lempa` needs no GitHub or GHCR credentials.
 
 #### `vp-deploy` deploys a release to an environment
 
@@ -1023,7 +1025,7 @@ credentials.
 
 ### 7.6 Compose files
 
-The compose files are in the monorepo, in `infra/compose/`. lempa runs the copy in `releases/<commit>/infra/`, never a
+The compose files are in the monorepo, in `infra/compose/`. `lempa` runs the copy in `releases/<commit>/infra/`, never a
 live checkout. A compose change therefore deploys and rolls back with its release.
 
 | File                                 | Contains                                                                              | Compose projects                | Applied by                                                     |
@@ -1031,12 +1033,12 @@ live checkout. A compose change therefore deploys and rolls back with its releas
 | `viespirkiai-business-compose.yaml`  | `web`, `mcp`, `pipeline`, `risk`, `open-data`                                         | `vp-alpha-business`, `vp-prod-business` | `vp-deploy alpha` / `vp-deploy prod`, every release    |
 | `viespirkiai-data-compose.yaml`      | `postgres`, `pgbouncer`, `quickwit`, `typesense`, `nats`, `metabase`, network `vp-<env>-data` | `vp-alpha-data`, `vp-prod-data` | Operator, `vp-deploy data <env>`, only on data-service changes |
 | `env/alpha.env`, `env/prod.env`      | Non-secret values per environment: ports, memory limits, data paths, feature switches | —                               | Committed                                                      |
-| `/srv/viespirkiai/<env>/secrets/<app>.env` | Passwords, API keys and `DATABASE_URL_*` values of one app (§6.5)                                                                   | —                               | On lempa only                                                  |
+| `/srv/viespirkiai/<env>/secrets/<app>.env` | Passwords, API keys and `DATABASE_URL_*` values of one app (§6.5)                                                                   | —                               | On `lempa` only                                                |
 | `releases/<commit>/manifest.env`     | Image digests                                                                         | —                               | Generated by `vp-deploy`                                       |
 
 **One set of compose files, two env files.** Separate alpha and production compose files drift apart, and alpha then
 stops testing what production runs. Structural differences go into env values; an override file is added only for a
-difference that env values can't express.
+difference that env values cannot express.
 
 **Data and business services are separate compose projects.** A business deployment never recreates PostgreSQL or the
 search engines.
@@ -1053,7 +1055,7 @@ docker compose -p vp-alpha-business \
 
 `infra/compose/viespirkiai-business-compose.yaml` gives each container its own secrets file, so a container receives
 only the credentials of §6.5. The listing shows `web`, `mcp` and `pipeline`. `risk` and `open-data` follow
-the same pattern as `mcp`; the public routes of the `pipeline` HTTP API are open (§9 Q13).
+the pattern of `pipeline`, without the data volume; the public routes of the `pipeline` HTTP API are open (§9 Q13).
 
 ```yaml
 name: vp-${VP_ENV}-business
@@ -1136,7 +1138,7 @@ S3_BACKUP_ENABLED=false
 `PGBOUNCER_PORT=6432`, `QUICKWIT_PORT=7280`, `TYPESENSE_PORT=8108`,
 `DATA_ROOT=/flashas/viespirkiai`, all jobs and side effects enabled.
 
-**Alpha and production on lempa:**
+**Alpha and production on `lempa`:**
 
 | Aspect                                | alpha                                                                                             | production                                                             |
 |---------------------------------------|---------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
@@ -1315,7 +1317,7 @@ flowchart LR
 | `vp-prod-business-risk-1`          | `risk`      | `node src/main.ts`          | Procurement Risk Service, Query Service | `READONLY`, `RISK_WRITER`        | —                        |
 | `vp-prod-business-open-data-1`     | `open-data` | `node src/main.ts`          | S4 Open Data Publishing, Query Service | `READONLY`                        | —                        |
 | `vp-prod-data-pgbouncer-1`         | `pgbouncer` | PgBouncer                   | Connection pool                        | —                                 | TCP `6432`               |
-| `vp-prod-data-postgres-1`          | `postgres`  | PostgreSQL                  | Staging, Integration & Serving and Control schemas | —                     | TCP `5432`               |
+| `vp-prod-data-postgres-1`          | `postgres`  | PostgreSQL                  | Staging, Integration & Serving and Control schemas; `metabase` database | —  | TCP `5432`               |
 | `vp-prod-data-quickwit-1`          | `quickwit`  | Quickwit                    | Full-text indexes                      | —                                 | HTTP `7280`              |
 | `vp-prod-data-typesense-1`         | `typesense` | Typesense, host network     | Suggestion and organisation indexes    | —                                 | HTTP `8108`, Raft `8107` |
 | `vp-prod-data-nats-1`              | `nats`      | NATS server                 | Facts changed event transport          | —                                 | TCP `4222`               |
@@ -1324,7 +1326,7 @@ flowchart LR
 **Process isolation.** Each container has its own process namespace, memory limit, restart policy and secrets file
 (§6.5, §7.6):
 
-- An out-of-memory kill or a crash stops one container. For example, a pipeline crash does not stop `web-1` or
+- An out-of-memory kill or a crash stops one container. For example, a `pipeline-1` crash does not stop `web-1` or
   `mcp-1`.
 - A container receives only the database roles of its row.
 - All Data Pipeline stages share one process in `pipeline-1`. S1 gives each stage its own job queues and concurrency
@@ -1332,7 +1334,7 @@ flowchart LR
   together, and interrupted jobs resume from their reservations.
 - `pipeline-1` holds `FACTS_WRITER` for the whole process. The boundary rule of §6.1 keeps `src/deliver/**` from
   importing the facts writer; the database role does not enforce that rule.
-- Each Query Service box is a separate instance with its own connection pool. The PgBouncer pool size counts all five
+- Each Query Service instance has its own connection pool. The PgBouncer pool size counts all five
   instances (§9 Q6).
 - Metabase connects to PostgreSQL port `5432` directly. PgBouncer transaction pooling breaks its JDBC prepared
   statements.
@@ -1362,7 +1364,7 @@ and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md)
 
 | #   | Thesis                                                                                                                                                             | Resolves (P13)     |
 |-----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
-| T1  | **Data is grouped into three layers:** Staging (source schemas), Integration & Serving (`ods`, `risk` and the derived stores) and Control. Each store has one writer. | D1, D8             |
+| T1  | **Data is grouped into three layers:** Staging (source schemas), Integration & Serving (`ods`, `risk`, document content and the derived stores) and Control. Each store has one writer. | D1, D8             |
 | T2  | **Frontend, MCP and the Risk Service MUST NOT read source schemas.** They read `ods` and `risk` through the Query Service.                                         | D6, D8, D9         |
 | T3  | **`domain-model.md` defines the entities of `ods`.** Their keys and grain are the contract for every consumer, the Frontend included. Conflicts with §8.4 are open (§9 Q3).                             | D10, D11           |
 | T4  | **`ods` entities are tables written by Normalize & Link,** with typed keys, enforced foreign keys, provenance and version.                                          | D2, D13            |
@@ -1377,7 +1379,7 @@ and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md)
 
 The front page reads the Quickwit contract index built from `ods`. A source schema is never the data source of a page.
 
-### 8.2 Data Layer model
+### 8.2 Data layer model
 
 §2.1 shows the flow of Data Pipeline into these layers.
 
@@ -1388,6 +1390,7 @@ The front page reads the Quickwit contract index built from `ods`. A source sche
 | Integration & Serving | `risk`                                                                                         | Analytical output                | One row per procurement risk decision; one row per risk signal          | Procurement Risk Service                      | Query Service, Metabase (S11)             | `ods` and indicator code          |
 | Control        | `infra`, `auth`, `jobs`                                                                               | Job control and metadata         | One row per setting, key or job          | S1, S5, S9 (§9 Q6)                            | The writing components                    | Migrations and fixtures           |
 
+- The Staging layer also holds stores outside PostgreSQL: the Raw Payload Store (I3) and downloaded files (I4).
 - The Integration & Serving layer also holds stores outside PostgreSQL: document content (I4), search indexes (S2) and
   the AI enrichment store (S3).
 - The Query Service reads only the Integration & Serving layer. Only Normalize & Link and S7 read the Staging layer.
@@ -1501,7 +1504,7 @@ convention, the grain of merged entities and the history model are open (§9 Q3�
   data warehouse.
 - The architecture has no data warehouse and no data mart layer. Source schemas keep source history (G5), the Raw
   Payload Store keeps raw payloads (G6), and `ods` keeps entity versions (§9 Q5).
-- `ods` also holds aggregates. One schema gives Frontend, MCP and risk one read contract.
+- `ods` also holds aggregates. One schema gives Frontend, MCP and the Risk Service one read contract.
 - The `public` schema is not a data layer. It holds PostGIS catalog objects only.
 - The control schemas `infra`, `auth` and `jobs` hold configuration, API keys and job state. They form the Control
   layer, which holds no domain data and which the Query Service does not read.
@@ -1521,7 +1524,7 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    §7.3 shows one database per environment. Alpha migrations and writes never reach production data.
    Option 2: one shared instance. Alpha runs no migrations and no writing apps, and reads through the read-only role only.
    Migrations then reach a database for the first time in `vp-deploy prod`.
-2. **Delivery guarantee of "facts changed" events**: §2.2 and G7 publish the event after commit as a NATS hint, and NATS
+2. **Delivery guarantee of facts changed events**: §2.2 and G7 publish the event after commit as a NATS hint, and NATS
    delivers at most once (`utils/natsHub.js`). A lost event leaves search indexes and risk decisions stale, and no
    component detects it (review P7).
    Question to address: how does each consumer find every committed change?
@@ -1571,13 +1574,14 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    all roles fit within `max_connections`.
    Option 2: one shared `DATABASE_URL_JOBS` role for every app that uses `@viespirkiai/platform/jobs`, plus `DATABASE_URL_*_DIRECT`
    connections that bypass PgBouncer for session features.
-7. **Placement of the AI enrichment store**: §1.2, §3 and §3.1 give S3 its own store, which the Query Service reads. §8
-   knows only source schemas, `ods` and `risk`; T5 puts every shown attribute into `ods`; `pipeline/src/deliver/enrichment/`
-   reads only through `query`, but the `pipeline` container holds the facts writer connection for all stages (§6.1, §6.5). The current code writes LLM descriptions to
+7. **Placement of the AI enrichment store**: §1.2, §3 and §3.1 give S3 its own store, which the Query Service reads. §8.2
+   places that store in the Integration & Serving layer but gives it no schema and no physical form. T5 puts every shown
+   attribute into `ods`. `pipeline/src/deliver/enrichment/` reads only through `query`, but the `pipeline` container
+   holds the facts writer connection for all stages (§6.1, §6.5). The current code writes LLM descriptions to
    `eppsViesiejiPirkimai."aprasymai"` and embeddings to SQLite (`modules/vector`).
    Question to address: where does S3 write, and how do its outputs reach Frontend and MCP?
    Option 1 (recommended): a PostgreSQL schema owned by S3 in `apps/pipeline`, for example `ai`, with its own writer role.
-   §8.2 lists it as a layer, the Query Service reads it, and embeddings use pgvector.
+   §8.2 lists it in the Integration & Serving layer, the Query Service reads it, and embeddings use pgvector.
    Option 2: S3 outputs are an upstream source of Data Ingestion. Extract stages them in a source schema, and Normalize & Link maps them
    into `ods` enrichment.
    Option 3: a store outside PostgreSQL behind `@viespirkiai/data/storage`, for example object storage. The Query Service then
@@ -1595,7 +1599,7 @@ Each question records an inconsistency or a gap that needs a decision. The optio
 9. **Schema verification in CI**: T10 requires CI to verify every `ods` object against the migrated schema, and review
    P1 requires a schema rebuild from the repository. §7.2 principle 3 allows no database in GitHub Actions, while
    `packages/testing` provides a Testcontainers database.
-   Question to address: which pipeline stage applies all migrations to an empty database?
+   Question to address: which CI/CD stage applies all migrations to an empty database?
    Option 1 (recommended): a `schema` job in `ci.yml` with a PostgreSQL and PostGIS service container. It runs
    `vp db migrate` from zero, compiles every view and checks that `packages/data/schema/` is current. Unit tests stay
    without a database.
@@ -1663,9 +1667,9 @@ Each question records an inconsistency or a gap that needs a decision. The optio
     Question to address: which repository builds and signs the release images?
     Option 1: `Viespirkiu-grupe/viespirkiai`, with images under `ghcr.io/viespirkiu-grupe/`.
     Option 2: `racionalas/viespirkiai`, with the `origin` remote changed to match.
-18. **lempa capacity for alpha**: alpha adds a second PostgreSQL, Quickwit and Typesense to lempa (§7.6). The
+18. **`lempa` capacity for alpha**: alpha adds a second PostgreSQL, Quickwit and Typesense to `lempa` (§7.6). The
     production stack has about 21.3 GB of memory limits (`architecture-current.md` §5.1).
-    Question to address: do lempa's free disk and memory hold a full copy of the production database and search
+    Question to address: do the free disk and memory of `lempa` and memory hold a full copy of the production database and search
     indexes?
     Option 1: full restore with low memory limits for alpha.
     Option 2: restore a subset of the data (recent years only) into alpha.
