@@ -28,13 +28,13 @@ The document uses these terms with one meaning each:
 | Functional component      | Unit of responsibility with owned data. It is not necessarily a separate process                             | §1, §3                                                 |
 | Core component            | Functional component that delivers the main value of the system. Diagrams mark it `«core»`                   | §1                                                     |
 | Supporting component      | Functional component that core components need. A core component can own supporting components when it is decomposed. Diagrams mark it `«supporting»` | §2.1, §3                                  |
-| `S1`–`S10`, `I1`–`I9`     | Ids of the supporting components (§3) and of the sub-components of Extract and Normalize & Link (§2.4)        | —                                                      |
+| `S1`–`S11`, `I1`–`I9`     | Ids of the supporting components (§3) and of the sub-components of Extract and Normalize & Link (§2.4)        | —                                                      |
 | Source schema             | PostgreSQL schema that mirrors one upstream source: a persistent staging area                                 | `vpmSutartys`, `eppsViesiejiPirkimai`, `rcJar`; §8.2   |
 | `ods`                     | Operational Data Store: canonical entities, enrichment, link tables, derived tables and views                 | §8                                                     |
 | Fact schemas              | The source schemas and `ods` together. Data Ingestion is their only writer                                    | §1.2, §2.3                                             |
 | Extract                   | Supporting component of Data Ingestion. It collects data from upstream sources into the source schemas and document content | §2.1, §2.4                               |
 | Normalize & Link          | Supporting component of Data Ingestion. It reads the source schemas and writes `ods`                         | §2.1, §2.4                                             |
-| Document content          | Extracted text and OCR results of downloaded files                                                            | I4, `packages/storage`                                 |
+| Document content          | Extracted text and OCR results of downloaded files                                                            | I4, `@viespirkiai/data/storage`                        |
 | Enrichment                | Attributes from registries and classifiers that Normalize & Link adds to `ods` entities                       | §8.3                                                   |
 | AI enrichment             | LLM descriptions and embeddings that S3 writes to the AI enrichment store                                     | S3                                                     |
 | Control schemas           | `infra`, `auth` and `jobs`: runtime configuration, API keys and job state. They form the Control layer        | §3, §8.10                                              |
@@ -44,16 +44,17 @@ The document uses these terms with one meaning each:
 | Data Pipeline             | Core component that holds the ETL components: the Data Ingestion stage and the Deliver stage. Workspace `apps/pipeline` | §1, §3.1, §6.2, §7.7                          |
 | Data Ingestion            | First stage of Data Pipeline: Extract and Normalize & Link. The only writer of the fact schemas              | §2                                                     |
 | Deliver stage             | Second stage of Data Pipeline: S2 Search Indexing and S3 AI Enrichment. It runs after Data Ingestion commits facts | §3, §3.1                                         |
-| Facts changed event       | Hint that Normalize & Link committed changes to `ods` entities in one ingestion run                           | `packages/events`, §2.2                                |
+| Facts changed event       | Hint that Normalize & Link committed changes to `ods` entities in one ingestion run                           | `@viespirkiai/platform/events`, §2.2                   |
 | Ingestion run             | One execution of an ingestion job. `ods` rows store its id in `ikelimoId`                                     | §8.4                                                   |
-| Job                       | Unit of scheduled or queued work that S1 manages. The current code calls it a *task*                          | `packages/jobs`; `tasks/*.js`, `runner/`               |
+| Job                       | Unit of scheduled or queued work that S1 manages. The current code calls it a *task*                          | `@viespirkiai/platform/jobs`; `tasks/*.js`, `runner/`  |
+| Metabase                  | Analytics dashboard service of S11. It reads `ods` and `risk` with the read-only role `METABASE_READER`      | S11, §7.7                                              |
 | Organisation              | Party of a procurement: registered legal entity, foreign company or natural person. Buyer and supplier are roles | `ods."organizacijos"`; §9 Q3, Q11                   |
 | Risk signal               | Result of one risk indicator for one subject                                                                  | `risk."signals"`                                       |
 | Procurement risk decision | Current risk evaluation of one procurement. It groups the risk signals of that procurement                   | `risk."procurementDecisions"`                          |
 | BVPŽ                      | Lithuanian name of the Common Procurement Vocabulary (CPV)                                                    | `bvpzKodai`                                            |
 | `lempa`                   | Primary physical server. It runs the alpha and production environments                                        | §7                                                     |
 | Environment               | `alpha` or `prod` on `lempa`: one data compose project and one business compose project                       | §7.6                                                   |
-| Release                   | Image digests and the `infra/` directory of one published commit on `main`                                    | §7.3, §7.5                                             |
+| Release                   | Image digests and the source tree of one published commit on `main`                                           | §7.3, §7.5                                             |
 | Operator                  | Team member who issues ingestion commands and production deployments                                         | §2.2, §7                                               |
 
 ---
@@ -65,13 +66,13 @@ The system has **five core functional components** around **one shared database*
 | # | Component                    | Purpose (one sentence)                                                                                                                     | Primary actors                                                    |
 |---|------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
 | 1 | **Data Pipeline**            | Brings public data from upstream sources into the Viešpirkiai database as normalised, linked and versioned facts, and delivers search indexes and AI enrichment built from them. | Upstream registries & portals, OCR workers, text extractors, LLM providers, operator |
-| 2 | **Query Service**            | The single read path to Viešpirkiai data: entity lookups, search, relationships, documents and risk results behind stable query contracts. | Frontend, MCP, Procurement Risk Service, Data Pipeline (S3), S4   |
+| 2 | **Query Service**            | The single read path of application code to Viešpirkiai data: entity lookups, search, relationships, documents and risk results behind stable query contracts. | Frontend, MCP, Procurement Risk Service, Data Pipeline (S3), S4   |
+| 3 | **Procurement Risk Service** | Evaluates procurements against risk indicators and records explainable risk decisions.                                                     | Analysts (through Frontend, MCP and S11 Metabase), operator       |
+| 4 | **Frontend**                 | Publishes the data as a searchable public website.                                                                                         | Citizens, journalists, researchers, NGOs                          |
+| 5 | **MCP**                      | Gives LLM agents structured, read-only access to the data through tools.                                                                   | AI agents / MCP clients                                           |
 
 Data Pipeline has two stages: **Data Ingestion** (Extract, Normalize & Link; §2) writes the fact schemas, and the
 **Deliver stage** (S2 Search Indexing, S3 AI Enrichment; §3) writes the derived stores.
-| 3 | **Procurement Risk Service** | Evaluates procurements against risk indicators and records explainable risk decisions.                                                     | Analysts (through Frontend and MCP), operator                     |
-| 4 | **Frontend**                 | Publishes the data as a searchable public website.                                                                                         | Citizens, journalists, researchers, NGOs                          |
-| 5 | **MCP**                      | Gives LLM agents structured, read-only access to the data through tools.                                                                   | AI agents / MCP clients                                           |
 
 ### 1.1 Core functional component diagram
 
@@ -135,7 +136,8 @@ flowchart LR
    search indexes and S3 writes the AI enrichment store. The Risk Service owns `risk` (§8). The writers of the control
    schemas are open (§9 Q6).
 2. **One read path.** Frontend, MCP and the Risk Service never query the database directly. They go through the Query
-   Service. This is the boundary that removes SQL from pages and tools (review P5).
+   Service. This is the boundary that removes SQL from pages and tools (review P5). S11 Metabase is the only
+   exception: it reads `ods` and `risk` directly with the read-only role `METABASE_READER`.
 3. Today both rules are broken:
     - SQL is spread across pages, MCP tools and risk indicators.
     - The Frontend writes OCR results and creates tables at runtime.
@@ -217,7 +219,7 @@ flowchart LR
     docs[("Document content store")]:::store
     s1["«supporting» S1<br/>Job Orchestration"]:::sup
     s6["«supporting» S6<br/>Observability"]:::sup
-    s9["«missing» S9<br/>Operations Console"]:::missing
+    s9["«missing» S9<br/>Operations CLI"]:::missing
     cons["«core / supporting»<br/>Risk · S2 Search Indexing ·<br/>S3 AI Enrichment · S4 Open Data"]:::sup
     iCmd --- ing
     iWork --- ing
@@ -320,7 +322,7 @@ patterns small:
 | I2 | Extract          | **Source Gateway**                  | Outbound access: proxies, Tor, per-source rate limits, request logging, adapters (stage 2)                         | `utils/scrapeFetch.js`, `modules/scrapeProxies/`, `modules/proxy/`, eTarSeimasScraper clients                                                                                  |
 | I3 | Extract          | **Raw Payload Store**               | Retain raw API and HTML payloads for audit and re-processing (stage 3)                                             | sidecar SQLite (`eTar`, `eSeimas`, `liteko2`)                                                                                                                                  |
 | I4 | Extract          | **File & Document Pipeline**        | Download, content-addressed storage, extraction, OCR work distribution, file lookup, document content              | `modules/failai/`, `modules/documents/`, `tasks/dokNuskaitytojai.js`, goViesdeze, OCR endpoints, sidecar SQLite (`failaiInfo`, `dokumentai`, `ocrRezultatai`)                  |
-| I5 | Normalize & Link | **Canonical Model & Normalisation** | Shared entity definitions (`packages/domain`) and one source-to-canonical mapper per source; produces `ods` entity rows (stage 6) | `upsert*.js`, per-module mapping code                                                                                                                                          |
+| I5 | Normalize & Link | **Canonical Model & Normalisation** | Shared entity definitions (`@viespirkiai/data/domain`) and one source-to-canonical mapper per source; produces `ods` entity rows (stage 6) | `upsert*.js`, per-module mapping code                                                                                                                                          |
 | I6 | Normalize & Link | **Reference Data**                  | CPV (BVPŽ), legal forms, addresses and geocoding, classifiers; produces enrichment (stage 7)                        | `modules/bvpz/`, `modules/geografija/`, `modules/liteko2/klasifikatoriai.js`                                                                                                   |
 | I7 | Normalize & Link | **Entity Resolution**               | Match organisations, procurements and contracts across sources; produce link tables and relationship edges (stage 7) | `modules/juridiniai/`, `modules/rysiai/` (building), `modules/2014esinvesticijos/rastiPareiskejuKodus.js`, `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` |
 | I8 | Normalize & Link | **Fact Persistence & Versioning**   | Idempotent upserts, change detection and diffs, provenance, derived tables, notifications (stages 8, 9)            | `sutartys` change tracking, `modules/sutartys/upsertVpmSutartis.js`, `teisekura` editions, `utils/taskSignals.js`                                                              |
@@ -350,8 +352,9 @@ The workspace `apps/pipeline` holds Data Ingestion and the Deliver stage; one co
 | **S6**  | **Observability & Statistics** | Metrics, logs (SQL, scrape, MCP tool calls), ingestion status, job health, alerting, public statistics                                                    | Operator, Frontend (`/statistika`)      | ⚠️ Partial        | `modules/statistika/`, `/metrics`, SQL and scrape log ingest; **no taskRunner health, no alerting**                 |
 | **S7**  | **Schema & Data Governance**   | Versioned migrations, schema documentation, table ownership map, data-quality checks, reconciliation of derived stores                                    | All core components                     | ⚠️ Fragmented     | `migrations/` (incomplete), `postgres/dumpSchema.js`, schema scripts; **no migration runner**                       |
 | **S8**  | **Backup & Recovery**          | PostgreSQL backups with point-in-time recovery, raw payload and document-store backups, file archive backup, **tested restore**                           | Whole system                            | ❌ Mostly missing | Only `modules/s3backup/` (file archive to S3 object storage)                                                                                |
-| **S9**  | **Operations Console**         | Issue ingestion commands; manage runtime configuration kept as data (proxies, workers, storage boxes, API keys, info banner, job toggles)                 | Operator                                | ❌ Missing        | pgAdmin, raw SQL, `npm run` scripts                                                                                 |
+| **S9**  | **Operations CLI**         | `vp` command-line tool on `lempa`: issue ingestion commands; manage runtime configuration kept as data (proxies, workers, storage boxes, API keys, info banner, job toggles)                 | Operator                                | ❌ Missing        | pgAdmin, raw SQL, `npm run` scripts                                                                                 |
 | **S10** | **Configuration & Secrets**    | One source of truth for configuration, secret storage and rotation, per-environment settings                                                              | All components                          | ⚠️ Sprawl         | `config.js`, `.env`, `utils/config*.js`, `ENV.md`                                                                   |
+| **S11** | **Analytics Dashboards**       | Metabase dashboards and saved questions over `ods` and `risk`; direct read-only SQL with `METABASE_READER`                                                | Analysts, operator                      | ❌ Missing        | new: `infra/services/metabase/`                                                                                     |
 
 ### 3.1 Full functional component diagram
 
@@ -369,6 +372,7 @@ flowchart TB
         agent(["«actor»<br/>AI agent"]):::actor
         odc(["«actor»<br/>Open-data consumer"]):::actor
         op(["«actor»<br/>Operator"]):::actor
+        analyst(["«actor»<br/>Analyst"]):::actor
     end
 
     subgraph L2["Consumers"]
@@ -376,6 +380,7 @@ flowchart TB
         mcp["«core»<br/><b>MCP</b>"]:::core
         risk["«core»<br/><b>Procurement Risk Service</b>"]:::core
         s4["«supporting» S4<br/>Open Data Publishing"]:::sup
+        s11["«missing» S11<br/>Analytics Dashboards<br/>Metabase"]:::missing
     end
 
     qs["«core»<br/><b>Query Service</b>"]:::core
@@ -411,7 +416,7 @@ flowchart TB
 
     subgraph L6["Platform & operations (cross-cutting)"]
         s1["«supporting» S1<br/>Job Orchestration"]:::sup
-        s9["«missing» S9<br/>Operations Console"]:::missing
+        s9["«missing» S9<br/>Operations CLI"]:::missing
         s5["«supporting» S5<br/>Identity & Access"]:::sup
         s6["«supporting» S6<br/>Observability & Statistics"]:::sup
         s7["«supporting» S7<br/>Schema & Data Governance"]:::sup
@@ -428,12 +433,15 @@ flowchart TB
     odc --> s4
     op --> s9
     workers -->|" OCR checkout · submit "| extract
+    analyst --> s11
 %% ── Read path (dependencies) ──
     fe --> qs
     mcp --> qs
     risk --> qs
     s4 --> qs
     qs -->|" reads "| ISL
+    s11 -->|" reads SQL, METABASE_READER "| ods
+    s11 -->|" reads SQL, METABASE_READER "| riskdb
 %% ── Data Pipeline: Deliver stage ──
    s2 -->|" reads "| ods
    s2 -->|" reads "| docs
@@ -464,7 +472,8 @@ flowchart TB
 ```
 
 This diagram shows **dependencies** and **writes into owned stores**. The Query Service reads only the Integration &
-Serving layer; the Staging layer is internal to the data pipeline. Platform components (S5–S10) are cross-cutting;
+Serving layer; the Staging layer is internal to the data pipeline. S11 Metabase reads `ods` and `risk` directly.
+Platform components (S5–S10) are cross-cutting;
 only their data-store edges are drawn, to keep the diagram readable.
 
 ---
@@ -479,7 +488,7 @@ P8).
    to **Extract**. Mapping, enrichment and linking into `ods` go to **Normalize & Link**.
 2. **Does it read Viešpirkiai data for someone else?** → it is a query in the **Query Service**. No other component
    issues read SQL against source, `ods` or `risk` schemas. The exceptions: a writer reads its own schemas, S2 index
-   builders read `ods`, and S7 governance tooling reads every schema.
+   builders read `ods`, S11 Metabase reads `ods` and `risk`, and S7 governance tooling reads every schema.
 3. **Does it show data to humans?** → **Frontend**, using only the Query Service.
 4. **Does it expose data to AI agents?** → **MCP**, using only the Query Service.
 5. **Does it compute a judgement about procurements** (score, flag, indicator)? → **Procurement Risk Service.** It reads
@@ -505,7 +514,7 @@ P8).
 | LLM description generation (`scripts/aprasyti*.js`) writes `eppsViesiejiPirkimai."aprasymai"`                                  | AI enrichment mixed with ingestion; writes a source schema                | **S3 AI Enrichment** (AI enrichment store)                                                 |
 | `export:*`, `push:*` scripts inside source modules                                       | Distribution mixed with ingestion                            | **S4 Open Data Publishing**                                                      |
 | MCP tool-call logging to the database and Quickwit                                       | Consumer writes data                                         | **S6 Observability**                                                             |
-| Info banner table created and edited through the Frontend                                | Runtime DDL, no admin UI                                     | **S9 Operations Console**, S7 migrations                                         |
+| Info banner table created and edited through the Frontend                                | Runtime DDL, no admin UI                                     | **S9 Operations CLI**, S7 migrations                                         |
 | `modules/risk` run manually via `npm run risk:run`                                       | Core component without scheduling                            | **Procurement Risk Service**, scheduled through S1, triggered by "facts changed" |
 | 115 self-executing files and 87 files with `process.exit` in `modules/`                     | CLI entry points inside library code                         | Ingestion commands via **S9** / **S7** tooling                                   |
 | Entity resolution in page services: `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` | Links are computed per request and never stored (review D5)  | **Normalize & Link** (I7), `ods` link tables (§8.5)                              |
@@ -517,25 +526,29 @@ P8).
 
 ## 6. Monorepo structure (npm workspaces)
 
-The repository stays a single GitHub monorepo, organised with **npm workspaces**. Each workspace is one functional
+The repository stays a single GitHub monorepo, organised with **npm workspaces**. Each app workspace is one functional
 component from §1–3. Its build, test and run commands, its dependencies and its configuration belong to that workspace
 alone.
 
 ### 6.1 Design principles
 
-1. **Workspace = functional component.** Each core component, and each supporting component that no core component
-   owns, has one primary workspace (§6.3). A supporting component that a core component owns is a folder in the
-   workspace of that core component: `apps/pipeline` (Data Pipeline) holds Extract and Normalize & Link under
-   `src/ingestion/`, and S2 and S3 under `src/deliver/`. Shared
-   technical packages (`domain`, `events`, `search`, `storage`, `testing`) serve several components. S8 lives in
-   `infra/backup/`, which is not a workspace.
+1. **App workspace = functional component.** Each core component, and each supporting component with its own process,
+   has one app workspace (§6.3). A supporting component that a core component owns is a folder in the workspace of that
+   core component: `apps/pipeline` (Data Pipeline) holds Extract and Normalize & Link under `src/ingestion/`, and S2 and
+   S3 under `src/deliver/`.
 2. **Two kinds of workspaces.**
-    - `apps/*` are **deployable**: they have an entrypoint, a config schema, a Dockerfile and runtime dependencies.
+    - `apps/*` are **deployable**: they have an entrypoint, a config schema and runtime dependencies. Every app
+      except `ops` has a Dockerfile; `ops` runs from the release directory on `lempa` (§7.5).
     - `packages/*` are **libraries**: no process, no environment reading, no `process.exit`.
 3. **Dependencies point inward only.** Apps depend on packages. Packages never import apps. Apps never import other
-   apps; they communicate through database contracts, events or HTTP.
-4. **Imports go through declared dependencies and each package's `exports` entry.** Deep imports
-   (`@viespirkiai/query/src/…`) are forbidden.
+   apps; they communicate through database contracts, S1 jobs, events or HTTP.
+4. **Imports go through declared dependencies and each package's subpath `exports`.** Deep imports
+   (`@viespirkiai/query/src/…`) are forbidden. dependency-cruiser enforces these boundary rules in CI:
+    - `web`, `mcp` and `open-data` import no `@viespirkiai/data` module. They read data only through `query`.
+    - Only `pipeline/src/ingestion/**` imports `@viespirkiai/data/database/facts-writer`. Only `risk` imports
+      `@viespirkiai/data/database/risk-writer`. PostgreSQL role grants enforce the same rule.
+    - Inside `pipeline`, `src/ingestion/extract/**`, `src/ingestion/normalize-link/**` and `src/deliver/**` never import
+      each other.
 5. **Plain npm workspaces, no extra monorepo tool.**
     - Node 24 runs TypeScript directly (built-in type stripping); `tsc -b` only type-checks.
     - Only the Astro app has a real build step.
@@ -544,9 +557,11 @@ alone.
    parameters. There is no global `CONFIG`.
 7. **Strict TypeScript everywhere.** New code is TypeScript; existing JavaScript is converted when its module moves into
    a workspace.
-8. **Create a package only when it is shared.** Code used by one workspace stays inside it; for example, the design
-   system stays in `apps/web`. A package exists only for a functional component or for code used by two or more
-   workspaces.
+8. **Few packages, grouped by consumers and runtime dependencies.**
+    - A package groups modules that the same workspaces import and that change together.
+    - Subpath `exports` (`@viespirkiai/platform/jobs`) separate the modules inside one package.
+    - A module becomes its own package only when its consumers or its runtime dependencies differ.
+    - Code used by one workspace stays inside it; for example, the design system stays in `apps/web`.
 9. **Versioned agent instructions.** A root `AGENTS.md`, plus a short `AGENTS.md` per workspace stating its
    responsibility, allowed dependencies and commands (review P8).
 
@@ -559,7 +574,7 @@ viespirkiai/
 ├── tsconfig.base.json              # strict · module "nodenext" · erasableSyntaxOnly · verbatimModuleSyntax
 ├── tsconfig.json                   # project references to every workspace (tsc -b)
 ├── eslint.config.js                # flat config: import hygiene, no process.env outside config.ts
-├── .dependency-cruiser.cjs         # architecture rules from §6.4, enforced in CI
+├── .dependency-cruiser.cjs         # boundary rules from §6.1, enforced in CI
 ├── .node-version                   # 24
 ├── .editorconfig
 ├── AGENTS.md                       # repository-wide agent instructions (versioned)
@@ -646,10 +661,10 @@ viespirkiai/
 │   │   └── test/
 │   │
 │   ├── open-data/                  # «supporting» S4 Open Data Publishing · @viespirkiai/open-data
-│   └── ops/                        # «supporting» S9 Operations Console · @viespirkiai/ops
+│   └── ops/                        # «supporting» S9 Operations CLI · @viespirkiai/ops · no image: runs on lempa (§7.5)
 │       ├── package.json            # "bin": { "vp": "./src/cli.ts" }
 │       └── src/
-│           ├── cli.ts              # vp ingestion run|backfill|requeue · vp db migrate · vp backup verify
+│           ├── cli.ts              # vp commands of §6.4
 │           └── commands/
 │
 ├── packages/                       # ── libraries: no entrypoints, no env reading, no process.exit ──
@@ -668,42 +683,54 @@ viespirkiai/
 │   │   │   └── analyst-sql/        # bounded ad-hoc SQL
 │   │   └── test/
 │   │
-│   ├── domain/                     # canonical model: entity types, identifiers, Money, dates
-│   ├── database/                   # «supporting» S7 Schema & Data Governance
-│   │   ├── src/                    # role-scoped pools: readOnly · analyst · factsWriter · riskWriter · migrator (§6.6)
+│   ├── data/                       # «supporting» S7 Schema & Data Governance · @viespirkiai/data
+│   │   ├── package.json            # "exports": ./domain · ./database · ./database/facts-writer · ./database/risk-writer · ./search · ./storage
+│   │   ├── AGENTS.md
+│   │   ├── src/
+│   │   │   ├── domain/             # canonical model (I5): entity types, identifiers, Money, dates
+│   │   │   ├── database/           # role-scoped pools: readOnly · analyst · factsWriter · riskWriter · migrator (§6.5)
+│   │   │   ├── search/             # Quickwit and Typesense clients, index definitions
+│   │   │   └── storage/            # file store, document content, raw payload stores
 │   │   ├── migrations/
 │   │   │   ├── source/             # source schemas, owned by apps/pipeline (Extract)
 │   │   │   ├── ods/                # Operational Data Store, owned by apps/pipeline (Normalize & Link)
 │   │   │   ├── risk/               # owned by apps/risk
 │   │   │   └── control/            # infra · auth · jobs
-│   │   └── schema/                 # generated schema documentation (committed)
-│   ├── jobs/                       # «supporting» S1 Job Orchestration: queues, schedules, retries
-│   ├── events/                     # "facts changed" event contracts + transport (NATS)
-│   ├── search/                     # Quickwit and Typesense clients, index definitions
-│   ├── storage/                    # file store, document content, raw payload stores
-│   ├── auth/                       # «supporting» S5 Identity & Access: API keys, rate limiting
-│   ├── config/                     # «supporting» S10 typed env loader (zod) used by every app's config.ts
-│   ├── observability/              # «supporting» S6 structured logging, metrics, health checks
-│   └── testing/                    # fixtures, test database (Testcontainers), fakes
+│   │   ├── schema/                 # generated schema documentation (committed)
+│   │   └── test/
+│   │
+│   ├── platform/                   # «supporting» S1 · S5 · S6 · S10 · @viespirkiai/platform
+│   │   ├── package.json            # "exports": ./config · ./observability · ./auth · ./jobs · ./events
+│   │   ├── AGENTS.md
+│   │   ├── src/
+│   │   │   ├── config/             # S10 typed env loader (zod) used by every app's config.ts
+│   │   │   ├── observability/      # S6 structured logging, metrics, health checks
+│   │   │   ├── auth/               # S5 API keys, rate limiting
+│   │   │   ├── jobs/               # S1 queues, schedules, retries
+│   │   │   └── events/             # "facts changed" event contracts + transport (NATS)
+│   │   └── test/
+│   │
+│   └── testing/                    # dev only: fixtures, test database (Testcontainers), fakes
 │
 ├── infra/                          # ── how it runs; no application code, not a workspace ──
 │   ├── ci/
 │   │   ├── images.json             # image name → Dockerfile, target, workspace (§7.4)
-│   │   ├── affected-images.ts      # changed paths + workspace graph → images to build
-│   │   └── it.Dockerfile           # integration test image: sources, devDependencies, *.it.ts suites (§7.4)
+│   │   └── affected-images.ts      # changed paths + workspace graph → images to build
 │   ├── compose/                    # see §7.6
-│   │   ├── viespirkiai-business-compose.yaml  # long-running apps of §6.3 · migrate; images by digest; alpha and production
-│   │   ├── viespirkiai-data-compose.yaml      # PostgreSQL · PgBouncer · Quickwit · Typesense · NATS; alpha and production
+│   │   ├── viespirkiai-business-compose.yaml  # long-running apps of §6.3; images by digest; alpha and production
+│   │   ├── viespirkiai-data-compose.yaml      # PostgreSQL · PgBouncer · Quickwit · Typesense · NATS · Metabase; alpha and production
 │   │   ├── dev.yaml                # local development services
 │   │   └── env/
 │   │       ├── alpha.env           # non-secret alpha values
 │   │       └── prod.env            # non-secret production values
-│   ├── deploy/                     # vp-deploy agent + systemd timer for lempa (§7.5)
-│   ├── cloudflared/                # tunnel ingress: viespirkiai.org, alpha.viespirkiai.org
-│   ├── postgres/                   # image (PostGIS, pg_repack) and configuration
-│   ├── pgbouncer/
-│   ├── quickwit/
-│   ├── typesense/
+│   ├── deploy/                     # vp-deploy agent, vp wrapper, systemd timer for lempa (§7.5)
+│   ├── services/                   # image and configuration of each third-party service
+│   │   ├── postgres/               # PostGIS, pg_repack
+│   │   ├── pgbouncer/
+│   │   ├── quickwit/
+│   │   ├── typesense/
+│   │   ├── metabase/               # «supporting» S11 Analytics Dashboards: application database, data source roles
+│   │   └── cloudflared/            # tunnel ingress: viespirkiai.org, alpha.viespirkiai.org
 │   └── backup/                     # «supporting» S8 Backup & Recovery: scripts and restore runbook
 │
 └── docs/
@@ -714,213 +741,89 @@ viespirkiai/
 
 ### 6.3 Workspace to functional component map
 
-| Workspace                | Package                      | Functional component                       | Runs as                                 | Moves from (today)                                                                           |
-|--------------------------|------------------------------|--------------------------------------------|-----------------------------------------|----------------------------------------------------------------------------------------------|
-| `apps/web`               | `@viespirkiai/web`           | «core» Frontend                            | `astro build` → Node server             | `src/`, `start-server.mjs`, `astro.config.mjs`                                               |
-| `apps/mcp`               | `@viespirkiai/mcp`           | «core» MCP                                 | `node src/main.ts`                      | `modules/mcp/`, `src/pages/mcp.astro`, `src/lib/mcp.ts`                                      |
-| `apps/pipeline`          | `@viespirkiai/pipeline`      | «core» Data Pipeline: Data Ingestion (Extract, Normalize & Link), S2 Search Indexing, S3 AI Enrichment | `node src/main.ts`                      | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints, matching logic in `src/lib/sutartisPirkimai.ts` and `src/lib/ppa.ts`; `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/`; `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js` |
-| `apps/risk`              | `@viespirkiai/risk`          | «core» Procurement Risk Service            | `node src/main.ts` (scheduled)          | `modules/risk/`, `services/procurement-risk/`                                                |
-| `apps/open-data`         | `@viespirkiai/open-data`     | S4 Open Data Publishing                    | `node src/main.ts`                      | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket         |
-| `apps/ops`               | `@viespirkiai/ops`           | S9 Operations Console                      | `vp <command>`                          | about 80 `npm run` scripts, `scripts/`                                                       |
-| `packages/query`         | `@viespirkiai/query`         | «core» Query Service                       | library                                 | `src/lib/*`, SQL in pages, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/analyst/` |
-| `packages/domain`        | `@viespirkiai/domain`        | Canonical model (I5)                       | library                                 | new                                                                                          |
-| `packages/database`      | `@viespirkiai/database`      | S7 Schema & Data Governance                | library + migrations                    | `postgres/`, `migrations/`, `dbSchema/`                                                      |
-| `packages/jobs`          | `@viespirkiai/jobs`          | S1 Job Orchestration                       | library                                 | `runner/`, per-module queues                                                                 |
-| `packages/events`        | `@viespirkiai/events`        | "Facts changed" contract                   | library                                 | `utils/natsHub.js`, `utils/taskSignals.js`                                                   |
-| `packages/search`        | `@viespirkiai/search`        | Search clients (used by query and pipeline) | library                                 | `quickwit/quickwit.js`, `typesense/`                                                         |
-| `packages/storage`       | `@viespirkiai/storage`       | Document and raw payload stores            | library                                 | `utils/sidecar*.js`, `modules/failai/failaiFs.js`, `modules/ocr/rezultataiFs.js`             |
-| `packages/auth`          | `@viespirkiai/auth`          | S5 Identity & Access                       | library                                 | `modules/failai/auth.js`, `src/lib/botChallenge.ts`                                          |
-| `packages/config`        | `@viespirkiai/config`        | S10 Configuration & Secrets                | library                                 | `utils/config*.js`                                                                           |
-| `packages/observability` | `@viespirkiai/observability` | S6 Observability                           | library                                 | `utils/log.js`, SQL and scrape log ingest, metrics                                           |
-| `packages/testing`       | `@viespirkiai/testing`       | Test support                               | dev library                             | `test/mocks/`                                                                                |
-| `infra/backup`           | —                            | S8 Backup & Recovery                       | scripts, runbook                        | `modules/s3backup/` + new database backups                                                   |
+The repository has **six app workspaces and four package workspaces**.
 
-### 6.4 Workspace dependency rules
+| Workspace            | Package                  | Functional component                                                                                   | Workspace dependencies      | Runs as                        | Moves from (today)                                                                                                                                                                                                                                                                                                     |
+|----------------------|--------------------------|--------------------------------------------------------------------------------------------------------|-----------------------------|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `apps/web`           | `@viespirkiai/web`       | «core» Frontend                                                                                        | `query`, `platform`         | `astro build` → Node server    | `src/`, `start-server.mjs`, `astro.config.mjs`                                                                                                                                                                                                                                                                         |
+| `apps/mcp`           | `@viespirkiai/mcp`       | «core» MCP                                                                                             | `query`, `platform`         | `node src/main.ts`             | `modules/mcp/`, `src/pages/mcp.astro`, `src/lib/mcp.ts`                                                                                                                                                                                                                                                                |
+| `apps/pipeline`      | `@viespirkiai/pipeline`  | «core» Data Pipeline: Data Ingestion (Extract, Normalize & Link), S2 Search Indexing, S3 AI Enrichment | `query`, `data`, `platform` | `node src/main.ts`             | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints, matching logic in `src/lib/sutartisPirkimai.ts` and `src/lib/ppa.ts`; `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/`; `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js` |
+| `apps/risk`          | `@viespirkiai/risk`      | «core» Procurement Risk Service                                                                        | `query`, `data`, `platform` | `node src/main.ts` (scheduled) | `modules/risk/`, `services/procurement-risk/`                                                                                                                                                                                                                                                                          |
+| `apps/open-data`     | `@viespirkiai/open-data` | S4 Open Data Publishing                                                                                | `query`, `platform`         | `node src/main.ts`             | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket                                                                                                                                                                                                                                   |
+| `apps/ops`           | `@viespirkiai/ops`       | S9 Operations CLI                                                                                  | `data`, `platform`          | `vp <command>` on `lempa`      | about 80 `npm run` scripts, `scripts/`                                                                                                                                                                                                                                                                                 |
+| `packages/query`     | `@viespirkiai/query`     | «core» Query Service                                                                                   | `data`                      | library                        | `src/lib/*`, SQL in pages, `modules/*/search*.js`, `modules/rysiai/`, `modules/mcp/analyst/`                                                                                                                                                                                                                           |
+| `packages/data`      | `@viespirkiai/data`      | S7 Schema & Data Governance; canonical model (I5); search and storage clients                          | —                           | library + migrations           | `postgres/`, `migrations/`, `dbSchema/`, `quickwit/quickwit.js`, `typesense/`, `utils/sidecar*.js`, `modules/failai/failaiFs.js`, `modules/ocr/rezultataiFs.js`                                                                                                                                                        |
+| `packages/platform`  | `@viespirkiai/platform`  | S1 Job Orchestration, S5 Identity & Access, S6 Observability, S10 Configuration, facts changed events  | `data`                      | library                        | `runner/`, per-module queues, `utils/natsHub.js`, `utils/taskSignals.js`, `modules/failai/auth.js`, `src/lib/botChallenge.ts`, `utils/config*.js`, `utils/log.js`, SQL and scrape log ingest, metrics                                                                                                                 |
+| `packages/testing`   | `@viespirkiai/testing`   | Test support                                                                                           | `data`                      | dev library                    | `test/mocks/`                                                                                                                                                                                                                                                                                                          |
+| `infra/backup`       | —                        | S8 Backup & Recovery                                                                                   | —                           | host scripts, runbook          | `modules/s3backup/` + new database backups                                                                                                                                                                                                                                                                             |
+| `infra/services/metabase` | —                   | S11 Analytics Dashboards                                                                               | —                           | Metabase container             | new                                                                                                                                                                                                                                                                                                                    |
 
-```mermaid
-flowchart TB
-    classDef app fill: #dbe9fb, stroke: #1f5fa8, stroke-width: 2px, color: #0b2545
-    classDef supapp fill: #f5f9ff, stroke: #1f5fa8, stroke-dasharray: 3 2, color: #0b2545
-    classDef pkg fill: #eef7ee, stroke: #2e7d32, color: #123d14
-    classDef xcut fill: #fafafa, stroke: #888, stroke-dasharray: 3 2, color: #333
+`infra/*` directories are not workspaces. The packages group their modules by consumers and runtime dependencies (§6.1,
+principle 8):
 
-    subgraph APPS["apps/* (deployable)"]
-        web["web"]:::app
-        mcp["mcp"]:::app
-        risk["risk"]:::app
-        pipeline["pipeline"]:::app
-        opendata["open-data"]:::supapp
-        ops["ops"]:::supapp
-    end
+| Package    | Modules (subpath `exports`)                                                        | Imported by                                   | Separate package because                                                                  |
+|------------|------------------------------------------------------------------------------------|-----------------------------------------------|-------------------------------------------------------------------------------------------|
+| `query`    | one entry: the query contract                                                      | `web`, `mcp`, `pipeline`, `risk`, `open-data` | It is a core component. Its contract is the read boundary of §1.2                         |
+| `data`     | `domain`, `database`, `database/facts-writer`, `database/risk-writer`, `search`, `storage` | `query`, `platform`, `pipeline`, `risk`, `ops`, `testing` | It holds the writer pools and migrations. `web`, `mcp` and `open-data` MUST NOT import it |
+| `platform` | `config`, `observability`, `auth`, `jobs`, `events`                                | every app                                     | Every app needs these runtime services; they read no domain data                          |
+| `testing`  | fixtures, Testcontainers database, fakes                                           | every workspace, as `devDependency`           | Testcontainers MUST NOT reach a production image                                          |
 
-    subgraph PKGS["packages/* (libraries)"]
-        query["query"]:::pkg
-        domain["domain"]:::pkg
-        database["database"]:::pkg
-        search["search"]:::pkg
-        storage["storage"]:::pkg
-        jobs["jobs"]:::pkg
-        events["events"]:::pkg
-        auth["auth"]:::pkg
-    end
+### 6.4 Commands
 
-    xc["config · observability · testing<br/>(allowed everywhere)"]:::xcut
-    web --> query
-    web --> auth
-    mcp --> query
-    mcp --> auth
-    risk --> query
-    risk --> database
-    risk --> jobs
-    risk --> events
-    opendata --> query
-    opendata --> jobs
-    pipeline --> query
-    pipeline --> domain
-    pipeline --> database
-    pipeline --> search
-    pipeline --> storage
-    pipeline --> jobs
-    pipeline --> events
-    pipeline --> auth
-    ops --> database
-    ops --> jobs
-    query --> domain
-    query --> database
-    query --> search
-    query --> storage
-    jobs --> database
-```
+| Command                                                                     | Defined in                          | Runs in                                         | Purpose                                                                                     | Replaces (today)                                                                                                                                                                                                                                                                                                                                                                  |
+|-----------------------------------------------------------------------------|-------------------------------------|-------------------------------------------------|---------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `npm ci`                                                                    | root                                | developer, CI, Dockerfiles                      | Install all workspaces from one lockfile; `-w <workspace>` installs one workspace            | `npm ci`                                                                                                                                                                                                                                                                                                                                                                          |
+| `npm install <pkg> -w <workspace>`                                          | root                                | developer                                       | Add a dependency to one workspace                                                           | `npm install <pkg>`                                                                                                                                                                                                                                                                                                                                                               |
+| `npm run dev -w @viespirkiai/web`                                           | `apps/web`                          | developer                                       | Astro dev server with hot reload                                                            | `npm run dev`                                                                                                                                                                                                                                                                                                                                                                     |
+| `npm run dev -w @viespirkiai/<app>`                                         | `apps/mcp`, `pipeline`, `risk`, `open-data` | developer                               | `node --watch --env-file=.env src/main.ts`                                                  | `node tasks/index.js`, `startTaskRunner.sh`                                                                                                                                                                                                                                                                                                                                       |
+| `npm start -w @viespirkiai/<app>`                                           | every app                           | app container                                   | Start the app entrypoint                                                                    | `npm start`, `node tasks/index.js`                                                                                                                                                                                                                                                                                                                                                |
+| `npm run build`                                                             | root → `apps/web`                   | developer, CI                                   | `astro build`, public links and build info; other workspaces have no build step             | `npm run build`                                                                                                                                                                                                                                                                                                                                                                   |
+| `npm run typecheck`                                                         | root → every workspace              | developer, CI                                   | `tsc -b`; `astro check` in `apps/web`                                                       | `npm run check`                                                                                                                                                                                                                                                                                                                                                                   |
+| `npm run lint`                                                              | root                                | developer, CI                                   | ESLint over all workspaces                                                                  | —                                                                                                                                                                                                                                                                                                                                                                                 |
+| `npm run boundaries`                                                        | root                                | developer, CI                                   | dependency-cruiser rules of §6.1                                                            | —                                                                                                                                                                                                                                                                                                                                                                                 |
+| `npm test [-w <workspace>]`                                                 | every workspace                     | developer, CI                                   | Vitest unit tests; no network, no database                                                  | `npm test`                                                                                                                                                                                                                                                                                                                                                                        |
+| `npm run test:integration`                                                  | apps, `packages/query`              | release directory on `lempa` (§7.5)             | Read-only `*.it.ts` suites against the environment database                                 | `npm run test:integration`                                                                                                                                                                                                                                                                                                                                                        |
+| `npm run check`                                                             | root                                | developer                                       | lint, typecheck, boundaries and unit tests                                                  | `npm run check`                                                                                                                                                                                                                                                                                                                                                                   |
+| `npm run deps:report`, `npm run code:lines`                                 | root                                | developer                                       | Dependency size and code size reports                                                       | same                                                                                                                                                                                                                                                                                                                                                                              |
+| `vp ingestion run \| backfill \| reprocess \| requeue --source <source>`    | `apps/ops`                          | S1 job, executed by `apps/pipeline`             | Run, backfill or re-process one source; requeue records                                     | `kotis:*`, `ppa:*`, `liteko2:*`, `eseimas:scrape`, `etar:dokumentai:backfill`, `etar:dokumentai:process`, `juridiniai:atnaujinti`, `juridiniai:papildomi`, `juridiniai:process`, `juridiniai:backfill`, `rcjar:dokumentai:*`, `esinvesticijos:*`, `cpva:projektai`, `regitra:atnaujinti`, `sodra:atnaujinti`, `adresuRegistras:importuoti`, `vptAtaskaitos:importuoti`, `scrape:planuojami-pirkimai`, `sutartys:canonical-json`, `sutartys:rescrape-recent`, `sutartys:rebuildDiffs`, `sutartys:dropEmptyChanges`, `process:*-adp-queue`, `failai:*`, `sidecars:sqlite-missing` |
+| `vp ingestion pause \| resume \| status \| audit --source <source>`         | `apps/ops`                          | S1 job, executed by `apps/pipeline`             | Pause or resume a source; show freshness; audit coverage and versions                       | `etar:dokumentai:audit`, `teisekura:audit`, `teisekura:palyginti`, `sutartys:changes`                                                                                                                                                                                                                                                                                             |
+| `vp index rebuild \| requeue --index <index>`                               | `apps/ops`                          | S1 job, executed by `apps/pipeline` (S2)        | Rebuild or requeue a Quickwit or Typesense index                                            | `quickwit:*`, `juridiniai:typesense`, `juridiniai:typesense:requeue`                                                                                                                                                                                                                                                                                                              |
+| `vp enrich describe \| embed`                                               | `apps/ops`                          | S1 job, executed by `apps/pipeline` (S3)        | Generate LLM descriptions and embeddings                                                    | `pirkimas:aprasas`, `pirkimai:aprasyti`, `pirkimai:aprasymu-eile`, `sutartys:aprasyti`, `vector:*`                                                                                                                                                                                                                                                                                |
+| `vp risk run [--procurement <key>]`                                         | `apps/ops`                          | S1 job, executed by `apps/risk`                 | Evaluate all procurements or one procurement                                                | `risk:run`                                                                                                                                                                                                                                                                                                                                                                        |
+| `vp open-data export \| push --dataset <dataset>`                           | `apps/ops`                          | S1 job, executed by `apps/open-data`            | Write a bulk export or push a dataset to Spinta                                             | `export:*`, `push:sutartys`, `push:domenai`                                                                                                                                                                                                                                                                                                                                       |
+| `vp db migrate`                                                             | `apps/ops`                          | `lempa` host, release directory (§7.5 step 5)   | Apply the migrations of `packages/data/migrations/`                                         | manual SQL                                                                                                                                                                                                                                                                                                                                                                        |
+| `vp db schema dump \| comments \| writers`                                  | `apps/ops`                          | developer or `lempa` host                       | Regenerate `packages/data/schema/`; report missing table comments and table writers         | `db:schema:dump`, `db:schema:komentarai`, `db:schema:rasytojai`                                                                                                                                                                                                                                                                                                                   |
+| `vp backup status \| verify`                                                | `apps/ops`                          | `lempa` host                                    | Show backup age and errors; run a restore check                                             | `s3backup:status`, `s3backup:klaidos`, `s3backup:get`                                                                                                                                                                                                                                                                                                                             |
+| `vp config proxy \| worker \| storage-box \| key \| banner \| job`          | `apps/ops`                          | `lempa` host                                    | Manage runtime configuration in the control schemas                                         | pgAdmin, raw SQL, info banner editing in the Frontend                                                                                                                                                                                                                                                                                                                             |
+| `infra/backup/*` scripts                                                    | `infra/backup`                      | `lempa` host, systemd timer                     | Back up PostgreSQL, document content and the file archive                                   | `s3backup:queue`, `s3backup:upload`, `s3backup:requeue`                                                                                                                                                                                                                                                                                                                           |
+| `vp-deploy watch \| it \| alpha \| prod \| rollback \| status \| data \| refresh-alpha-db` | `infra/deploy`       | `lempa` host                                    | Deploy and test releases (§7.5)                                                             | manual deployment                                                                                                                                                                                                                                                                                                                                                                 |
+| `docker compose -f infra/compose/dev.yaml up <service> -d`                  | `infra/compose`                     | developer                                       | Start local PostgreSQL, PgBouncer, Quickwit, Typesense, NATS or Metabase                    | `docker compose up <service> -d`                                                                                                                                                                                                                                                                                                                                                  |
 
-Solid arrows are allowed dependencies. Any dependency not drawn is forbidden. `config`, `observability` and `testing` are
-cross-cutting and may be used by every workspace.
+### 6.5 Configuration to workspace map
 
-| Rule                                                                                                                   | Enforced by                                                                                     |
-|------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| `apps/*` import only `packages/*`; never another app                                                                   | dependency-cruiser in CI                                                                        |
-| `packages/*` never import `apps/*`                                                                                     | dependency-cruiser in CI                                                                        |
-| `web`, `mcp`, `open-data` and `pipeline/src/deliver/enrichment/**` read data **only through `query`**; the three apps have no `database` dependency | dependency-cruiser + `package.json` review (CODEOWNERS)                                         |
-| Only `pipeline/src/ingestion/**` imports `@viespirkiai/database/facts-writer`; only `risk` imports `@viespirkiai/database/risk-writer` | Per-role `exports` entries + dependency-cruiser + **PostgreSQL role grants** (defence in depth) |
-| Inside `pipeline`, `src/ingestion/extract/**` and `src/ingestion/normalize-link/**` never import each other; they meet only at the source schemas | dependency-cruiser in CI                                                          |
-| Inside `pipeline`, `src/deliver/**` never imports `src/ingestion/**`; it reads the Integration & Serving layer and receives facts changed events | dependency-cruiser in CI                                                          |
-| No deep imports; only paths listed in `exports`                                                                        | Node `exports` resolution + ESLint                                                              |
-| Every import is a declared dependency (npm hoisting would otherwise hide mistakes)                                     | ESLint `import/no-extraneous-dependencies` or `knip`                                            |
-| No `process.env` outside an app's `src/config.ts`; no `process.exit` or top-level side effects in packages             | ESLint (`n/no-process-env`, custom rule)                                                        |
+| Workspace or directory                                   | Configuration files                                                                       | Runtime values on `lempa`                                                  | Database connections                                  |
+|----------------------------------------------------------|-------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|-------------------------------------------------------|
+| root                                                     | `tsconfig.base.json`, `tsconfig.json`, `eslint.config.js`, `.dependency-cruiser.cjs`, `.node-version` | —                                                              | —                                                     |
+| `apps/web`                                               | `src/config.ts`, `.env.example`, `astro.config.ts`                                        | `env/<env>.env`, `secrets/web.env`                                         | `DATABASE_URL_READONLY`                               |
+| `apps/mcp`                                               | `src/config.ts`, `.env.example`                                                           | `env/<env>.env`, `secrets/mcp.env`                                         | `DATABASE_URL_READONLY`, `DATABASE_URL_ANALYST`       |
+| `apps/pipeline`                                          | `src/config.ts`, `.env.example`                                                           | `env/<env>.env`, `secrets/pipeline.env`                                    | `DATABASE_URL_FACTS_WRITER`, `DATABASE_URL_READONLY`  |
+| `apps/risk`                                              | `src/config.ts`, `.env.example`                                                           | `env/<env>.env`, `secrets/risk.env`                                        | `DATABASE_URL_READONLY`, `DATABASE_URL_RISK_WRITER`   |
+| `apps/open-data`                                         | `src/config.ts`, `.env.example`                                                           | `env/<env>.env`, `secrets/open-data.env`                                   | `DATABASE_URL_READONLY`                               |
+| `apps/ops`                                               | `src/config.ts`, `.env.example`                                                           | `secrets/ops.env`, read by the `vp` wrapper                                | `DATABASE_URL_MIGRATOR` (PostgreSQL `127.0.0.1`)      |
+| `packages/query`, `packages/data`, `packages/platform`   | none; typed settings arrive as function parameters. `@viespirkiai/platform/config` provides the zod loader | —                                                         | Pools from the connection strings of the calling app  |
+| `packages/testing`                                       | Testcontainers settings in the test setup                                                 | —                                                                          | Test database                                         |
+| Integration tests (`*.it.ts` in apps, `packages/query`)  | `vitest.integration.config.ts`                                                            | `secrets/it.env`, read by `vp-deploy`                                      | `DATABASE_URL_READONLY` (PgBouncer `127.0.0.1`)       |
+| `infra/ci`                                               | `images.json`, `affected-images.ts`                                                       | —                                                                          | —                                                     |
+| `infra/compose`                                          | `viespirkiai-business-compose.yaml`, `viespirkiai-data-compose.yaml`, `dev.yaml`          | `env/alpha.env`, `env/prod.env` (committed)                                | —                                                     |
+| `infra/services/postgres`, `pgbouncer`, `quickwit`, `typesense` | Service configuration files                                                        | `secrets/<service>.env`                                                    | —                                                     |
+| `infra/services/metabase`                                | Data source definitions for `ods` and `risk`                                              | `secrets/metabase.env`: `MB_DB_*`, `MB_ENCRYPTION_SECRET_KEY`              | `METABASE_APP` (database `metabase`), `METABASE_READER` |
+| `infra/services/cloudflared`                             | `config.yml`                                                                              | Tunnel credentials                                                         | —                                                     |
+| `infra/deploy`                                           | `vp-deploy`, systemd units                                                                | `/srv/viespirkiai/deploy.env`                                              | —                                                     |
 
-### 6.5 Commands
-
-**Root `package.json`**, which orchestrates only:
-
-```json
-{
-  "name": "viespirkiai",
-  "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "scripts": {
-    "dev:web": "npm run dev -w @viespirkiai/web",
-    "dev:mcp": "npm run dev -w @viespirkiai/mcp",
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "tsc -b && npm run typecheck -w @viespirkiai/web",
-    "lint": "eslint .",
-    "boundaries": "depcruise apps packages",
-    "test": "npm run test --workspaces --if-present",
-    "test:integration": "npm run test:integration --workspaces --if-present",
-    "check": "npm run lint && npm run typecheck && npm run boundaries && npm test"
-  }
-}
-```
-
-The `typecheck` script of `apps/web` runs `astro check`, because `tsc` does not check `.astro` files.
-
-**A workspace `package.json`** (`apps/mcp`):
-
-```json
-{
-  "name": "@viespirkiai/mcp",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "node --watch --env-file=.env src/main.ts",
-    "start": "node src/main.ts",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@viespirkiai/query": "*",
-    "@viespirkiai/auth": "*",
-    "@viespirkiai/config": "*",
-    "@viespirkiai/observability": "*",
-    "@modelcontextprotocol/server": "^2.0.0",
-    "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "@viespirkiai/testing": "*"
-  }
-}
-```
-
-**A library `package.json`** (`packages/query`):
-
-```json
-{
-  "name": "@viespirkiai/query",
-  "private": true,
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "scripts": {
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@viespirkiai/domain": "*",
-    "@viespirkiai/database": "*",
-    "@viespirkiai/search": "*",
-    "@viespirkiai/storage": "*"
-  }
-}
-```
-
-Typical workflows:
-
-| Task                                           | Command                                                       |
-|------------------------------------------------|---------------------------------------------------------------|
-| Run the website locally                        | `npm run dev:web`                                             |
-| Test only the Query Service                    | `npm test -w @viespirkiai/query`                              |
-| Add a dependency to MCP only                   | `npm install <pkg> -w @viespirkiai/mcp`                       |
-| Build the MCP image with only its dependencies | `npm ci -w @viespirkiai/mcp` inside `apps/mcp/Dockerfile` (build context: repository root)     |
-| Run a backfill                                 | `npx vp ingestion backfill --source cvp-is --from 2024-01-01` |
-| Apply migrations                               | `npx vp db migrate`                                           |
-| Local gate (CI stage 1 without build, audit and Dockerfile lint) | `npm run check`                                               |
-
-### 6.6 Configuration separation
-
-| Level        | Where                              | Contains                                                                                       |
-|--------------|------------------------------------|------------------------------------------------------------------------------------------------|
-| App schema   | `apps/<app>/src/config.ts`         | zod schema of **only** the variables that app needs; the only place `process.env` is read      |
-| App template | `apps/<app>/.env.example`          | documented defaults for local development; replaces `ENV.md`, `config.sample.js` and `.env.sample` |
-| Packages     | constructor or function parameters | no environment access; the app passes typed settings in                                        |
-| Runtime      | `infra/compose/*-compose.yaml`, `env/<env>.env`       | environment per service; secrets from `/srv/viespirkiai/<env>/secrets/<app>.env` on `lempa`, never committed                      |
-
-Database access is split by **role-specific connection strings**, so each container can only receive the credentials
-it is allowed to use:
-
-| Container (image)                                  | Database connection variables                       |
-|----------------------------------------------------|-----------------------------------------------------|
-| `web`, `open-data`                                 | `DATABASE_URL_READONLY`                             |
-| `mcp`                                              | `DATABASE_URL_READONLY`, `DATABASE_URL_ANALYST`     |
-| `risk`                                             | `DATABASE_URL_READONLY`, `DATABASE_URL_RISK_WRITER` |
-| `pipeline`                                         | `DATABASE_URL_FACTS_WRITER`, `DATABASE_URL_READONLY` |
-| `migrate` (`ops`)                                  | `DATABASE_URL_MIGRATOR`                             |
-| `it` image (§7.5)                | `DATABASE_URL_READONLY`                             |
-
-The roles that write job state and control schemas are open (§9 Q6).
+- `secrets/` is `/srv/viespirkiai/<env>/secrets/` on `lempa`. Secrets are never committed.
+- `src/config.ts` is the only reader of `process.env` in an app.
+- `.env.example` replaces `ENV.md`, `config.sample.js` and `.env.sample`.
+- The roles that write job state and control schemas are open (§9 Q6).
 
 ---
 
@@ -964,7 +867,7 @@ same image* can mean anything, the image must be self-contained (C3) and the tas
 ### 7.2 Design principles
 
 1. **Build once, promote the same digest.** CI builds an image only for a commit that changes the inputs of that image.
-   Integration tests, alpha and production run that same digest.
+   Alpha and production run that same digest. Integration tests and `vp` run from the source tree of the same commit.
 2. **Deploy by digest.** Compose files reference `image@sha256:…`. Every commit that `delivery.yml` publishes has the
    tag `sha-<commit>` on every image. CI moves one pointer tag, `main`, for discovery only. CI does not publish `latest`.
 3. **GitHub Actions verifies and publishes.** Lint, type-check, unit tests and build pass before an image reaches
@@ -1005,12 +908,12 @@ flowchart LR
         watch["vp-deploy watch"]
         subgraph alphaenv["alpha environment"]
             alphadeploy["vp-deploy alpha"]
-            alphait["it image: integration tests"]
+            alphait["release directory: integration tests"]
             alphaapps["alpha.viespirkiai.org"]
         end
         subgraph prodenv["production environment"]
             proddeploy["vp-deploy prod"]
-            prodit["it image: integration tests"]
+            prodit["release directory: integration tests"]
             prodapps["viespirkiai.org"]
         end
         ods[("PostgreSQL ods (§8.2), one instance")]
@@ -1044,7 +947,7 @@ flowchart LR
 | Test kind         | Runs in                                 | Reads                                        | Side effects                                   |
 |-------------------|-----------------------------------------|----------------------------------------------|------------------------------------------------|
 | Unit tests        | GitHub Actions, stage 1                 | mocks and fixtures only                      | none; no network, no database                  |
-| Integration tests | lempa, `it` image, stages 4 and 5 (§7.5) | the one `ods` instance and search indexes (§9 Q1)    | none; read-only role, search-only keys         |
+| Integration tests | lempa, release directory, stages 4 and 5 (§7.5) | the one `ods` instance and search indexes (§9 Q1)    | none; read-only role, search-only keys         |
 
 A release moves through these states:
 
@@ -1074,74 +977,38 @@ stateDiagram-v2
 | Dependency audit | `npm audit --omit=dev --audit-level=high`           | yes                                    |
 | Dockerfile lint  | `hadolint`                                          | yes                                    |
 
-**Stage 2 — Publish** (`delivery.yml`, push to `main` only):
+**Stage 2 — Publish** (`delivery.yml`, push to `main` only). It builds only the changed images:
 
 1. Run `ci.yml` as a reusable workflow. The unit tests run again on the merged commit.
-2. Detect the changed images with `infra/ci/affected-images.ts`.
-3. Build and push each changed image with the tag `sha-<full commit>`.
-4. Generate an SBOM and a provenance attestation for each built image.
-5. Scan each built image with Trivy. `CRITICAL` findings block the publish.
-6. Tag each unchanged image: add `sha-<full commit>` to the digest of `sha-<base commit>`. This is a registry operation
-   (`docker buildx imagetools create`), without a build.
-7. **Move the pointer tag `main`** on every image to the new digests. This step runs last, so lempa never sees a partial
-   release.
+2. Find the base commit: the commit of the last successful `delivery.yml` run on `main` (`gh run list`). Without a
+   successful run, select all images and go to step 5.
+3. List the changed paths: `git diff --name-only <base>..HEAD`.
+4. Match the paths to the image inputs with `infra/ci/affected-images.ts`:
+    - An app image: `apps/<app>/**` and its transitive `@viespirkiai/*` dependencies (§6.3).
+    - All images: `package.json`, `package-lock.json`, `tsconfig.base.json`, `.node-version`, `infra/ci/**`.
+5. Build each changed image, generate its SBOM and provenance attestation, and scan it with Trivy. `CRITICAL` findings
+   block the publish.
+6. Push each changed image with the tag `sha-<commit>`.
+7. Tag each unchanged image: add `sha-<commit>` to the digest of `sha-<base>` with `docker buildx imagetools create`.
+8. **Move the pointer tag `main`** on every image to the new digests. This step runs last.
 
-The images are the six apps of §6.3 (`ops` included) and the `it` test image.
-
-#### `delivery.yml` builds only the changed images
-
-`delivery.yml` selects the images to build from the paths changed since the last successful publish:
-
-```mermaid
-flowchart TD
-    run["gh run list: last successful delivery.yml run on main"] -->|run list| found{"run found?"}
-    found -->|no| all["select all images"]
-    found -->|"yes: base commit"| diff["git diff --name-only base..HEAD"]
-    diff -->|changed paths| match["affected-images.ts: match paths to image inputs"]
-    match -->|changed images| build["build, attest, scan, push sha-#lt;commit#gt;"]
-    match -->|unchanged images| retag["imagetools create: sha-#lt;base#gt; digest as sha-#lt;commit#gt;"]
-    all -->|all images| build
-    build -->|digests| pointer["move pointer main on every image"]
-    retag -->|digests| pointer
-```
-
-`infra/ci/images.json` declares each image. `affected-images.ts` resolves the image inputs from the workspace graph:
-
-| Image                                         | Inputs                                                                                                        |
-|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| `web`, `mcp`, `pipeline`, `risk`, `open-data` | `apps/<app>/**` and every workspace in its transitive `@viespirkiai/*` `dependencies` (§6.4)             |
-| `ops`                                         | `apps/ops/**` and its transitive workspace dependencies, which include `packages/database/migrations/**`      |
-| `it`                                          | `apps/**`, `packages/**`                                                                                      |
-| All images                                    | `package.json`, `package-lock.json`, `tsconfig.base.json`, `.node-version`, `infra/ci/**`                     |
-
-| Rule                                                                                                   | Effect                                                                                     |
-|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
-| The base commit is the last **successful** run, not `HEAD^`                                            | Changes from cancelled or failed runs are included in the next build                       |
-| Every image gets `sha-<commit>` on every commit                                                        | `vp-deploy` resolves a complete `manifest.env` for any commit, without knowing what changed |
-| An unchanged image keeps its digest                                                                    | `compose up` does not recreate its containers                                              |
-| A change in `infra/compose/**` or `infra/deploy/**` builds no image, but still creates a release       | Compose and deploy changes deploy through alpha like code changes                          |
-| `push` has `paths-ignore: ['docs/**', '**/*.md']`                                                      | Documentation changes create no release                                                    |
-| `workflow_dispatch` input `all-images: true` selects all images                                        | An operator rebuilds everything, for example to pick up a patched base image              |
-
-Workflow settings:
-
-- `concurrency: { group: delivery, cancel-in-progress: true }`. A newer push cancels an older run. A cancelled run is
-  not a successful run, so the next run takes the changes of the cancelled commit into its diff.
-- Minimal `permissions:` per job. `GITHUB_TOKEN` is the only credential.
-- Actions are pinned by commit SHA. Dependabot updates them.
-
-`infra/ci/it.Dockerfile` builds the `it` image. It contains the source, `devDependencies` and the `*.it.ts` suites, so
-lempa runs tests without a checkout.
+- The images are the five long-running apps of §6.3: `web`, `mcp`, `pipeline`, `risk` and `open-data`.
+- `push` has `paths-ignore: ['docs/**', '**/*.md']`. A change in `apps/ops/**`, `infra/compose/**` or
+  `infra/deploy/**` builds no image, but creates a release.
+- `workflow_dispatch` input `all-images: true` selects all images.
+- `concurrency: { group: delivery, cancel-in-progress: true }`. The next run includes the changes of a cancelled run.
+- Minimal `permissions:` per job. `GITHUB_TOKEN` is the only credential. Actions are pinned by commit SHA.
 
 ### 7.5 Deploy agent `vp-deploy` on lempa
 
 | Element                              | Location                                                        | Responsibility                                                                    |
 |--------------------------------------|-----------------------------------------------------------------|-----------------------------------------------------------------------------------|
 | `vp-deploy`                          | `infra/deploy/vp-deploy` (bash), installed to `/usr/local/bin/` | Commands `watch`, `it`, `alpha`, `prod`, `rollback`, `status`, `data`, `refresh-alpha-db` |
+| `vp` wrapper                         | `infra/deploy/vp` (bash), installed to `/usr/local/bin/`        | Runs `apps/ops/src/cli.ts` from `/srv/viespirkiai/<env>/current` with `secrets/ops.env`. Operators run `sudo -u deploy vp --env <env> …`, never as root |
 | `vp-deploy-watch.timer` + `.service` | `infra/deploy/systemd/`                                         | Runs `vp-deploy watch` every 2 minutes as user `deploy`                           |
-| `deploy` user                        | lempa                                                           | Member of the `docker` group; owns `/srv/viespirkiai/`                            |
+| `deploy` user                        | lempa                                                           | Member of the `docker` group; owns `/srv/viespirkiai/`; the only user that runs `vp` |
 | Repository mirror                    | `/srv/viespirkiai/repo.git`                                     | Bare clone of the public repository; `git fetch` only                             |
-| Release directories                  | `/srv/viespirkiai/releases/<commit>/`                           | `infra/` extracted at `<commit>`, `manifest.env`, `status`, test logs             |
+| Release directories                  | `/srv/viespirkiai/releases/<commit>/`                           | Source tree at `<commit>`, `node_modules`, `manifest.env`, `status`, test logs; the last 10 are kept |
 | Environment state                    | `/srv/viespirkiai/{alpha,prod}/`                                | `current` and `previous` symlinks, `secrets/<app>.env`, `deployments.log`               |
 | Lock                                 | `/srv/viespirkiai/deploy.lock`                                  | `flock`: one `vp-deploy` command at a time                                        |
 | Notification                         | `NOTIFY_WEBHOOK_URL` in `/srv/viespirkiai/deploy.env`           | Message on every failure and every production deployment                          |
@@ -1153,65 +1020,48 @@ lempa runs tests without a checkout.
 ├── repo.git/                      # bare mirror of github.com/racionalas/viespirkiai
 ├── releases/
 │   └── <commit>/
-│       ├── infra/                 # compose files, env files and scripts at <commit>
+│       ├── apps/ packages/ infra/ # source tree at <commit> (git archive)
+│       ├── node_modules/          # npm ci, devDependencies included
 │       ├── manifest.env           # WEB_IMAGE=ghcr.io/racionalas/viespirkiai-web@sha256:… (one line per image)
 │       ├── status                 # published · alpha-passed · prod-deployed · failed
 │       └── logs/
 ├── alpha/
 │   ├── current -> ../releases/<commit>
 │   ├── previous -> ../releases/<commit>
-│   ├── secrets/                   # one <app>.env per app and it.env; chmod 600, not in git
+│   ├── secrets/                   # <app>.env per app, ops.env, it.env; chmod 600, not in git
 │   └── deployments.log
 └── prod/                          # same layout as alpha/
 ```
 
-`vp-deploy` uses only Docker, git, `curl`, `cosign` and `flock`. The images and the repository are public, so lempa needs no GitHub or GHCR
+`vp-deploy` and `vp` use only Docker, git, Node 24 with npm, `curl`, `cosign` and `flock`. The images and the repository are public, so lempa needs no GitHub or GHCR
 credentials.
 
 #### `vp-deploy` deploys a release to an environment
 
-`vp-deploy alpha <commit>` and `vp-deploy prod <commit>` run the same steps against their own environment.
-`vp-deploy prod` first requires status `alpha-passed`, a typed short commit and a fresh database backup.
+`vp-deploy alpha <commit>` and `vp-deploy prod <commit>` run these steps against their own environment:
 
-```mermaid
-flowchart TD
-    gate{"prod only: status alpha-passed, typed short commit, fresh backup"}
-    fetch["extract infra/ at commit, resolve image digests"]
-    verify{"cosign: verify provenance attestations"}
-    pull["docker pull images by digest"]
-    migrate{"run ops image: vp db migrate"}
-    it{"run it image: npm run test:integration with read-only role"}
-    abort["abort; release status unchanged"]
-    stop["status failed, notify; running apps unchanged"]
-    rollout{"point current to release, compose up -d --wait"}
-    rollback["point current to previous, compose up -d --wait, status failed, notify"]
-    smoke{"smoke tests"}
-    record["status alpha-passed or prod-deployed, append deployments.log"]
-    gate -->|" alpha, or all prod checks pass "| fetch
-    gate -->|" a prod check fails "| abort
-    fetch -->|manifest.env| verify
-    verify -->|valid| pull
-    verify -->|invalid| stop
-    pull -->|images| migrate
-    migrate -->|migrated schema| it
-    migrate -->|fail| stop
-    it -->|fail| stop
-    it -->|pass| rollout
-    rollout -->|unhealthy| rollback
-    rollout -->|healthy| smoke
-    smoke -->|fail| rollback
-    smoke -->|pass| record
-```
+1. `prod` only: check status `alpha-passed`, the typed short commit and a fresh database backup.
+2. Extract the source tree at the commit with `git archive`, run `npm ci`, and resolve the image digests into
+   `manifest.env`.
+3. Verify the provenance attestations with `cosign`.
+4. Pull the images by digest.
+5. Run `vp db migrate` from the release directory.
+6. Run `npm run test:integration` from the release directory with `secrets/it.env`.
+7. Point `current` to the release and run `docker compose up -d --wait`.
+8. Run the smoke tests.
+9. Set status `alpha-passed` or `prod-deployed` and append the deployment to `deployments.log`.
 
-The integration tests run before rollout, so they test the new code against the migrated schema. The running apps keep
-serving during the test run, because migrations are expand/contract.
+- A failed step 1 aborts the command. The release status stays unchanged.
+- A failed step 2–6 sets status `failed` and sends a notification. The running apps stay unchanged.
+- A failed step 7 or 8 points `current` to `previous`, runs `docker compose up -d --wait`, sets status `failed` and
+  sends a notification.
 
 #### Integration tests read the real database
 
 | Rule                                                                     | Enforcement                                                                                     |
 |--------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
 | Tests only read: queries, views, search requests                         | PostgreSQL role from `DATABASE_URL_READONLY`: `SELECT` grants only, `default_transaction_read_only = on` |
-| Tests use the data of the target environment                             | The `it` container joins network `vp-<env>-data`                                                |
+| Tests use the data of the target environment                             | `secrets/it.env` points at the `127.0.0.1` data service ports of the target environment (§7.6)  |
 | Search tests use read access only                                        | Typesense search-only API key; Quickwit search endpoints only (Quickwit has no API keys, so code review enforces it)                                   |
 | Tests assert on structure and invariants, not on exact row counts or values | Code review of `*.it.ts`                                                                     |
 | Tests run any number of times with the same effect                       | `vp-deploy it <env>` runs the suite against the running environment, without a deployment      |
@@ -1224,10 +1074,10 @@ live checkout. A compose change therefore deploys and rolls back with its releas
 
 | File                                 | Contains                                                                              | Compose projects                | Applied by                                                     |
 |--------------------------------------|---------------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------|
-| `viespirkiai-business-compose.yaml`  | `web`, `mcp`, `pipeline`, `risk`, `open-data`; `migrate` (profile `migrate`, `ops` image) | `vp-alpha-business`, `vp-prod-business` | `vp-deploy alpha` / `vp-deploy prod`, every release    |
-| `viespirkiai-data-compose.yaml`      | `postgres`, `pgbouncer`, `quickwit`, `typesense`, `nats`, network `vp-<env>-data`     | `vp-alpha-data`, `vp-prod-data` | Operator, `vp-deploy data <env>`, only on data-service changes |
+| `viespirkiai-business-compose.yaml`  | `web`, `mcp`, `pipeline`, `risk`, `open-data`                                         | `vp-alpha-business`, `vp-prod-business` | `vp-deploy alpha` / `vp-deploy prod`, every release    |
+| `viespirkiai-data-compose.yaml`      | `postgres`, `pgbouncer`, `quickwit`, `typesense`, `nats`, `metabase`, network `vp-<env>-data` | `vp-alpha-data`, `vp-prod-data` | Operator, `vp-deploy data <env>`, only on data-service changes |
 | `env/alpha.env`, `env/prod.env`      | Non-secret values per environment: ports, memory limits, data paths, feature switches | —                               | Committed                                                      |
-| `/srv/viespirkiai/<env>/secrets/<app>.env` | Passwords, API keys and `DATABASE_URL_*` values of one app (§6.6)                                                                   | —                               | On lempa only                                                  |
+| `/srv/viespirkiai/<env>/secrets/<app>.env` | Passwords, API keys and `DATABASE_URL_*` values of one app (§6.5)                                                                   | —                               | On lempa only                                                  |
 | `releases/<commit>/manifest.env`     | Image digests                                                                         | —                               | Generated by `vp-deploy`                                       |
 
 **One set of compose files, two env files.** Separate alpha and production compose files drift apart, and alpha then
@@ -1248,7 +1098,7 @@ docker compose -p vp-alpha-business \
 ```
 
 `infra/compose/viespirkiai-business-compose.yaml` gives each container its own secrets file, so a container receives
-only the credentials of §6.6. The listing shows `migrate`, `web`, `mcp` and `pipeline`. `risk` and `open-data` follow
+only the credentials of §6.5. The listing shows `web`, `mcp` and `pipeline`. `risk` and `open-data` follow
 the same pattern as `mcp`; the public routes of the `pipeline` HTTP API are open (§9 Q13).
 
 ```yaml
@@ -1262,14 +1112,6 @@ x-app: &app
     options: { max-size: 50m, max-file: "5" }
 
 services:
-  migrate:
-    <<: *app
-    image: ${OPS_IMAGE}
-    env_file: [ ./env/${VP_ENV}.env, /srv/viespirkiai/${VP_ENV}/secrets/ops.env ]
-    command: [ "vp", "db", "migrate" ]
-    restart: "no"
-    profiles: [ migrate ]
-
   web:
     <<: *app
     image: ${WEB_IMAGE}
@@ -1322,6 +1164,10 @@ PUBLIC_URL=https://alpha.viespirkiai.org
 DATA_ROOT=/flashas/viespirkiai-alpha
 WEB_PORT=9029
 MCP_PORT=9032
+POSTGRES_PORT=9128
+PGBOUNCER_PORT=9130
+QUICKWIT_PORT=7290
+TYPESENSE_PORT=8118
 WEB_MEMORY=1g
 MCP_MEMORY=512m
 PIPELINE_MEMORY=1g
@@ -1332,7 +1178,8 @@ LLM_ENABLED=false
 S3_BACKUP_ENABLED=false
 ```
 
-`env/prod.env` has the same keys with production values: `WEB_PORT=9019`, `MCP_PORT=9022`,
+`env/prod.env` has the same keys with production values: `WEB_PORT=9019`, `MCP_PORT=9022`, `POSTGRES_PORT=5432`,
+`PGBOUNCER_PORT=6432`, `QUICKWIT_PORT=7280`, `TYPESENSE_PORT=8108`,
 `DATA_ROOT=/flashas/viespirkiai`, all jobs and side effects enabled.
 
 **Alpha and production on lempa:**
@@ -1351,7 +1198,9 @@ S3_BACKUP_ENABLED=false
 
 - Apps reach data services by service name (`pgbouncer:6432`) over the bridge network, not over `localhost`. The
   `DATABASE_URL_*` values in `secrets/<app>.env` point at `pgbouncer:6432`.
-- The cloudflared configuration is versioned in `infra/cloudflared/config.yml`.
+- The data compose file publishes PostgreSQL, PgBouncer, Quickwit and Typesense on `127.0.0.1` with the `*_PORT`
+  values. The host processes `vp` and the integration tests use these ports.
+- The cloudflared configuration is versioned in `infra/services/cloudflared/config.yml`.
 - The weekly alpha database restore also serves as the tested restore that S8 Backup & Recovery requires.
 
 ### 7.7 Deployment diagram
@@ -1373,6 +1222,7 @@ flowchart LR
     agent(["«actor»<br/>AI agent"]):::actor
     workers(["«actor»<br/>OCR workers ·<br/>goViesdezeProxyRewrite"]):::actor
     op(["«actor»<br/>Operator"]):::actor
+    analyst(["«actor»<br/>Analyst"]):::actor
     cf["«external»<br/>Cloudflare edge"]:::ext
     src["«external»<br/>Public registries & portals"]:::ext
     extr["«external»<br/>Text extractors"]:::ext
@@ -1411,10 +1261,11 @@ flowchart LR
                 s4["«supporting» S4<br/>Open Data Publishing"]:::sup
                 qsOpenData["«core»<br/><b>Query Service</b>"]:::core
             end
-            subgraph cMigrate["«container» vp-prod-business-migrate-1 (one-off)"]
-                s9["«missing» S9<br/>Operations Console"]:::missing
-                s7["«supporting» S7<br/>Schema & Data Governance"]:::sup
-            end
+        end
+
+        subgraph pVp["«process» vp · /srv/viespirkiai/prod/current"]
+            s9["«missing» S9<br/>Operations CLI"]:::missing
+            s7["«supporting» S7<br/>Schema & Data Governance"]:::sup
         end
 
         subgraph data["compose project vp-prod-data"]
@@ -1426,6 +1277,7 @@ flowchart LR
                 ods[("«schema»<br/><b>ods</b>")]:::store
                 riskdb[("«schema»<br/><b>risk</b>")]:::store
                 ctrl[("«schemas»<br/><b>Control schemas</b>")]:::store
+                mbdb[("«database»<br/><b>metabase</b><br/>Metabase application data")]:::store
             end
             subgraph cQuickwit["«container» vp-prod-data-quickwit-1"]
                 qw[("Full-text indexes")]:::store
@@ -1435,6 +1287,9 @@ flowchart LR
             end
             subgraph cNats["«container» vp-prod-data-nats-1"]
                 bus["Facts changed events"]
+            end
+            subgraph cMetabase["«container» vp-prod-data-metabase-1"]
+                s11["«missing» S11<br/>Analytics Dashboards<br/>Metabase"]:::missing
             end
         end
     end
@@ -1461,15 +1316,19 @@ flowchart LR
     tunnel -->|" HTTP 127.0.0.1:9019 "| cWeb
     tunnel -->|" HTTP 127.0.0.1:9022 "| cMcp
     tunnel -->|" HTTP, route open (§9 Q13) "| cPipeline
-    op -->|" ssh · vp-deploy prod "| cMigrate
+    analyst -->|" HTTPS "| cf
+    tunnel -->|" HTTP 127.0.0.1:3000, route open (§9 Q13) "| cMetabase
+    op -->|" ssh · sudo -u deploy vp "| pVp
 %% ── Database ──
     cWeb -->|" PostgreSQL TCP 6432 "| pool
     cMcp -->|" PostgreSQL TCP 6432 "| pool
     cPipeline -->|" PostgreSQL TCP 6432 "| pool
     cRisk -->|" PostgreSQL TCP 6432 "| pool
     cOpenData -->|" PostgreSQL TCP 6432 "| pool
-    cMigrate -->|" PostgreSQL TCP 6432 "| pool
+    pVp -->|" PostgreSQL TCP 127.0.0.1:6432 · S1 jobs "| pool
+    pVp -->|" PostgreSQL TCP 127.0.0.1:5432 · MIGRATOR "| cPostgres
     pool -->|" PostgreSQL TCP 5432 "| cPostgres
+    cMetabase -->|" PostgreSQL TCP 5432, METABASE_READER · METABASE_APP "| cPostgres
     cPostgres -.->|" streaming replication over WireGuard "| cReplica
 %% ── Search ──
     cWeb -->|" HTTP REST search "| cQuickwit
@@ -1501,15 +1360,15 @@ flowchart LR
 | `vp-prod-business-pipeline-1`      | `pipeline`  | `node src/main.ts`          | Extract, Normalize & Link, S2 Search Indexing, S3 AI Enrichment, Query Service | `FACTS_WRITER`, `READONLY` | HTTP (§9 Q13) |
 | `vp-prod-business-risk-1`          | `risk`      | `node src/main.ts`          | Procurement Risk Service, Query Service | `READONLY`, `RISK_WRITER`        | —                        |
 | `vp-prod-business-open-data-1`     | `open-data` | `node src/main.ts`          | S4 Open Data Publishing, Query Service | `READONLY`                        | —                        |
-| `vp-prod-business-migrate-1`       | `ops`       | `vp db migrate`, once per deployment | S9, S7                        | `MIGRATOR`                        | —                        |
 | `vp-prod-data-pgbouncer-1`         | `pgbouncer` | PgBouncer                   | Connection pool                        | —                                 | TCP `6432`               |
 | `vp-prod-data-postgres-1`          | `postgres`  | PostgreSQL                  | Staging, Integration & Serving and Control schemas | —                     | TCP `5432`               |
 | `vp-prod-data-quickwit-1`          | `quickwit`  | Quickwit                    | Full-text indexes                      | —                                 | HTTP `7280`              |
 | `vp-prod-data-typesense-1`         | `typesense` | Typesense, host network     | Suggestion and organisation indexes    | —                                 | HTTP `8108`, Raft `8107` |
 | `vp-prod-data-nats-1`              | `nats`      | NATS server                 | Facts changed event transport          | —                                 | TCP `4222`               |
+| `vp-prod-data-metabase-1`          | `metabase`  | Metabase (JVM)              | S11 Analytics Dashboards               | `METABASE_READER`, `METABASE_APP` | HTTP `127.0.0.1:3000`    |
 
 **Process isolation.** Each container has its own process namespace, memory limit, restart policy and secrets file
-(§6.6, §7.6):
+(§6.5, §7.6):
 
 - An out-of-memory kill or a crash stops one container. For example, a pipeline crash does not stop `web-1` or
   `mcp-1`.
@@ -1517,17 +1376,19 @@ flowchart LR
 - All Data Pipeline stages share one process in `pipeline-1`. S1 gives each stage its own job queues and concurrency
   limits, so a slow S3 queue does not block Data Ingestion jobs. A crash or an out-of-memory kill restarts all stages
   together, and interrupted jobs resume from their reservations.
-- `pipeline-1` holds `FACTS_WRITER` for the whole process. The dependency rule of §6.4 keeps `src/deliver/**` from
+- `pipeline-1` holds `FACTS_WRITER` for the whole process. The boundary rule of §6.1 keeps `src/deliver/**` from
   importing the facts writer; the database role does not enforce that rule.
 - Each Query Service box is a separate instance with its own connection pool. The PgBouncer pool size counts all five
   instances (§9 Q6).
+- Metabase connects to PostgreSQL port `5432` directly. PgBouncer transaction pooling breaks its JDBC prepared
+  statements.
 
 **Other instances:**
 
 - Alpha runs the same containers as `vp-alpha-business-*` and `vp-alpha-data-*`, on ports `9029` and `9032`, with
   single-node Quickwit and Typesense and no replica (§7.6).
-- `vp-deploy` also starts the one-off `it` container before each rollout (§7.5). An operator command runs as a one-off
-  `ops` container (`docker compose run`). Neither is drawn.
+- `vp` (S9, S7) and the integration tests run as host processes as user `deploy`, not in containers (§7.5). They
+  reach the data services on `127.0.0.1` ports (§7.6). The integration test process is not drawn.
 - The off-site mirror hosts are open (§9 Q15). Container names on `lempa2` and the off-site mirror are not in the
   repository (§10.1).
 - S8 Backup & Recovery runs as host scripts from `infra/backup/`. S6 Observability and S10 Configuration are libraries
@@ -1584,6 +1445,7 @@ flowchart LR
     RiskService["Procurement Risk Service"]
     QueryService["Query Service"]
     Consumers["Frontend and MCP"]
+    Metabase["Metabase (S11)"]
     Extract -.->|source rows| Source
     Source -.->|typed facts| NormalizeLink
     NormalizeLink -.->|entities, links, derived rows| Ods
@@ -1596,13 +1458,15 @@ flowchart LR
     QueryService -->|reads| Ods
     QueryService -->|full-text search| Search
     QueryService -->|risk results| Risk
+    Metabase -->|reads with METABASE_READER| Ods
+    Metabase -->|reads with METABASE_READER| Risk
 ```
 
 | Layer          | Schema names                                                                                          | ETL term                         | Grain                                   | Writer                                        | Readers                                   | Rebuilt from                      |
 |----------------|-------------------------------------------------------------------------------------------------------|----------------------------------|-----------------------------------------|-----------------------------------------------|-------------------------------------------|-----------------------------------|
 | Staging        | One schema per upstream source, for example `vpmSutartys`, `eppsViesiejiPirkimai`, `cvpp`, `ppa`, `rcJar`, `sabis` | Persistent staging area          | One row per source record               | Extract (I1)                                  | Normalize & Link (I5), S7 governance tooling | Raw Payload Store (I3), re-scrape |
-| Integration & Serving | `ods`                                                                                                 | Operational Data Store           | One row per entity, link or aggregate   | Normalize & Link (I5–I8); migrations for views        | Query Service, Search Indexing (S2)   | Source schemas                    |
-| Integration & Serving | `risk`                                                                                         | Analytical output                | One row per procurement risk decision; one row per risk signal          | Procurement Risk Service                      | Query Service                             | `ods` and indicator code          |
+| Integration & Serving | `ods`                                                                                                 | Operational Data Store           | One row per entity, link or aggregate   | Normalize & Link (I5–I8); migrations for views        | Query Service, Search Indexing (S2), Metabase (S11) | Source schemas                    |
+| Integration & Serving | `risk`                                                                                         | Analytical output                | One row per procurement risk decision; one row per risk signal          | Procurement Risk Service                      | Query Service, Metabase (S11)             | `ods` and indicator code          |
 | Control        | `infra`, `auth`, `jobs`                                                                               | Job control and metadata         | One row per setting, key or job          | S1, S5, S9 (§9 Q6)                            | The writing components                    | Migrations and fixtures           |
 
 - The Integration & Serving layer also holds stores outside PostgreSQL: document content (I4), search indexes (S2) and
@@ -1702,6 +1566,7 @@ convention, the grain of merged entities and the history model are open (§9 Q3�
 | MCP tools                             | `ods` through the Query Service                                                                           |
 | MCP analyst SQL                       | `ods` with `SELECT` grants; no separate analyst view layer                                                |
 | Procurement Risk Service              | `ods` through the Query Service                                                                           |
+| Metabase dashboards (S11)             | `ods` and `risk` with `SELECT` grants of `METABASE_READER`                                                |
 
 ### 8.9 Placement rules
 
@@ -1776,8 +1641,8 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    filters on an open interval.
    Option 3: `ods` keeps current state only, and source schemas keep one row per source record version. The Query
    Service then reads history from source schemas, which T2 forbids.
-6. **Database roles for job state and control data**: `packages/jobs` writes job state for `pipeline`, `risk`
-   and `open-data`, but no connection of §6.6 grants writes to the `jobs` schema. S1, S5, S9
+6. **Database roles for job state and control data**: `@viespirkiai/platform/jobs` writes job state for `pipeline`,
+   `risk` and `open-data`, but no connection of §6.5 grants writes to the `jobs` schema. S1, S5, S9
    and OCR work distribution write `infra`, `auth` and `jobs` (§3.1), which breaks rule 1 of §1.2. The Risk Service
    holds a session advisory lock (`services/procurement-risk/index.ts`), and PgBouncer transaction pooling keeps no
    session state.
@@ -1785,20 +1650,20 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    Option 1 (recommended): one PostgreSQL role per app, granted its owned schema and its own `jobs` queues, while queries
    use the shared read-only role. A lease row in `jobs` replaces the session advisory lock, and the PgBouncer pools of
    all roles fit within `max_connections`.
-   Option 2: one shared `DATABASE_URL_JOBS` role for every app that uses `packages/jobs`, plus `DATABASE_URL_*_DIRECT`
+   Option 2: one shared `DATABASE_URL_JOBS` role for every app that uses `@viespirkiai/platform/jobs`, plus `DATABASE_URL_*_DIRECT`
    connections that bypass PgBouncer for session features.
 7. **Placement of the AI enrichment store**: §1.2, §3 and §3.1 give S3 its own store, which the Query Service reads. §8
    knows only source schemas, `ods` and `risk`; T5 puts every shown attribute into `ods`; `pipeline/src/deliver/enrichment/`
-   reads only through `query`, but the `pipeline` container holds the facts writer connection for all stages (§6.4, §6.6). The current code writes LLM descriptions to
+   reads only through `query`, but the `pipeline` container holds the facts writer connection for all stages (§6.1, §6.5). The current code writes LLM descriptions to
    `eppsViesiejiPirkimai."aprasymai"` and embeddings to SQLite (`modules/vector`).
    Question to address: where does S3 write, and how do its outputs reach Frontend and MCP?
    Option 1 (recommended): a PostgreSQL schema owned by S3 in `apps/pipeline`, for example `ai`, with its own writer role.
    §8.2 lists it as a layer, the Query Service reads it, and embeddings use pgvector.
    Option 2: S3 outputs are an upstream source of Data Ingestion. Extract stages them in a source schema, and Normalize & Link maps them
    into `ods` enrichment.
-   Option 3: a store outside PostgreSQL behind `packages/storage`, for example object storage. The Query Service then
+   Option 3: a store outside PostgreSQL behind `@viespirkiai/data/storage`, for example object storage. The Query Service then
    combines two stores in one read.
-8. **Storage of document content and raw payloads**: I3, I4 and `packages/storage` keep the sidecar SQLite files, which
+8. **Storage of document content and raw payloads**: I3, I4 and `@viespirkiai/data/storage` keep the sidecar SQLite files, which
    have one writer host and no backup (review P1, P7). The Query Service reads document content inside `web` and `mcp`,
    but §7.6 mounts `DATA_ROOT` read-write into `web` and not into `mcp`.
    Question to address: which store keeps document content and raw payloads, and how do `web` and `mcp` read it?
@@ -1807,13 +1672,13 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    Option 2 (recommended, if the measured volume fits the PostgreSQL disk and backup budget): document content in
    PostgreSQL tables with TOAST compression, raw payloads in S3-compatible object storage. No app mounts a shared volume.
    Option 3: S3-compatible object storage for both, for example MinIO on `lempa` with off-site replication.
-   `packages/storage` reads it over HTTP.
+   `@viespirkiai/data/storage` reads it over HTTP.
 9. **Schema verification in CI**: T10 requires CI to verify every `ods` object against the migrated schema, and review
    P1 requires a schema rebuild from the repository. §7.2 principle 3 allows no database in GitHub Actions, while
    `packages/testing` provides a Testcontainers database.
    Question to address: which pipeline stage applies all migrations to an empty database?
    Option 1 (recommended): a `schema` job in `ci.yml` with a PostgreSQL and PostGIS service container. It runs
-   `vp db migrate` from zero, compiles every view and checks that `packages/database/schema/` is current. Unit tests stay
+   `vp db migrate` from zero, compiles every view and checks that `packages/data/schema/` is current. Unit tests stay
    without a database.
    Option 2: `vp-deploy alpha` verifies the schema before the integration tests. A broken migration is then found only
    after the merge.
@@ -1831,20 +1696,21 @@ Each question records an inconsistency or a gap that needs a decision. The optio
     Option 1 (recommended): two route forms, by `jarKodas` when it is known and by `organizacijosId` otherwise. The
     current URLs redirect permanently (HTTP 301) to the new routes.
     Option 2: `organizacijosId` only, with a lookup route from `jarKodas`. The URLs are stable but not readable.
-12. **Implementation of S1 Job Orchestration**: `packages/jobs` moves from `runner/` and the per-module `SKIP LOCKED`
-    queues (§6.3). Review P6 names the home-grown scheduler and queues as a permanent maintenance cost.
-    Question to address: does `packages/jobs` wrap a maintained job queue library, or does it re-house
+12. **Implementation of S1 Job Orchestration**: `@viespirkiai/platform/jobs` moves from `runner/` and the per-module
+    `SKIP LOCKED` queues (§6.3). Review P6 names the home-grown scheduler and queues as a permanent maintenance cost.
+    Question to address: does `@viespirkiai/platform/jobs` wrap a maintained job queue library, or does it re-house
     `runner/TaskRunner.js`?
     Option 1 (recommended): a maintained PostgreSQL job queue, for example pg-boss or Graphile Worker, behind the
-    `packages/jobs` interface. Compatibility with PgBouncer transaction pooling is a selection criterion (Q6).
-    Option 2: `runner/` moves into `packages/jobs`, and one generic queue table replaces the per-module queues. The team
+    `@viespirkiai/platform/jobs` interface. Compatibility with PgBouncer transaction pooling is a selection criterion (Q6).
+    Option 2: `runner/` moves into `@viespirkiai/platform/jobs`, and one generic queue table replaces the per-module queues. The team
     keeps maintaining the scheduler.
-13. **Public HTTP surface of the apps**: `mcp`, the `pipeline` HTTP API and the contract export WebSocket need public routes
+13. **Public HTTP surface of the apps**: `mcp`, the `pipeline` HTTP API, Metabase and the contract export WebSocket need routes
     (§6.3, §7.6). The cloudflared ingress names only `viespirkiai.org` and `alpha.viespirkiai.org`, and §6.3 moves the
     export WebSocket from `web` into `apps/open-data`.
     Question to address: which hostname, path and port reach each internet-facing app?
     Option 1 (recommended): cloudflared path rules send `/mcp` to `mcp`, and a separate hostname sends OCR worker and
-    file lookup traffic to `pipeline`. The export WebSocket stays in `web` and reads through the Query Service.
+    file lookup traffic to `pipeline`. Cloudflare Access limits the Metabase hostname to the team. The export WebSocket
+    stays in `web` and reads through the Query Service.
     Option 2: one reverse proxy container, for example Caddy, in the business compose project routes all paths.
     cloudflared forwards every hostname to it.
 14. **Networking of the production Typesense cluster**: production Typesense uses host networking for Raft peering
@@ -1869,7 +1735,7 @@ Each question records an inconsistency or a gap that needs a decision. The optio
     Question to address: which language do domain types, query functions, tables and columns use?
     Option 1 (recommended): Lithuanian domain terms in every layer, as `domain-model.md` and `CLAUDE.md` do. Technical
     structure stays English, and the root `AGENTS.md` holds a Lithuanian–English glossary.
-    Option 2: English in code and in `risk`, Lithuanian only in `ods` and the UI. `packages/domain` maps the two
+    Option 2: English in code and in `risk`, Lithuanian only in `ods` and the UI. `@viespirkiai/data/domain` maps the two
     vocabularies.
 17. **GitHub repository and image namespace**: §7.5 and §7.6 use `github.com/racionalas/viespirkiai` and
     `ghcr.io/racionalas/viespirkiai-<app>`. The `origin` remote is `github.com/Viespirkiu-grupe/viespirkiai`,
@@ -1909,7 +1775,7 @@ The repository does not record these host facts, and the target design depends o
 - [ ] **Existing backups:** find host-level backups or snapshots outside the repository, and the date of the last
   tested restore (review §6, question 1).
 - [ ] **Host prerequisites of `vp-deploy`:** confirm systemd, the Docker Engine and Compose versions (`up --wait`,
-  repeated `--env-file`), `cosign`, `flock`, the `deploy` user and free space under `/srv` (§7.5).
+  repeated `--env-file`), `cosign`, `flock`, Node 24 with npm, the `deploy` user and free space under `/srv` (§7.5).
 - [ ] **Network exposure:** confirm that `lempa` accepts inbound connections only over WireGuard and local interfaces
   (§7.2, principle 4).
 - [ ] **Other hosts:** list the services, owners and access paths on `lempa2`, the off-site mirror, the goViesdeze
@@ -1928,7 +1794,7 @@ The repository does not record these host facts, and the target design depends o
 - [ ] **Match quality:** measure the precision and recall of each link table on a labelled sample, and set the minimum
   `patikimumas` of each consumer (§8.5, review D5).
 - [ ] **Exact types:** replace the global `pg` type parsers (`NUMERIC` as float, dates as strings) with exact money and
-  date types in `packages/database` and `packages/domain` (review P9).
+  date types in `@viespirkiai/data/database` and `@viespirkiai/data/domain` (review P9).
 - [ ] **Personal data:** classify the personal data in `ods` (natural persons in `organizacijos`, `asmenuRysiai`), with
   legal basis, retention and erasure procedure.
 - [ ] **Data-quality checks:** define the S7 checks that reconcile `ods`, derived tables and search indexes, with an
@@ -1950,20 +1816,18 @@ The repository does not record these host facts, and the target design depends o
   database role (review P4).
 - [ ] **Statistics reads:** assign the `/statistika` reads of Quickwit logs and ingestion status to a Query Service
   family (§1.3, S6).
-- [ ] **Live page updates:** define how `web` receives OCR results and info-banner changes for its SSE streams. §6.4
-  gives `web` no `events` dependency.
-- [ ] **Operator commands in production:** define where `vp` runs against production, for example `docker compose run`
-  with the `ops` image on `lempa`, and with which database role (§6.5).
+- [ ] **Live page updates:** define how `web` receives OCR results and info-banner changes for its SSE streams
+  (`@viespirkiai/platform/events`).
 - [ ] **Secret rotation:** define the rotation of database passwords, API keys and cloudflared credentials. Rotate the
   Typesense admin key that git history contains (S10, review P3).
 
 ### 10.4 CI/CD
 
 - [ ] **Smoke tests:** define the smoke tests, their runner and their time limit for each app (§7.5).
-- [ ] **`vp-deploy` self-update:** define how a change in `infra/deploy/**` replaces `/usr/local/bin/vp-deploy` and its
+- [ ] **`vp-deploy` self-update:** define how a change in `infra/deploy/**` replaces `/usr/local/bin/vp-deploy`, `/usr/local/bin/vp` and their
   systemd units (§7.4, §7.5).
 - [ ] **Watched pointer:** name the image whose `main` pointer `vp-deploy watch` reads, and move that pointer last in
-  step 7 (§7.4).
+  step 8 (§7.4).
 - [ ] **Vulnerability backlog:** the audit gate blocks every merge while the critical `astro` finding and the unfixable
   `xlsx` finding remain. Upgrade `astro` and replace `xlsx`, or record time-limited exceptions (§7.4, review P3).
 - [ ] **GHCR visibility:** make every published package public, because `lempa` pulls without credentials (§7.5).
@@ -1971,7 +1835,7 @@ The repository does not record these host facts, and the target design depends o
   release is acceptable (§7.6).
 - [ ] **Integration test invariants:** list the invariants per Query Service family that the `*.it.ts` suites assert
   (§7.5).
-- [ ] **Architecture rules and agent instructions:** write `.dependency-cruiser.cjs`, the ESLint rules of §6.4, the
+- [ ] **Architecture rules and agent instructions:** write `.dependency-cruiser.cjs`, the ESLint rules of §6.1, the
   root `AGENTS.md` and one `AGENTS.md` per workspace (§6.1, principle 9; review P8).
 
 ### 10.5 Security
@@ -1983,6 +1847,8 @@ The repository does not record these host facts, and the target design depends o
   `DATABASE_URL_ANALYST` (§1.3, review P3).
 - [ ] **Untrusted file parsing:** parse downloaded spreadsheets and XML in a process without database write credentials,
   with CPU and memory limits (review P3).
+- [ ] **Metabase access:** define the login method, the `METABASE_READER` grants, `statement_timeout` and connection
+  limit (S11).
 
 ### 10.6 Documentation
 
