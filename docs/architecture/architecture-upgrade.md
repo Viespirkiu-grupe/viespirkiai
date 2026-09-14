@@ -338,7 +338,7 @@ I7).
 S2 Search Indexing and S3 AI Enrichment form the **Deliver stage** of the core component Data Pipeline. They run after Data Ingestion
 commits facts and write derived stores in the Integration & Serving layer. They are not part of Data Ingestion: their
 outputs are not facts, S3 output is not deterministic, and their failures must not delay fact writes (G1, G4, G9).
-The workspace `apps/pipeline` holds Data Ingestion and the Deliver stage; each runs in its own container (§6.2, §7.7).
+The workspace `apps/pipeline` holds Data Ingestion and the Deliver stage; one container runs both stages (§6.2, §7.7).
 
 | #       | Component                      | Responsibility                                                                                                                                            | Serves                                  | Exists today?     | Current code / gap                                                                                                  |
 |---------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------|
@@ -605,14 +605,11 @@ viespirkiai/
 │   ├── pipeline/                   # «core» Data Pipeline · @viespirkiai/pipeline: Data Ingestion + Deliver stages
 │   │   ├── package.json
 │   │   ├── AGENTS.md
-│   │   ├── Dockerfile              # one image; compose runs one container per entrypoint (§7.7)
+│   │   ├── Dockerfile              # one image, one container (§7.7)
 │   │   ├── .env.example
 │   │   ├── src/
-│   │   │   ├── ingestion.ts        # entrypoint: Extract and Normalize & Link workers, schedules
-│   │   │   ├── ingestion-api.ts    # entrypoint: OCR work distribution and file lookup (HTTP)
-│   │   │   ├── indexer.ts          # entrypoint: S2 Search Indexing workers
-│   │   │   ├── enrichment.ts       # entrypoint: S3 AI Enrichment workers
-│   │   │   ├── config.ts           # one zod schema per entrypoint
+│   │   │   ├── main.ts             # entrypoint: Data Ingestion and Deliver workers, HTTP API for OCR work and file lookup
+│   │   │   ├── config.ts
 │   │   │   ├── ingestion/          # Data Ingestion stage
 │   │   │   │   ├── control/        # I9 schedules, backfills, freshness status
 │   │   │   │   ├── extract/        # «supporting» Extract: upstream sources → Staging layer, document content
@@ -721,7 +718,7 @@ viespirkiai/
 |--------------------------|------------------------------|--------------------------------------------|-----------------------------------------|----------------------------------------------------------------------------------------------|
 | `apps/web`               | `@viespirkiai/web`           | «core» Frontend                            | `astro build` → Node server             | `src/`, `start-server.mjs`, `astro.config.mjs`                                               |
 | `apps/mcp`               | `@viespirkiai/mcp`           | «core» MCP                                 | `node src/main.ts`                      | `modules/mcp/`, `src/pages/mcp.astro`, `src/lib/mcp.ts`                                      |
-| `apps/pipeline`          | `@viespirkiai/pipeline`      | «core» Data Pipeline: Data Ingestion (Extract, Normalize & Link), S2 Search Indexing, S3 AI Enrichment | `node src/ingestion.ts`, `node src/ingestion-api.ts`, `node src/indexer.ts`, `node src/enrichment.ts` | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints, matching logic in `src/lib/sutartisPirkimai.ts` and `src/lib/ppa.ts`; `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/`; `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js` |
+| `apps/pipeline`          | `@viespirkiai/pipeline`      | «core» Data Pipeline: Data Ingestion (Extract, Normalize & Link), S2 Search Indexing, S3 AI Enrichment | `node src/main.ts`                      | `tasks/`, `modules/<source>/`, `modules/failai/`, `modules/documents/`, OCR endpoints, matching logic in `src/lib/sutartisPirkimai.ts` and `src/lib/ppa.ts`; `quickwit/`, `modules/*/quickwitProcessIndexQueue.js`, `modules/juridiniai/typesense*`, `modules/searchSuggestion/`; `modules/openrouter/`, `modules/vector/`, `scripts/aprasyti*.js` |
 | `apps/risk`              | `@viespirkiai/risk`          | «core» Procurement Risk Service            | `node src/main.ts` (scheduled)          | `modules/risk/`, `services/procurement-risk/`                                                |
 | `apps/open-data`         | `@viespirkiai/open-data`     | S4 Open Data Publishing                    | `node src/main.ts`                      | `modules/spinta/`, `modules/*/pushToSpinta.js`, `export:*` scripts, export WebSocket         |
 | `apps/ops`               | `@viespirkiai/ops`           | S9 Operations Console                      | `vp <command>`                          | about 80 `npm run` scripts, `scripts/`                                                       |
@@ -912,15 +909,14 @@ Typical workflows:
 | Runtime      | `infra/compose/*-compose.yaml`, `env/<env>.env`       | environment per service; secrets from `/srv/viespirkiai/<env>/secrets/<app>.env` on `lempa`, never committed                      |
 
 Database access is split by **role-specific connection strings**, so each container can only receive the credentials
-it is allowed to use. The `pipeline` containers share one image but receive different secrets files (§7.6):
+it is allowed to use:
 
 | Container (image)                                  | Database connection variables                       |
 |----------------------------------------------------|-----------------------------------------------------|
 | `web`, `open-data`                                 | `DATABASE_URL_READONLY`                             |
 | `mcp`                                              | `DATABASE_URL_READONLY`, `DATABASE_URL_ANALYST`     |
 | `risk`                                             | `DATABASE_URL_READONLY`, `DATABASE_URL_RISK_WRITER` |
-| `ingestion`, `ingestion-api` (`pipeline`)          | `DATABASE_URL_FACTS_WRITER`                         |
-| `indexer`, `enrichment` (`pipeline`)               | `DATABASE_URL_READONLY`                             |
+| `pipeline`                                         | `DATABASE_URL_FACTS_WRITER`, `DATABASE_URL_READONLY` |
 | `migrate` (`ops`)                                  | `DATABASE_URL_MIGRATOR`                             |
 | `it` image (§7.5)                | `DATABASE_URL_READONLY`                             |
 
@@ -1228,7 +1224,7 @@ live checkout. A compose change therefore deploys and rolls back with its releas
 
 | File                                 | Contains                                                                              | Compose projects                | Applied by                                                     |
 |--------------------------------------|---------------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------|
-| `viespirkiai-business-compose.yaml`  | `web`, `mcp`, `risk`, `open-data`; `ingestion`, `ingestion-api`, `indexer`, `enrichment` (`pipeline` image); `migrate` (profile `migrate`, `ops` image) | `vp-alpha-business`, `vp-prod-business` | `vp-deploy alpha` / `vp-deploy prod`, every release    |
+| `viespirkiai-business-compose.yaml`  | `web`, `mcp`, `pipeline`, `risk`, `open-data`; `migrate` (profile `migrate`, `ops` image) | `vp-alpha-business`, `vp-prod-business` | `vp-deploy alpha` / `vp-deploy prod`, every release    |
 | `viespirkiai-data-compose.yaml`      | `postgres`, `pgbouncer`, `quickwit`, `typesense`, `nats`, network `vp-<env>-data`     | `vp-alpha-data`, `vp-prod-data` | Operator, `vp-deploy data <env>`, only on data-service changes |
 | `env/alpha.env`, `env/prod.env`      | Non-secret values per environment: ports, memory limits, data paths, feature switches | —                               | Committed                                                      |
 | `/srv/viespirkiai/<env>/secrets/<app>.env` | Passwords, API keys and `DATABASE_URL_*` values of one app (§6.6)                                                                   | —                               | On lempa only                                                  |
@@ -1252,9 +1248,8 @@ docker compose -p vp-alpha-business \
 ```
 
 `infra/compose/viespirkiai-business-compose.yaml` gives each container its own secrets file, so a container receives
-only the credentials of §6.6. The listing shows `migrate`, `web`, `mcp` and `ingestion`. `ingestion-api`, `indexer` and
-`enrichment` run the `pipeline` image with their own `command` and secrets file. `risk` and `open-data` follow the
-same pattern as `mcp`; the public routes of `ingestion-api` are open (§9 Q13).
+only the credentials of §6.6. The listing shows `migrate`, `web`, `mcp` and `pipeline`. `risk` and `open-data` follow
+the same pattern as `mcp`; the public routes of the `pipeline` HTTP API are open (§9 Q13).
 
 ```yaml
 name: vp-${VP_ENV}-business
@@ -1303,15 +1298,15 @@ services:
     deploy:
       resources: { limits: { memory: "${MCP_MEMORY}" } }
 
-  ingestion:
+  pipeline:
     <<: *app
     image: ${PIPELINE_IMAGE}
-    env_file: [ ./env/${VP_ENV}.env, /srv/viespirkiai/${VP_ENV}/secrets/ingestion.env ]
-    command: [ "node", "src/ingestion.ts" ]
+    env_file: [ ./env/${VP_ENV}.env, /srv/viespirkiai/${VP_ENV}/secrets/pipeline.env ]
+    command: [ "node", "src/main.ts" ]
     volumes: [ "${DATA_ROOT}:/data" ]
     stop_grace_period: 120s          # lets running jobs release their reservations
     deploy:
-      resources: { limits: { memory: "${INGESTION_MEMORY}" } }
+      resources: { limits: { memory: "${PIPELINE_MEMORY}" } }
 
 networks:
   data:
@@ -1329,7 +1324,7 @@ WEB_PORT=9029
 MCP_PORT=9032
 WEB_MEMORY=1g
 MCP_MEMORY=512m
-INGESTION_MEMORY=1g
+PIPELINE_MEMORY=1g
 ROBOTS_NOINDEX=true
 JOBS_ENABLED=quickwit-index,typesense-index,risk
 SPINTA_PUSH_ENABLED=false
@@ -1397,19 +1392,16 @@ flowchart LR
                 mcp["«core»<br/><b>MCP</b>"]:::core
                 qsMcp["«core»<br/><b>Query Service</b>"]:::core
             end
-            subgraph cIngestion["«container» vp-prod-business-ingestion-1"]
-                extract["«supporting»<br/>Extract"]:::sup
-                nl["«supporting»<br/>Normalize & Link"]:::sup
-            end
-            subgraph cIngestionApi["«container» vp-prod-business-ingestion-api-1"]
-                extractApi["«supporting»<br/>Extract<br/>OCR work · file lookup (I4)"]:::sup
-            end
-            subgraph cIndexer["«container» vp-prod-business-indexer-1"]
-                s2["«supporting» S2<br/>Search Indexing"]:::sup
-            end
-            subgraph cEnrichment["«container» vp-prod-business-enrichment-1"]
-                s3["«supporting» S3<br/>AI Enrichment"]:::sup
-                qsEnrichment["«core»<br/><b>Query Service</b>"]:::core
+            subgraph cPipeline["«container» vp-prod-business-pipeline-1"]
+                subgraph pIngestion["Data Ingestion stage"]
+                    extract["«supporting»<br/>Extract"]:::sup
+                    nl["«supporting»<br/>Normalize & Link"]:::sup
+                end
+                subgraph pDeliver["Deliver stage"]
+                    s2["«supporting» S2<br/>Search Indexing"]:::sup
+                    s3["«supporting» S3<br/>AI Enrichment"]:::sup
+                end
+                qsPipeline["«core»<br/><b>Query Service</b>"]:::core
             end
             subgraph cRisk["«container» vp-prod-business-risk-1"]
                 risk["«core»<br/><b>Procurement Risk Service</b>"]:::core
@@ -1468,15 +1460,12 @@ flowchart LR
     cf -->|" Cloudflare Tunnel "| tunnel
     tunnel -->|" HTTP 127.0.0.1:9019 "| cWeb
     tunnel -->|" HTTP 127.0.0.1:9022 "| cMcp
-    tunnel -->|" HTTP, route open (§9 Q13) "| cIngestionApi
+    tunnel -->|" HTTP, route open (§9 Q13) "| cPipeline
     op -->|" ssh · vp-deploy prod "| cMigrate
 %% ── Database ──
     cWeb -->|" PostgreSQL TCP 6432 "| pool
     cMcp -->|" PostgreSQL TCP 6432 "| pool
-    cIngestion -->|" PostgreSQL TCP 6432 "| pool
-    cIngestionApi -->|" PostgreSQL TCP 6432 "| pool
-    cIndexer -->|" PostgreSQL TCP 6432 "| pool
-    cEnrichment -->|" PostgreSQL TCP 6432 "| pool
+    cPipeline -->|" PostgreSQL TCP 6432 "| pool
     cRisk -->|" PostgreSQL TCP 6432 "| pool
     cOpenData -->|" PostgreSQL TCP 6432 "| pool
     cMigrate -->|" PostgreSQL TCP 6432 "| pool
@@ -1487,23 +1476,21 @@ flowchart LR
     cWeb -->|" HTTP REST search "| cTypesense
     cMcp -->|" HTTP REST search "| cQuickwit
     cMcp -->|" HTTP REST search "| cTypesense
-    cIndexer -->|" HTTP REST ingest "| cQuickwit
-    cIndexer -->|" HTTP REST import "| cTypesense
+    cPipeline -->|" HTTP REST ingest "| cQuickwit
+    cPipeline -->|" HTTP REST import "| cTypesense
     cTypesense <-->|" Raft peering TCP 8107 over WireGuard "| cTypesense2
     cTypesense <-->|" Raft peering TCP 8107 over WireGuard "| cTypesense3
 %% ── Events ──
-    cIngestion -.->|" NATS publish TCP 4222 "| cNats
-    cNats -.->|" NATS subscribe "| cIndexer
-    cNats -.->|" NATS subscribe "| cEnrichment
+    cPipeline -.->|" NATS publish TCP 4222 "| cNats
+    cNats -.->|" NATS subscribe (Deliver stage) "| cPipeline
     cNats -.->|" NATS subscribe "| cRisk
 %% ── Files ──
-    cIngestion -->|" bind mount /data "| vol
-    cIngestionApi -->|" bind mount /data "| vol
+    cPipeline -->|" bind mount /data "| vol
     cWeb -->|" bind mount /data "| vol
 %% ── Outbound ──
-    cIngestion -->|" HTTPS via proxies · Tor "| src
-    cIngestion -->|" HTTP POST /extract "| extr
-    cEnrichment -->|" HTTPS "| llm
+    cPipeline -->|" HTTPS via proxies · Tor "| src
+    cPipeline -->|" HTTP POST /extract "| extr
+    cPipeline -->|" HTTPS "| llm
     cOpenData -->|" HTTPS "| spinta
 ```
 
@@ -1511,10 +1498,7 @@ flowchart LR
 |------------------------------------|-------------|-----------------------------|----------------------------------------|-----------------------------------|--------------------------|
 | `vp-prod-business-web-1`           | `web`       | Astro Node server           | Frontend, Query Service                | `READONLY`                        | HTTP `127.0.0.1:9019`    |
 | `vp-prod-business-mcp-1`           | `mcp`       | `node src/main.ts`          | MCP, Query Service                     | `READONLY`, `ANALYST`             | HTTP `127.0.0.1:9022`    |
-| `vp-prod-business-ingestion-1`     | `pipeline`  | `node src/ingestion.ts`     | Extract, Normalize & Link              | `FACTS_WRITER`                    | —                        |
-| `vp-prod-business-ingestion-api-1` | `pipeline`  | `node src/ingestion-api.ts` | Extract (OCR work, file lookup)        | `FACTS_WRITER`                    | HTTP (§9 Q13)            |
-| `vp-prod-business-indexer-1`       | `pipeline`  | `node src/indexer.ts`       | S2 Search Indexing                     | `READONLY`                        | —                        |
-| `vp-prod-business-enrichment-1`    | `pipeline`  | `node src/enrichment.ts`    | S3 AI Enrichment, Query Service        | `READONLY`                        | —                        |
+| `vp-prod-business-pipeline-1`      | `pipeline`  | `node src/main.ts`          | Extract, Normalize & Link, S2 Search Indexing, S3 AI Enrichment, Query Service | `FACTS_WRITER`, `READONLY` | HTTP (§9 Q13) |
 | `vp-prod-business-risk-1`          | `risk`      | `node src/main.ts`          | Procurement Risk Service, Query Service | `READONLY`, `RISK_WRITER`        | —                        |
 | `vp-prod-business-open-data-1`     | `open-data` | `node src/main.ts`          | S4 Open Data Publishing, Query Service | `READONLY`                        | —                        |
 | `vp-prod-business-migrate-1`       | `ops`       | `vp db migrate`, once per deployment | S9, S7                        | `MIGRATOR`                        | —                        |
@@ -1527,10 +1511,14 @@ flowchart LR
 **Process isolation.** Each container has its own process namespace, memory limit, restart policy and secrets file
 (§6.6, §7.6):
 
-- An out-of-memory kill or a crash stops one container. For example, an S3 failure in `enrichment-1` does not stop
-  fact writes in `ingestion-1`.
-- A container receives only the database role of its row. `indexer-1` and `enrichment-1` cannot write facts, although
-  they run the same image as `ingestion-1`.
+- An out-of-memory kill or a crash stops one container. For example, a pipeline crash does not stop `web-1` or
+  `mcp-1`.
+- A container receives only the database roles of its row.
+- All Data Pipeline stages share one process in `pipeline-1`. S1 gives each stage its own job queues and concurrency
+  limits, so a slow S3 queue does not block Data Ingestion jobs. A crash or an out-of-memory kill restarts all stages
+  together, and interrupted jobs resume from their reservations.
+- `pipeline-1` holds `FACTS_WRITER` for the whole process. The dependency rule of §6.4 keeps `src/deliver/**` from
+  importing the facts writer; the database role does not enforce that rule.
 - Each Query Service box is a separate instance with its own connection pool. The PgBouncer pool size counts all five
   instances (§9 Q6).
 
@@ -1544,8 +1532,8 @@ flowchart LR
   repository (§10.1).
 - S8 Backup & Recovery runs as host scripts from `infra/backup/`. S6 Observability and S10 Configuration are libraries
   inside every application container.
-- The data service ports are the image defaults. `web`, `ingestion` and `ingestion-api` mount the data root, as in
-  §7.6. `mcp`, `indexer` and `enrichment` cannot read the document content until §9 Q8 is decided.
+- The data service ports are the image defaults. `web` and `pipeline` mount the data root, as in §7.6. `mcp` cannot
+  read the document content until §9 Q8 is decided.
 
 ---
 
@@ -1788,8 +1776,8 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    filters on an open interval.
    Option 3: `ods` keeps current state only, and source schemas keep one row per source record version. The Query
    Service then reads history from source schemas, which T2 forbids.
-6. **Database roles for job state and control data**: `packages/jobs` writes job state for `ingestion`, `risk`,
-   `indexer`, `enrichment` and `open-data`, but §6.6 gives most of these apps only `DATABASE_URL_READONLY`. S1, S5, S9
+6. **Database roles for job state and control data**: `packages/jobs` writes job state for `pipeline`, `risk`
+   and `open-data`, but no connection of §6.6 grants writes to the `jobs` schema. S1, S5, S9
    and OCR work distribution write `infra`, `auth` and `jobs` (§3.1), which breaks rule 1 of §1.2. The Risk Service
    holds a session advisory lock (`services/procurement-risk/index.ts`), and PgBouncer transaction pooling keeps no
    session state.
@@ -1801,10 +1789,10 @@ Each question records an inconsistency or a gap that needs a decision. The optio
    connections that bypass PgBouncer for session features.
 7. **Placement of the AI enrichment store**: §1.2, §3 and §3.1 give S3 its own store, which the Query Service reads. §8
    knows only source schemas, `ods` and `risk`; T5 puts every shown attribute into `ods`; `pipeline/src/deliver/enrichment/`
-   reads only through `query`, and the `enrichment` container has only a read-only connection (§6.4, §6.6). The current code writes LLM descriptions to
+   reads only through `query`, but the `pipeline` container holds the facts writer connection for all stages (§6.4, §6.6). The current code writes LLM descriptions to
    `eppsViesiejiPirkimai."aprasymai"` and embeddings to SQLite (`modules/vector`).
    Question to address: where does S3 write, and how do its outputs reach Frontend and MCP?
-   Option 1 (recommended): a PostgreSQL schema owned by S3 (`enrichment` container), for example `ai`, with its own writer role.
+   Option 1 (recommended): a PostgreSQL schema owned by S3 in `apps/pipeline`, for example `ai`, with its own writer role.
    §8.2 lists it as a layer, the Query Service reads it, and embeddings use pgvector.
    Option 2: S3 outputs are an upstream source of Data Ingestion. Extract stages them in a source schema, and Normalize & Link maps them
    into `ods` enrichment.
@@ -1851,12 +1839,12 @@ Each question records an inconsistency or a gap that needs a decision. The optio
     `packages/jobs` interface. Compatibility with PgBouncer transaction pooling is a selection criterion (Q6).
     Option 2: `runner/` moves into `packages/jobs`, and one generic queue table replaces the per-module queues. The team
     keeps maintaining the scheduler.
-13. **Public HTTP surface of the apps**: `mcp`, `ingestion-api` and the contract export WebSocket need public routes
+13. **Public HTTP surface of the apps**: `mcp`, the `pipeline` HTTP API and the contract export WebSocket need public routes
     (§6.3, §7.6). The cloudflared ingress names only `viespirkiai.org` and `alpha.viespirkiai.org`, and §6.3 moves the
     export WebSocket from `web` into `apps/open-data`.
     Question to address: which hostname, path and port reach each internet-facing app?
     Option 1 (recommended): cloudflared path rules send `/mcp` to `mcp`, and a separate hostname sends OCR worker and
-    file lookup traffic to `ingestion-api`. The export WebSocket stays in `web` and reads through the Query Service.
+    file lookup traffic to `pipeline`. The export WebSocket stays in `web` and reads through the Query Service.
     Option 2: one reverse proxy container, for example Caddy, in the business compose project routes all paths.
     cloudflared forwards every hostname to it.
 14. **Networking of the production Typesense cluster**: production Typesense uses host networking for Raft peering
@@ -1954,7 +1942,7 @@ The repository does not record these host facts, and the target design depends o
   encryption and retention. Define the "fresh backup" check of `vp-deploy prod` (§7.5).
 - [ ] **Search index rebuild:** document the rebuild procedure and duration of each Quickwit and Typesense index
   (review P7).
-- [ ] **Worker health:** give `ingestion`, `indexer`, `risk`, `enrichment` and `open-data` health and metrics
+- [ ] **Worker health:** give `pipeline`, `risk` and `open-data` health and metrics
   endpoints, and compose health checks that detect a stuck worker (review P4).
 - [ ] **Alerting:** define alerts for failed jobs, ingestion lag (G8), disk usage, backup age and failed deployments
   (S6).
