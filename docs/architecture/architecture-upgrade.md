@@ -27,13 +27,13 @@ The document uses these terms with one meaning each:
 |---------------------------|---------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|
 | Functional component      | Unit of responsibility with owned data. It is not necessarily a separate process                             | §1, §3                                                 |
 | Core component            | Functional component that delivers the main value of the system. Diagrams mark it `«core»`                   | §1                                                     |
-| Supporting component      | Functional component that core components need. A core component can own supporting components when it is decomposed. Diagrams mark it `«supporting»` | §2.1, §3                                  |
-| `S1`–`S11`, `I1`–`I9`     | Ids of the supporting components (§3) and of the sub-components of Extract and Normalize & Link (§2.4)        | —                                                      |
+| Supporting component      | Functional component that core components need. A core component can own supporting components when it is decomposed. Diagrams mark it `«supporting»` | §2, §3                                  |
+| `S1`–`S11`, `I1`–`I9`     | Ids of the supporting components (§3) and of the sub-components of Extract and Normalize & Link (§2.3)        | —                                                      |
 | Source schema             | PostgreSQL schema that mirrors one upstream source: a persistent staging area                                 | `vpmSutartys`, `eppsViesiejiPirkimai`, `rcJar`; §8.2   |
 | `ods`                     | Operational Data Store: canonical entities, enrichment, link tables, derived tables and views                 | §8                                                     |
-| Fact schemas              | The source schemas and `ods` together. Data Ingestion is their only writer                                    | §1.2, §2.3                                             |
-| Extract                   | Supporting component of Data Ingestion. It collects data from upstream sources into the source schemas and document content | §2.1, §2.4                               |
-| Normalize & Link          | Supporting component of Data Ingestion. It reads the source schemas and writes `ods`                         | §2.1, §2.4                                             |
+| Fact schemas              | The source schemas and `ods` together. Data Ingestion is their only writer                                    | §1.2, §2.4                                             |
+| Extract                   | Supporting component of Data Ingestion. It collects data from upstream sources into the source schemas and document content | §2.1, §2.3                               |
+| Normalize & Link          | Supporting component of Data Ingestion. It reads the source schemas and writes `ods`                         | §2.1, §2.3                                             |
 | Document content          | Extracted text and OCR results of downloaded files                                                            | I4, `@viespirkiai/data/storage`                        |
 | Enrichment                | Attributes from registries and classifiers that Normalize & Link adds to `ods` entities                       | §8.3                                                   |
 | AI enrichment             | LLM descriptions and embeddings that S3 writes to the AI enrichment store                                     | S3                                                     |
@@ -166,34 +166,12 @@ boundary, not the deployment.
 
 ---
 
-## 2. Data Ingestion — the abstraction
+## 2. Data Pipeline
 
-### 2.1 Data Ingestion is one stage of Data Pipeline with two supporting components
+Data Pipeline is the only writer of the fact schemas and the derived stores. §8.2 defines the data layers that it
+writes.
 
-The current code implements ingestion as **30+ source modules**. Each module re-implements its own discovery, fetching,
-parsing, queues, reservation cleanup and persistence (review P5, P6).
-
-From the rest of the system's point of view, all of it has **one responsibility and one output**: *keep the fact schemas
-complete, correct and current*. Treating it as a single black box, with a stable external contract and freely
-decomposable internals, gives:
-
-- **Consumers** (Query Service, Risk, Search Indexing, AI Enrichment, Open Data) depend only on the *facts* and on *"facts changed"*
-  notifications, never on how a source is scraped.
-- **New sources** plug into a shared pipeline instead of copying a whole module.
-- **Internal redesign** (queues, scheduler, document processing) doesn't ripple outside.
-
-Data Ingestion owns two supporting components. They do not call each other; the source schemas are the boundary between
-them.
-
-| Component            | Responsibility                                                                            | Reads                                          | Writes                                          | Stages (§2.4) | Sub-components (§2.4) |
-|----------------------|-------------------------------------------------------------------------------------------|------------------------------------------------|-------------------------------------------------|---------------|-----------------------|
-| **Extract**          | Collect data from upstream sources on the internet: discover, fetch, retain, parse, stage | Upstream sources, text extractors, OCR workers | Source schemas, raw payloads, document content  | 1–5           | I1–I4                 |
-| **Normalize & Link** | Populate `ods` from the source schemas: normalise, enrich, resolve entities, persist, notify | Source schemas                              | `ods`, facts changed events                     | 6–9           | I5–I8                 |
-
-Ingestion Control (I9) belongs to Data Ingestion itself and schedules both components through S1. Normalize & Link never
-calls an upstream source, so `ods` can be rebuilt from the source schemas without a new extraction (G9).
-
-### 2.2 External contract (black-box view)
+### 2.1 Pipeline flow
 
 ```mermaid
 flowchart LR
@@ -202,138 +180,114 @@ flowchart LR
     classDef sup fill: #f5f9ff, stroke: #1f5fa8, stroke-dasharray: 3 2, color: #0b2545
     classDef store fill: #eaf6ea, stroke: #2e7d32, color: #123d14
     classDef ext fill: #f4f4f4, stroke: #777, stroke-dasharray: 4 3, color: #333
-    classDef iface fill: #ffffff, stroke: #1f5fa8, color: #0b2545
-    classDef missing fill: #fff4f4, stroke: #c62828, stroke-dasharray: 3 2, color: #5a1010
     src["«external»<br/>Public registries & portals"]:::ext
     extr["«external»<br/>Text extractors"]:::ext
     ocr(["«actor»<br/>OCR workers"]):::actor
-    fpr(["«actor»<br/>goViesdezeProxyRewrite<br/>file gateway"]):::actor
-    iCmd(("Ingestion<br/>commands")):::iface
-    iWork(("OCR work<br/>distribution")):::iface
-    iFile(("File<br/>lookup")):::iface
-    iStatus(("Ingestion<br/>status")):::iface
-    iEvt(("Facts changed<br/>events")):::iface
-    ing["«core» Data Pipeline<br/><b>Data Ingestion stage</b><br/>(black box)"]:::core
-    srcdb[("«schemas»<br/><b>Source schemas</b>")]:::store
-    ods[("«schema»<br/><b>ods</b>")]:::store
-    docs[("Document content store")]:::store
+    llm["«external»<br/>LLM & embedding providers"]:::ext
     s1["«supporting» S1<br/>Job Orchestration"]:::sup
-    s6["«supporting» S6<br/>Observability"]:::sup
-    s9["«missing» S9<br/>Operations CLI"]:::missing
-    cons["«core / supporting»<br/>Risk · S2 Search Indexing ·<br/>S3 AI Enrichment · S4 Open Data"]:::sup
-    iCmd --- ing
-    iWork --- ing
-    iFile --- ing
-    iStatus --- ing
-    iEvt --- ing
-    s9 -->|" commands as S1 jobs "| iCmd
-    ocr -->|" checkout · submit "| iWork
-    fpr -->|" file id → storage box "| iFile
-    s6 --> iStatus
-    cons --> iEvt
-    ing --> src
-    ing -->|" POST /extract "| extr
-    ing --> s1
-    src -.->|" raw records & files "| ing
-    ing -.->|" source rows "| srcdb
-    ing -.->|" entities · links · derived rows "| ods
-    ing -.->|" document content "| docs
+    qs["«core»<br/><b>Query Service</b>"]:::core
+
+    subgraph PIPE["«core» Data Pipeline · apps/pipeline"]
+        subgraph ING["Data Ingestion stage"]
+            ctl["I9 Ingestion Control<br/>schedules · backfills · status"]:::sup
+            extract["«supporting» <b>Extract</b><br/>I1 Source Connectors · I2 Source Gateway<br/>I3 Raw Payload Store · I4 File & Document Pipeline"]:::sup
+            nl["«supporting» <b>Normalize & Link</b><br/>I5 Normalisation · I6 Reference Data<br/>I7 Entity Resolution · I8 Fact Persistence"]:::sup
+        end
+        subgraph DLV["Deliver stage"]
+            s2["«supporting» S2<br/>Search Indexing"]:::sup
+            s3["«supporting» S3<br/>AI Enrichment"]:::sup
+        end
+    end
+
+    subgraph STG["Staging layer (§8.2)"]
+        srcdb[("«schemas»<br/><b>Source schemas</b>")]:::store
+        raw[("Raw payload & file store")]:::store
+    end
+    subgraph ISL["Integration & Serving layer (§8.2)"]
+        docs[("Document content store")]:::store
+        ods[("«schema»<br/><b>ods</b>")]:::store
+        search[("Search indexes<br/>Quickwit · Typesense")]:::store
+        enrich[("AI enrichment store")]:::store
+    end
+    evt[["Facts changed events<br/>NATS"]]
+
+    ctl -->|" schedules jobs "| s1
+    extract -->|" HTTPS via proxies · Tor "| src
+    src -.->|" records · files "| extract
+    extract -->|" POST /extract "| extr
+    ocr -->|" OCR checkout · submit "| extract
+    extract -.->|" source rows "| srcdb
+    extract -.->|" raw payloads · files "| raw
+    extract -.->|" text · OCR results "| docs
+    srcdb -.->|" source rows "| nl
+    nl -.->|" entities · enrichment · links · derived rows "| ods
+    nl -.->|" changed entity keys, after commit "| evt
+    evt -.->|" changed entity keys "| s2
+    evt -.->|" changed entity keys "| s3
+    ods -.->|" entity rows "| s2
+    docs -.->|" document text "| s2
+    enrich -.->|" descriptions "| s2
+    s2 -.->|" index documents "| search
+    s3 -->|" reads entities "| qs
+    s3 -->|" prompts "| llm
+    s3 -.->|" descriptions · embeddings "| enrich
 ```
 
-The operator issues ingestion commands through S9.
+### 2.2 Pipeline process
 
-| Interface                             | Direction         | Purpose                                                                                                                                                                                                                                    |
-|---------------------------------------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Writes facts**                      | Output → database | The only output that matters to consumers. Extract writes source rows and document content; Normalize & Link writes canonical, linked, versioned `ods` facts                                                                             |
-| **Facts changed events**              | Provided          | "Entity X of type T changed in ingestion run R", emitted by Normalize & Link **after commit**. It is a hint: consumers re-read the entities through the Query Service, and S2 reads `ods` directly (§4). Replaces the `*.changed` NATS subjects of `utils/taskSignals.js`. The delivery guarantee is open (§9 Q2). |
-| **Ingestion status**                  | Provided          | Per source: last successful sync, lag, error rate, backlog, record counts. Feeds S6 and `/statistika`.                                                                                                                                     |
-| **Ingestion commands**                | Provided          | Run, backfill, re-process, pause or resume a source; requeue a record. S9 issues each command as an S1 job. Replaces ad-hoc `npm run` scripts.                                                                                             |
-| **OCR work distribution**             | Provided          | Checkout and submit for external OCR workers, provided by Extract (I4). Moves out of the Frontend (`src/pages/failas/ocr/*`).                                                                                                                                        |
-| **File lookup**                       | Provided          | Resolves a file to the storage box that holds it, for `goViesdezeProxyRewrite`; provided by Extract (I4). Moves out of the Frontend (`downloadProxyInformation`).                                                                                                    |
-| Upstream sources, text extractors, S1 | Required          | Everything the black box needs from outside. Extract calls text extractors with `POST /extract`.                                                                                                                                           |
+1. I9 Ingestion Control schedules the jobs of each source through S1. Operator commands (`vp ingestion …`, §6.4) are
+   S1 jobs too.
+2. Extract discovers new and changed records of a source (I1) and fetches them through the Source Gateway (I2).
+3. Extract retains each raw payload and file (I3). It parses the payload and upserts the rows of the source schema.
+4. The File & Document Pipeline (I4) downloads referenced files and gets their text from text extractors and OCR
+   workers. It writes document content.
+5. Normalize & Link reads the new source rows. It maps them to the canonical model (I5) and adds enrichment (I6).
+6. Entity Resolution (I7) matches organisations, procurements and contracts across sources and produces link rows.
+7. Fact Persistence (I8) upserts the `ods` rows with version and provenance in one transaction. The same transaction
+   updates the affected derived rows.
+8. After commit, I8 publishes a facts changed event with the changed entity keys (§9 Q2).
+9. S2 Search Indexing reads the changed `ods` rows and document content, and updates Quickwit and Typesense.
+10. S3 AI Enrichment reads the changed entities through the Query Service. It writes LLM descriptions and embeddings.
 
-### 2.3 Contract guarantees
+- Extract and Normalize & Link never call each other. The source schemas are the boundary between them.
+- Normalize & Link never calls an upstream source, so `ods` can be rebuilt from the source schemas (G9).
+- The Deliver stage writes no facts. A Deliver failure does not delay Data Ingestion.
+- Only I1 and I5 contain source-specific code. All other steps are shared by every source.
 
-These invariants are what "writes facts" *means*. Every internal design decision must preserve them.
+### 2.3 Data Ingestion sub-components
 
-| #  | Guarantee                                                                                                                                                     | Why it matters                                                              | Today                                   |
-|----|---------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|-----------------------------------------|
-| G1 | **Single writer**: only Data Ingestion writes fact schemas. Extract writes the source schemas; Normalize & Link writes `ods`                                   | Clear ownership; safe schema evolution                                      | ❌ multiple writers                     |
-| G2 | **Canonical model**: `ods` uses normalised entities (procurement, contract, organisation, person, document, legal act, court case). Only source schemas keep source-specific shapes (§8) | Consumers stay stable when a source changes format                          | ⚠️ only `v_*` analyst views (review P13) |
-| G3 | **Provenance**: every `ods` row records its source, source record id and ingestion run (§8.4). The referenced source row records source URL and retrieval time | Transparency, auditability, debugging                                       | ⚠️ inconsistent                         |
-| G4 | **Idempotency**: re-ingesting a source record never duplicates or corrupts facts                                                                              | Safe retries, backfills and re-processing                                   | ⚠️ per module                           |
-| G5 | **Versioned changes**: changes in source records become recorded versions, not silent overwrites                                                              | Contract edits, legislation editions and court updates are product features | ⚠️ some sources                         |
-| G6 | **Reprocessability**: raw payloads and files are retained, so parsing and normalisation can be re-run without re-scraping                                     | Sources disappear or block access; parsers improve                          | ⚠️ sidecars have no backup; the file archive has an S3 object storage backup |
-| G7 | **Commit, then notify**: events and notifications are sent only after facts are committed                                                                     | No consumer reads uncommitted state                                         | ✅ documented NATS rule                 |
-| G8 | **Observable freshness**: every source reports sync status and lag                                                                                            | Operators and users know how current the data is                            | ⚠️ partial                              |
-| G9 | **Layered flow**: Normalize & Link reads only the source schemas and never calls an upstream source                                                          | A mapping or linking fix rebuilds `ods` without a new extraction            | ⚠️ per module                           |
+| #  | Component        | Sub-component                       | Responsibility                                                                                               | Provides                                  | Current code                                                                                                                                                                   |
+|----|------------------|-------------------------------------|--------------------------------------------------------------------------------------------------------------|-------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| I1 | Extract          | **Source Connectors**               | One connector per source: bulk dataset, change feed, crawler or API adapter. Discovery, parsing, source rows | —                                         | `modules/<source>/*`                                                                                                                                                           |
+| I2 | Extract          | **Source Gateway**                  | Outbound access: proxies, Tor, per-source rate limits, request log                                           | —                                         | `utils/scrapeFetch.js`, `modules/scrapeProxies/`, `modules/proxy/`, eTarSeimasScraper clients                                                                                  |
+| I3 | Extract          | **Raw Payload Store**               | Retain raw API and HTML payloads for audit and re-processing                                                 | —                                         | sidecar SQLite (`eTar`, `eSeimas`, `liteko2`)                                                                                                                                  |
+| I4 | Extract          | **File & Document Pipeline**        | Download, content-addressed storage, text extraction, OCR, document content                                  | OCR work distribution, file lookup        | `modules/failai/`, `modules/documents/`, `tasks/dokNuskaitytojai.js`, goViesdeze, OCR endpoints, sidecar SQLite (`failaiInfo`, `dokumentai`, `ocrRezultatai`)                  |
+| I5 | Normalize & Link | **Canonical Model & Normalisation** | Shared entity definitions (`@viespirkiai/data/domain`) and one source-to-canonical mapper per source          | —                                         | `upsert*.js`, per-module mapping code                                                                                                                                          |
+| I6 | Normalize & Link | **Reference Data**                  | CPV (BVPŽ), legal forms, addresses and geocoding, classifiers                                                | —                                         | `modules/bvpz/`, `modules/geografija/`, `modules/liteko2/klasifikatoriai.js`                                                                                                   |
+| I7 | Normalize & Link | **Entity Resolution**               | Match entities across sources; produce link tables and relationship edges                                    | —                                         | `modules/juridiniai/`, `modules/rysiai/` (building), `modules/2014esinvesticijos/rastiPareiskejuKodus.js`, `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` |
+| I8 | Normalize & Link | **Fact Persistence & Versioning**   | Idempotent upserts, change detection, provenance, derived tables                                             | Facts changed events                      | `sutartys` change tracking, `modules/sutartys/upsertVpmSutartis.js`, `teisekura` editions, `utils/taskSignals.js`                                                              |
+| I9 | Data Ingestion   | **Ingestion Control**               | Per-source schedules of Extract and Normalize & Link, backfills, freshness                                    | Ingestion commands, ingestion status      | `tasks/*.js` definitions, `npm run` scripts                                                                                                                                    |
 
-### 2.4 Internal view
+### 2.4 Data Ingestion guarantees
 
-Every source goes through the same stages. Only the source-specific stages are implemented per source; the rest are
-shared. Extract runs stages 1–5 and writes the source schema. Normalize & Link runs stages 6–9 and writes `ods`. The
-Staging layer (§8.2) is the boundary between the two components.
-
-```mermaid
-flowchart LR
-    classDef specific fill: #dbe9fb, stroke: #1f5fa8, color: #0b2545
-    classDef shared fill: #f5f9ff, stroke: #1f5fa8, stroke-dasharray: 3 2, color: #0b2545
-    subgraph extract["«supporting» Extract"]
-        d["1 · Discover<br/>what is new or changed"]:::specific
-        f["2 · Fetch<br/>via Source Gateway"]:::shared
-        r["3 · Retain raw<br/>payload · file"]:::shared
-        p["4 · Parse & extract<br/>structure · text · OCR"]:::specific
-        s["5 · Stage<br/>upsert source schema rows"]:::specific
-    end
-    subgraph normalizeLink["«supporting» Normalize & Link"]
-        n["6 · Normalise<br/>source rows to canonical model"]:::specific
-        l["7 · Link & enrich<br/>reference data · entity resolution"]:::shared
-        w["8 · Persist<br/>ods upsert · version · provenance"]:::shared
-        e["9 · Notify<br/>facts changed"]:::shared
-    end
-    d -.->|" record references "| f
-    f -.->|" payload · file "| r
-    r -.->|" retained payload "| p
-    p -.->|" parsed records · text "| s
-    s -.->|" source schema rows "| n
-    n -.->|" canonical entities "| l
-    l -.->|" linked, enriched entities "| w
-    w -.->|" committed changes "| e
-```
-
-Solid blue: source-specific stage, implemented once per source. Dashed: shared stage, implemented once.
-
-**Source connector types.** Extract groups sources by *how* they are acquired, which keeps the number of connector
-patterns small:
-
-| Connector type                        | Examples today                                                                  |
-|---------------------------------------|---------------------------------------------------------------------------------|
-| Bulk dataset (CSV / XLSX / JSON dump) | JAR CSV, VPT XLSX reports, address register, Sodra, Regitra                     |
-| Change feed                           | data.gov.lt ADP `:changes` datasets                                             |
-| Crawler / scraper                     | CVP IS contracts and procurements, CVPP, LITEKO, KOTIS, PINREG, ES investicijos |
-| API adapter                           | e-TAR, e-Seimas (stateless adapter), TED                                        |
-| Document pipeline (source-agnostic)   | Any fact that references a file: download → store → extract → OCR               |
-
-**Internal sub-components** (candidates for the detailed decomposition):
-
-| #  | Component        | Sub-component                       | Responsibility                                                                                                     | Current code                                                                                                                                                                   |
-|----|------------------|-------------------------------------|--------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| I1 | Extract          | **Source Connectors**               | Source-specific discovery, parsing and source schema rows, one per source (stages 1, 4, 5)                         | `modules/<source>/*`                                                                                                                                                           |
-| I2 | Extract          | **Source Gateway**                  | Outbound access: proxies, Tor, per-source rate limits, request logging, adapters (stage 2)                         | `utils/scrapeFetch.js`, `modules/scrapeProxies/`, `modules/proxy/`, eTarSeimasScraper clients                                                                                  |
-| I3 | Extract          | **Raw Payload Store**               | Retain raw API and HTML payloads for audit and re-processing (stage 3)                                             | sidecar SQLite (`eTar`, `eSeimas`, `liteko2`)                                                                                                                                  |
-| I4 | Extract          | **File & Document Pipeline**        | Download, content-addressed storage, extraction, OCR work distribution, file lookup, document content              | `modules/failai/`, `modules/documents/`, `tasks/dokNuskaitytojai.js`, goViesdeze, OCR endpoints, sidecar SQLite (`failaiInfo`, `dokumentai`, `ocrRezultatai`)                  |
-| I5 | Normalize & Link | **Canonical Model & Normalisation** | Shared entity definitions (`@viespirkiai/data/domain`) and one source-to-canonical mapper per source; produces `ods` entity rows (stage 6) | `upsert*.js`, per-module mapping code                                                                                                                                          |
-| I6 | Normalize & Link | **Reference Data**                  | CPV (BVPŽ), legal forms, addresses and geocoding, classifiers; produces enrichment (stage 7)                        | `modules/bvpz/`, `modules/geografija/`, `modules/liteko2/klasifikatoriai.js`                                                                                                   |
-| I7 | Normalize & Link | **Entity Resolution**               | Match organisations, procurements and contracts across sources; produce link tables and relationship edges (stage 7) | `modules/juridiniai/`, `modules/rysiai/` (building), `modules/2014esinvesticijos/rastiPareiskejuKodus.js`, `src/lib/sutartisPirkimai.ts`, `loadPpaSutarciuAtitikmenys()` in `src/lib/ppa.ts` |
-| I8 | Normalize & Link | **Fact Persistence & Versioning**   | Idempotent upserts, change detection and diffs, provenance, derived tables, notifications (stages 8, 9)            | `sutartys` change tracking, `modules/sutartys/upsertVpmSutartis.js`, `teisekura` editions, `utils/taskSignals.js`                                                              |
-| I9 | Data Ingestion   | **Ingestion Control**               | Per-source schedules of Extract and Normalize & Link, backfills, commands, status and freshness                    | `tasks/*.js` definitions, `npm run` scripts                                                                                                                                    |
+| #  | Guarantee                                                                                                                  | Today                                   |
+|----|----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|
+| G1 | **Single writer**: only Data Ingestion writes the fact schemas. Extract writes the source schemas; Normalize & Link writes `ods` | ❌ multiple writers                     |
+| G2 | **Canonical model**: `ods` uses normalised entities. Only source schemas keep source-specific shapes (§8)                  | ⚠️ only `v_*` analyst views (review P13) |
+| G3 | **Provenance**: every `ods` row records its source, source record id and ingestion run (§8.4)                              | ⚠️ inconsistent                         |
+| G4 | **Idempotency**: re-ingesting a source record never duplicates or corrupts facts                                           | ⚠️ per module                           |
+| G5 | **Versioned changes**: a changed source record becomes a recorded version, not an overwrite                                | ⚠️ some sources                         |
+| G6 | **Reprocessability**: raw payloads and files are retained, so parsing and normalisation re-run without re-scraping          | ⚠️ sidecars have no backup              |
+| G7 | **Commit, then notify**: events are sent only after facts are committed                                                    | ✅ documented NATS rule                 |
+| G8 | **Observable freshness**: every source reports sync status and lag                                                         | ⚠️ partial                              |
+| G9 | **Layered flow**: Normalize & Link reads only the source schemas and never calls an upstream source                        | ⚠️ per module                           |
 
 ---
 
 ## 3. Supporting (secondary) functional components
 
 These do not deliver end-user value on their own, but the core components can't function reliably without them.
-Data Ingestion owns two further supporting components, Extract and Normalize & Link (§2.1). Source access and file and
+Data Ingestion owns two further supporting components, Extract and Normalize & Link (§2.3). Source access and file and
 document processing belong to Extract (I2, I4). Reference data and entity resolution belong to Normalize & Link (I6,
 I7).
 
@@ -1402,7 +1356,7 @@ flowchart LR
 
 Input: [`architecture-review.md` P13](architecture-review.md#p13--no-operational-data-store-pages-and-tools-read-source-schemas-directly-)
 and [`../indicators-story/domain-model.md`](../indicators-story/domain-model.md). This section defines guarantee G2
-(canonical model) from §2.3 and the data that the Query Service (§1.3) reads.
+(canonical model) from §2.4 and the data that the Query Service (§1.3) reads.
 
 ### 8.1 Principal theses
 
@@ -1425,42 +1379,7 @@ The front page reads the Quickwit contract index built from `ods`. A source sche
 
 ### 8.2 Data Layer model
 
-The diagram shows the writer of each data layer and the read path of every consumer.
-
-```mermaid
-flowchart LR
-    subgraph ingestion["Data Ingestion"]
-        Extract["Extract (I1–I4)"]
-        NormalizeLink["Normalize & Link (I5–I8)"]
-    end
-    subgraph staging["Staging layer"]
-        Source[("Source schemas, for example vpmSutartys, eppsViesiejiPirkimai, cvpp, ppa, rcJar, sabis")]
-    end
-    subgraph serving["Integration & Serving layer"]
-        Ods[("ods: entities, enrichment, links, derived tables, views")]
-        Risk[("risk: procurement risk decisions, risk signals")]
-        Search[("Quickwit and Typesense indexes")]
-    end
-    Indexer["Search Indexing (S2)"]
-    RiskService["Procurement Risk Service"]
-    QueryService["Query Service"]
-    Consumers["Frontend and MCP"]
-    Metabase["Metabase (S11)"]
-    Extract -.->|source rows| Source
-    Source -.->|typed facts| NormalizeLink
-    NormalizeLink -.->|entities, links, derived rows| Ods
-    NormalizeLink -.->|facts changed| Indexer
-    Indexer -->|reads| Ods
-    Indexer -.->|documents| Search
-    RiskService -.->|decisions, signals| Risk
-    RiskService -->|analytical reads| QueryService
-    Consumers -->|calls queries| QueryService
-    QueryService -->|reads| Ods
-    QueryService -->|full-text search| Search
-    QueryService -->|risk results| Risk
-    Metabase -->|reads with METABASE_READER| Ods
-    Metabase -->|reads with METABASE_READER| Risk
-```
+§2.1 shows the flow of Data Pipeline into these layers.
 
 | Layer          | Schema names                                                                                          | ETL term                         | Grain                                   | Writer                                        | Readers                                   | Rebuilt from                      |
 |----------------|-------------------------------------------------------------------------------------------------------|----------------------------------|-----------------------------------------|-----------------------------------------------|-------------------------------------------|-----------------------------------|
